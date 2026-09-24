@@ -30,6 +30,7 @@ def build_lineage_graph(
     report: dict[str, Any],
     model_spec: dict[str, Any],
     model_run: dict[str, Any],
+    trial_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     snapshot_id = snapshot.get("id", "DS-SYNTH-001")
     study_id = study.get("study", {}).get("id", "STUDY-001")
@@ -244,6 +245,100 @@ def build_lineage_graph(
     ))
     link("GEN-001", study_id, "supports", "study design")
     link(study_id, cohort.get("id", "COHORT-001"), "defines", "study cohort")
+
+    plan = study.get("plan", {})
+    if plan:
+        add(_node(
+            plan.get("id", "PLAN-001"),
+            "plan",
+            "Frozen analysis plan",
+            plan.get("status", "FROZEN"),
+            detail=plan,
+        ))
+        link(study_id, plan.get("id", "PLAN-001"), "governed_by", "pre-specified plan")
+        for spec_id in specs:
+            link(plan.get("id", "PLAN-001"), spec_id, "authorises", "planned analysis")
+
+    question = study.get("question", {})
+    if question:
+        add(_node(
+            question.get("id", "RQ-001"),
+            "question",
+            "Research question",
+            question.get("estimand", ""),
+            detail=question,
+        ))
+        link(question.get("id", "RQ-001"), study_id, "investigated_by", "study objective")
+        for hypothesis in study.get("hypotheses", []):
+            add(_node(
+                hypothesis["id"],
+                "hypothesis",
+                hypothesis.get("statement", hypothesis["id"]),
+                f"{hypothesis.get('status', '')} · {hypothesis.get('direction', '')}",
+                detail=hypothesis,
+            ))
+            link(question.get("id", "RQ-001"), hypothesis["id"], "tested_as", "registered hypothesis")
+
+    # Materialise the focused measurement so a trial or match can be inspected
+    # directly instead of only through the aggregate trial index.
+    focused_trial = next((row for row in (trial_rows or []) if str(row.get("trial_id")) == artifact_id), None)
+    if focused_trial is not None:
+        add(_node(
+            artifact_id,
+            "trial",
+            artifact_id,
+            f"{focused_trial.get('quality_state', '')} · week {focused_trial.get('week')}",
+            detail={
+                "subject_id": focused_trial.get("subject_id"),
+                "display_id": focused_trial.get("display_id"),
+                "session_id": focused_trial.get("session_id"),
+                "week": focused_trial.get("week"),
+                "trial_number": focused_trial.get("trial_number"),
+                "quality_state": focused_trial.get("quality_state"),
+                "exclusion_reason": focused_trial.get("exclusion_reason"),
+                "body_mass_kg": focused_trial.get("body_mass_kg"),
+                "intervention_arm": focused_trial.get("intervention_arm"),
+                "phase_boundaries": focused_trial.get("phase_boundaries"),
+                "trace_path": focused_trial.get("trace_path"),
+                "metrics": {
+                    key: focused_trial.get(key)
+                    for key in (
+                        "jump_height_cm",
+                        "concentric_impulse_n_s_kg",
+                        "eccentric_braking_impulse_n_s_kg",
+                        "eccentric_braking_duration_s",
+                        "countermovement_depth_cm",
+                        "peak_force_n",
+                        "peak_power_w_kg",
+                        "rsi_mod",
+                    )
+                },
+            },
+        ))
+        link("GEN-001", artifact_id, "simulated", "synthetic force trace")
+        link(artifact_id, "TRIAL-INDEX", "indexed_in", "trial registry")
+        link(artifact_id, snapshot_id, "stored_in", "immutable snapshot")
+        for metric_id in metric_defs:
+            link(metric_id, artifact_id, "extracted_from", "phase-aware extraction")
+
+    if artifact_id == "MATCH-SYNTH-001":
+        add(_node(
+            artifact_id,
+            "match",
+            "Synthetic match segment",
+            f"{snapshot.get('row_counts', {}).get('match_tracking', 0)} tracking rows · 10 Hz",
+            detail={
+                "tracking_source": "match_tracking.parquet",
+                "pose_source": "match_pose.parquet",
+                "events_source": "match_events.parquet",
+                "pose_athletes": snapshot.get("pose_athletes"),
+                "frame_count": snapshot.get("row_counts", {}).get("match_tracking"),
+                "sample_rate_hz": snapshot.get("sample_rates", {}).get("match_tracking_hz"),
+            },
+        ))
+        link("GEN-001", artifact_id, "simulated", "bounded match segment")
+        link(artifact_id, snapshot_id, "stored_in", "immutable snapshot")
+        link(artifact_id, "PROT-MATCH", "constrained_by", "match protocol")
 
     if artifact_id not in nodes:
         nodes[artifact_id] = _node(artifact_id, "unknown", artifact_id, "not found in local artefact store")

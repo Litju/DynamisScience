@@ -677,6 +677,7 @@ def _lineage_for(artifact_id: str) -> dict[str, Any]:
         report=_json("report.json", {}),
         model_spec=_json("model_spec.json", {}),
         model_run=_json("model_run.json", {}),
+        trial_rows=_rows("cmj_trials") if artifact_id.startswith("CMJ-") else None,
     )
 
 
