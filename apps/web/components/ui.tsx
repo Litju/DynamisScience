@@ -61,13 +61,32 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   return <div className="error-state"><CircleAlert size={18} /><div><strong>Local service unavailable</strong><span>{message}</span></div>{onRetry && <Button size="sm" onClick={onRetry}>Retry</Button>}</div>;
 }
 
-export function EvidencePassport({ evidence, onNavigate }: { evidence: Evidence; onNavigate?: (view: string, id?: string) => void }) {
+export function EvidencePassport({ evidence, onNavigate, lineageId }: { evidence: Evidence; onNavigate?: (view: string, id?: string) => void; lineageId?: string }) {
+  const halfWidth = evidence.uncertainty;
+  const interval = halfWidth === null ? null : [evidence.value === null ? null : evidence.value - halfWidth, evidence.value === null ? null : evidence.value + halfWidth];
   return <div className="passport">
     <div className="passport-top"><div><div className="eyebrow">Evidence passport</div><h3>{evidence.title}</h3></div><StatusBadge tone={evidence.quality === "VALID" ? "good" : "warn"}>{evidence.quality}</StatusBadge></div>
-    <div className="passport-value"><span>{evidence.value === null ? "—" : evidence.value.toFixed(3)}</span><small>{evidence.unit}</small><em>{evidence.uncertainty_label ?? "estimate"}{evidence.uncertainty !== null ? ` · ${evidence.uncertainty.toFixed(3)} ${evidence.unit}` : ""}</em></div>
-    <div className="passport-grid"><KeyValue label="Method" value={String(evidence.provenance.algorithm ?? evidence.metric_id)} /><KeyValue label="Algorithm" value={`${String(evidence.provenance.algorithm_version ?? "1.0.0")}`} mono /><KeyValue label="Protocol" value={evidence.protocol_id} mono /><KeyValue label="Population" value={evidence.population} /><KeyValue label="Sample size" value={String(evidence.sample_size)} /><KeyValue label="Snapshot" value={evidence.dataset_snapshot_id} mono /></div>
-    <div className="passport-provenance"><ShieldCheck size={14} /><span>Input provenance complete</span><span className="provenance-checksum">{String(evidence.provenance.snapshot_checksum ?? "checksum recorded").slice(0, 12)}…</span></div>
-    <div className="passport-actions"><Button size="sm" onClick={() => onNavigate?.("analyses", evidence.analysis_run_id)}><ExternalLink size={13} /> Open analysis</Button><Button size="sm" variant="ghost" onClick={() => onNavigate?.("lineage", evidence.id)}>View lineage <ArrowUpRight size={13} /></Button></div>
+    <div className="passport-value">
+      <span>{evidence.value === null ? "—" : evidence.value.toFixed(3)}</span>
+      <small>{evidence.unit}</small>
+      <em>{evidence.uncertainty_label ?? "estimate"}{halfWidth !== null ? ` · ±${halfWidth.toFixed(3)} ${evidence.unit}` : ""}</em>
+    </div>
+    {interval && interval[0] !== null && interval[1] !== null && <div className="passport-interval"><span>Interval</span><strong className="mono">{interval[0].toFixed(3)} → {interval[1].toFixed(3)} {evidence.unit}</strong></div>}
+    <div className="passport-grid">
+      <KeyValue label="Method" value={String(evidence.provenance.method ?? evidence.provenance.algorithm ?? evidence.metric_id)} />
+      <KeyValue label="Algorithm" value={String(evidence.provenance.algorithm ?? "—")} mono />
+      <KeyValue label="Version" value={String(evidence.provenance.algorithm_version ?? "—")} mono />
+      <KeyValue label="Protocol" value={evidence.protocol_id} mono />
+      <KeyValue label="Metric" value={evidence.metric_id} mono />
+      <KeyValue label="Population" value={evidence.population} />
+      <KeyValue label="Sample size" value={String(evidence.sample_size)} />
+      <KeyValue label="Snapshot" value={evidence.dataset_snapshot_id} mono />
+    </div>
+    <div className="passport-provenance"><ShieldCheck size={14} /><span>Input provenance complete</span><span className="provenance-checksum">{String(evidence.provenance.snapshot_checksum ?? "checksum recorded").slice(0, 18)}…</span></div>
+    <div className="passport-actions">
+      <Button size="sm" onClick={() => onNavigate?.("runs", evidence.analysis_run_id)}><ExternalLink size={13} /> Open source run</Button>
+      <Button size="sm" variant="ghost" onClick={() => onNavigate?.("lineage", lineageId ?? evidence.id)}>View lineage <ArrowUpRight size={13} /></Button>
+    </div>
   </div>;
 }
 
