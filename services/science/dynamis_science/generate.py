@@ -81,6 +81,8 @@ def _force_trace(
     mass = float(subject["body_mass_kg"])
     body_weight = mass * 9.80665
     athlete_factor = float(subject["response_factor"])
+    impulse_factor = float(subject["impulse_factor"])
+    jump_factor = float(subject["jump_factor"])
     arm = subject["intervention_arm"]
     progress = 0.0
     if arm == "INTERVENTION" and 3 <= week <= 10:
@@ -88,12 +90,14 @@ def _force_trace(
     elif arm == "INTERVENTION" and week > 10:
         progress = 1.0
     strength_gain = 1 + 0.075 * progress * athlete_factor
+    capacity = impulse_factor * strength_gain
     recovery_penalty = 0.045 if week == 12 else 0.0
     movement_onset = 0.42 + rng.normal(0, 0.012)
     unweighting_end = movement_onset + 0.13 + rng.normal(0, 0.006)
-    braking_end = unweighting_end + 0.23 + rng.normal(0, 0.008)
+    braking_duration = (0.235 - 0.014 * progress * athlete_factor) + rng.normal(0, 0.007)
+    braking_end = unweighting_end + max(0.15, braking_duration)
     takeoff = braking_end + 0.245 + rng.normal(0, 0.008)
-    flight_time = 0.59 + 0.018 * (strength_gain - 1) * 8 + rng.normal(0, 0.012)
+    flight_time = 0.585 * jump_factor + 0.085 * (capacity - 1) + rng.normal(0, 0.008)
     flight_time = float(np.clip(flight_time, 0.48, 0.72))
     landing = takeoff + flight_time
     boundaries = {
@@ -112,11 +116,11 @@ def _force_trace(
     net_norm = np.zeros_like(times, dtype=float)
     net_norm[quiet] = rng.normal(0, 0.0025, int(quiet.sum()))
     unweight_progress = (times[unweighting] - movement_onset) / max(0.01, unweighting_end - movement_onset)
-    net_norm[unweighting] = -0.22 * np.sin(np.pi * unweight_progress)
+    net_norm[unweighting] = -0.22 * impulse_factor * np.sin(np.pi * unweight_progress)
     braking_progress = (times[braking] - unweighting_end) / max(0.01, braking_end - unweighting_end)
-    net_norm[braking] = -0.62 * np.sin(np.pi * braking_progress) - 0.08 * braking_progress
+    net_norm[braking] = capacity * (-0.66 * np.sin(np.pi * braking_progress) - 0.08 * braking_progress)
     propulsion_progress = (times[propulsion] - braking_end) / max(0.01, takeoff - braking_end)
-    net_norm[propulsion] = strength_gain * (0.95 * np.sin(np.pi * propulsion_progress * 0.82) + 0.18 * propulsion_progress) - 0.05
+    net_norm[propulsion] = capacity * (0.95 * np.sin(np.pi * propulsion_progress * 0.82) + 0.18 * propulsion_progress) - 0.05
     net_norm[flight] = rng.normal(0, 0.003, int(flight.sum()))
     landing_progress = (times[landing_phase] - landing) / max(0.01, duration - landing)
     net_norm[landing_phase] = 1.18 * np.exp(-((landing_progress / 0.22) ** 2)) - 0.16 * np.exp(-((landing_progress / 0.55) ** 2))
@@ -126,7 +130,7 @@ def _force_trace(
     phase[propulsion] = "PROPULSION"
     phase[flight] = "FLIGHT"
     phase[landing_phase] = "LANDING"
-    force = np.maximum(body_weight * (1 + net_norm * strength_gain), 0.05 * body_weight)
+    force = np.maximum(body_weight * (1 + net_norm), 0.05 * body_weight)
     if week == 12:
         force *= 1 - recovery_penalty
     velocity = np.cumsum((force - body_weight) / mass) / sample_rate
@@ -176,6 +180,13 @@ def _force_trace(
 
 
 def _subjects(rng: np.random.Generator) -> list[dict[str, Any]]:
+    """Build the synthetic roster.
+
+    Each athlete carries persistent traits so repeated trials are correlated
+    within an athlete: ``impulse_factor`` (baseline force-production capacity),
+    ``jump_factor`` (flight-time tendency) and ``response_factor``
+    (heterogeneous response to the strength block).
+    """
     rows = []
     for index in range(1, SUBJECT_COUNT + 1):
         arm = "INTERVENTION" if index % 2 == 1 else "COMPARISON"
@@ -189,6 +200,8 @@ def _subjects(rng: np.random.Generator) -> list[dict[str, Any]]:
                 "height_cm": round(float(np.clip(181 + rng.normal(0, 6.8), 168, 201)), 1),
                 "training_age_years": int(np.clip(8 + rng.normal(0, 4.0), 2, 22)),
                 "intervention_arm": _normalise_arm(arm),
+                "impulse_factor": round(float(np.clip(rng.normal(1.0, 0.062), 0.80, 1.22)), 4),
+                "jump_factor": round(float(np.clip(rng.normal(1.0, 0.045), 0.86, 1.16)), 4),
                 "response_factor": round(float(np.clip(rng.normal(1.0, 0.16), 0.55, 1.45)), 4),
                 "status": "ACTIVE",
             }
@@ -397,92 +410,170 @@ def _build_trials(
     return trial_rows, trace_rows, missing_slots
 
 
-def _registry() -> dict[str, Any]:
+def _analysis_specs() -> list[dict[str, Any]]:
+    return [
+        {"id": "SPEC-LONG-001", "study_id": "STUDY-001", "name": "Group longitudinal effect on concentric impulse", "method_id": "METH-LONG", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "concentric_impulse ~ week + group + week:group; random intercept = athlete", "parameters": {"reference_week": 1, "contrast_week": 10, "alpha": 0.05, "fallback": "athlete-clustered OLS"}, "planned_contrasts": ["Intervention × Time at week 10 versus comparison"], "status": "FROZEN"},
+        {"id": "SPEC-REL-001", "study_id": "STUDY-001", "name": "Baseline repeated-trial reliability", "method_id": "METH-REL", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "ICC(3,1) with balanced repeated baseline trials", "parameters": {"baseline_weeks": [1], "alpha": 0.05}, "planned_contrasts": ["Within-subject CV, typical error, ICC(3,1)"], "status": "FROZEN"},
+        {"id": "SPEC-IND-001", "study_id": "STUDY-001", "name": "Individual longitudinal change", "method_id": "METH-IND", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "baseline mean, observed post-block change, standardized change, typical-error context", "parameters": {"baseline_weeks": [1, 2], "post_weeks": [9, 10]}, "planned_contrasts": ["Individual descriptive change"], "status": "FROZEN"},
+    ]
+
+
+def _metric_definitions(specs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    usage: dict[str, int] = {}
+    for spec in specs:
+        metric_id = spec.get("outcome_metric_id")
+        if metric_id:
+            usage[metric_id] = usage.get(metric_id, 0) + 1
+    return [
+        {
+            "id": "MET-CMJ-IMPULSE",
+            "canonical_id": "cmj.concentric_impulse",
+            "name": "CMJ / Concentric Impulse",
+            "quantity": "impulse normalised to body mass",
+            "unit": "N·s·kg⁻¹",
+            "method": "trapezoidal integration of net vertical GRF over the propulsion phase, divided by body mass",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["body_mass_kg", "force_trace", "phase_boundaries"],
+            "known_limitations": ["Phase boundary estimates depend on force-plate signal quality.", "Integration window changes the absolute value."],
+            "usage_count": usage.get("MET-CMJ-IMPULSE", 0),
+        },
+        {
+            "id": "MET-CMJ-HEIGHT",
+            "canonical_id": "cmj.jump_height.flight_time",
+            "name": "CMJ / Jump Height from Flight Time",
+            "quantity": "jump height",
+            "unit": "cm",
+            "method": "g·t²/8 from takeoff-to-landing flight time",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["takeoff_s", "landing_s"],
+            "known_limitations": ["Flight-time estimates assume symmetric takeoff and landing.", "Not interchangeable with impulse-momentum jump height."],
+            "usage_count": usage.get("MET-CMJ-HEIGHT", 0),
+        },
+        {
+            "id": "MET-CMJ-HEIGHT-IMPULSE",
+            "canonical_id": "cmj.jump_height.impulse_momentum",
+            "name": "CMJ / Jump Height from Impulse-Momentum",
+            "quantity": "jump height",
+            "unit": "cm",
+            "method": "takeoff velocity squared over 2g, where takeoff velocity is the integrated net impulse divided by body mass",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["concentric_impulse_n_s_kg", "body_mass_kg"],
+            "known_limitations": ["Sensitive to the integration window.", "A distinct definition of jump height, not a re-expression of the flight-time metric."],
+            "usage_count": usage.get("MET-CMJ-HEIGHT-IMPULSE", 0),
+        },
+        {
+            "id": "MET-CMJ-BRAKING-DURATION",
+            "canonical_id": "cmj.eccentric_braking_duration",
+            "name": "CMJ / Eccentric Braking Duration",
+            "quantity": "phase duration",
+            "unit": "s",
+            "method": "end of unweighting to end of eccentric braking phase",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["unweighting_end_s", "braking_end_s"],
+            "known_limitations": ["Event detection is sensitive to filtering and sampling choices."],
+            "usage_count": usage.get("MET-CMJ-BRAKING-DURATION", 0),
+        },
+        {
+            "id": "MET-CMJ-BRAKING-IMPULSE",
+            "canonical_id": "cmj.eccentric_braking_impulse",
+            "name": "CMJ / Eccentric Braking Impulse",
+            "quantity": "impulse normalised to body mass",
+            "unit": "N·s·kg⁻¹",
+            "method": "absolute trapezoidal integration of net vertical GRF from movement onset to end of braking",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["body_mass_kg", "force_trace", "phase_boundaries"],
+            "known_limitations": ["Braking impulse and braking duration are distinct quantities and must not be substituted."],
+            "usage_count": usage.get("MET-CMJ-BRAKING-IMPULSE", 0),
+        },
+        {
+            "id": "MET-CMJ-POWER",
+            "canonical_id": "cmj.peak_power",
+            "name": "CMJ / Peak Power",
+            "quantity": "peak mechanical power normalised to body mass",
+            "unit": "W·kg⁻¹",
+            "method": "maximum of force × centre-of-mass velocity during propulsion, divided by body mass",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["body_mass_kg", "force_trace", "velocity_trace"],
+            "known_limitations": ["Velocity is integrated from the force trace, so it accumulates any force offset error."],
+            "usage_count": usage.get("MET-CMJ-POWER", 0),
+        },
+        {
+            "id": "MET-CMJ-DEPTH",
+            "canonical_id": "cmj.countermovement_depth",
+            "name": "CMJ / Countermovement Depth",
+            "quantity": "displacement",
+            "unit": "cm",
+            "method": "magnitude of the most negative integrated displacement before takeoff",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["force_trace", "body_mass_kg"],
+            "known_limitations": ["Double integration of force amplifies low-frequency drift."],
+            "usage_count": usage.get("MET-CMJ-DEPTH", 0),
+        },
+        {
+            "id": "MET-CMJ-RSI-MOD",
+            "canonical_id": "cmj.rsi_mod",
+            "name": "CMJ / Reactive Strength Index (modified)",
+            "quantity": "jump height per unit propulsion time",
+            "unit": "cm·s⁻¹",
+            "method": "jump height divided by propulsion duration",
+            "protocol_id": "PROT-CMJ",
+            "algorithm": "cmj-metrics",
+            "version": "1.0.0",
+            "status": "ACTIVE",
+            "dependencies": ["jump_height_cm", "braking_end_s", "takeoff_s"],
+            "known_limitations": ["Inherits the assumptions of the flight-time jump height metric."],
+            "usage_count": usage.get("MET-CMJ-RSI-MOD", 0),
+        },
+    ]
+
+
+def _registry(specs: list[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "metrics": [
-            {
-                "id": "MET-CMJ-IMPULSE",
-                "canonical_id": "cmj.concentric_impulse",
-                "name": "CMJ / Concentric Impulse",
-                "quantity": "impulse normalized to body mass",
-                "unit": "N·s·kg⁻¹",
-                "method": "net vertical GRF integration during concentric phase",
-                "protocol_id": "PROT-CMJ",
-                "algorithm": "cmj-metrics",
-                "version": "1.0.0",
-                "status": "ACTIVE",
-                "dependencies": ["body_mass_kg", "force_trace", "phase_boundaries"],
-                "known_limitations": ["Phase boundary estimates depend on force-plate signal quality."],
-                "usage_count": 2,
-            },
-            {
-                "id": "MET-CMJ-HEIGHT",
-                "canonical_id": "cmj.jump_height.flight_time",
-                "name": "CMJ / Jump Height from Flight Time",
-                "quantity": "jump height",
-                "unit": "cm",
-                "method": "g·t²/8 from takeoff-to-landing flight time",
-                "protocol_id": "PROT-CMJ",
-                "algorithm": "cmj-metrics",
-                "version": "1.0.0",
-                "status": "ACTIVE",
-                "dependencies": ["takeoff_s", "landing_s"],
-                "known_limitations": ["Flight-time estimates assume symmetric takeoff and landing."],
-                "usage_count": 2,
-            },
-            {
-                "id": "MET-CMJ-BRAKING-DURATION",
-                "canonical_id": "cmj.eccentric_braking_duration",
-                "name": "CMJ / Eccentric Braking Duration",
-                "quantity": "phase duration",
-                "unit": "s",
-                "method": "movement onset to end of eccentric braking phase",
-                "protocol_id": "PROT-CMJ",
-                "algorithm": "cmj-metrics",
-                "version": "1.0.0",
-                "status": "ACTIVE",
-                "dependencies": ["movement_onset_s", "braking_end_s"],
-                "known_limitations": ["Event detection is sensitive to filtering choices."],
-                "usage_count": 1,
-            },
-            {
-                "id": "MET-CMJ-HEIGHT-IMPULSE",
-                "canonical_id": "cmj.jump_height.impulse_momentum",
-                "name": "CMJ / Jump Height from Impulse-Momentum",
-                "quantity": "jump height",
-                "unit": "cm",
-                "method": "integrated net impulse divided by body mass",
-                "protocol_id": "PROT-CMJ",
-                "algorithm": "cmj-metrics",
-                "version": "1.0.0",
-                "status": "ACTIVE",
-                "dependencies": ["concentric_impulse_n_s_kg", "body_mass_kg"],
-                "known_limitations": ["Impulse-momentum estimate is sensitive to the integration window."],
-                "usage_count": 0,
-            },
-        ],
+        "metrics": _metric_definitions(specs),
         "protocols": [
-            {"id": "PROT-CMJ", "name": "Bilateral countermovement jump", "status": "ACTIVE", "frequency": "2 sessions/week", "method": "Three maximal trials per session; first valid trial used for monitoring summaries."},
-            {"id": "PROT-LOAD", "name": "Weekly external load exposure", "status": "ACTIVE", "frequency": "Daily / weekly aggregation", "method": "Session RPE x duration and instrumented load proxies."},
-            {"id": "PROT-MATCH", "name": "Match segment tracking", "status": "ACTIVE", "frequency": "Match exposure", "method": "10 Hz bounded synthetic segment with synchronized pose streams."},
+            {"id": "PROT-CMJ", "name": "Bilateral countermovement jump", "status": "ACTIVE", "frequency": "2 trials per week", "method": "Repeated maximal trials with 1000 Hz force-plate capture on audit trials; first valid trial drives group inference."},
+            {"id": "PROT-LOAD", "name": "Weekly external load exposure", "status": "ACTIVE", "frequency": "Weekly aggregation", "method": "Session duration, external load proxy, high-speed running, acceleration load and session RPE aggregated to a weekly training impulse."},
+            {"id": "PROT-MATCH", "name": "Match segment tracking", "status": "ACTIVE", "frequency": "Match exposure", "method": "10 Hz bounded synthetic segment with synchronized tracking, ball and pose streams."},
         ],
         "algorithms": [
-            {"id": "ALG-CMJ", "name": "CMJ phase-aware metric extraction", "version": "1.0.0", "status": "ACTIVE"},
-            {"id": "ALG-MIXEDLM", "name": "Group longitudinal mixed model", "version": "statsmodels-compatible", "status": "ACTIVE"},
-            {"id": "ALG-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.1.0", "status": "PROTOTYPE"},
+            {"id": "ALG-CMJ", "name": "CMJ phase-aware metric extraction", "version": "1.0.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/generate.py::_force_trace", "description": "Deterministic phase template with trapezoidal net-force integration."},
+            {"id": "ALG-MIXEDLM", "name": "Group × time repeated-measures model", "version": "1.1.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/analysis.py::_group_longitudinal", "description": "statsmodels MixedLM with athlete random intercept; athlete-clustered OLS fallback."},
+            {"id": "ALG-ICC", "name": "Balanced two-way ICC(3,1)", "version": "1.1.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/analysis.py::_reliability", "description": "Within-subject CV, typical error (√MSE) and Shrout–Fleiss confidence limits."},
+            {"id": "ALG-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.2.0", "status": "PROTOTYPE", "implementation": "services/science/dynamis_science/analysis.py::_training_response", "description": "Grid-searched fitness–fatigue time constants with exposed residuals."},
         ],
         "methods": [
-            {"id": "METH-LONG", "name": "Group × time longitudinal mixed model", "version": "1.0.0", "status": "FROZEN"},
-            {"id": "METH-REL", "name": "Repeated-trial reliability", "version": "1.0.0", "status": "FROZEN"},
-            {"id": "METH-IND", "name": "Individual change context", "version": "1.0.0", "status": "FROZEN"},
+            {"id": "METH-LONG", "name": "Group × time longitudinal model", "version": "1.1.0", "status": "FROZEN", "estimator": "statsmodels MixedLM (athlete random intercept)", "fallback": "athlete-clustered OLS"},
+            {"id": "METH-REL", "name": "Repeated-trial reliability", "version": "1.1.0", "status": "FROZEN", "estimator": "ICC(3,1) / within-subject CV / typical error"},
+            {"id": "METH-IND", "name": "Individual change context", "version": "1.1.0", "status": "FROZEN", "estimator": "baseline versus post-block descriptive change"},
         ],
         "models": [
-            {"id": "MODEL-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.1.0", "status": "PROTOTYPE", "description": "A bounded mechanistic demonstration fitted to weekly training-load and CMJ observations."},
+            {"id": "MODEL-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.2.0", "status": "PROTOTYPE", "description": "A bounded mechanistic demonstration fitted to weekly training-load and CMJ observations."},
         ],
     }
 
 
-def _study_artifacts() -> dict[str, Any]:
+def _study_artifacts(specs: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "study": {
             "id": "STUDY-001",
@@ -499,43 +590,41 @@ def _study_artifacts() -> dict[str, Any]:
             "start_week": 1,
             "end_week": 16,
             "protocol_ids": ["PROT-CMJ", "PROT-LOAD", "PROT-MATCH"],
-            "analysis_spec_ids": ["SPEC-LONG-001", "SPEC-REL-001", "SPEC-IND-001"],
+            "analysis_spec_ids": [spec["id"] for spec in specs],
         },
         "question": {"id": "RQ-001", "study_id": "STUDY-001", "statement": "Does the strength intervention alter CMJ propulsion and braking strategy relative to comparison athletes?", "estimand": "Difference in week-10 intervention versus comparison mean, adjusted for repeated athlete observations.", "population": "28 synthetic elite football athletes", "exposure": "Weeks 3–10 progressive strength block", "outcomes": ["cmj.concentric_impulse", "cmj.eccentric_braking_duration"], "time_horizon": "Baseline through follow-up week 16"},
         "hypotheses": [
-            {"id": "HYP-001", "study_id": "STUDY-001", "question_id": "RQ-001", "statement": "Intervention athletes will show a greater increase in concentric impulse than comparison athletes.", "direction": "increase", "status": "PRIMARY", "rationale": "The intervention emphasizes rate of force development and force expression."},
+            {"id": "HYP-001", "study_id": "STUDY-001", "question_id": "RQ-001", "statement": "Intervention athletes will show a greater increase in concentric impulse than comparison athletes.", "direction": "increase", "status": "PRIMARY", "rationale": "The intervention emphasises rate of force development and force expression."},
             {"id": "HYP-002", "study_id": "STUDY-001", "question_id": "RQ-001", "statement": "Intervention athletes will show a modest reduction in eccentric braking duration.", "direction": "decrease", "status": "PRIMARY", "rationale": "Improved braking strategy may accompany increased braking impulse."},
+            {"id": "HYP-003", "study_id": "STUDY-001", "question_id": "RQ-001", "statement": "Jump height, peak power and countermovement depth will move in the same direction as concentric impulse, but with smaller standardised effects.", "direction": "increase", "status": "SECONDARY", "rationale": "Secondary outcomes are recorded to check that the primary result is not an isolated artefact of one extraction method."},
         ],
+        "groups": {
+            "intervention": {"label": "Intervention", "arm": "INTERVENTION", "block_weeks": [3, 10], "description": "Progressive strength block alongside usual football training."},
+            "comparison": {"label": "Comparison", "arm": "COMPARISON", "block_weeks": [3, 10], "description": "Usual care; no additional strength block."},
+        },
         "cohort": {"id": "COHORT-001", "study_id": "STUDY-001", "name": "Elite football longitudinal cohort", "description": "All synthetic athletes with a valid baseline CMJ session and at least one post-block observation.", "subject_ids": [f"SUB-{i:03d}" for i in range(1, 29)], "exclusion_criteria": ["No baseline CMJ session", "Force trace fails deterministic QC rule"], "snapshot_id": SNAPSHOT_ID, "status": "FROZEN"},
         "protocols": [
-            {"id": "PROT-CMJ", "study_id": "STUDY-001", "name": "Bilateral countermovement jump", "description": "Two weekly sessions with repeated trials and force-plate traces.", "frequency": "2 sessions/week", "status": "ACTIVE", "duration_weeks": 16, "visit_labels": ["Baseline", "Intervention", "Post", "Follow-up"]},
-            {"id": "PROT-LOAD", "study_id": "STUDY-001", "name": "Weekly external load exposure", "description": "Session duration, external load, high-speed running, acceleration load, RPE and match exposure.", "frequency": "Daily aggregation", "status": "ACTIVE", "duration_weeks": 16, "visit_labels": ["Build", "Match", "Taper"]},
+            {"id": "PROT-CMJ", "study_id": "STUDY-001", "name": "Bilateral countermovement jump", "description": "Two maximal CMJ trials per week with force-plate traces retained on audit weeks.", "frequency": "2 trials/week", "status": "ACTIVE", "duration_weeks": 16, "visit_labels": ["Baseline", "Intervention", "Post", "Follow-up"]},
+            {"id": "PROT-LOAD", "study_id": "STUDY-001", "name": "Weekly external load exposure", "description": "Session duration, external load, high-speed running, acceleration load, RPE and match exposure.", "frequency": "Weekly aggregation", "status": "ACTIVE", "duration_weeks": 16, "visit_labels": ["Build", "Match", "Taper"]},
+            {"id": "PROT-MATCH", "study_id": "STUDY-001", "name": "Match segment tracking", "description": "Bounded 10 Hz tracking and pose segment for synchronized field and joint-space inspection.", "frequency": "Match exposure", "status": "ACTIVE", "duration_weeks": 16, "visit_labels": ["Segment"]},
         ],
-        "analysis_specs": [
-            {"id": "SPEC-LONG-001", "study_id": "STUDY-001", "name": "Group longitudinal effect on concentric impulse", "method_id": "METH-LONG", "method_version": "1.0.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "concentric_impulse ~ week + group + week:group; random intercept = athlete", "parameters": {"reference_week": 1, "contrast_week": 10, "alpha": 0.05}, "planned_contrasts": ["Intervention × Time at week 10 versus comparison"], "status": "FROZEN"},
-            {"id": "SPEC-REL-001", "study_id": "STUDY-001", "name": "Baseline repeated-trial reliability", "method_id": "METH-REL", "method_version": "1.0.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "ICC(3,1) with repeated baseline trials", "parameters": {"alpha": 0.05}, "planned_contrasts": ["Within-subject CV and typical error"], "status": "FROZEN"},
-            {"id": "SPEC-IND-001", "study_id": "STUDY-001", "name": "Individual longitudinal change", "method_id": "METH-IND", "method_version": "1.0.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "baseline mean, observed post-block change, standardized change, typical-error context", "parameters": {"baseline_weeks": [1, 2], "post_weeks": [9, 10]}, "planned_contrasts": ["Individual descriptive change"], "status": "FROZEN"},
-        ],
-        "plan": {"id": "PLAN-001", "status": "FROZEN", "primary_outcomes": ["concentric impulse", "eccentric braking duration"], "exclusion_criteria": ["No baseline CMJ session", "Force trace fails deterministic QC rule"], "planned_models": ["Group × time mixed model", "ICC(3,1) reliability", "Individual change context"], "planned_contrasts": ["Intervention × Time at week 10 versus comparison"]},
+        "analysis_specs": specs,
+        "plan": {"id": "PLAN-001", "status": "FROZEN", "frozen_before_inspection": True, "primary_outcomes": ["concentric impulse", "eccentric braking duration"], "secondary_outcomes": ["jump height (flight time)", "peak power", "countermovement depth"], "exclusion_criteria": ["No baseline CMJ session", "Force trace fails deterministic QC rule"], "planned_models": ["Group × time mixed model", "ICC(3,1) reliability", "Individual change context"], "planned_contrasts": ["Intervention × Time at week 10 versus comparison"], "immutability_rule": "Changing cohort, method, parameters, dataset or exclusions creates a new AnalysisSpec and a new AnalysisRun."},
     }
 
 
-def _lineage() -> list[dict[str, Any]]:
-    return [
-        {"id": "LE-001", "source": "GEN-001", "target": "RAW-CMJ-001", "relation": "generated", "label": "generator output"},
-        {"id": "LE-002", "source": "RAW-CMJ-001", "target": "TRIAL-001", "relation": "contains", "label": "raw force signal"},
-        {"id": "LE-003", "source": "TRIAL-001", "target": "METRIC-CMJ-IMPULSE", "relation": "derives", "label": "phase-aware extraction"},
-        {"id": "LE-004", "source": "METRIC-CMJ-IMPULSE", "target": SNAPSHOT_ID, "relation": "included_in", "label": "immutable snapshot"},
-        {"id": "LE-005", "source": SNAPSHOT_ID, "target": "COHORT-001", "relation": "filtered_into", "label": "frozen cohort"},
-        {"id": "LE-006", "source": "COHORT-001", "target": "RUN-0001", "relation": "input_to", "label": "analysis spec"},
-        {"id": "LE-007", "source": "RUN-0001", "target": "EVID-0001", "relation": "produces", "label": "effect estimate"},
-        {"id": "LE-008", "source": "EVID-0001", "target": "FIG-0001", "relation": "visualized_as", "label": "longitudinal figure"},
-        {"id": "LE-009", "source": "EVID-0001", "target": "REPORT-001", "relation": "cited_by", "label": "interim report"},
-    ]
-
-
 def _report() -> dict[str, Any]:
-    return {"id": "REPORT-001", "title": "Strength Intervention — Interim Scientific Report", "study_id": "STUDY-001", "status": "DRAFT", "evidence_ids": ["EVID-0001", "EVID-0002", "EVID-0003"], "figure_ids": ["FIG-0001", "FIG-0002"], "sections": ["Study information", "Methods", "Cohort", "Longitudinal signal", "Reliability", "Interpretation", "Limitations", "Provenance"], "provenance_note": "All displayed estimates and figures are computed from DS-SYNTH-001 using frozen analysis specifications.", "created_at": GENERATED_AT}
+    return {
+        "id": "REPORT-001",
+        "title": "Strength Intervention — Interim Scientific Report",
+        "study_id": "STUDY-001",
+        "status": "DRAFT",
+        "evidence_ids": ["EVID-0001", "EVID-0002", "EVID-0003"],
+        "figure_ids": ["FIG-0001", "FIG-0002"],
+        "sections": ["Study information", "Methods", "Cohort and data quality", "Longitudinal result", "Reliability evidence", "Interpretation and limitations", "Reproducibility"],
+        "provenance_note": "All displayed estimates and figures are computed from DS-SYNTH-001 using frozen analysis specifications.",
+        "created_at": GENERATED_AT,
+    }
 
 
 def _write_snapshot_manifest() -> dict[str, Any]:
@@ -544,6 +633,7 @@ def _write_snapshot_manifest() -> dict[str, Any]:
     row_counts = {}
     for path in files:
         row_counts[path.stem] = pl.read_parquet(path).height
+    pose_athletes = sorted(pl.read_parquet(PARQUET_DIR / "match_pose.parquet")["athlete_id"].unique().to_list())
     manifest = {
         "id": SNAPSHOT_ID,
         "label": "Synthetic football longitudinal snapshot",
@@ -553,6 +643,10 @@ def _write_snapshot_manifest() -> dict[str, Any]:
         "generated_at": GENERATED_AT,
         "row_counts": row_counts,
         "checksums": checksums,
+        "sample_rates": {"force_traces_hz": 1000, "match_tracking_hz": 10, "match_pose_hz": 10},
+        "subjects": {"total": SUBJECT_COUNT, "weeks": WEEK_COUNT, "positions": POSITIONS},
+        "pose_athletes": pose_athletes,
+        "missing_observations": len(json.loads((ARTIFACT_DIR / "missing_observations.json").read_text(encoding="utf-8"))) if (ARTIFACT_DIR / "missing_observations.json").exists() else None,
         "provenance": {
             "source": "deterministic local generator",
             "code_application_version": GENERATOR_VERSION,
@@ -580,13 +674,14 @@ def generate_data() -> dict[str, Any]:
     _write_parquet("match_tracking", tracking_rows)
     _write_parquet("match_pose", pose_rows)
     _write_parquet("match_events", events)
-    registry = _registry()
-    study = _study_artifacts()
+    specs = _analysis_specs()
+    registry = _registry(specs)
+    study = _study_artifacts(specs)
     _write_json(SYNTHETIC_DIR / "generator_manifest.json", {"seed": SEED, "generator_version": GENERATOR_VERSION, "schema_version": SCHEMA_VERSION, "files": ["subjects", "training_load", "wellness", "cmj_trials", "force_traces", "match_tracking", "match_pose", "match_events"]})
     _write_json(ARTIFACT_DIR / "registry.json", registry)
     _write_json(ARTIFACT_DIR / "study.json", study)
-    _write_json(ARTIFACT_DIR / "lineage.json", _lineage())
     _write_json(ARTIFACT_DIR / "report.json", _report())
+    _write_json(ARTIFACT_DIR / "missing_observations.json", missing_slots)
     snapshot = _write_snapshot_manifest()
     analysis = build_analysis_artifacts(trial_rows, load_rows, snapshot, study, registry)
     _write_json(ARTIFACT_DIR / "analysis_runs.json", analysis["runs"])
@@ -595,7 +690,6 @@ def generate_data() -> dict[str, Any]:
     _write_json(ARTIFACT_DIR / "model_spec.json", analysis["model_spec"])
     _write_json(ARTIFACT_DIR / "model_run.json", analysis["model_run"])
     _write_json(ARTIFACT_DIR / "overview_signal.json", analysis["overview_signal"])
-    _write_json(ARTIFACT_DIR / "missing_observations.json", missing_slots)
     counts = {"subjects": len(subjects), "trials": len(trial_rows), "trace_rows": len(trace_rows), "tracking": len(tracking_rows), "pose": len(pose_rows), "events": len(events), "load": len(load_rows), "wellness": len(wellness_rows), "missing_slots": len(missing_slots)}
     return {"snapshot": snapshot, "counts": counts, "artifacts": analysis}
 
