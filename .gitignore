@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+data/parquet/*.parquet
+data/artifacts/*.json
+!data/parquet/.gitkeep
+!data/artifacts/.gitkeep

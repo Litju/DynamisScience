@@ -1,0 +1,15 @@
+{
+  "files": [
+    "subjects",
+    "training_load",
+    "wellness",
+    "cmj_trials",
+    "force_traces",
+    "match_tracking",
+    "match_pose",
+    "match_events"
+  ],
+  "generator_version": "dynamis-synthetic@1.0.0",
+  "schema_version": "dynamis-science.schema@1.0.0",
+  "seed": 20260924
+}

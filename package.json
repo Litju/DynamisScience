@@ -1,0 +1,21 @@
+{
+  "name": "dynamis-science",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "data:generate": "uv run --directory services/science python -m dynamis_science.generate",
+    "science:dev": "uv run --directory services/science uvicorn dynamis_science.api:app --reload --port 8000",
+    "web:dev": "pnpm --filter @dynamis/web dev",
+    "dev": "pnpm data:generate && concurrently -k \"pnpm science:dev\" \"pnpm web:dev\"",
+    "build": "pnpm --filter @dynamis/web build",
+    "test": "pnpm --filter @dynamis/web test && uv run --directory services/science pytest",
+    "test:web": "pnpm --filter @dynamis/web test",
+    "test:python": "uv run --directory services/science pytest",
+    "lint": "pnpm --filter @dynamis/web lint",
+    "typecheck": "pnpm --filter @dynamis/web typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

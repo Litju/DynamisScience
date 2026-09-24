@@ -1,0 +1,30 @@
+[project]
+name = "dynamis-science-service"
+version = "0.1.0"
+description = "Local deterministic scientific computation service for DynamisScience"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic>=2.10,<3",
+  "numpy>=2.2,<3",
+  "polars>=1.27,<2",
+  "pyarrow>=18,<21",
+  "duckdb>=1.1,<2",
+  "scipy>=1.15,<2",
+  "statsmodels>=0.14,<1"
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
