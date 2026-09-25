@@ -220,6 +220,37 @@ def _group_longitudinal(
         for week in sorted(set(weeks.tolist()))
         if int((weeks == week).sum()) > 0
     ]
+    result["residual_qq"] = _normal_qq(residuals)
+    result["residual_by_arm"] = {
+        arm: {
+            "n": int(mask.sum()),
+            "sd": float(np.std(residuals[mask], ddof=1)) if int(mask.sum()) > 1 else None,
+            "mean": float(np.mean(residuals[mask])) if int(mask.sum()) else None,
+        }
+        for arm, mask in (("INTERVENTION", groups == 1.0), ("COMPARISON", groups == 0.0))
+    }
+    excluded = [row for row in trial_rows if row.get("quality_state") == "EXCLUDED"]
+    second_trials = [row for row in trial_rows if row.get("quality_state") == "VALID" and row.get("trial_number") != 1]
+    result["sample_context"] = {
+        "valid_first_trials_used": int(len(valid)),
+        "excluded_trials_in_cohort": len(excluded),
+        "excluded_trial_ids": sorted(str(row.get("trial_id")) for row in excluded),
+        "valid_repeat_trials_not_modelled": len(second_trials),
+        "observations_per_subject_min": int(min(subject_counts.values())) if (subject_counts := _counts(subject_ids)) else 0,
+        "observations_per_subject_max": int(max(subject_counts.values())) if subject_counts else 0,
+        "weeks_observed": sorted({int(week) for week in weeks.tolist()}),
+    }
+    result["assumptions"] = [
+        "Linear change in the outcome across weeks within each arm (a single slope per arm).",
+        "Athlete-level dependence captured by the random-effects structure recorded as the estimator.",
+        "Approximately normal, homoscedastic within-athlete residuals; inspect the residual QQ and by-week means.",
+        "Missing first trials are assumed missing at random conditional on arm and week; they are not imputed.",
+    ]
+    result["limitations"] = [
+        "A linear week term cannot represent the week-11 load spike and week-12 transient suppression; residuals by week show where the linear model misfits.",
+        "Confidence intervals are Wald intervals from the fitted covariance (normal approximation).",
+        "Synthetic data: the estimate has no external validity.",
+    ]
     result["quality_note"] = "Excluded trials remain in the trial registry and are omitted from the primary model only."
     result["diagnostics"] = {
         "estimator": result["estimator"],
@@ -230,8 +261,84 @@ def _group_longitudinal(
         "residual_summary": result["residual_summary"],
         "week_centering": reference_week,
         "quality_note": result["quality_note"],
+        "estimator_attempts": result.get("estimator_attempts", []),
+        "log_likelihood": fitted_llf,
+        "residual_by_week": result["residual_by_week"],
+        "residual_qq": result["residual_qq"],
+        "residual_by_arm": result["residual_by_arm"],
+        "sample_context": result["sample_context"],
+        "baseline_balance": baseline_balance,
+        "assumptions": result["assumptions"],
+        "limitations": result["limitations"],
     }
     return result
+
+
+def _counts(values: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def _normal_qq(residuals: np.ndarray, points: int = 60) -> list[dict[str, float]]:
+    """Standardised residual quantiles against standard-normal quantiles.
+
+    Uses Blom plotting positions and returns an evenly spaced subset so the
+    payload stays bounded while the shape of the full distribution is kept.
+    """
+    from scipy import stats
+
+    values = np.sort(np.asarray(residuals, dtype=float))
+    n = len(values)
+    if n < 3:
+        return []
+    sd = float(np.std(values, ddof=1)) or 1.0
+    standardised = (values - float(np.mean(values))) / sd
+    positions = (np.arange(1, n + 1) - 0.375) / (n + 0.25)
+    theoretical = stats.norm.ppf(positions)
+    index = np.unique(np.linspace(0, n - 1, min(points, n)).round().astype(int))
+    return [{"theoretical": float(theoretical[i]), "observed": float(standardised[i])} for i in index]
+
+
+def result_digest(method_id: str, result: dict[str, Any]) -> str:
+    """Stable digest of the scientific payload of a run.
+
+    Two runs with the same digest produced the same estimates to 10 significant
+    digits, which is how an independent re-execution is shown to reproduce an
+    earlier one. Timing and environment fields are deliberately excluded.
+    """
+    import hashlib
+
+    if method_id == "METH-LONG":
+        block = result.get("primary", result)
+        payload: Any = {
+            "estimator": block.get("estimator"),
+            "contrasts": block.get("contrasts"),
+            "n_observations": block.get("n_observations"),
+        }
+    elif method_id == "METH-REL":
+        payload = {key: result.get(key) for key in ("icc_3_1", "icc_3_1_ci_low", "icc_3_1_ci_high", "typical_error", "mean_cv_percent", "n_subjects", "trials_per_subject")}
+    else:
+        payload = {key: result.get(key) for key in ("median_change", "mean_change", "change_sd", "typical_error", "n_subjects")}
+
+    def _round(value: Any) -> Any:
+        if isinstance(value, float):
+            return float(f"{value:.10g}") if math.isfinite(value) else None
+        if isinstance(value, dict):
+            return {key: _round(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [_round(item) for item in value]
+        return value
+
+    return hashlib.sha256(json.dumps(_round(payload), sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+
+def reproducibility_key(snapshot_id: str, spec_id: str, metric_canonical_id: str, cohort_subject_ids: list[str], parameters: dict[str, Any]) -> str:
+    import hashlib
+
+    cohort_digest = hashlib.sha256(",".join(sorted(cohort_subject_ids)).encode("utf-8")).hexdigest()[:12]
+    return f"{snapshot_id}:{spec_id}:{metric_canonical_id}:cohort-{cohort_digest}:{json.dumps(parameters, sort_keys=True)}"
 
 
 def _cluster_robust_covariance(
@@ -479,8 +586,10 @@ def _training_response(load_rows: list[dict[str, Any]], trial_rows: list[dict[st
                     best = (score, tau_fitness, fatigue_tau, fatigue_penalty)
     assert best is not None
     score, tau_fitness, fatigue_tau, fatigue_penalty = best
-    modelled = _impulse_response(normalized_load, tau_fitness, fatigue_tau, 1.0, fatigue_penalty)
-    modelled = (modelled - modelled.mean()) / (float(np.std(modelled)) or 1e-9)
+    raw_modelled = _impulse_response(normalized_load, tau_fitness, fatigue_tau, 1.0, fatigue_penalty)
+    predicted_mean = float(raw_modelled.mean())
+    predicted_sd = float(np.std(raw_modelled)) or 1e-9
+    modelled = (raw_modelled - predicted_mean) / predicted_sd
     modelled_observed_units = modelled * performance_scale + observed_array.mean()
     residuals = observed_array - modelled_observed_units
     fitted = simulate_training_response(load.tolist(), {
@@ -504,6 +613,17 @@ def _training_response(load_rows: list[dict[str, Any]], trial_rows: list[dict[st
             "fit_rmse_standardized": score,
             "fit_rmse_outcome_units": float(np.sqrt(np.mean(residuals**2))),
             "performance_scale": performance_scale,
+            "unit": "N·s·kg⁻¹",
+            "weekly_load_au": [float(value) for value in load],
+            "transform": {
+                "load_mean_au": float(load.mean()),
+                "load_sd_au": load_scale,
+                "predicted_mean": predicted_mean,
+                "predicted_sd": predicted_sd,
+                "observed_mean": float(observed_array.mean()),
+                "performance_scale": performance_scale,
+                "note": "Load is standardised with the observed 16-week mean and SD; the impulse response is mapped to outcome units with the fit-window mean and SD.",
+            },
         },
         "diagnostics": {
             "fit_status": "PROTOTYPE_FIT",
@@ -513,6 +633,63 @@ def _training_response(load_rows: list[dict[str, Any]], trial_rows: list[dict[st
             "limitations": ["Aggregate prototype; not a substitute for individual inference."],
         },
         "created_at": None,
+    }
+
+
+def simulate_scenario(model_run: dict[str, Any], future_load_au: list[float]) -> dict[str, Any]:
+    """Extend the fitted fitness-fatigue model over a future load scenario.
+
+    The fitted parameters and the fit-window transform are reused, so the
+    first 16 weeks reproduce the fitted modelled series exactly and the
+    scenario weeks are a forward simulation in the same outcome units.
+    """
+    output = model_run["output"]
+    transform = output["transform"]
+    parameters = model_run["parameters"]
+    history = [float(value) for value in output["weekly_load_au"]]
+    scenario = [float(value) for value in future_load_au]
+    loads = np.array(history + scenario, dtype=float)
+    normalized = (loads - transform["load_mean_au"]) / (transform["load_sd_au"] or 1e-9)
+    raw = _impulse_response(normalized, parameters["tau_fitness_weeks"], parameters["fatigue_tau_weeks"], parameters["fitness_gain"], parameters["fatigue_penalty"])
+    standardised = (raw - transform["predicted_mean"]) / (transform["predicted_sd"] or 1e-9)
+    performance = standardised * transform["performance_scale"] + transform["observed_mean"]
+    fitness = 0.0
+    fatigue_state = 0.0
+    states = []
+    for index, value in enumerate(normalized):
+        fitness = fitness * math.exp(-1 / parameters["tau_fitness_weeks"]) + parameters["fitness_gain"] * float(value)
+        fatigue_state = fatigue_state * math.exp(-1 / parameters["fatigue_tau_weeks"]) + float(value)
+        states.append({
+            "week": index + 1,
+            "load_au": round(float(loads[index]), 3),
+            "segment": "OBSERVED_LOAD" if index < len(history) else "SCENARIO",
+            "fitness": round(fitness, 6),
+            "fatigue": round(fatigue_state, 6),
+            "modelled_performance": round(float(performance[index]), 6),
+        })
+    horizon = len(history)
+    scenario_values = performance[horizon:]
+    last_fitted = float(performance[horizon - 1]) if horizon else float("nan")
+    return {
+        "model_run_id": model_run["id"],
+        "model_spec_id": model_run["model_spec_id"],
+        "parameters": parameters,
+        "unit": output.get("unit", "N·s·kg⁻¹"),
+        "history_weeks": horizon,
+        "scenario_weeks": len(scenario),
+        "states": states,
+        "summary": {
+            "end_of_history_performance": last_fitted,
+            "scenario_final_performance": float(scenario_values[-1]) if len(scenario_values) else None,
+            "scenario_peak_performance": float(scenario_values.max()) if len(scenario_values) else None,
+            "scenario_peak_week": int(horizon + int(scenario_values.argmax()) + 1) if len(scenario_values) else None,
+            "scenario_mean_load_au": float(np.mean(scenario)) if scenario else None,
+        },
+        "limitations": [
+            "Aggregate group-mean prototype fitted to 16 synthetic weeks; not an individual prediction.",
+            "No uncertainty is propagated: the grid-searched parameters are treated as fixed.",
+            "Extrapolation beyond the observed load range is not validated.",
+        ],
     }
 
 
@@ -557,6 +734,13 @@ def build_analysis_artifacts(
     study: dict[str, Any],
     registry: dict[str, Any],
 ) -> dict[str, Any]:
+    specs_by_id = {spec["id"]: spec for spec in study.get("analysis_specs", [])}
+    cohort = study.get("cohort", {})
+
+    def _seed_key(spec_id: str) -> str:
+        spec = specs_by_id[spec_id]
+        return reproducibility_key(snapshot["id"], spec_id, "cmj.concentric_impulse", cohort.get("subject_ids", []), spec.get("parameters", {}))
+
     longitudinal = _group_longitudinal(trial_rows, "concentric_impulse_n_s_kg")
     reliability = _reliability(trial_rows, "concentric_impulse_n_s_kg")
     braking = _group_longitudinal(trial_rows, "eccentric_braking_duration_s")
@@ -580,7 +764,7 @@ def build_analysis_artifacts(
             "result": {"primary": longitudinal, "secondary": braking},
             "diagnostics": longitudinal["diagnostics"],
             "output_artifact_ids": ["EVID-0001", "FIG-0001"],
-            "reproducibility_key": f"{snapshot['id']}:SPEC-LONG-001:cmj.concentric_impulse:v1",
+            "reproducibility_key": _seed_key("SPEC-LONG-001"),
         },
         {
             "id": "RUN-0002",
@@ -602,7 +786,7 @@ def build_analysis_artifacts(
                 "status": reliability.get("status"),
             },
             "output_artifact_ids": ["EVID-0002", "FIG-0002"],
-            "reproducibility_key": f"{snapshot['id']}:SPEC-REL-001:cmj.concentric_impulse:v1",
+            "reproducibility_key": _seed_key("SPEC-REL-001"),
         },
         {
             "id": "RUN-0003",
@@ -619,9 +803,14 @@ def build_analysis_artifacts(
             "result": individual,
             "diagnostics": {"description": "Descriptive individual change with typical-error context; no causal individual inference.", "n_subjects": individual["n_subjects"]},
             "output_artifact_ids": ["EVID-0003"],
-            "reproducibility_key": f"{snapshot['id']}:SPEC-IND-001:cmj.concentric_impulse:v1",
+            "reproducibility_key": _seed_key("SPEC-IND-001"),
         },
     ]
+    for run in runs:
+        spec = specs_by_id[run["analysis_spec_id"]]
+        run["plan_alignment"] = "PLANNED"
+        run["result_digest"] = result_digest(run["method_id"], run["result"])
+        run["execution"] = {"analysis_spec": spec, "cohort": cohort}
     primary_contrast = longitudinal["contrasts"][longitudinal["primary_contrast_id"]]
     week_10_contrast = longitudinal["contrasts"]["intervention_vs_comparison_week_10"]
     baseline_balance = longitudinal["contrasts"]["baseline_balance_week_1"]
@@ -696,8 +885,30 @@ def build_analysis_artifacts(
             "interpretation": "Individual change is descriptive and should be interpreted against the baseline repeated-trial typical error.",
         },
     ]
+    run_by_id = {run["id"]: run for run in runs}
+    reliability_ci = (reliability.get("icc_3_1_ci_low"), reliability.get("icc_3_1_ci_high"))
+    intervals = {
+        "EVID-0001": {"low": primary_contrast["ci_low"], "high": primary_contrast["ci_high"], "level": 0.95, "kind": "Wald 95% CI"},
+        "EVID-0002": {"low": reliability_ci[0], "high": reliability_ci[1], "level": 0.95, "kind": "Shrout–Fleiss F-based 95% CI"} if reliability.get("status") == "COMPUTED" else None,
+        "EVID-0003": None,
+    }
+    classes = {"EVID-0001": "CONFIRMATORY", "EVID-0002": "PLANNED", "EVID-0003": "PLANNED"}
+    for item in evidence:
+        run = run_by_id[item["analysis_run_id"]]
+        item.update({
+            "evidence_class": classes[item["id"]],
+            "interval": intervals[item["id"]],
+            "analysis_spec_id": run["analysis_spec_id"],
+            "cohort_id": run["cohort_id"],
+            "reproducibility_key": run["reproducibility_key"],
+            "result_digest": run["result_digest"],
+            "version": 1,
+            "state": "CURRENT",
+            "created_at": timestamp,
+        })
+        item.setdefault("contrast_id", longitudinal["primary_contrast_id"] if item["kind"] == "EFFECT" else None)
     figures = [
-        {"id": "FIG-0001", "title": "Concentric impulse response by intervention arm", "kind": "LINE", "evidence_ids": ["EVID-0001"], "dataset_snapshot_id": snapshot["id"], "analysis_run_id": "RUN-0001", "spec": {"x": "week", "y": "concentric impulse", "unit": "N·s·kg⁻¹", "series": ["INTERVENTION", "COMPARISON"], "source_artifact": "overview_signal.json"}},
+        {"id": "FIG-0001", "title": "Concentric impulse response by intervention arm", "kind": "LINE", "evidence_ids": ["EVID-0001"], "dataset_snapshot_id": snapshot["id"], "analysis_run_id": "RUN-0001", "spec": {"x": "week", "y": "concentric impulse", "unit": "N·s·kg⁻¹", "series": ["INTERVENTION", "COMPARISON"], "metric_id": "MET-CMJ-IMPULSE", "cohort_id": "COHORT-001", "subject_ids": cohort.get("subject_ids", []), "summary": "arm weekly mean ± 95% CI of first valid trials", "source_artifact": "cmj_trials.parquet"}},
         {"id": "FIG-0002", "title": "Within-subject CV across baseline athletes", "kind": "DISTRIBUTION", "evidence_ids": ["EVID-0002"], "dataset_snapshot_id": snapshot["id"], "analysis_run_id": "RUN-0002", "spec": {"x": "within-subject CV", "unit": "%", "values": [row["cv_percent"] for row in reliability.get("cv_percent_by_subject", [])], "source_artifact": "evidence.json#EVID-0002.diagnostics.cv_percent_by_subject"}},
     ]
     overview_signal = _overview_signal(trial_rows)

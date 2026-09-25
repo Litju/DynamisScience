@@ -410,9 +410,15 @@ def _build_trials(
     return trial_rows, trace_rows, missing_slots
 
 
+PRIMARY_ESTIMAND = "Intervention × Time: difference in change from week 1 to week 10, intervention minus comparison"
+LONG_FORMULA = "{outcome} ~ week + group + week:group; athlete random intercept + random week slope (estimator ladder recorded on the run)"
+LONG_PARAMETERS = {"reference_week": 1, "contrast_week": 10, "alpha": 0.05}
+
+
 def _analysis_specs() -> list[dict[str, Any]]:
     return [
-        {"id": "SPEC-LONG-001", "study_id": "STUDY-001", "name": "Group longitudinal effect on concentric impulse", "method_id": "METH-LONG", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "concentric_impulse ~ week + group + week:group; random intercept = athlete", "parameters": {"reference_week": 1, "contrast_week": 10, "alpha": 0.05, "fallback": "athlete-clustered OLS"}, "planned_contrasts": ["Intervention × Time at week 10 versus comparison"], "status": "FROZEN"},
+        {"id": "SPEC-LONG-001", "study_id": "STUDY-001", "name": "Group longitudinal effect on concentric impulse", "method_id": "METH-LONG", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": LONG_FORMULA.format(outcome="concentric_impulse"), "parameters": LONG_PARAMETERS, "planned_contrasts": [PRIMARY_ESTIMAND], "primary_estimand": PRIMARY_ESTIMAND, "status": "FROZEN"},
+        {"id": "SPEC-LONG-002", "study_id": "STUDY-001", "name": "Group longitudinal effect on eccentric braking duration", "method_id": "METH-LONG", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-BRAKING-DURATION", "model_formula": LONG_FORMULA.format(outcome="eccentric_braking_duration"), "parameters": LONG_PARAMETERS, "planned_contrasts": [PRIMARY_ESTIMAND], "primary_estimand": PRIMARY_ESTIMAND, "status": "FROZEN"},
         {"id": "SPEC-REL-001", "study_id": "STUDY-001", "name": "Baseline repeated-trial reliability", "method_id": "METH-REL", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "ICC(3,1) with balanced repeated baseline trials", "parameters": {"baseline_weeks": [1], "alpha": 0.05}, "planned_contrasts": ["Within-subject CV, typical error, ICC(3,1)"], "status": "FROZEN"},
         {"id": "SPEC-IND-001", "study_id": "STUDY-001", "name": "Individual longitudinal change", "method_id": "METH-IND", "method_version": "1.1.0", "cohort_id": "COHORT-001", "snapshot_id": SNAPSHOT_ID, "outcome_metric_id": "MET-CMJ-IMPULSE", "model_formula": "baseline mean, observed post-block change, standardized change, typical-error context", "parameters": {"baseline_weeks": [1, 2], "post_weeks": [9, 10]}, "planned_contrasts": ["Individual descriptive change"], "status": "FROZEN"},
     ]
@@ -558,17 +564,22 @@ def _registry(specs: list[dict[str, Any]]) -> dict[str, Any]:
         ],
         "algorithms": [
             {"id": "ALG-CMJ", "name": "CMJ phase-aware metric extraction", "version": "1.0.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/generate.py::_force_trace", "description": "Deterministic phase template with trapezoidal net-force integration."},
-            {"id": "ALG-MIXEDLM", "name": "Group × time repeated-measures model", "version": "1.1.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/analysis.py::_group_longitudinal", "description": "statsmodels MixedLM with athlete random intercept; athlete-clustered OLS fallback."},
+            {"id": "ALG-MIXEDLM", "name": "Group × time repeated-measures model", "version": "1.1.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/analysis.py::_group_longitudinal", "description": "statsmodels MixedLM with athlete random intercept and random week slope; documented estimator ladder down to athlete-clustered OLS."},
+            {"id": "ALG-IND", "name": "Baseline/post descriptive change", "version": "1.1.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/analysis.py::_individual_change", "description": "Per-athlete baseline (weeks 1-2) and post-block (weeks 9-10) means with standardised change."},
             {"id": "ALG-ICC", "name": "Balanced two-way ICC(3,1)", "version": "1.1.0", "status": "ACTIVE", "implementation": "services/science/dynamis_science/analysis.py::_reliability", "description": "Within-subject CV, typical error (√MSE) and Shrout–Fleiss confidence limits."},
             {"id": "ALG-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.2.0", "status": "PROTOTYPE", "implementation": "services/science/dynamis_science/analysis.py::_training_response", "description": "Grid-searched fitness–fatigue time constants with exposed residuals."},
         ],
         "methods": [
-            {"id": "METH-LONG", "name": "Group × time longitudinal model", "version": "1.1.0", "status": "FROZEN", "estimator": "statsmodels MixedLM (athlete random intercept)", "fallback": "athlete-clustered OLS"},
-            {"id": "METH-REL", "name": "Repeated-trial reliability", "version": "1.1.0", "status": "FROZEN", "estimator": "ICC(3,1) / within-subject CV / typical error"},
-            {"id": "METH-IND", "name": "Individual change context", "version": "1.1.0", "status": "FROZEN", "estimator": "baseline versus post-block descriptive change"},
+            {"id": "METH-LONG", "name": "Group × time longitudinal model", "version": "1.1.0", "status": "FROZEN", "algorithm": "ALG-MIXEDLM", "estimator": "statsmodels MixedLM, athlete random intercept + random week slope", "fallback": "MixedLM random intercept, then GEE exchangeable, then athlete-clustered OLS (recorded on the run)", "estimand": PRIMARY_ESTIMAND, "requirements": ["At least 2 arms with repeated weekly observations", "First valid CMJ trial per athlete-week", "Week centred on the reference week"], "outputs": ["difference-in-change contrast with SE and Wald 95% CI", "baseline balance", "model-implied cross-sectional difference", "residual diagnostics"], "known_limitations": ["Linear week term; non-linear responses appear as structured residuals.", "Wald intervals rely on a normal approximation."]},
+            {"id": "METH-REL", "name": "Repeated-trial reliability", "version": "1.1.0", "status": "FROZEN", "algorithm": "ALG-ICC", "estimator": "ICC(3,1) / within-subject CV / typical error", "requirements": ["At least 3 athletes with 2 or more valid trials in the baseline week", "Balanced trials per athlete (trimmed to the minimum k)"], "outputs": ["ICC(3,1) with Shrout-Fleiss 95% CI", "typical error (square root of MSE)", "within-subject CV per athlete", "smallest worthwhile change"], "known_limitations": ["Two trials per athlete bound the precision of the ICC.", "Reliability is estimated for baseline conditions only."]},
+            {"id": "METH-IND", "name": "Individual change context", "version": "1.1.0", "status": "FROZEN", "algorithm": "ALG-IND", "estimator": "baseline versus post-block descriptive change", "requirements": ["Valid trials in baseline weeks 1-2 and post-block weeks 9-10"], "outputs": ["baseline mean", "post mean", "raw and standardised change", "comparison with the typical error of a change"], "known_limitations": ["Descriptive only; not a causal individual response.", "Typical error of a change is derived from the cohort change SD."]},
         ],
         "models": [
-            {"id": "MODEL-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.2.0", "status": "PROTOTYPE", "description": "A bounded mechanistic demonstration fitted to weekly training-load and CMJ observations."},
+            {"id": "MODEL-FITNESS-FATIGUE", "name": "Training response impulse model", "version": "0.2.0", "status": "PROTOTYPE", "kind": "Mechanistic", "description": "A bounded mechanistic demonstration fitted to weekly training-load and CMJ observations.", "inputs": ["weekly training impulse (AU)", "weekly mean first-trial concentric impulse (N·s·kg⁻¹)"], "known_limitations": ["Aggregate group-mean prototype; not an individual predictor.", "Grid-searched parameters without uncertainty."]},
+            {"id": "MODEL-BAYES", "name": "Bayesian hierarchical models", "status": "UNAVAILABLE", "kind": "Bayesian", "description": "Roadmap category. No Bayesian executor is implemented in this MVP."},
+            {"id": "MODEL-ML", "name": "Machine learning", "status": "UNAVAILABLE", "kind": "Machine Learning", "description": "Roadmap category. No machine-learning model is trained or served in this MVP."},
+            {"id": "MODEL-PIML", "name": "Physics-informed ML", "status": "UNAVAILABLE", "kind": "Physics-Informed ML", "description": "Roadmap category. No physics-informed learning is implemented in this MVP."},
+            {"id": "MODEL-DIFFBIO", "name": "Differentiable biomechanics", "status": "UNAVAILABLE", "kind": "Differentiable Biomechanics", "description": "Roadmap category. No differentiable biomechanical simulator is implemented in this MVP."},
         ],
     }
 
@@ -592,7 +603,7 @@ def _study_artifacts(specs: list[dict[str, Any]]) -> dict[str, Any]:
             "protocol_ids": ["PROT-CMJ", "PROT-LOAD", "PROT-MATCH"],
             "analysis_spec_ids": [spec["id"] for spec in specs],
         },
-        "question": {"id": "RQ-001", "study_id": "STUDY-001", "statement": "Does the strength intervention alter CMJ propulsion and braking strategy relative to comparison athletes?", "estimand": "Difference in week-10 intervention versus comparison mean, adjusted for repeated athlete observations.", "population": "28 synthetic elite football athletes", "exposure": "Weeks 3–10 progressive strength block", "outcomes": ["cmj.concentric_impulse", "cmj.eccentric_braking_duration"], "time_horizon": "Baseline through follow-up week 16"},
+        "question": {"id": "RQ-001", "study_id": "STUDY-001", "statement": "Does the strength intervention alter CMJ propulsion and braking strategy relative to comparison athletes?", "estimand": PRIMARY_ESTIMAND + ", estimated with a repeated-measures model of first valid weekly trials.", "population": "28 synthetic elite football athletes", "exposure": "Weeks 3–10 progressive strength block", "outcomes": ["cmj.concentric_impulse", "cmj.eccentric_braking_duration"], "time_horizon": "Baseline through follow-up week 16"},
         "hypotheses": [
             {"id": "HYP-001", "study_id": "STUDY-001", "question_id": "RQ-001", "statement": "Intervention athletes will show a greater increase in concentric impulse than comparison athletes.", "direction": "increase", "status": "PRIMARY", "rationale": "The intervention emphasises rate of force development and force expression."},
             {"id": "HYP-002", "study_id": "STUDY-001", "question_id": "RQ-001", "statement": "Intervention athletes will show a modest reduction in eccentric braking duration.", "direction": "decrease", "status": "PRIMARY", "rationale": "Improved braking strategy may accompany increased braking impulse."},
@@ -609,7 +620,7 @@ def _study_artifacts(specs: list[dict[str, Any]]) -> dict[str, Any]:
             {"id": "PROT-MATCH", "study_id": "STUDY-001", "name": "Match segment tracking", "description": "Bounded 10 Hz tracking and pose segment for synchronized field and joint-space inspection.", "frequency": "Match exposure", "status": "ACTIVE", "duration_weeks": 16, "visit_labels": ["Segment"]},
         ],
         "analysis_specs": specs,
-        "plan": {"id": "PLAN-001", "status": "FROZEN", "frozen_before_inspection": True, "primary_outcomes": ["concentric impulse", "eccentric braking duration"], "secondary_outcomes": ["jump height (flight time)", "peak power", "countermovement depth"], "exclusion_criteria": ["No baseline CMJ session", "Force trace fails deterministic QC rule"], "planned_models": ["Group × time mixed model", "ICC(3,1) reliability", "Individual change context"], "planned_contrasts": ["Intervention × Time at week 10 versus comparison"], "immutability_rule": "Changing cohort, method, parameters, dataset or exclusions creates a new AnalysisSpec and a new AnalysisRun."},
+        "plan": {"id": "PLAN-001", "status": "FROZEN", "frozen_before_inspection": True, "primary_outcomes": ["concentric impulse", "eccentric braking duration"], "secondary_outcomes": ["jump height (flight time)", "peak power", "countermovement depth"], "exclusion_criteria": ["No baseline CMJ session", "Force trace fails deterministic QC rule"], "planned_models": ["Group × time mixed model (SPEC-LONG-001, SPEC-LONG-002)", "ICC(3,1) reliability (SPEC-REL-001)", "Individual change context (SPEC-IND-001)"], "planned_contrasts": [PRIMARY_ESTIMAND], "primary_estimand": PRIMARY_ESTIMAND, "planned_reliability": "Baseline week-1 repeated trials: ICC(3,1), within-subject CV and typical error", "post_plan_rule": "Any analysis whose method, outcome, cohort, parameters or exclusions differ from a frozen spec is recorded as EXPLORATORY.", "immutability_rule": "Changing cohort, method, parameters, dataset or exclusions creates a new AnalysisSpec and a new AnalysisRun."},
     }
 
 
@@ -621,9 +632,46 @@ def _report() -> dict[str, Any]:
         "status": "DRAFT",
         "evidence_ids": ["EVID-0001", "EVID-0002", "EVID-0003"],
         "figure_ids": ["FIG-0001", "FIG-0002"],
-        "sections": ["Study information", "Methods", "Cohort and data quality", "Longitudinal result", "Reliability evidence", "Interpretation and limitations", "Reproducibility"],
+        "sections": ["Study question and design", "Dataset and cohort", "Methods", "Intervention result", "Reliability context", "Interpretation", "Limitations", "Reproducibility and provenance"],
+        "citations": [
+            {"artifact_id": "EVID-0001", "section": "Intervention result", "added_at": GENERATED_AT},
+            {"artifact_id": "FIG-0001", "section": "Intervention result", "added_at": GENERATED_AT},
+            {"artifact_id": "EVID-0002", "section": "Reliability context", "added_at": GENERATED_AT},
+            {"artifact_id": "FIG-0002", "section": "Reliability context", "added_at": GENERATED_AT},
+            {"artifact_id": "EVID-0003", "section": "Reliability context", "added_at": GENERATED_AT},
+        ],
         "provenance_note": "All displayed estimates and figures are computed from DS-SYNTH-001 using frozen analysis specifications.",
         "created_at": GENERATED_AT,
+    }
+
+
+def _investigation() -> dict[str, Any]:
+    """The seeded primary investigation.
+
+    Blocks reference typed domain objects by ID; the GUI renders them but is
+    not the authority for any scientific value.
+    """
+    blocks = [
+        {"id": "B-QUESTION", "type": "question", "title": "Research question", "state": {"question_id": "RQ-001", "plan_id": "PLAN-001"}},
+        {"id": "B-DATASET", "type": "dataset", "title": "DS-SYNTH-001", "state": {"snapshot_id": SNAPSHOT_ID}},
+        {"id": "B-COHORT", "type": "cohort", "title": "Study cohort", "state": {"cohort_id": "COHORT-001", "excluded_subject_ids": []}},
+        {"id": "B-EXPLORE", "type": "explore", "title": "Concentric impulse longitudinal trajectory", "state": {"metric_id": "MET-CMJ-IMPULSE", "population": "ALL", "view": "LONGITUDINAL", "reference": "RAW", "context": ["LOAD", "MATCH"], "cohort_block_id": "B-COHORT"}},
+        {"id": "B-ANALYSIS", "type": "analysis", "title": "Longitudinal intervention model", "state": {"spec_id": "SPEC-LONG-001", "method_id": "METH-LONG", "outcome_metric_id": "MET-CMJ-IMPULSE", "parameters": dict(LONG_PARAMETERS), "cohort_block_id": "B-COHORT", "run_id": "RUN-0001"}},
+        {"id": "B-DIAGNOSTICS", "type": "diagnostics", "title": "Model diagnostics", "state": {"analysis_block_id": "B-ANALYSIS"}},
+        {"id": "B-EVIDENCE", "type": "evidence", "title": "Intervention × Time effect", "state": {"analysis_block_id": "B-ANALYSIS", "evidence_id": "EVID-0001"}},
+        {"id": "B-FIGURE", "type": "figure", "title": "Group longitudinal response", "state": {"evidence_block_id": "B-EVIDENCE", "figure_id": "FIG-0001"}},
+        {"id": "B-INTERPRETATION", "type": "interpretation", "title": "Interpretation", "state": {"evidence_block_id": "B-EVIDENCE", "note": "The difference-in-change estimate is read against the baseline reliability (EVID-0002): an effect smaller than the smallest worthwhile change would not support a practically meaningful adaptation. The week-12 dip coincides with the week-11 load spike and is not part of the planned contrast."}},
+        {"id": "B-REPORT", "type": "report_section", "title": "Report · Intervention result", "state": {"report_id": "REPORT-001", "section": "Intervention result"}},
+    ]
+    return {
+        "id": "INV-001",
+        "study_id": "STUDY-001",
+        "title": "Primary Intervention Analysis",
+        "status": "ACTIVE",
+        "version": 1,
+        "created_at": GENERATED_AT,
+        "updated_at": GENERATED_AT,
+        "blocks": [{**block, "collapsed": False} for block in blocks],
     }
 
 
@@ -681,6 +729,7 @@ def generate_data() -> dict[str, Any]:
     _write_json(ARTIFACT_DIR / "registry.json", registry)
     _write_json(ARTIFACT_DIR / "study.json", study)
     _write_json(ARTIFACT_DIR / "report.json", _report())
+    _write_json(ARTIFACT_DIR / "investigations.json", [_investigation()])
     _write_json(ARTIFACT_DIR / "missing_observations.json", missing_slots)
     snapshot = _write_snapshot_manifest()
     analysis = build_analysis_artifacts(trial_rows, load_rows, snapshot, study, registry)

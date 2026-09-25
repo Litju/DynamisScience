@@ -412,54 +412,147 @@ def test_lineage_nodes_carry_inspectable_metadata(client: TestClient) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_executed_analysis_appends_a_new_run_with_evidence_and_lineage(client: TestClient) -> None:
+def _ledger_fields(run: dict) -> dict:
+    """Stored run fields; ``reproduces``/``evidence_ids`` are computed views."""
+    return {key: value for key, value in run.items() if key not in {"reproduces", "evidence_ids"}}
+
+
+def test_execution_appends_an_immutable_run_without_creating_evidence(client: TestClient) -> None:
     before = client.get("/runs").json()
-    before_ids = {run["id"] for run in before}
+    evidence_before = client.get("/evidence").json()
     response = client.post(
         "/analyses/execute",
         json={"method_id": "METH-LONG", "outcome_metric_id": "MET-CMJ-IMPULSE", "parameters": {"reference_week": 1, "contrast_week": 10}},
     )
     assert response.status_code == 200
     created = response.json()
-    assert created["id"] not in before_ids
+    assert created["id"] not in {run["id"] for run in before}
     assert created["status"] == "COMPLETED"
     assert created["snapshot_id"] == SNAPSHOT_ID
     assert created["seed"] == 20260924
     assert created["duration_ms"] > 0
     assert created["software_versions"]["service"]
     assert created["reproducibility_key"].startswith(SNAPSHOT_ID)
-
-    evidence_id = created["evidence_artifact"]["id"]
-    assert evidence_id in created["output_artifact_ids"]
-    assert created["evidence_artifact"]["analysis_run_id"] == created["id"]
+    # Execution never creates evidence: promotion is an explicit action.
+    assert created["output_artifact_ids"] == []
+    assert created["evidence_ids"] == []
+    assert len(client.get("/evidence").json()) == len(evidence_before)
 
     after = client.get("/runs").json()
     assert len(after) == len(before) + 1
-    # Historical runs must be untouched.
     for original in before:
-        assert next(run for run in after if run["id"] == original["id"]) == original
+        assert _ledger_fields(next(run for run in after if run["id"] == original["id"])) == _ledger_fields(original)
 
-    lineage = client.get(f"/lineage/{created['id']}").json()
-    node_ids = {node["id"] for node in lineage["nodes"]}
-    assert created["id"] in node_ids and evidence_id in node_ids
-    assert (created["id"], evidence_id) in {(edge["source"], edge["target"]) for edge in lineage["edges"]}
 
-    detail = client.get(f"/evidence/{evidence_id}").json()
+def test_rerunning_the_frozen_spec_reproduces_the_seeded_run(client: TestClient) -> None:
+    created = client.post("/analyses/execute", json={"method_id": "METH-LONG", "outcome_metric_id": "MET-CMJ-IMPULSE"}).json()
+    assert created["analysis_spec_id"] == "SPEC-LONG-001"
+    assert created["plan_alignment"] == "PLANNED"
+    assert created["execution"]["analysis_spec"]["status"] == "FROZEN"
+    assert "RUN-0001" in created["reproduces"]
+    primary = client.get("/runs/RUN-0001").json()["result"]["primary"]
+    contrast_id = primary["primary_contrast_id"]
+    assert created["result"]["contrasts"][contrast_id]["estimate"] == pytest.approx(primary["contrasts"][contrast_id]["estimate"], rel=1e-9)
+
+
+def test_promotion_creates_one_immutable_evidence_artifact_per_run(client: TestClient) -> None:
+    runs_before = client.get("/runs").json()
+    created = client.post("/analyses/execute", json={"method_id": "METH-LONG", "outcome_metric_id": "MET-CMJ-IMPULSE"}).json()
+    promoted = client.post("/evidence", json={"run_id": created["id"]})
+    assert promoted.status_code == 200
+    payload = promoted.json()
+    evidence = payload["evidence_artifact"]
+    assert payload["already_promoted"] is False
+    assert evidence["analysis_run_id"] == created["id"]
+    assert evidence["analysis_spec_id"] == "SPEC-LONG-001"
+    assert evidence["evidence_class"] == "CONFIRMATORY"
+    assert evidence["interval"]["low"] < evidence["estimate"] < evidence["interval"]["high"]
+    assert evidence["interval"]["level"] == 0.95
+    assert "EVID-0001" in evidence["reproduces"]
+    assert payload["figure_artifact"]["evidence_ids"] == [evidence["id"]]
+
+    again = client.post("/evidence", json={"run_id": created["id"]}).json()
+    assert again["already_promoted"] is True
+    assert again["evidence_artifact"]["id"] == evidence["id"]
+    assert sum(1 for item in client.get("/evidence").json() if item["analysis_run_id"] == created["id"]) == 1
+
+    # Promotion must not rewrite the run ledger.
+    ledger = {run["id"]: run for run in client.get("/runs").json()}
+    for original in runs_before:
+        assert _ledger_fields(ledger[original["id"]]) == _ledger_fields(original)
+
+    lineage = client.get(f"/lineage/{evidence['id']}").json()
+    assert (created["id"], evidence["id"]) in {(edge["source"], edge["target"]) for edge in lineage["edges"]}
+    detail = client.get(f"/evidence/{evidence['id']}").json()
     assert detail["source_runs"][0]["id"] == created["id"]
-    assert detail["lineage"]["focus"]["id"] == evidence_id
+    assert detail["lineage"]["focus"]["id"] == evidence["id"]
+
+
+def test_promotion_rejects_unknown_runs(client: TestClient) -> None:
+    assert client.post("/evidence", json={"run_id": "RUN-9999"}).status_code == 404
+
+
+def test_second_primary_outcome_resolves_to_its_frozen_spec(client: TestClient) -> None:
+    created = client.post("/analyses/execute", json={"method_id": "METH-LONG", "outcome_metric_id": "MET-CMJ-BRAKING-DURATION"}).json()
+    assert created["analysis_spec_id"] == "SPEC-LONG-002"
+    assert created["plan_alignment"] == "PLANNED"
+    contrast = created["result"]["contrasts"][created["result"]["primary_contrast_id"]]
+    assert contrast["unit"] == "s"
+    assert contrast["ci_high"] < 0, "Braking duration should shorten in the intervention arm"
+
+
+def test_deviations_from_the_frozen_plan_are_exploratory(client: TestClient) -> None:
+    excluded = client.post("/analyses/execute", json={"method_id": "METH-LONG", "excluded_subject_ids": ["SUB-001", "SUB-002"]}).json()
+    assert excluded["plan_alignment"] == "EXPLORATORY"
+    assert excluded["cohort_id"].startswith("COHORT-D-")
+    assert excluded["execution"]["cohort"]["status"] == "DRAFT"
+    assert excluded["result"]["n_subjects"] == 26
+    again = client.post("/analyses/execute", json={"method_id": "METH-LONG", "excluded_subject_ids": ["SUB-002", "SUB-001"]}).json()
+    assert again["cohort_id"] == excluded["cohort_id"], "The same selection must resolve to the same cohort"
+    assert excluded["id"] in again["reproduces"]
+
+    window = client.post("/analyses/execute", json={"method_id": "METH-LONG", "parameters": {"contrast_week": 8}}).json()
+    assert window["plan_alignment"] == "EXPLORATORY"
+    assert window["execution"]["analysis_spec"]["status"] == "EXPLORATORY"
+    assert window["result"]["contrast_week"] == 8
+    promoted = client.post("/evidence", json={"run_id": window["id"]}).json()["evidence_artifact"]
+    assert promoted["evidence_class"] == "EXPLORATORY"
+
+
+def test_execution_validates_parameters(client: TestClient) -> None:
+    assert client.post("/analyses/execute", json={"method_id": "METH-LONG", "parameters": {"contrast_week": 1}}).status_code == 422
+    assert client.post("/analyses/execute", json={"method_id": "METH-NOPE"}).status_code == 422
+    assert client.post("/analyses/execute", json={"method_id": "METH-LONG", "excluded_subject_ids": ["SUB-999"]}).status_code == 422
 
 
 def test_executed_analysis_spec_captures_the_configuration(client: TestClient) -> None:
     created = client.post(
         "/analyses/execute",
-        json={"method_id": "METH-REL", "outcome_metric_id": "MET-CMJ-IMPULSE"},
+        json={"method_id": "METH-REL", "outcome_metric_id": "MET-CMJ-IMPULSE", "parameters": {"baseline_weeks": [1, 2]}},
     ).json()
     spec = created["execution"]["analysis_spec"]
     assert spec["method_id"] == "METH-REL"
     assert spec["snapshot_id"] == SNAPSHOT_ID
     assert spec["status"] == "EXPLORATORY"
-    assert created["evidence_artifact"]["kind"] == "RELIABILITY"
-    assert 0 < created["evidence_artifact"]["value"] <= 1
+    assert spec["parameters"]["baseline_weeks"] == [1, 2]
+    evidence = client.post("/evidence", json={"run_id": created["id"]}).json()["evidence_artifact"]
+    assert evidence["kind"] == "RELIABILITY"
+    assert 0 < evidence["value"] <= 1
+
+
+def test_longitudinal_diagnostics_are_computed_and_attached(dataset: dict) -> None:
+    runs = json.loads((ARTIFACT_DIR / "analysis_runs.json").read_text(encoding="utf-8"))
+    diagnostics = next(run for run in runs if run["id"] == "RUN-0001")["diagnostics"]
+    assert diagnostics["estimator"] == "MIXEDLM_RANDOM_SLOPE"
+    assert diagnostics["converged"] is True
+    assert len(diagnostics["residual_by_week"]) == 16
+    qq = diagnostics["residual_qq"]
+    assert len(qq) >= 30
+    assert [point["theoretical"] for point in qq] == sorted(point["theoretical"] for point in qq)
+    # The only flagged trial is a trial-2 repeat, so it never enters the first-trial model.
+    assert diagnostics["sample_context"]["valid_first_trials_used"] == diagnostics["n_observations"]
+    assert diagnostics["assumptions"] and diagnostics["limitations"]
+    assert diagnostics["baseline_balance"]["ci_low"] < 0 < diagnostics["baseline_balance"]["ci_high"]
 
 
 def test_executed_analysis_rejects_unknown_metrics(client: TestClient) -> None:
@@ -580,3 +673,140 @@ def test_no_generated_artifact_contains_a_placeholder_value(dataset: dict) -> No
         text = Path(path).read_text(encoding="utf-8")
         for marker in ("TODO", "FIXME", "PLACEHOLDER", "lorem", "XXX"):
             assert marker not in text, f"{path.name} contains {marker}"
+
+
+# --------------------------------------------------------------------------- #
+# Workbench surfaces: cohort, exploration, lineage path, model, investigations
+# --------------------------------------------------------------------------- #
+
+
+def test_frozen_plan_states_the_difference_in_change_estimand(dataset: dict) -> None:
+    study = json.loads((ARTIFACT_DIR / "study.json").read_text(encoding="utf-8"))
+    for text in (study["plan"]["primary_estimand"], study["question"]["estimand"], *study["plan"]["planned_contrasts"]):
+        assert "difference in change from week 1 to week 10" in text
+    frozen = {spec["id"]: spec for spec in study["analysis_specs"] if spec["status"] == "FROZEN"}
+    assert {"SPEC-LONG-001", "SPEC-LONG-002", "SPEC-REL-001", "SPEC-IND-001"} <= set(frozen)
+    assert frozen["SPEC-LONG-002"]["outcome_metric_id"] == "MET-CMJ-BRAKING-DURATION"
+
+
+def test_cohort_resolution_reports_counts_and_missingness(client: TestClient) -> None:
+    frozen = client.post("/cohorts/resolve", json={"excluded_subject_ids": []}).json()
+    assert frozen["cohort"]["id"] == "COHORT-001"
+    assert frozen["cohort"]["status"] == "FROZEN"
+    assert frozen["arm_counts"] == {"INTERVENTION": 14, "COMPARISON": 14}
+    assert frozen["trial_quality"]["excluded"] == 1
+    assert frozen["trial_quality"]["missing"] == 12
+    assert frozen["trial_quality"]["excluded_trials"][0]["reason"]
+    draft = client.post("/cohorts/resolve", json={"excluded_subject_ids": ["SUB-009"]}).json()
+    assert draft["cohort"]["status"] == "DRAFT"
+    assert draft["n"] == 27
+    assert not next(athlete for athlete in draft["athletes"] if athlete["subject_id"] == "SUB-009")["included"]
+    assert draft["trial_quality"]["missing"] < frozen["trial_quality"]["missing"]
+
+
+def test_exploration_aggregates_athletes_and_discovers_context(client: TestClient) -> None:
+    payload = client.get("/explore/longitudinal", params={"metric_id": "MET-CMJ-IMPULSE"}).json()
+    assert payload["unit"] == "N·s·kg⁻¹"
+    assert len(payload["athletes"]) == 28
+    assert len(payload["summary"]) == 32
+    for row in payload["summary"]:
+        assert row["n_athletes"] == 14
+        assert row["ci_low"] < row["mean"] < row["ci_high"]
+    assert [peak["week"] for peak in payload["annotations"]["load_peaks"]] == [11]
+    assert payload["annotations"]["intervention_block"]["start_week"] == 3
+    assert payload["annotations"]["intervention_block"]["end_week"] == 10
+    change = client.get("/explore/longitudinal", params={"metric_id": "MET-CMJ-IMPULSE", "reference": "CHANGE"}).json()
+    week10 = {row["arm"]: row["mean"] for row in change["summary"] if row["week"] == 10}
+    assert week10["INTERVENTION"] > week10["COMPARISON"]
+    subset = client.get("/explore/longitudinal", params={"exclude": "SUB-001,SUB-003"}).json()
+    assert subset["cohort"]["n"] == 26 and subset["cohort"]["status"] == "DRAFT"
+
+
+def test_lineage_path_scope_reaches_source_measurements(client: TestClient) -> None:
+    payload = client.get("/lineage/EVID-0001", params={"scope": "path"}).json()
+    ids = {node["id"] for node in payload["nodes"]}
+    edges = {(edge["source"], edge["target"]) for edge in payload["edges"]}
+    chain = ["GEN-001", "TRIAL-INDEX", "MET-CMJ-IMPULSE", SNAPSHOT_ID, "COHORT-001", "SPEC-LONG-001", "RUN-0001", "EVID-0001", "FIG-0001", "REPORT-001"]
+    assert set(chain) <= ids
+    for source, target in zip(chain, chain[1:]):
+        assert (source, target) in edges, (source, target)
+    assert "RUN-0002" not in ids, "Unrelated runs must not appear on the evidence path"
+
+
+def test_scenario_simulation_extends_the_fitted_model(client: TestClient) -> None:
+    fitted = client.get("/models/training-response").json()["run"]
+    steady = client.post("/models/training-response/scenario", json={"future_load_au": [300.0] * 8}).json()
+    heavy = client.post("/models/training-response/scenario", json={"future_load_au": [600.0] * 8}).json()
+    history = [state["modelled_performance"] for state in steady["states"][:16]]
+    assert history == pytest.approx(fitted["output"]["modelled_performance"], abs=1e-5)
+    assert steady["states"][16]["segment"] == "SCENARIO"
+    assert steady["summary"]["scenario_final_performance"] != pytest.approx(heavy["summary"]["scenario_final_performance"])
+    again = client.post("/models/training-response/scenario", json={"future_load_au": [300.0] * 8}).json()
+    assert again["states"] == steady["states"] and again["scenario_id"] == steady["scenario_id"]
+    assert client.post("/models/training-response/scenario", json={"future_load_au": []}).status_code == 422
+    assert client.post("/models/training-response/scenario", json={"future_load_au": [-5.0]}).status_code == 422
+
+
+def test_seeded_investigation_is_an_ordered_typed_document(client: TestClient) -> None:
+    investigation = client.get("/investigations/INV-001").json()
+    assert [block["type"] for block in investigation["blocks"]] == [
+        "question", "dataset", "cohort", "explore", "analysis", "diagnostics", "evidence", "figure", "interpretation", "report_section",
+    ]
+    analysis = next(block for block in investigation["blocks"] if block["type"] == "analysis")
+    assert analysis["state"]["spec_id"] == "SPEC-LONG-001" and analysis["state"]["run_id"] == "RUN-0001"
+
+
+def test_investigation_updates_enforce_semantic_order(client: TestClient) -> None:
+    investigation = client.get("/investigations/INV-001").json()
+    blocks = investigation["blocks"]
+    reordered = [blocks[5], *blocks[:5], *blocks[6:]]  # diagnostics before its analysis
+    rejected = client.put("/investigations/INV-001", json={"blocks": reordered, "base_version": investigation["version"]})
+    assert rejected.status_code == 422
+    stale = client.put("/investigations/INV-001", json={"blocks": blocks, "base_version": investigation["version"] - 1})
+    assert stale.status_code == 409
+    collapsed = [{**block, "collapsed": block["type"] == "dataset"} for block in blocks]
+    saved = client.put("/investigations/INV-001", json={"blocks": collapsed, "base_version": investigation["version"]}).json()
+    assert saved["version"] == investigation["version"] + 1
+    assert next(block for block in saved["blocks"] if block["type"] == "dataset")["collapsed"] is True
+    unknown = client.put("/investigations/INV-001", json={"blocks": [{"id": "X", "type": "dashboard", "title": "x"}]})
+    assert unknown.status_code == 422
+
+
+def test_dataset_surface_exposes_schemas_counts_and_checksums(client: TestClient) -> None:
+    detail = client.get("/datasets/DS-SYNTH-001").json()
+    snapshot = detail["snapshot"]
+    assert {table["name"] for table in detail["tables"]} == set(snapshot["row_counts"])
+    for table in detail["tables"]:
+        assert table["rows"] == table["manifest_rows"]
+        assert table["checksum_sha256"] == snapshot["checksums"][table["file"]]
+        assert table["columns"]
+    force = next(table for table in detail["tables"] if table["name"] == "force_traces")
+    assert force["sample_rate_hz"] == 1000
+    assert "synthetic" in detail["disclaimer"].lower()
+    assert client.get("/datasets/DS-NOPE").status_code == 404
+
+
+def test_force_trial_payload_is_bounded_and_self_describing(client: TestClient) -> None:
+    trials = client.get("/force/trials", params={"subject_id": "SUB-008", "week": 10}).json()
+    with_trace = next(trial for trial in trials if trial["trace_available"])
+    detail = client.get(f"/force/trials/{with_trace['trial_id']}").json()
+    assert detail["trace_available"] is True
+    assert len(detail["trace"]) == 2350
+    assert detail["subject"]["subject_id"] == "SUB-008"
+    assert detail["provenance"]["traces_checksum"]
+    assert set(detail["boundaries"]) == {"movement_onset", "unweighting_end", "braking_end", "takeoff", "landing"}
+
+
+def test_report_citations_are_explicit_and_idempotent(client: TestClient) -> None:
+    run = client.post("/analyses/execute", json={"method_id": "METH-LONG", "outcome_metric_id": "MET-CMJ-BRAKING-DURATION"}).json()
+    evidence = client.post("/evidence", json={"run_id": run["id"]}).json()["evidence_artifact"]
+    added = client.post("/report/citations", json={"artifact_id": evidence["id"]}).json()
+    assert added["section"] == "Intervention result" and added["already_cited"] is False
+    assert client.post("/report/citations", json={"artifact_id": evidence["id"]}).json()["already_cited"] is True
+    report = client.get("/report").json()
+    assert evidence["id"] in {item["id"] for item in report["evidence"]}
+    assert all(item["analysis_run_id"] for item in report["evidence"])
+    lineage = client.get("/lineage/REPORT-001").json()
+    assert (evidence["id"], "REPORT-001") in {(edge["source"], edge["target"]) for edge in lineage["edges"]}
+    assert client.delete(f"/report/citations/{evidence['id']}").json()["removed"] is True
+    assert client.post("/report/citations", json={"artifact_id": "EVID-9999"}).status_code == 404

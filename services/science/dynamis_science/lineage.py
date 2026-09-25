@@ -233,8 +233,12 @@ def build_lineage_graph(
         f"{snapshot.get('row_counts', {}).get('cmj_trials', 0)} CMJ trials",
         detail={"source": "cmj_trials.parquet", "trace_source": "force_traces.parquet", "sample_rate_hz": 1000},
     ))
-    link(snapshot_id, "TRIAL-INDEX", "contains", "trial summaries")
     link("GEN-001", "TRIAL-INDEX", "simulates", "synthetic measurements")
+    # Source measurements are upstream of the metrics extracted from them, and
+    # the metrics are materialised in the snapshot: generator → trial → metric
+    # → snapshot → cohort → spec → run → evidence → figure → report.
+    for metric_id in metric_defs:
+        link("TRIAL-INDEX", metric_id, "measured_as", "phase-aware extraction")
 
     add(_node(
         study_id,
@@ -319,7 +323,7 @@ def build_lineage_graph(
         link(artifact_id, "TRIAL-INDEX", "indexed_in", "trial registry")
         link(artifact_id, snapshot_id, "stored_in", "immutable snapshot")
         for metric_id in metric_defs:
-            link(metric_id, artifact_id, "extracted_from", "phase-aware extraction")
+            link(artifact_id, metric_id, "measured_as", "phase-aware extraction")
 
     if artifact_id == "MATCH-SYNTH-001":
         add(_node(
@@ -349,4 +353,47 @@ def build_lineage_graph(
         "focus": focus,
         "nodes": sorted(nodes.values(), key=lambda item: item["id"]),
         "edges": sorted(edges.values(), key=lambda item: item["id"]),
+    }
+
+
+def scope_lineage_graph(graph: dict[str, Any], descendant_depth: int = 3) -> dict[str, Any]:
+    """Restrict a full graph to the provenance path of its focused artefact.
+
+    Every ancestor is kept, so the route back to the generator is complete;
+    descendants are kept up to ``descendant_depth`` edges so an evidence
+    artefact shows the figure and report that consume it without pulling in
+    every other result derived from the same snapshot.
+    """
+    focus = graph["artifact_id"]
+    parents: dict[str, list[str]] = {}
+    children: dict[str, list[str]] = {}
+    for edge in graph["edges"]:
+        parents.setdefault(edge["target"], []).append(edge["source"])
+        children.setdefault(edge["source"], []).append(edge["target"])
+    ancestors: set[str] = set()
+    frontier = [focus]
+    while frontier:
+        current = frontier.pop()
+        for parent in parents.get(current, []):
+            if parent not in ancestors:
+                ancestors.add(parent)
+                frontier.append(parent)
+    descendants: set[str] = set()
+    level = [focus]
+    for _ in range(descendant_depth):
+        next_level = []
+        for current in level:
+            for child in children.get(current, []):
+                if child not in descendants and child not in ancestors and child != focus:
+                    descendants.add(child)
+                    next_level.append(child)
+        level = next_level
+    keep = ancestors | descendants | {focus}
+    return {
+        **graph,
+        "scope": "path",
+        "ancestor_ids": sorted(ancestors),
+        "descendant_ids": sorted(descendants),
+        "nodes": [node for node in graph["nodes"] if node["id"] in keep],
+        "edges": [edge for edge in graph["edges"] if edge["source"] in keep and edge["target"] in keep],
     }
