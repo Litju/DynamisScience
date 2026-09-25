@@ -36,6 +36,8 @@ from .lineage import build_lineage_graph, scope_lineage_graph
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     _ensure_data()
+    # Warm DuckDB and SciPy once so the first exploration a scientist opens is not a cold start.
+    explore_longitudinal(metric_id="MET-CMJ-IMPULSE", exclude="", reference="RAW")
     yield
 
 
