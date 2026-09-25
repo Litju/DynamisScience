@@ -1,103 +1,193 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { ArrowUpRight, Check, CircleAlert, Copy, ExternalLink, FlaskConical, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
-import type { Evidence, QualityState } from "@/lib/types";
+import { AlertTriangle, GitBranch, Microscope, ScanLine } from "lucide-react";
+import type { Arm } from "@/lib/types";
+import { ARM_LABEL, formatSig, shortChecksum } from "@/lib/scientific";
 
-export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "good" | "warn" | "bad" | "cyan" | "purple" }) {
-  return <span className={`status-badge status-${tone}`}><span className="status-dot" />{children}</span>;
+/** Maps the scientific status vocabulary to a colour token. The text is always rendered. */
+export function toneFor(state: string | null | undefined): string {
+  switch (state) {
+    case "VALID":
+    case "COMPLETED":
+    case "CURRENT":
+    case "ACTIVE":
+    case "COMPUTED":
+    case "CONVERGED":
+    case "REPRODUCED":
+    case "CITED":
+      return "tone-valid";
+    case "WARNING":
+    case "DRAFT":
+    case "INCOMPLETE":
+    case "PROTOTYPE":
+    case "MISSING":
+    case "NOT RUN":
+    case "FALLBACK":
+      return "tone-warning";
+    case "EXCLUDED":
+    case "FAILED":
+    case "UNAVAILABLE":
+      return "tone-excluded";
+    case "EXPLORATORY":
+    case "DESCRIPTIVE":
+      return "tone-exploratory";
+    case "FROZEN":
+    case "PLANNED":
+    case "CONFIRMATORY":
+      return "tone-frozen";
+    case "SYNTHETIC":
+      return "tone-synthetic";
+    case "SUPERSEDED":
+    case "ROADMAP":
+      return "tone-superseded";
+    default:
+      return "tone-neutral";
+  }
 }
 
-export function Panel({ children, className = "", title, eyebrow, action }: { children: ReactNode; className?: string; title?: string; eyebrow?: string; action?: ReactNode }) {
-  return <section className={`panel ${className}`}>
-    {(title || eyebrow || action) && <div className="panel-heading">
-      <div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}{title && <h2>{title}</h2>}</div>
-      {action}
-    </div>}
-    {children}
-  </section>;
+export function State({ children, tone, plain = false, title }: { children: string; tone?: string; plain?: boolean; title?: string }) {
+  return <span className={`state ${tone ?? toneFor(children)} ${plain ? "plain" : ""}`} title={title}>{children}</span>;
 }
 
-export function SectionHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
-  return <div className="section-header">
-    <div><div className="eyebrow">{eyebrow ?? "Scientific workspace"}</div><h1>{title}</h1>{description && <p>{description}</p>}</div>
-    {actions && <div className="header-actions">{actions}</div>}
-  </div>;
+export function ArmLabel({ arm }: { arm: Arm | string }) {
+  const known = arm === "INTERVENTION" || arm === "COMPARISON";
+  return <span className={`arm ${arm === "INTERVENTION" ? "arm-int" : "arm-cmp"}`}>{known ? ARM_LABEL[arm as Arm] : arm}</span>;
 }
 
-export function Button({ children, variant = "secondary", size = "md", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger"; size?: "sm" | "md" }) {
-  return <button className={`button button-${variant} button-${size} ${className}`} {...props}>{children}</button>;
+export function Button({ children, variant = "default", size = "md", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "primary" | "ghost"; size?: "sm" | "md" }) {
+  return (
+    <button type="button" className={`btn ${variant === "primary" ? "btn-primary" : variant === "ghost" ? "btn-ghost" : ""} ${size === "sm" ? "btn-sm" : ""} ${className}`} {...props}>
+      {children}
+    </button>
+  );
 }
 
-export function IconButton({ label, children, onClick, active = false }: { label: string; children: ReactNode; onClick?: () => void; active?: boolean }) {
-  return <button className={`icon-button ${active ? "is-active" : ""}`} aria-label={label} title={label} onClick={onClick}>{children}</button>;
+export function IconButton({ label, children, onClick, pressed, disabled }: { label: string; children: ReactNode; onClick?: () => void; pressed?: boolean; disabled?: boolean }) {
+  return (
+    <button type="button" className="icon-btn" aria-label={label} title={label} onClick={onClick} aria-pressed={pressed} disabled={disabled}>
+      {children}
+    </button>
+  );
 }
 
-export function MetricTile({ label, value, unit, detail, state = "VALID", onClick }: { label: string; value: string; unit?: string; detail?: string; state?: QualityState; onClick?: () => void }) {
-  return <button className={`metric-tile metric-${state.toLowerCase()}`} onClick={onClick}>
-    <div className="metric-label"><span>{label}</span><span className="metric-state">{state}</span></div>
-    <div className="metric-value">{value}<small>{unit}</small></div>
-    {detail && <div className="metric-detail">{detail}</div>}
-  </button>;
+export function KV({ rows }: { rows: [string, ReactNode, ("mono" | undefined)?][] }) {
+  return (
+    <dl className="kv">
+      {rows.map(([label, value, style]) => (
+        <div key={label} style={{ display: "contents" }}>
+          <dt>{label}</dt>
+          <dd className={style === "mono" ? "mono" : undefined}>{value === null || value === undefined || value === "" ? "—" : value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
-export function KeyValue({ label, value, mono = false, children }: { label: string; value?: ReactNode; mono?: boolean; children?: ReactNode }) {
-  return <div className="key-value"><span>{label}</span><strong className={mono ? "mono" : ""}>{children ?? value ?? "—"}</strong></div>;
-}
-
-export function ProgressBar({ value, tone = "cyan" }: { value: number; tone?: "cyan" | "amber" | "bad" }) {
-  return <div className="progress-track"><span className={`progress-fill progress-${tone}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>;
-}
-
-export function EmptyState({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
-  return <div className="empty-state"><FlaskConical size={20} /><strong>{title}</strong><span>{detail}</span>{action}</div>;
-}
-
-export function LoadingState({ label = "Loading local analytical store" }: { label?: string }) {
-  return <div className="loading-state"><RefreshCw size={16} className="spin" /><span>{label}</span></div>;
-}
-
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return <div className="error-state"><CircleAlert size={18} /><div><strong>Local service unavailable</strong><span>{message}</span></div>{onRetry && <Button size="sm" onClick={onRetry}>Retry</Button>}</div>;
-}
-
-export function EvidencePassport({ evidence, onNavigate, lineageId }: { evidence: Evidence; onNavigate?: (view: string, id?: string) => void; lineageId?: string }) {
-  const halfWidth = evidence.uncertainty;
-  const interval = halfWidth === null ? null : [evidence.value === null ? null : evidence.value - halfWidth, evidence.value === null ? null : evidence.value + halfWidth];
-  return <div className="passport">
-    <div className="passport-top"><div><div className="eyebrow">Evidence passport</div><h3>{evidence.title}</h3></div><StatusBadge tone={evidence.quality === "VALID" ? "good" : "warn"}>{evidence.quality}</StatusBadge></div>
-    <div className="passport-value">
-      <span>{evidence.value === null ? "—" : evidence.value.toFixed(3)}</span>
-      <small>{evidence.unit}</small>
-      <em>{evidence.uncertainty_label ?? "estimate"}{halfWidth !== null ? ` · ±${halfWidth.toFixed(3)} ${evidence.unit}` : ""}</em>
+export function Readout({ label, value, unit, detail, large = false }: { label: string; value: ReactNode; unit?: string; detail?: ReactNode; large?: boolean }) {
+  return (
+    <div className="readout">
+      <div className="k">{label}</div>
+      <div className={`v ${large ? "lg" : ""}`}>{value}{unit && <span className="unit">{unit}</span>}</div>
+      {detail && <div className="d">{detail}</div>}
     </div>
-    {interval && interval[0] !== null && interval[1] !== null && <div className="passport-interval"><span>Interval</span><strong className="mono">{interval[0].toFixed(3)} → {interval[1].toFixed(3)} {evidence.unit}</strong></div>}
-    <div className="passport-grid">
-      <KeyValue label="Method" value={String(evidence.provenance.method ?? evidence.provenance.algorithm ?? evidence.metric_id)} />
-      <KeyValue label="Algorithm" value={String(evidence.provenance.algorithm ?? "—")} mono />
-      <KeyValue label="Version" value={String(evidence.provenance.algorithm_version ?? "—")} mono />
-      <KeyValue label="Protocol" value={evidence.protocol_id} mono />
-      <KeyValue label="Metric" value={evidence.metric_id} mono />
-      <KeyValue label="Population" value={evidence.population} />
-      <KeyValue label="Sample size" value={String(evidence.sample_size)} />
-      <KeyValue label="Snapshot" value={evidence.dataset_snapshot_id} mono />
+  );
+}
+
+export function Loading({ label }: { label: string }) {
+  return <div className="loading" role="status"><span className="bar" />{label}</div>;
+}
+
+export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    <div className="error" role="alert">
+      <AlertTriangle size={15} />
+      <div style={{ flex: 1 }}>
+        <strong>Computation unavailable</strong>
+        {message}
+      </div>
+      {onRetry && <Button size="sm" onClick={onRetry}>Retry</Button>}
     </div>
-    <div className="passport-provenance"><ShieldCheck size={14} /><span>Input provenance complete</span><span className="provenance-checksum">{String(evidence.provenance.snapshot_checksum ?? "checksum recorded").slice(0, 18)}…</span></div>
-    <div className="passport-actions">
-      <Button size="sm" onClick={() => onNavigate?.("runs", evidence.analysis_run_id)}><ExternalLink size={13} /> Open source run</Button>
-      <Button size="sm" variant="ghost" onClick={() => onNavigate?.("lineage", lineageId ?? evidence.id)}>View lineage <ArrowUpRight size={13} /></Button>
+  );
+}
+
+/**
+ * One-dimensional interval plot. The scale always includes zero so the reader
+ * sees whether the interval excludes the null value.
+ */
+export function Forest({ estimate, low, high, unit }: { estimate: number; low: number; high: number; unit: string }) {
+  const min = Math.min(0, low);
+  const max = Math.max(0, high);
+  const pad = (max - min) * 0.18 || Math.abs(estimate) || 1;
+  const lo = min - pad;
+  const hi = max + pad;
+  const x = (value: number) => `${((value - lo) / (hi - lo)) * 100}%`;
+  return (
+    <div aria-label={`Estimate ${formatSig(estimate)} ${unit}, 95% interval ${formatSig(low)} to ${formatSig(high)}`} role="img">
+      <div className="forest">
+        <div className="axis" />
+        <div className="zero" style={{ left: x(0) }} />
+        <div className="ci" style={{ left: x(low), width: `calc(${x(high)} - ${x(low)})` }} />
+        <div className="pt" style={{ left: x(estimate) }} />
+      </div>
+      <div className="forest-labels"><span>{formatSig(lo, 2)}</span><span>0 {unit}</span><span>{formatSig(hi, 2)}</span></div>
     </div>
-  </div>;
+  );
 }
 
-export function CodeBlock({ value, label = "Machine-readable specification" }: { value: unknown; label?: string }) {
-  return <div className="code-block"><div className="code-label"><span>{label}</span><Copy size={13} /></div><pre>{JSON.stringify(value, null, 2)}</pre></div>;
+export interface PassportProps {
+  metricLabel: string;
+  value: number | null;
+  unit: string;
+  metricId: string;
+  canonicalId?: string;
+  method?: string;
+  algorithm?: string;
+  protocolId: string;
+  sourceId: string;
+  snapshotId: string;
+  quality: string;
+  checksum?: string;
+  reproducible: boolean;
+  onInspectSource?: () => void;
+  onInspectMethod?: () => void;
+  onInspectLineage?: () => void;
 }
 
-export function LockedPlan({ children }: { children: ReactNode }) {
-  return <div className="locked-plan"><LockKeyhole size={15} /><div><strong>Frozen analysis plan</strong><span>Configuration is versioned and execution is append-only.</span></div>{children}</div>;
-}
-
-export function CheckLine({ children, state = "valid" }: { children: ReactNode; state?: "valid" | "warning" | "muted" }) {
-  return <div className={`check-line check-${state}`}>{state === "valid" ? <Check size={13} /> : <CircleAlert size={13} />}<span>{children}</span></div>;
+/** Evidence Passport: the provenance contract behind one derived measurement. */
+export function EvidencePassport(props: PassportProps) {
+  return (
+    <div className="frame">
+      <div className="frame-head">
+        <span className="upper faint">Evidence passport</span>
+        <span style={{ marginLeft: "auto" }}><State>{props.quality}</State></span>
+      </div>
+      <div className="frame-body">
+        <div className="readout" style={{ padding: 0, border: 0 }}>
+          <div className="k">{props.metricLabel}</div>
+          <div className="v lg">{formatSig(props.value, 4)}<span className="unit">{props.unit}</span></div>
+        </div>
+        <div className="hr" />
+        <KV
+          rows={[
+            ["MetricDefinition", props.metricId, "mono"],
+            ["Canonical ID", props.canonicalId, "mono"],
+            ["Method", props.method],
+            ["Algorithm", props.algorithm, "mono"],
+            ["Protocol", props.protocolId, "mono"],
+            ["Source trial", props.sourceId, "mono"],
+            ["Snapshot", props.snapshotId, "mono"],
+            ["Checksum", shortChecksum(props.checksum, 16), "mono"],
+            ["Reproducibility", props.reproducible ? "deterministic (fixed seed)" : "not reproducible"],
+          ]}
+        />
+        <div className="insp-actions" style={{ marginTop: 10 }}>
+          <Button size="sm" onClick={props.onInspectSource} disabled={!props.onInspectSource}><ScanLine size={12} />Source</Button>
+          <Button size="sm" onClick={props.onInspectMethod} disabled={!props.onInspectMethod}><Microscope size={12} />Methodology</Button>
+          <Button size="sm" onClick={props.onInspectLineage} disabled={!props.onInspectLineage}><GitBranch size={12} />Lineage</Button>
+        </div>
+      </div>
+    </div>
+  );
 }

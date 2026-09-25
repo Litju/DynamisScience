@@ -3,156 +3,454 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
-import type { TracePoint } from "@/lib/types";
+import type { ExploreAthlete, ExploreContextRow, ExploreSummaryRow, FigureSeriesPoint, ScenarioState, TracePoint } from "@/lib/types";
+import { formatSig } from "@/lib/scientific";
 
-const axis = { axisLine: { lineStyle: { color: "#3a4a57" } }, axisLabel: { color: "#8495a3", fontSize: 10 }, splitLine: { lineStyle: { color: "rgba(91,111,126,.16)" } } };
+export const COLORS = {
+  int: "#4fc4b6",
+  cmp: "#86a0f0",
+  signal: "#e3a74e",
+  axis: "#3a4750",
+  label: "#7d8a92",
+  grid: "rgba(150,170,180,0.08)",
+  text: "#dde4e8",
+  excluded: "#e5716c",
+  faint: "#56636b",
+};
 
-export function LongitudinalChart({ data, unit = "N·s·kg⁻¹", height = 250 }: { data: { week: number; arm: string; mean: number; sd: number }[]; unit?: string; height?: number }) {
+const FONT = "IBM Plex Mono, Consolas, monospace";
+
+const tooltipBase = {
+  backgroundColor: "#151a1e",
+  borderColor: "#3a4750",
+  borderWidth: 1,
+  padding: [6, 8],
+  textStyle: { color: COLORS.text, fontSize: 11, fontFamily: FONT },
+  extraCssText: "border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.45);",
+};
+
+function axisStyle(name: string, extra: Record<string, unknown> = {}) {
+  return {
+    name,
+    nameTextStyle: { color: COLORS.label, fontSize: 10, fontFamily: FONT },
+    axisLine: { lineStyle: { color: COLORS.axis } },
+    axisTick: { lineStyle: { color: COLORS.axis } },
+    axisLabel: { color: COLORS.label, fontSize: 10, fontFamily: FONT },
+    splitLine: { lineStyle: { color: COLORS.grid } },
+    ...extra,
+  };
+}
+
+const armColor = (arm: string) => (arm === "INTERVENTION" ? COLORS.int : COLORS.cmp);
+const armName = (arm: string) => (arm === "INTERVENTION" ? "Intervention" : "Comparison");
+
+/**
+ * 95% interval band drawn as one polygon per week-to-week segment. A custom
+ * series is used because ECharts area stacking does not stack on a value axis,
+ * and gaps (missing weeks) must stay visible rather than be bridged.
+ */
+function bandSeries(rows: { week: number; ci_low: number | null; ci_high: number | null }[], arm: string, xAxisIndex = 0, yAxisIndex = 0) {
+  const points = rows.map((row) => [row.week, row.ci_low, row.ci_high]);
+  return [
+    {
+      name: `${arm}-band`,
+      type: "custom" as const,
+      xAxisIndex,
+      yAxisIndex,
+      silent: true,
+      z: 2,
+      clip: true,
+      tooltip: { show: false },
+      data: points,
+      encode: { x: 0, y: [1, 2] },
+      renderItem: (params: { dataIndex: number }, api: { coord: (value: [number, number]) => [number, number] }) => {
+        const current = points[params.dataIndex];
+        const next = points[params.dataIndex + 1];
+        if (!next || current[1] === null || current[2] === null || next[1] === null || next[2] === null) return null;
+        return {
+          type: "polygon",
+          shape: { points: [api.coord([current[0] as number, current[1] as number]), api.coord([next[0] as number, next[1] as number]), api.coord([next[0] as number, next[2] as number]), api.coord([current[0] as number, current[2] as number])] },
+          style: { fill: armColor(arm), opacity: 0.16 },
+        };
+      },
+    },
+  ];
+}
+
+export interface CohortChartProps {
+  summary: ExploreSummaryRow[];
+  athletes: ExploreAthlete[];
+  context: ExploreContextRow[];
+  unit: string;
+  metricLabel: string;
+  population: "ALL" | "INTERVENTION" | "COMPARISON";
+  blockWeeks: [number, number];
+  loadPeaks: number[];
+  showContext: boolean;
+  selectedAthlete?: string | null;
+  selectedWeek?: number | null;
+  onSelectAthlete?: (subjectId: string) => void;
+  onSelectWeek?: (week: number) => void;
+  height?: number;
+}
+
+/**
+ * Cohort longitudinal trajectory: arm mean ± 95% CI across athletes, every
+ * athlete as a thin trace, the intervention block, computed load peaks and an
+ * optional training-load / match-exposure context panel on the same week axis.
+ */
+export function CohortLongitudinalChart(props: CohortChartProps) {
+  const { summary, athletes, context, unit, metricLabel, population, blockWeeks, loadPeaks, showContext, selectedAthlete, selectedWeek, onSelectAthlete, onSelectWeek } = props;
+  const arms = useMemo(() => (population === "ALL" ? ["INTERVENTION", "COMPARISON"] : [population]), [population]);
   const option = useMemo<EChartsOption>(() => {
-    const intervention = data.filter((item) => item.arm === "INTERVENTION");
-    const comparison = data.filter((item) => item.arm === "COMPARISON");
-    const toSeries = (rows: typeof data, name: string, color: string) => ({ name, type: "line" as const, smooth: true, symbol: "circle", symbolSize: 5, data: rows.map((row) => [row.week, row.mean]), lineStyle: { width: 2, color }, itemStyle: { color }, areaStyle: { color: `${color}12` }, markLine: name === "Intervention" ? { silent: true, symbol: "none", lineStyle: { color: "#62788a", type: "dashed" }, label: { color: "#9eafbb", formatter: "block" }, data: [{ xAxis: 3 }, { xAxis: 10 }] } : undefined });
-    return { animationDuration: 450, grid: { left: 46, right: 18, top: 18, bottom: 30 }, tooltip: { trigger: "axis", backgroundColor: "#121d26", borderColor: "#30424f", textStyle: { color: "#d8e3e8", fontSize: 11 }, formatter: (params: unknown) => { const rows = params as { axisValue: number; marker: string; seriesName: string; value: [number, number] }[]; return `<strong>Week ${rows[0]?.axisValue}</strong><br/>${rows.map((row) => `${row.marker}${row.seriesName}: ${Number(row.value[1]).toFixed(3)} ${unit}`).join("<br/>")}`; } }, xAxis: { type: "category", data: Array.from({ length: 16 }, (_, index) => index + 1), ...axis, name: "week", nameTextStyle: { color: "#6f8594" } }, yAxis: { type: "value", ...axis, name: unit, nameTextStyle: { color: "#6f8594", fontSize: 10 }, scale: true }, series: [toSeries(intervention, "Intervention", "#59d6c7"), toSeries(comparison, "Comparison", "#e5b567")] } as EChartsOption;
-  }, [data, unit]);
+    const mainHeight = showContext ? 218 : 290;
+    const grids = [{ left: 58, right: 16, top: 16, height: mainHeight }];
+    if (showContext) grids.push({ left: 58, right: 16, top: mainHeight + 44, height: 62 });
+    const visibleAthletes = athletes.filter((athlete) => arms.includes(athlete.intervention_arm));
+    const athleteSeries = visibleAthletes.map((athlete) => {
+      const selected = athlete.subject_id === selectedAthlete;
+      return {
+        name: athlete.display_id,
+        id: `ath-${athlete.subject_id}`,
+        type: "line" as const,
+        data: athlete.values.map((value, index) => [index + 1, value]),
+        symbol: selected ? "circle" : "none",
+        symbolSize: 5,
+        showSymbol: selected,
+        z: selected ? 10 : 1,
+        lineStyle: { width: selected ? 2.2 : 1, color: selected ? COLORS.signal : armColor(athlete.intervention_arm), opacity: selected ? 1 : 0.16 },
+        itemStyle: { color: COLORS.signal },
+        emphasis: { focus: "none" as const, lineStyle: { width: 1.8, opacity: 0.8 } },
+        connectNulls: false,
+        triggerLineEvent: true,
+        tooltip: { show: false },
+      };
+    });
+    const meanSeries = arms.flatMap((arm) => {
+      const rows = summary.filter((row) => row.arm === arm);
+      return [
+        ...bandSeries(rows, arm),
+        {
+          name: armName(arm),
+          type: "line" as const,
+          data: rows.map((row) => [row.week, row.mean]),
+          symbol: "circle",
+          symbolSize: 5,
+          lineStyle: { width: 2.2, color: armColor(arm) },
+          itemStyle: { color: armColor(arm), borderColor: "#0f1316", borderWidth: 1 },
+          z: 6,
+          connectNulls: false,
+        },
+      ];
+    });
+    const markArea = {
+      silent: true,
+      itemStyle: { color: "rgba(79,196,182,0.05)", borderColor: "rgba(79,196,182,0.25)", borderWidth: 0 },
+      label: { color: COLORS.label, fontSize: 9.5, fontFamily: FONT, position: "insideTopLeft" as const },
+      data: [[{ xAxis: blockWeeks[0] - 0.5, name: `strength block w${blockWeeks[0]}–${blockWeeks[1]}` }, { xAxis: blockWeeks[1] + 0.5 }]] as never,
+    };
+    const markLines = [
+      ...loadPeaks.map((week) => ({ xAxis: week, name: `load peak w${week}`, lineStyle: { color: COLORS.signal, type: "dashed" as const, opacity: 0.6 }, label: { formatter: `load peak w${week}`, color: COLORS.signal, fontSize: 9.5, fontFamily: FONT } })),
+      ...(selectedWeek ? [{ xAxis: selectedWeek, name: "selected", lineStyle: { color: "#dde4e8", type: "solid" as const, opacity: 0.35 }, label: { show: false } }] : []),
+    ];
+    const anchor = {
+      name: "annotations",
+      type: "line" as const,
+      data: [],
+      markArea,
+      markLine: { silent: true, symbol: "none", data: markLines as never },
+      tooltip: { show: false },
+    };
+    const contextSeries = showContext
+      ? arms.flatMap((arm) => [
+          {
+            name: `${armName(arm)} load`,
+            type: "bar" as const,
+            xAxisIndex: 1,
+            yAxisIndex: 1,
+            data: context.filter((row) => row.arm === arm).map((row) => [row.week, row.training_impulse_au]),
+            itemStyle: { color: armColor(arm), opacity: 0.45 },
+            barGap: "10%",
+            barMaxWidth: 9,
+          },
+          {
+            name: `${armName(arm)} match min`,
+            type: "line" as const,
+            xAxisIndex: 1,
+            yAxisIndex: 2,
+            data: context.filter((row) => row.arm === arm).map((row) => [row.week, row.match_minutes]),
+            symbol: "rect",
+            symbolSize: 4,
+            lineStyle: { width: 1, type: "dotted" as const, color: armColor(arm) },
+            itemStyle: { color: armColor(arm) },
+          },
+        ])
+      : [];
+    const xAxis = [
+      { type: "value" as const, min: 0.5, max: 16.5, interval: 1, gridIndex: 0, ...axisStyle(showContext ? "" : "week"), axisLabel: { color: COLORS.label, fontSize: 10, fontFamily: FONT, formatter: (value: number) => (Number.isInteger(value) ? String(value) : "") }, splitLine: { show: false } },
+      ...(showContext ? [{ type: "value" as const, min: 0.5, max: 16.5, interval: 1, gridIndex: 1, ...axisStyle("week"), axisLabel: { color: COLORS.label, fontSize: 10, fontFamily: FONT, formatter: (value: number) => (Number.isInteger(value) ? String(value) : "") }, splitLine: { show: false } }] : []),
+    ];
+    const yAxis = [
+      { type: "value" as const, scale: true, gridIndex: 0, ...axisStyle(unit, { nameLocation: "end" as const }) },
+      ...(showContext
+        ? [
+            { type: "value" as const, gridIndex: 1, splitNumber: 2, ...axisStyle("AU"), axisLabel: { color: COLORS.label, fontSize: 9, fontFamily: FONT } },
+            { type: "value" as const, gridIndex: 1, splitNumber: 2, position: "right" as const, ...axisStyle("min"), splitLine: { show: false }, axisLabel: { color: COLORS.label, fontSize: 9, fontFamily: FONT } },
+          ]
+        : []),
+    ];
+    return {
+      animation: false,
+      grid: grids,
+      axisPointer: { link: [{ xAxisIndex: "all" }] },
+      tooltip: {
+        ...tooltipBase,
+        trigger: "axis",
+        axisPointer: { type: "line", lineStyle: { color: "#56636b" } },
+        formatter: (raw: unknown) => {
+          const rows = Array.isArray(raw) ? (raw as { axisValue: number }[]) : [];
+          const week = Math.round(Number(rows[0]?.axisValue ?? 0));
+          if (!week) return "";
+          const lines = arms.map((arm) => {
+            const row = summary.find((item) => item.arm === arm && item.week === week);
+            if (!row) return "";
+            const missing = row.missing_athletes > 0 ? ` · ${row.missing_athletes} athlete(s) missing` : "";
+            const excluded = row.excluded_trials > 0 ? ` · ${row.excluded_trials} trial excluded` : "";
+            return `<span style="color:${armColor(arm)}">■</span> ${armName(arm)} ${formatSig(row.mean, 4)} ${unit} <span style="color:#7d8a92">[${formatSig(row.ci_low, 3)}, ${formatSig(row.ci_high, 3)}] n=${row.n}${missing}${excluded}</span>`;
+          });
+          const athlete = athletes.find((item) => item.subject_id === selectedAthlete);
+          if (athlete) lines.push(`<span style="color:${COLORS.signal}">■</span> ${athlete.display_id} ${formatSig(athlete.values[week - 1], 4)} ${unit} <span style="color:#7d8a92">${athlete.n_valid[week - 1]}/2 valid</span>`);
+          const load = arms.map((arm) => context.find((row) => row.arm === arm && row.week === week)).filter(Boolean) as ExploreContextRow[];
+          if (showContext && load.length) lines.push(`<span style="color:#7d8a92">load ${load.map((row) => `${armName(row.arm).slice(0, 3)} ${row.training_impulse_au.toFixed(0)} AU / ${row.match_minutes.toFixed(0)} min`).join(" · ")}</span>`);
+          return `<strong>Week ${week}</strong> · ${metricLabel}<br/>${lines.filter(Boolean).join("<br/>")}`;
+        },
+      },
+      xAxis,
+      yAxis,
+      series: [...athleteSeries, ...meanSeries, anchor, ...contextSeries] as never,
+    } as EChartsOption;
+  }, [arms, athletes, blockWeeks, context, loadPeaks, metricLabel, selectedAthlete, selectedWeek, showContext, summary, unit]);
+
+  const events = useMemo(
+    () => ({
+      click: (params: { seriesId?: string; componentType?: string; data?: unknown }) => {
+        if (params.seriesId?.startsWith("ath-")) onSelectAthlete?.(params.seriesId.slice(4));
+        const data = params.data as [number, number] | undefined;
+        if (Array.isArray(data) && typeof data[0] === "number") onSelectWeek?.(Math.round(data[0]));
+      },
+    }),
+    [onSelectAthlete, onSelectWeek],
+  );
+  return <ReactECharts option={option} style={{ height: props.height ?? (showContext ? 360 : 330), width: "100%" }} notMerge lazyUpdate onEvents={events} />;
+}
+
+export function GroupFigureChart({ series, unit, height = 260 }: { series: FigureSeriesPoint[]; unit: string; height?: number }) {
+  const option = useMemo<EChartsOption>(() => {
+    const arms = ["INTERVENTION", "COMPARISON"];
+    return {
+      animation: false,
+      grid: { left: 58, right: 16, top: 26, bottom: 30 },
+      legend: { top: 0, right: 8, textStyle: { color: COLORS.label, fontSize: 10, fontFamily: FONT }, itemWidth: 12, itemHeight: 2, data: arms.map(armName) },
+      tooltip: {
+        ...tooltipBase,
+        trigger: "axis",
+        formatter: (raw: unknown) => {
+          const week = Math.round(Number((raw as { axisValue: number }[])[0]?.axisValue ?? 0));
+          return `<strong>Week ${week}</strong><br/>${arms
+            .map((arm) => {
+              const row = series.find((item) => item.arm === arm && item.week === week);
+              return row ? `<span style="color:${armColor(arm)}">■</span> ${armName(arm)} ${formatSig(row.mean, 4)} ${unit} [${formatSig(row.ci_low, 3)}, ${formatSig(row.ci_high, 3)}] n=${row.n}` : "";
+            })
+            .join("<br/>")}`;
+        },
+      },
+      xAxis: { type: "value", min: 0.5, max: 16.5, interval: 1, ...axisStyle("week"), axisLabel: { color: COLORS.label, fontSize: 10, fontFamily: FONT, formatter: (value: number) => (Number.isInteger(value) ? String(value) : "") }, splitLine: { show: false } },
+      yAxis: { type: "value", scale: true, ...axisStyle(unit) },
+      series: [
+        { name: "block", type: "line", data: [], markArea: { silent: true, itemStyle: { color: "rgba(79,196,182,0.05)" }, label: { color: COLORS.label, fontSize: 9.5, fontFamily: FONT, position: "insideTopLeft" }, data: [[{ xAxis: 2.5, name: "strength block w3–10" }, { xAxis: 10.5 }]] as never } },
+        ...arms.flatMap((arm) => {
+          const rows = series.filter((row) => row.arm === arm);
+          return [
+            ...bandSeries(rows, arm),
+            { name: armName(arm), type: "line", data: rows.map((row) => [row.week, row.mean]), symbol: "circle", symbolSize: 5, lineStyle: { width: 2.2, color: armColor(arm) }, itemStyle: { color: armColor(arm) } },
+          ];
+        }),
+      ] as never,
+    } as EChartsOption;
+  }, [series, unit]);
   return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
 }
 
-export function ForceTraceChart({ trace, boundaries, height = 330 }: { trace: TracePoint[]; boundaries: Record<string, number>; height?: number }) {
+const PHASE_COLORS: Record<string, string> = {
+  QUIET_STANDING: "rgba(150,170,180,0.05)",
+  UNWEIGHTING: "rgba(227,167,78,0.10)",
+  BRAKING: "rgba(229,113,108,0.11)",
+  PROPULSION: "rgba(79,196,182,0.12)",
+  FLIGHT: "rgba(134,160,240,0.10)",
+  LANDING: "rgba(150,170,180,0.08)",
+};
+
+export const PHASES: { key: string; label: string; from: string; to: string; color: string }[] = [
+  { key: "UNWEIGHTING", label: "Unweighting", from: "movement_onset", to: "unweighting_end", color: "#e3a74e" },
+  { key: "BRAKING", label: "Braking", from: "unweighting_end", to: "braking_end", color: "#e5716c" },
+  { key: "PROPULSION", label: "Propulsion", from: "braking_end", to: "takeoff", color: "#4fc4b6" },
+  { key: "FLIGHT", label: "Flight", from: "takeoff", to: "landing", color: "#86a0f0" },
+];
+
+/** Vertical GRF on a true time axis (s) with body-weight reference and phase boundaries. */
+export function ForceTraceChart({ trace, boundaries, bodyWeight, height = 380 }: { trace: TracePoint[]; boundaries: Record<string, number>; bodyWeight: number; height?: number }) {
   const option = useMemo<EChartsOption>(() => {
-    const times = trace.map((point) => point.time_s);
-    const values = trace.map((point) => point.force_n);
-    const bodyWeight = trace[0]?.body_weight_n ?? 0;
-    const shade = (from: string, to: string, color: string) => [{ xAxis: from }, { xAxis: to, itemStyle: { color } }];
-    return { animation: false, grid: { left: 54, right: 20, top: 18, bottom: 36 }, tooltip: { trigger: "axis", backgroundColor: "#121d26", borderColor: "#30424f", textStyle: { color: "#d8e3e8", fontSize: 11 }, formatter: (params: unknown) => { const rows = params as { axisValue: number; value: [number, number] }[]; return `t = ${Number(rows[0]?.axisValue).toFixed(3)} s<br/>${Number(rows[0]?.value[1]).toFixed(1)} N`; } }, xAxis: { type: "category", data: times, ...axis, name: "time (s)", nameTextStyle: { color: "#6f8594" } }, yAxis: { type: "value", ...axis, name: "vertical GRF (N)", nameTextStyle: { color: "#6f8594", fontSize: 10 }, scale: true }, dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none" }], series: [{ name: "Vertical GRF", type: "line", showSymbol: false, data: values, lineStyle: { color: "#59d6c7", width: 1.5 }, areaStyle: { color: "rgba(89,214,199,.08)" }, markLine: { silent: true, symbol: "none", label: { color: "#9eafbb", fontSize: 10 }, lineStyle: { color: "#6b8190", type: "dashed" }, data: [{ yAxis: bodyWeight, name: "body weight" }, { xAxis: boundaries.movement_onset, name: "onset" }, { xAxis: boundaries.braking_end, name: "braking → propulsion" }, { xAxis: boundaries.takeoff, name: "takeoff" }, { xAxis: boundaries.landing, name: "landing" }] }, markArea: { silent: true, data: [...shade(String(boundaries.movement_onset), String(boundaries.unweighting_end), "rgba(229,181,103,.10)"), ...shade(String(boundaries.unweighting_end), String(boundaries.braking_end), "rgba(227,123,123,.11)"), ...shade(String(boundaries.braking_end), String(boundaries.takeoff), "rgba(89,214,199,.11)"), ...shade(String(boundaries.takeoff), String(boundaries.landing), "rgba(129,151,168,.08)")] } }] } as EChartsOption;
-  }, [trace, boundaries]);
+    const data = trace.map((point) => [point.time_s, point.force_n]);
+    const phaseAreas = PHASES.map((phase) => [
+      { xAxis: boundaries[phase.from], name: phase.label, itemStyle: { color: PHASE_COLORS[phase.key] } },
+      { xAxis: boundaries[phase.to] },
+    ]);
+    const landing = boundaries.landing;
+    const end = trace.length ? trace[trace.length - 1].time_s : landing;
+    const boundaryLines = [
+      ["movement_onset", "onset"],
+      ["unweighting_end", "unweighting end"],
+      ["braking_end", "braking → propulsion"],
+      ["takeoff", "takeoff"],
+      ["landing", "landing"],
+    ].map(([key, label], index) => ({ xAxis: boundaries[key], label: { formatter: label, color: COLORS.label, fontSize: 9, fontFamily: FONT, position: (index % 2 ? "insideEndBottom" : "insideEndTop") as "insideEndTop", rotate: 90 }, lineStyle: { color: "#56636b", type: "dashed" as const } }));
+    const phaseAt = (t: number) => trace.reduce((closest, point) => (Math.abs(point.time_s - t) < Math.abs(closest.time_s - t) ? point : closest), trace[0])?.phase ?? "";
+    return {
+      animation: false,
+      grid: { left: 62, right: 18, top: 30, bottom: 58 },
+      tooltip: {
+        ...tooltipBase,
+        trigger: "axis",
+        axisPointer: { type: "cross", lineStyle: { color: "#56636b" }, label: { backgroundColor: "#1f262c", fontFamily: FONT, fontSize: 10 } },
+        formatter: (raw: unknown) => {
+          const row = (raw as { value: [number, number] }[])[0];
+          if (!row) return "";
+          const [time, force] = row.value;
+          return `t = ${time.toFixed(3)} s<br/>F = ${force.toFixed(1)} N<br/>${(force / bodyWeight).toFixed(2)} × BW · ${phaseAt(time).replaceAll("_", " ").toLowerCase()}`;
+        },
+      },
+      xAxis: { type: "value", min: 0, max: Math.ceil(end * 20) / 20, ...axisStyle("time (s)", { nameLocation: "middle" as const, nameGap: 24 }) },
+      yAxis: { type: "value", ...axisStyle("vertical GRF (N)"), min: 0 },
+      dataZoom: [{ type: "inside", filterMode: "none" }, { type: "slider", height: 14, bottom: 8, borderColor: "#2a343b", fillerColor: "rgba(227,167,78,0.12)", handleStyle: { color: COLORS.signal }, textStyle: { color: COLORS.label, fontSize: 9 }, dataBackground: { lineStyle: { color: "#3a4750" }, areaStyle: { color: "#1a2025" } } }],
+      series: [
+        {
+          name: "Vertical GRF",
+          type: "line",
+          data,
+          showSymbol: false,
+          sampling: "lttb",
+          lineStyle: { width: 1.4, color: COLORS.text },
+          markArea: { silent: true, label: { show: false }, data: phaseAreas as never },
+          markLine: { silent: true, symbol: "none", data: [{ yAxis: bodyWeight, label: { formatter: `body weight ${bodyWeight.toFixed(0)} N`, color: COLORS.signal, fontSize: 9.5, fontFamily: FONT, position: "insideEndTop" }, lineStyle: { color: COLORS.signal, type: "solid", opacity: 0.7 } }, ...boundaryLines] as never },
+        },
+      ],
+    } as EChartsOption;
+  }, [bodyWeight, boundaries, trace]);
   return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
 }
 
-export function DistributionChart({ values, title, unit, color = "#59d6c7", height = 190 }: { values: number[]; title: string; unit: string; color?: string; height?: number }) {
+export function ResidualByWeekChart({ rows, unit, height = 150 }: { rows: { week: number; mean_residual: number }[]; unit: string; height?: number }) {
+  const option = useMemo<EChartsOption>(() => ({
+    animation: false,
+    grid: { left: 54, right: 10, top: 12, bottom: 26 },
+    tooltip: { ...tooltipBase, trigger: "axis", formatter: (raw: unknown) => { const row = (raw as { value: [number, number] }[])[0]; return row ? `week ${row.value[0]}<br/>mean residual ${formatSig(row.value[1], 3)} ${unit}` : ""; } },
+    xAxis: { type: "category", data: rows.map((row) => row.week), ...axisStyle("week", { nameGap: 4 }) },
+    yAxis: { type: "value", ...axisStyle(unit) },
+    series: [{ type: "bar", data: rows.map((row) => [String(row.week), row.mean_residual]), barMaxWidth: 12, itemStyle: { color: (item: { value: [string, number] }) => (item.value[1] >= 0 ? "#7f9aaa" : "#56636b") } as never, markLine: { silent: true, symbol: "none", data: [{ yAxis: 0 }], lineStyle: { color: "#7d8a92" }, label: { show: false } } }],
+  }) as EChartsOption, [rows, unit]);
+  return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
+}
+
+export function QQChart({ points, height = 150 }: { points: { theoretical: number; observed: number }[]; height?: number }) {
+  const option = useMemo<EChartsOption>(() => {
+    const extent = Math.max(3, ...points.map((point) => Math.max(Math.abs(point.theoretical), Math.abs(point.observed))));
+    const bound = 2 * Math.ceil(extent / 2);
+    return {
+      animation: false,
+      grid: { left: 40, right: 10, top: 12, bottom: 26 },
+      tooltip: { ...tooltipBase, trigger: "item", formatter: (raw: unknown) => { const value = (raw as { value: [number, number] }).value; return `normal quantile ${value[0].toFixed(2)}<br/>standardised residual ${value[1].toFixed(2)}`; } },
+      xAxis: { type: "value", min: -bound, max: bound, interval: 2, ...axisStyle("N(0,1)", { nameGap: 4 }) },
+      yAxis: { type: "value", min: -bound, max: bound, interval: 2, ...axisStyle("z") },
+      series: [
+        { type: "line", data: [[-bound, -bound], [bound, bound]], symbol: "none", lineStyle: { color: COLORS.signal, type: "dashed", width: 1 }, silent: true, tooltip: { show: false } },
+        { type: "scatter", data: points.map((point) => [point.theoretical, point.observed]), symbolSize: 4, itemStyle: { color: "#9fb1bc" } },
+      ],
+    } as EChartsOption;
+  }, [points]);
+  return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
+}
+
+export function DistributionChart({ values, unit, label, height = 200 }: { values: number[]; unit: string; label: string; height?: number }) {
   const option = useMemo<EChartsOption>(() => {
     const bins = 10;
     const min = Math.min(...values);
     const max = Math.max(...values);
     const width = (max - min) / bins || 1;
     const counts = Array.from({ length: bins }, (_, index) => values.filter((value) => value >= min + index * width && (index === bins - 1 ? value <= max : value < min + (index + 1) * width)).length);
-    return { animationDuration: 300, grid: { left: 8, right: 8, top: 12, bottom: 28 }, tooltip: { trigger: "axis", backgroundColor: "#121d26", borderColor: "#30424f", textStyle: { color: "#d8e3e8" } }, xAxis: { type: "category", data: counts.map((_, index) => `${(min + index * width).toFixed(2)}`), ...axis }, yAxis: { type: "value", ...axis, minInterval: 1 }, series: [{ type: "bar", data: counts, barMaxWidth: 22, itemStyle: { color, borderRadius: [2, 2, 0, 0] } }], title: { text: `${title} (${unit})`, left: 0, top: 0, textStyle: { color: "#a8b8c2", fontSize: 11, fontWeight: 500 } } } as EChartsOption;
-  }, [values, title, unit, color]);
-  return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
-}
-
-export function ModelChart({ states, height = 220 }: { states: { week: number; load: number; performance_state: number }[]; height?: number }) {
-  const option = useMemo<EChartsOption>(() => ({ animationDuration: 350, grid: { left: 42, right: 18, top: 18, bottom: 30 }, legend: { textStyle: { color: "#8495a3", fontSize: 10 }, top: 0 }, tooltip: { trigger: "axis", backgroundColor: "#121d26", borderColor: "#30424f", textStyle: { color: "#d8e3e8" } }, xAxis: { type: "category", data: states.map((state) => state.week), ...axis, name: "week" }, yAxis: { type: "value", ...axis, scale: true }, series: [{ name: "load", type: "bar", data: states.map((state) => state.load), itemStyle: { color: "#334957" } }, { name: "performance state", type: "line", data: states.map((state) => state.performance_state), smooth: true, lineStyle: { color: "#59d6c7", width: 2 }, itemStyle: { color: "#59d6c7" } }] }) as EChartsOption, [states]);
-  return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
-}
-
-export function AthleteChart({ data, unit = "N·s·kg⁻¹", height = 260 }: { data: { week: number; value: number | null; rolling_mean: number | null; rolling_sd: number | null; quality_state?: string }[]; unit?: string; height?: number }) {
-  const option = useMemo<EChartsOption>(() => {
-    const observed = data.filter((item) => item.value !== null && item.quality_state !== "WARNING");
-    const flagged = data.filter((item) => item.value !== null && item.quality_state === "WARNING");
-    const band = data.map((item) => (item.rolling_mean === null || item.rolling_sd === null ? null : [item.week, item.rolling_mean + item.rolling_sd]));
-    const lower = data.map((item) => (item.rolling_mean === null || item.rolling_sd === null ? null : [item.week, item.rolling_mean - item.rolling_sd])).reverse();
     return {
-      animationDuration: 350,
-      grid: { left: 56, right: 20, top: 34, bottom: 34 },
-      legend: { textStyle: { color: "#8495a3", fontSize: 10 }, top: 0 },
-      tooltip: {
-        trigger: "axis",
-        backgroundColor: "#121d26",
-        borderColor: "#30424f",
-        textStyle: { color: "#d8e3e8", fontSize: 11 },
-        formatter: (params: unknown) => {
-          const rows = params as { axisValue: string; marker: string; seriesName: string; value: [number, number] | number }[];
-          const week = rows[0]?.axisValue;
-          const lines = rows
-            .filter((row) => Array.isArray(row.value) && Number.isFinite(Number((row.value as [number, number])[1])))
-            .map((row) => `${row.marker}${row.seriesName}: ${Number((row.value as [number, number])[1]).toFixed(3)} ${unit}`);
-          return `<strong>Week ${week}</strong><br/>${lines.join("<br/>")}`;
-        },
-      },
-      xAxis: { type: "category", data: data.map((item) => item.week), ...axis, name: "week", nameTextStyle: { color: "#6f8594" } },
-      yAxis: { type: "value", ...axis, name: unit, nameTextStyle: { color: "#6f8594", fontSize: 10 }, scale: true },
-      series: [
-        {
-          name: "Observed",
-          type: "scatter",
-          symbolSize: 9,
-          data: observed.map((item) => [item.week, item.value]),
-          itemStyle: { color: "#59d6c7", borderColor: "#d8fffa", borderWidth: 1 },
-        },
-        {
-          name: "Flagged week",
-          type: "scatter",
-          symbolSize: 9,
-          symbol: "triangle",
-          data: flagged.map((item) => [item.week, item.value]),
-          itemStyle: { color: "#e5b567", borderColor: "#ffe6b0", borderWidth: 1 },
-        },
-        { name: "Weekly mean", type: "line", smooth: true, data: data.map((item) => item.value), lineStyle: { color: "#59d6c7", width: 2 }, itemStyle: { color: "#59d6c7" }, connectNulls: false },
-        { name: "Rolling baseline", type: "line", smooth: true, data: data.map((item) => item.rolling_mean), lineStyle: { color: "#e5b567", width: 1.5, type: "dashed" }, itemStyle: { color: "#e5b567" }, connectNulls: false },
-        { name: "Reference band", type: "line", data: [...band, ...lower], lineStyle: { opacity: 0 }, areaStyle: { color: "rgba(229,181,103,.10)" }, stack: "reference", symbol: "none" },
-      ],
+      animation: false,
+      grid: { left: 40, right: 10, top: 14, bottom: 34 },
+      tooltip: { ...tooltipBase, trigger: "axis", formatter: (raw: unknown) => { const row = (raw as { dataIndex: number; value: number }[])[0]; return row ? `${(min + row.dataIndex * width).toFixed(2)}–${(min + (row.dataIndex + 1) * width).toFixed(2)} ${unit}<br/>${row.value} athletes` : ""; } },
+      xAxis: { type: "category", data: counts.map((_, index) => (min + (index + 0.5) * width).toFixed(1)), ...axisStyle(`${label} (${unit})`, { nameLocation: "middle" as const, nameGap: 22 }) },
+      yAxis: { type: "value", minInterval: 1, ...axisStyle("athletes") },
+      series: [{ type: "bar", data: counts, barCategoryGap: "12%", itemStyle: { color: "#7f9aaa" } }],
     } as EChartsOption;
-  }, [data, unit]);
+  }, [label, unit, values]);
   return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
 }
 
-export function ModelFitChart({
-  weeks,
-  observed,
-  modelled,
-  residuals,
-  unit = "N·s·kg⁻¹",
-  height = 300,
-}: {
-  weeks: number[];
-  observed: number[];
-  modelled: number[];
-  residuals: number[];
-  unit?: string;
-  height?: number;
-}) {
+export function ChangeScatterChart({ points, typicalError, unit, height = 220 }: { points: { subject_id: string; baseline: number; change: number }[]; typicalError?: number; unit: string; height?: number }) {
+  const option = useMemo<EChartsOption>(() => ({
+    animation: false,
+    grid: { left: 54, right: 12, top: 14, bottom: 34 },
+    tooltip: { ...tooltipBase, trigger: "item", formatter: (raw: unknown) => { const item = raw as { value: [number, number, string] }; return `${item.value[2]}<br/>baseline ${formatSig(item.value[0], 4)} ${unit}<br/>change ${formatSig(item.value[1], 3)} ${unit}`; } },
+    xAxis: { type: "value", scale: true, ...axisStyle(`baseline (${unit})`, { nameLocation: "middle" as const, nameGap: 22 }) },
+    yAxis: { type: "value", ...axisStyle(`change (${unit})`) },
+    series: [{
+      type: "scatter",
+      data: points.map((point) => [point.baseline, point.change, point.subject_id]),
+      symbolSize: 6,
+      itemStyle: { color: "#9fb1bc" },
+      markArea: typicalError ? { silent: true, itemStyle: { color: "rgba(227,167,78,0.07)" }, label: { show: true, formatter: "± typical error", color: COLORS.label, fontSize: 9, position: "insideTopLeft" }, data: [[{ yAxis: -typicalError }, { yAxis: typicalError }]] as never } : undefined,
+    }],
+  }) as EChartsOption, [points, typicalError, unit]);
+  return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
+}
+
+export function ModelScenarioChart({ states, observedWeeks, observed, unit, height = 300 }: { states: ScenarioState[]; observedWeeks: number[]; observed: number[]; unit: string; height?: number }) {
   const option = useMemo<EChartsOption>(() => {
-    const residualValues = residuals.map((value) => Math.abs(value));
-    const maxResidual = Math.max(...residualValues, 0.0001);
+    const history = states.filter((state) => state.segment === "OBSERVED_LOAD");
+    const lastHistory = history[history.length - 1];
+    const scenario = states.filter((state) => state.segment === "SCENARIO");
+    const horizon = states.length;
     return {
-      animationDuration: 350,
-      grid: [
-        { left: 62, right: 22, top: 34, height: 168 },
-        { left: 62, right: 22, top: 232, height: 60 },
-      ],
-      legend: { textStyle: { color: "#8495a3", fontSize: 10 }, top: 0 },
+      animation: false,
+      grid: [{ left: 58, right: 16, top: 34, height: 158 }, { left: 58, right: 16, top: 222, height: 52 }],
+      legend: { top: 2, right: 8, itemWidth: 12, itemHeight: 3, textStyle: { color: COLORS.label, fontSize: 10, fontFamily: FONT }, data: ["Observed (group mean)", "Fitted model", "Scenario simulation"] },
+      axisPointer: { link: [{ xAxisIndex: "all" }] },
       tooltip: {
+        ...tooltipBase,
         trigger: "axis",
-        backgroundColor: "#121d26",
-        borderColor: "#30424f",
-        textStyle: { color: "#d8e3e8", fontSize: 11 },
-        formatter: (params: unknown) => {
-          const rows = params as { axisValue: string; marker: string; seriesName: string; value: [number, number] }[];
-          const lines = rows.map((row) => `${row.marker}${row.seriesName}: ${Number(row.value[1]).toFixed(3)}`);
-          return `<strong>Week ${rows[0]?.axisValue}</strong><br/>${lines.join("<br/>")}`;
+        formatter: (raw: unknown) => {
+          const week = Math.round(Number((raw as { axisValue: number }[])[0]?.axisValue ?? 0));
+          const state = states.find((item) => item.week === week);
+          const observedIndex = observedWeeks.indexOf(week);
+          if (!state) return "";
+          return `<strong>Week ${week}</strong> · ${state.segment === "SCENARIO" ? "scenario" : "observed load"}<br/>load ${state.load_au.toFixed(0)} AU<br/>modelled ${formatSig(state.modelled_performance, 4)} ${unit}${observedIndex >= 0 ? `<br/>observed ${formatSig(observed[observedIndex], 4)} ${unit}` : ""}`;
         },
       },
       xAxis: [
-        { type: "category", data: weeks, ...axis, name: "week", gridIndex: 0, nameTextStyle: { color: "#6f8594" } },
-        { type: "category", data: weeks, ...axis, gridIndex: 1, axisLabel: { show: false } },
+        { type: "value", min: 0.5, max: horizon + 0.5, interval: 1, gridIndex: 0, ...axisStyle(""), axisLabel: { show: false }, splitLine: { show: false } },
+        { type: "value", min: 0.5, max: horizon + 0.5, interval: 1, gridIndex: 1, ...axisStyle("week"), axisLabel: { color: COLORS.label, fontSize: 10, fontFamily: FONT, formatter: (value: number) => (Number.isInteger(value) && value % 2 === 0 ? String(value) : "") }, splitLine: { show: false } },
       ],
-      yAxis: [
-        { type: "value", ...axis, name: unit, nameTextStyle: { color: "#6f8594", fontSize: 10 }, scale: true, gridIndex: 0 },
-        { type: "value", ...axis, name: "|residual|", nameTextStyle: { color: "#6f8594", fontSize: 9 }, max: Number((maxResidual * 1.15).toFixed(4)), gridIndex: 1, splitNumber: 2 },
-      ],
+      yAxis: [{ type: "value", scale: true, gridIndex: 0, ...axisStyle(unit) }, { type: "value", gridIndex: 1, splitNumber: 2, ...axisStyle("AU") }],
       series: [
-        { name: "Observed CMJ", type: "scatter", symbolSize: 8, data: observed.map((value, index) => [weeks[index], value]), itemStyle: { color: "#59d6c7", borderColor: "#d8fffa", borderWidth: 1 }, xAxisIndex: 0, yAxisIndex: 0 },
-        { name: "Modelled", type: "line", smooth: true, data: modelled.map((value, index) => [weeks[index], value]), lineStyle: { color: "#e5b567", width: 2 }, itemStyle: { color: "#e5b567" }, xAxisIndex: 0, yAxisIndex: 0 },
-        { name: "|Residual|", type: "bar", data: residualValues, barMaxWidth: 14, itemStyle: { color: "#7f9bb0" }, xAxisIndex: 1, yAxisIndex: 1 },
-      ],
+        { name: "Observed (group mean)", type: "scatter", data: observedWeeks.map((week, index) => [week, observed[index]]), symbolSize: 6, itemStyle: { color: COLORS.text }, xAxisIndex: 0, yAxisIndex: 0 },
+        { name: "Fitted model", type: "line", data: history.map((state) => [state.week, state.modelled_performance]), symbol: "none", lineStyle: { width: 2, color: COLORS.int }, xAxisIndex: 0, yAxisIndex: 0, markArea: scenario.length ? { silent: true, itemStyle: { color: "rgba(227,167,78,0.05)" }, label: { color: COLORS.signal, fontSize: 9.5, fontFamily: FONT, position: "insideTopLeft" }, data: [[{ xAxis: history.length + 0.5, name: "scenario" }, { xAxis: horizon + 0.5 }]] as never } : undefined },
+        { name: "Scenario simulation", type: "line", data: [...(lastHistory ? [[lastHistory.week, lastHistory.modelled_performance]] : []), ...scenario.map((state) => [state.week, state.modelled_performance])], symbol: "circle", symbolSize: 4, lineStyle: { width: 2, type: "dashed", color: COLORS.signal }, itemStyle: { color: COLORS.signal }, xAxisIndex: 0, yAxisIndex: 0 },
+        { name: "load", type: "bar", data: states.map((state) => ({ value: [state.week, state.load_au], itemStyle: { color: state.segment === "SCENARIO" ? "rgba(227,167,78,0.55)" : "#3d4b54" } })), barMaxWidth: 10, xAxisIndex: 1, yAxisIndex: 1 },
+      ] as never,
     } as EChartsOption;
-  }, [modelled, observed, residuals, unit, weeks]);
+  }, [observed, observedWeeks, states, unit]);
   return <ReactECharts option={option} style={{ height, width: "100%" }} notMerge lazyUpdate />;
-}
-
-export function Sparkline({ values, color = "#59d6c7", width = 90, height = 24 }: { values: number[]; color?: string; width?: number; height?: number }) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const points = values.map((value, index) => `${(index / Math.max(1, values.length - 1)) * width},${height - 3 - ((value - min) / Math.max(0.0001, max - min)) * (height - 6)}`).join(" ");
-  return <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true"><polyline points={points} fill="none" stroke={color} strokeWidth="1.5" /></svg>;
 }
