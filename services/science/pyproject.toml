@@ -3,6 +3,7 @@ name = "dynamis-science-service"
 version = "0.1.0"
 description = "Local deterministic scientific computation service for DynamisScience"
 requires-python = ">=3.12"
+license = { text = "Proprietary. All rights reserved. See LICENSE." }
 dependencies = [
   "fastapi>=0.115,<1",
   "uvicorn[standard]>=0.34,<1",

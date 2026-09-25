@@ -1,6 +1,7 @@
 {
   "name": "dynamis-science",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.1.0",
   "packageManager": "pnpm@11.24.0",
   "scripts": {

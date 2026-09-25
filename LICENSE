@@ -1,0 +1,46 @@
+DynamisScience — Proprietary Licence
+
+Copyright (c) 2026 Julio Rodriguez. All rights reserved.
+
+This repository and everything in it — source code, documentation, designs,
+user-interface work, images, synthetic data generators, generated data and any
+other material (together, the "Software") — is the exclusive property of the
+copyright holder and is protected by copyright and other intellectual-property
+laws.
+
+The Software is made publicly visible for the sole purpose of allowing others
+to view and read it as a portfolio example. No licence or right is granted
+other than that limited permission to view.
+
+Without the prior written permission of the copyright holder, you may NOT:
+
+  1. copy, reproduce or download the Software, in whole or in part, except the
+     transient copy your browser or GitHub makes in order to display it;
+  2. distribute, publish, sublicense, sell, lease, lend or otherwise make the
+     Software or any part of it available to any third party;
+  3. modify, adapt, translate or create derivative works based on the Software;
+  4. use the Software, or any part of it, in any product, service, project,
+     research, training data set or machine-learning model, whether commercial
+     or non-commercial;
+  5. deploy, host, run or execute the Software for any purpose other than
+     personal evaluation of this portfolio;
+  6. remove, alter or obscure any copyright, proprietary or licence notice.
+
+GitHub platform notice. By publishing this repository publicly on GitHub, the
+copyright holder accepts only the minimum rights that GitHub's Terms of Service
+require to be granted to GitHub users (viewing the repository and forking it
+within GitHub). Any fork created under those terms remains subject to every
+restriction above; no other right is granted, and a fork may not be used,
+modified, distributed or deployed.
+
+Third-party components. Open-source dependencies referenced by this repository
+(for example through package.json, pnpm-lock.yaml, pyproject.toml or uv.lock)
+remain under their own licences. This licence applies to the original work in
+this repository only.
+
+No warranty. The Software is provided "as is", without warranty of any kind,
+express or implied. In no event shall the copyright holder be liable for any
+claim, damages or other liability arising from, out of or in connection with
+the Software or its use.
+
+Permission requests: contact the copyright holder through GitHub (@Litju).
