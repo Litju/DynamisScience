@@ -10,7 +10,7 @@ import type { MatchEntity, PoseJoint } from "@/lib/types";
  * surface, so the field, players, ball and pose skeleton all share one
  * coordinate frame. The skeleton is exaggerated by a documented factor so a
  * 1.8 m athlete stays visible at pitch scale; the exaggeration is disclosed in
- * the MatchLab legend rather than hidden.
+ * the match viewer legend rather than hidden.
  */
 const METRES_PER_UNIT = 10;
 const POSE_EXAGGERATION = 4;
@@ -50,8 +50,6 @@ function PoseSkeleton({ joints }: { joints: PoseJoint[] }) {
   const connections = [
     ["hip", "left_hip"],
     ["hip", "right_hip"],
-    ["hip", "knee"],
-    ["knee", "ankle"],
     ["left_hip", "left_knee"],
     ["left_knee", "left_ankle"],
     ["right_hip", "right_knee"],
@@ -81,7 +79,7 @@ function PoseSkeleton({ joints }: { joints: PoseJoint[] }) {
         if (!a || !b) return null;
         return <Line key={`${from}-${to}`} points={[point(a), point(b)]} color="#b4e9e2" lineWidth={1.6} transparent opacity={0.92} />;
       })}
-      {joints.map((joint) => (
+      {joints.filter((joint) => joint.joint !== "knee" && joint.joint !== "ankle").map((joint) => (
         <mesh key={joint.joint} position={point(joint)}>
           <sphereGeometry args={[joint.confidence > 0.85 ? 0.055 : 0.035, 8, 8]} />
           <meshBasicMaterial color={joint.confidence > 0.85 ? "#e8fffa" : "#8fb8b3"} />
