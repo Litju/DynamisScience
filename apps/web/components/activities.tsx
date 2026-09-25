@@ -20,7 +20,13 @@ function jointMap(joints: PoseJoint[] | undefined) {
   return new Map((joints ?? []).map((joint) => [joint.joint, joint]));
 }
 
-const angleAt = jointAngleDegrees;
+function toVec(joint: PoseJoint | undefined) {
+  return joint ? { x: joint.x_m, y: joint.y_m, z: joint.z_m } : undefined;
+}
+
+function angleAt(a: PoseJoint | undefined, vertex: PoseJoint | undefined, c: PoseJoint | undefined) {
+  return jointAngleDegrees(toVec(a), toVec(vertex), toVec(c));
+}
 
 export function MatchLabView({ onNavigate }: { onNavigate: (view: string, id?: string) => void }) {
   const [selectedPlayer, setSelectedPlayer] = useState("PLAYER-14");
