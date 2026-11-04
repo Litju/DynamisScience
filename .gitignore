@@ -10,6 +10,7 @@ __pycache__/
 *.pyc
 data/parquet/*.parquet
 data/artifacts/*.json
+data/admitted/
 !data/parquet/.gitkeep
 !data/artifacts/.gitkeep
 *.tsbuildinfo

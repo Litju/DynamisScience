@@ -14,11 +14,29 @@ from typing import Any
 import duckdb
 import numpy as np
 import polars as pl
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
+from .admission import (
+    admit_artifact,
+    get_admission_record,
+    get_quality,
+    get_source,
+    get_source_artifact,
+    ingest_source_artifact,
+    list_admission_records,
+    list_admitted_snapshots,
+    list_instruments,
+    list_protocols,
+    list_source_artifacts,
+    list_sources,
+    register_instrument,
+    register_protocol,
+    register_source,
+    verify_rights,
+)
 from .analysis import (
     _group_longitudinal,
     _individual_change,
@@ -31,6 +49,7 @@ from .analysis import (
 )
 from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID, generate_data
 from .lineage import build_lineage_graph, scope_lineage_graph
+from .qualification import list_qualification_records, run_qualification
 
 
 @asynccontextmanager
@@ -761,6 +780,158 @@ def match_tracking(match_id: str) -> dict[str, Any]:
         first = values.row(0, named=True)
         frames.append({"frame": int(first["frame"]), "time_s": float(first["time_s"]), "entities": values.select(["player_id", "team", "x_m", "y_m", "vx_m_s", "vy_m_s"]).to_dicts()})
     return {"match_id": match_id, "sample_rate_hz": 10, "frame_count": frame["frame"].n_unique(), "duration_s": float(frame["time_s"].max()), "frames": frames, "events": _rows("match_events")}
+
+
+# ---------------------------------------------------------------------------
+# Real-data admission (RES-587)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/admission/sources")
+def admission_sources() -> list[dict[str, Any]]:
+    return list_sources()
+
+
+@app.post("/admission/sources")
+def admission_source_create(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return register_source(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/admission/sources/{source_id}/verify-rights")
+def admission_verify_rights(source_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    verifier = (payload or {}).get("verifier", "system")
+    try:
+        return verify_rights(source_id, str(verifier))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.get("/admission/instruments")
+def admission_instruments() -> list[dict[str, Any]]:
+    return list_instruments()
+
+
+@app.post("/admission/instruments")
+def admission_instrument_create(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return register_instrument(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.get("/admission/protocols")
+def admission_protocols() -> list[dict[str, Any]]:
+    return list_protocols()
+
+
+@app.post("/admission/protocols")
+def admission_protocol_create(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return register_protocol(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.get("/admission/artifacts")
+def admission_artifacts() -> list[dict[str, Any]]:
+    return list_source_artifacts()
+
+
+@app.post("/admission/artifacts")
+def admission_artifact_create(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        import base64
+
+        content = base64.b64decode(payload["content_base64"])
+        return ingest_source_artifact(
+            str(payload["source_id"]),
+            str(payload["original_filename"]),
+            content,
+            str(payload.get("acquisition_method", "upload")),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/admission/artifacts/upload")
+async def admission_artifact_upload(
+    source_id: str = Form(...),
+    file: UploadFile = File(...),
+    acquisition_method: str = Form("upload"),
+) -> dict[str, Any]:
+    try:
+        content = await file.read()
+        return ingest_source_artifact(source_id, file.filename or "upload", content, acquisition_method)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/admission/validate")
+def admission_validate(payload: dict[str, Any]) -> dict[str, Any]:
+    artifact = get_source_artifact(str(payload["artifact_id"]))
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Source artifact not found")
+    family = str(payload["measurement_family"])
+    metadata = payload.get("metadata", {}) or {}
+    try:
+        if family == "CMJ_FORCE_PLATFORM":
+            from .admission import validate_cmj
+
+            return validate_cmj(artifact, metadata)
+        if family == "SPRINT_TIMING":
+            from .admission import validate_sprint
+
+            return validate_sprint(artifact, metadata)
+        raise ValueError(f"Unsupported measurement family: {family}")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/admission/admit")
+def admission_admit(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return admit_artifact(str(payload["artifact_id"]), str(payload["measurement_family"]), payload.get("metadata", {}) or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.get("/admission/records")
+def admission_records() -> list[dict[str, Any]]:
+    return list_admission_records()
+
+
+@app.get("/admission/records/{record_id}")
+def admission_record_detail(record_id: str) -> dict[str, Any]:
+    record = get_admission_record(record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Admission record not found")
+    return record
+
+
+@app.get("/admission/quality/{assessment_id}")
+def admission_quality_detail(assessment_id: str) -> dict[str, Any]:
+    assessment = get_quality(assessment_id)
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Quality assessment not found")
+    return assessment
+
+
+@app.get("/admission/snapshots")
+def admission_snapshots() -> list[dict[str, Any]]:
+    return list_admitted_snapshots()
+
+
+@app.get("/qualification")
+def qualification_list() -> list[dict[str, Any]]:
+    return list_qualification_records()
+
+
+@app.post("/qualification/run")
+def qualification_run() -> list[dict[str, Any]]:
+    return run_qualification()
 
 
 @app.get("/match/{match_id}/pose")

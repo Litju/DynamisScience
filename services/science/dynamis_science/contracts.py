@@ -258,3 +258,146 @@ class Report(ContractModel):
     sections: list[str]
     provenance_note: str
     created_at: str
+
+
+# ---------------------------------------------------------------------------
+# Real-data admission contracts (RES-587)
+# ---------------------------------------------------------------------------
+
+
+class DataSource(ContractModel):
+    id: str
+    name: str
+    publisher: str
+    dataset_identity: str
+    version: str
+    acquisition_method: str
+    license_or_agreement: str
+    permitted_uses: list[str] = Field(default_factory=list)
+    redistribution_restrictions: str
+    privacy_status: Literal["ANONYMOUS", "PSEUDONYMOUS", "IDENTIFIABLE", "NOT_APPLICABLE"] = "NOT_APPLICABLE"
+    retention_limitations: str = ""
+    derived_data_publishable: bool = False
+    rights_status: Literal["VERIFIED", "UNVERIFIED", "FIXTURE_ONLY", "BLOCKED"] = "UNVERIFIED"
+    rights_verified_at: str | None = None
+    rights_verified_by: str | None = None
+    notes: str = ""
+
+
+class SourceArtifact(ContractModel):
+    id: str
+    source_id: str
+    format: Literal["CSV", "PARQUET", "JSON", "OTHER"]
+    original_filename: str
+    stored_path: str
+    content_hash_sha256: str
+    size_bytes: int
+    acquired_at: str = Field(default_factory=utc_now)
+    acquisition_method: str
+    rights_record_id: str
+
+
+class Instrument(ContractModel):
+    id: str
+    measurement_family: Literal["CMJ_FORCE_PLATFORM", "SPRINT_TIMING", "IMU", "GNSS", "OTHER"]
+    manufacturer: str
+    model: str
+    serial_number: str
+    calibration_status: Literal["CALIBRATED", "UNCALIBRATED", "UNKNOWN"] = "UNKNOWN"
+    calibration_date: str | None = None
+    sampling_capabilities_hz: list[float] = Field(default_factory=list)
+    supported_units: dict[str, str] = Field(default_factory=dict)
+    notes: str = ""
+
+
+class AcquisitionProtocol(ContractModel):
+    id: str
+    measurement_family: Literal["CMJ_FORCE_PLATFORM", "SPRINT_TIMING", "IMU", "GNSS", "OTHER"]
+    name: str
+    version: str
+    sampling_hz: float
+    units: dict[str, str] = Field(default_factory=dict)
+    coordinate_convention: str = "NOT_SPECIFIED"
+    processing_method: str = "NOT_SPECIFIED"
+    body_mass_required: bool = True
+    known_limitations: list[str] = Field(default_factory=list)
+
+
+class Signal(ContractModel):
+    id: str
+    trial_id: str
+    channel: str
+    unit: str
+    sampling_hz: float
+    samples: list[float] = Field(default_factory=list)
+    timestamps_s: list[float] = Field(default_factory=list)
+    quality_state: Literal["VALID", "WARNING", "EXCLUDED"] = "VALID"
+
+
+class Observation(ContractModel):
+    id: str
+    source_artifact_id: str
+    measurement_family: str
+    subject_id: str
+    session_id: str
+    trial_id: str
+    instrument_id: str
+    protocol_id: str
+    sampling_hz: float
+    occurred_at: str
+    quality_state: Literal["VALID", "WARNING", "EXCLUDED", "QUARANTINED"] = "VALID"
+    values: dict[str, float] = Field(default_factory=dict)
+    units: dict[str, str] = Field(default_factory=dict)
+    derived_metric_ids: list[str] = Field(default_factory=list)
+
+
+class QualityAssessment(ContractModel):
+    id: str
+    source_artifact_id: str
+    measurement_family: str
+    status: Literal["REJECTED", "QUARANTINED", "ADMITTED_WITH_WARNINGS", "ADMITTED"]
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    rejected_record_ids: list[str] = Field(default_factory=list)
+    quarantined_record_ids: list[str] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+    checked_at: str = Field(default_factory=utc_now)
+
+
+class AdmissionRecord(ContractModel):
+    id: str
+    source_id: str
+    source_artifact_id: str
+    measurement_family: str
+    status: Literal["REJECTED", "QUARANTINED", "ADMITTED_WITH_WARNINGS", "ADMITTED"]
+    rights_status: str
+    quality_assessment_id: str
+    dataset_snapshot_id: str | None = None
+    parser_version: str
+    normalization_rules: list[str] = Field(default_factory=list)
+    qc_operations: list[str] = Field(default_factory=list)
+    exclusion_criteria: list[str] = Field(default_factory=list)
+    instrument_ids: list[str] = Field(default_factory=list)
+    protocol_ids: list[str] = Field(default_factory=list)
+    metric_definition_ids: list[str] = Field(default_factory=list)
+    algorithm_versions: dict[str, str] = Field(default_factory=dict)
+    schema_version: str
+    admitted_at: str = Field(default_factory=utc_now)
+    provenance_manifest_id: str | None = None
+
+
+class ProvenanceManifest(ContractModel):
+    id: str
+    snapshot_id: str
+    source_artifact_ids: list[str] = Field(default_factory=list)
+    content_hashes: dict[str, str] = Field(default_factory=dict)
+    data_rights_status: str
+    parser_version: str
+    normalization_rules: list[str] = Field(default_factory=list)
+    qc_operations: list[str] = Field(default_factory=list)
+    exclusion_criteria: list[str] = Field(default_factory=list)
+    instrument_metadata: list[dict[str, Any]] = Field(default_factory=list)
+    metric_definitions: list[dict[str, Any]] = Field(default_factory=list)
+    algorithm_versions: dict[str, str] = Field(default_factory=dict)
+    schema_version: str
+    created_at: str = Field(default_factory=utc_now)

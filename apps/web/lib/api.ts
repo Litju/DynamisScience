@@ -106,4 +106,8 @@ export const scienceApi = {
     request<Investigation>(`/investigations/${id}`, body("PUT", { blocks, base_version: baseVersion })),
   trainingModel: () => request<{ spec: ModelSpec; run: ModelRun; snapshot: Snapshot }>("/models/training-response"),
   scenario: (futureLoad: number[]) => request<ScenarioResult>("/models/training-response/scenario", body("POST", { future_load_au: futureLoad })),
+  admissionSources: () => request<any[]>("/admission/sources"),
+  admissionRecords: () => request<any[]>("/admission/records"),
+  admissionSnapshots: () => request<any[]>("/admission/snapshots"),
+  qualification: () => request<any[]>("/qualification"),
 };
