@@ -50,6 +50,7 @@ from .analysis import (
 from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID, generate_data
 from .lineage import build_lineage_graph, scope_lineage_graph
 from .qualification import list_qualification_records, run_qualification
+from . import qualification_real, realanalysis, realstore
 
 
 @asynccontextmanager
@@ -64,7 +65,14 @@ app = FastAPI(title="DynamisScience Local Science Service", version="0.2.0", lif
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,6 +101,7 @@ REPORT_SECTIONS = ["Intervention result", "Reliability context", "Exploratory re
 
 
 class AnalysisRequest(BaseModel):
+    study_id: str = "STUDY-001"
     method_id: str = "METH-LONG"
     outcome_metric_id: str = "MET-CMJ-IMPULSE"
     subject_ids: list[str] | None = None
@@ -102,14 +111,17 @@ class AnalysisRequest(BaseModel):
 
 class PromotionRequest(BaseModel):
     run_id: str
+    study_id: str | None = None
 
 
 class CitationRequest(BaseModel):
     artifact_id: str
     section: str | None = None
+    study_id: str | None = None
 
 
 class CohortRequest(BaseModel):
+    study_id: str = "STUDY-001"
     excluded_subject_ids: list[str] = Field(default_factory=list)
 
 
@@ -185,6 +197,20 @@ def _find(items: list[dict[str, Any]], key: str, value: str) -> dict[str, Any] |
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _is_real_study(study_id: str | None) -> bool:
+    return bool(study_id) and study_id in realstore.real_study_ids()
+
+
+def _real_qualification_records() -> list[dict[str, Any]]:
+    path = realstore.paths()["qualification"] / "real_qualification.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
 
 
 def _metric_columns() -> dict[str, dict[str, Any]]:
@@ -364,12 +390,18 @@ def _study_summary(study: dict[str, Any]) -> dict[str, Any]:
 @app.get("/studies")
 def studies() -> list[dict[str, Any]]:
     _ensure_data()
-    return [_study_summary(_study())]
+    real = realstore.list_studies()
+    return [_study_summary(_study()), *real]
 
 
 @app.get("/studies/{study_id}")
 def study_detail(study_id: str) -> dict[str, Any]:
     _ensure_data()
+    if _is_real_study(study_id):
+        real = realstore.get_study(study_id)
+        if real is None:
+            raise HTTPException(status_code=404, detail="Real-data study not admitted yet")
+        return real
     study = _study()
     if study_id != "STUDY-001":
         raise HTTPException(status_code=404, detail="Study not found")
@@ -393,9 +425,19 @@ def study_detail(study_id: str) -> dict[str, Any]:
 
 
 @app.get("/subjects")
-def subjects(position: str | None = None, arm: str | None = None) -> list[dict[str, Any]]:
+def subjects(
+    position: str | None = None,
+    arm: str | None = None,
+    study_id: str = "STUDY-001",
+) -> list[dict[str, Any]]:
     _ensure_data()
-    frame = _parquet("subjects")
+    if _is_real_study(study_id):
+        study = realstore.get_study(study_id)
+        if study is None:
+            raise HTTPException(status_code=404, detail="Real-data study not admitted yet")
+        frame = realstore.read_table(study["snapshot"]["id"], "subjects")
+    else:
+        frame = _parquet("subjects")
     if position:
         frame = frame.filter(pl.col("position") == position)
     if arm:
@@ -492,8 +534,17 @@ def _longitudinal_for(subject_id: str, metric_id: str) -> dict[str, Any]:
 
 
 @app.get("/subjects/{subject_id}/longitudinal")
-def subject_longitudinal(subject_id: str, metric_id: str = "MET-CMJ-IMPULSE") -> dict[str, Any]:
+def subject_longitudinal(
+    subject_id: str,
+    metric_id: str = "MET-CMJ-IMPULSE",
+    study_id: str = "STUDY-001",
+) -> dict[str, Any]:
     _ensure_data()
+    if _is_real_study(study_id):
+        try:
+            return realanalysis.athlete_longitudinal(study_id, subject_id, metric_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
     return _longitudinal_for(subject_id, metric_id)
 
 
@@ -505,6 +556,11 @@ def subject_longitudinal(subject_id: str, metric_id: str = "MET-CMJ-IMPULSE") ->
 @app.post("/cohorts/resolve")
 def resolve_cohort(request: CohortRequest) -> dict[str, Any]:
     _ensure_data()
+    if _is_real_study(request.study_id):
+        try:
+            return realanalysis._cohort(request.study_id, request.excluded_subject_ids)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
     cohort = _cohort_for(excluded=request.excluded_subject_ids)
     members = set(cohort["subject_ids"])
     subjects_rows = _rows("subjects")
@@ -568,6 +624,7 @@ def explore_longitudinal(
     metric_id: str = "MET-CMJ-IMPULSE",
     exclude: str = "",
     reference: str = Query(default="RAW", pattern="^(RAW|CHANGE|PERCENT)$"),
+    study_id: str = "STUDY-001",
 ) -> dict[str, Any]:
     """Server-side aggregation of the cohort longitudinal signal.
 
@@ -576,8 +633,13 @@ def explore_longitudinal(
     athlete contributes one value per week (unit of analysis = athlete).
     """
     _ensure_data()
-    metric = _metric(metric_id)
     excluded = [value for value in exclude.split(",") if value]
+    if _is_real_study(study_id):
+        try:
+            return realanalysis.explore(study_id, metric_id, excluded, reference)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+    metric = _metric(metric_id)
     cohort = _cohort_for(excluded=excluded)
     members = cohort["subject_ids"]
     column = metric["column"]
@@ -926,12 +988,17 @@ def admission_snapshots() -> list[dict[str, Any]]:
 
 @app.get("/qualification")
 def qualification_list() -> list[dict[str, Any]]:
-    return list_qualification_records()
+    return [*list_qualification_records(), *_real_qualification_records()]
 
 
 @app.post("/qualification/run")
 def qualification_run() -> list[dict[str, Any]]:
-    return run_qualification()
+    return [*run_qualification(), *_real_qualification_records()]
+
+
+@app.post("/real/qualification/run")
+def real_qualification_run() -> list[dict[str, Any]]:
+    return qualification_real.run()
 
 
 @app.get("/match/{match_id}/pose")
@@ -1035,6 +1102,30 @@ TABLE_DESCRIPTIONS = {
 def datasets() -> list[dict[str, Any]]:
     _ensure_data()
     snapshot = _json("dataset_snapshot.json", {})
+    real = [
+        {
+            "id": item["id"],
+            "label": item["label"],
+            "seed": item["seed"],
+            "generator_version": item["generator_version"],
+            "schema_version": item["schema_version"],
+            "generated_at": item["generated_at"],
+            "table_count": len(item.get("row_counts", {})),
+            "row_total": sum(item.get("row_counts", {}).values()),
+            "synthetic": False,
+            "real_data": True,
+            "source": item.get("source", {}),
+            "used_by_studies": [
+                study["study"]["id"]
+                for study in (
+                    realstore.get_study(realstore.STUDY_MENDELEY),
+                    realstore.get_study(realstore.STUDY_MOVESMART),
+                )
+                if study and study["snapshot"]["id"] == item["id"]
+            ],
+        }
+        for item in realstore.list_snapshots()
+    ]
     return [{
         "id": snapshot.get("id"),
         "label": snapshot.get("label"),
@@ -1046,12 +1137,17 @@ def datasets() -> list[dict[str, Any]]:
         "row_total": sum(snapshot.get("row_counts", {}).values()),
         "synthetic": True,
         "used_by_studies": ["STUDY-001"],
-    }]
+    }, *real]
 
 
 @app.get("/datasets/{snapshot_id}")
 def dataset_detail(snapshot_id: str) -> dict[str, Any]:
     _ensure_data()
+    if realstore.get_snapshot(snapshot_id) is not None:
+        detail = realstore.snapshot_detail(snapshot_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="Dataset snapshot not found")
+        return detail
     snapshot = _json("dataset_snapshot.json", {})
     if snapshot_id != snapshot.get("id"):
         raise HTTPException(status_code=404, detail="Dataset snapshot not found")
@@ -1099,8 +1195,10 @@ def _run_view(run: dict[str, Any], runs: list[dict[str, Any]], evidence: list[di
 
 
 @app.get("/runs")
-def runs() -> list[dict[str, Any]]:
+def runs(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
     _ensure_data()
+    if _is_real_study(study_id):
+        return [run for run in realanalysis.list_runs() if run["study_id"] == study_id][::-1]
     all_runs = _json("analysis_runs.json", [])
     evidence = _json("evidence.json", [])
     return [_run_view(run, all_runs, evidence) for run in all_runs][::-1]
@@ -1109,6 +1207,15 @@ def runs() -> list[dict[str, Any]]:
 @app.get("/runs/{run_id}")
 def run_detail(run_id: str) -> dict[str, Any]:
     _ensure_data()
+    if run_id.startswith("RUN-REAL-"):
+        run = realanalysis.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return {
+            **run,
+            "lineage": realstore.lineage_graph(run_id),
+            "evidence": [item for item in realanalysis.list_evidence() if item.get("analysis_run_id") == run_id],
+        }
     all_runs = _json("analysis_runs.json", [])
     run = _find(all_runs, "id", run_id)
     if run is None:
@@ -1161,6 +1268,17 @@ def execute_analysis(request: AnalysisRequest) -> dict[str, Any]:
     an EvidenceArtifact only exists after an explicit promotion of a run.
     """
     _ensure_data()
+    if _is_real_study(request.study_id):
+        try:
+            return realanalysis.execute(
+                request.study_id,
+                request.method_id,
+                request.outcome_metric_id,
+                request.excluded_subject_ids,
+                request.parameters,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
     if request.method_id not in {"METH-LONG", "METH-REL", "METH-IND"}:
         raise HTTPException(status_code=422, detail=f"Unknown method: {request.method_id}")
     started = time.perf_counter()
@@ -1383,6 +1501,11 @@ def _evidence_view(item: dict[str, Any], evidence: list[dict[str, Any]], report:
 def promote_evidence(request: PromotionRequest) -> dict[str, Any]:
     """Explicitly promote a completed run to an immutable EvidenceArtifact."""
     _ensure_data()
+    if request.run_id.startswith("RUN-REAL-"):
+        try:
+            return realanalysis.promote(request.run_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
     all_runs = _json("analysis_runs.json", [])
     run = _find(all_runs, "id", request.run_id)
     if run is None:
@@ -1414,8 +1537,16 @@ def promote_evidence(request: PromotionRequest) -> dict[str, Any]:
 
 
 @app.get("/evidence")
-def evidence() -> list[dict[str, Any]]:
+def evidence(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
     _ensure_data()
+    if _is_real_study(study_id):
+        report = realstore.get_report(study_id)
+        cited = set(report.get("evidence_ids", []))
+        return [
+            {**item, "cited_by_report": item["id"] in cited}
+            for item in realanalysis.list_evidence()
+            if item.get("study_id") == study_id
+        ]
     items = _json("evidence.json", [])
     report = _json("report.json", {})
     return [_evidence_view(item, items, report) for item in items]
@@ -1424,6 +1555,17 @@ def evidence() -> list[dict[str, Any]]:
 @app.get("/evidence/{evidence_id}")
 def evidence_detail(evidence_id: str) -> dict[str, Any]:
     _ensure_data()
+    if evidence_id.startswith("EVID-REAL-"):
+        item = realanalysis.get_evidence(evidence_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        figures = [figure for figure in realanalysis.list_figures() if evidence_id in figure.get("evidence_ids", [])]
+        return {
+            **item,
+            "lineage": realstore.lineage_graph(evidence_id),
+            "source_runs": [run for run in realanalysis.list_runs() if run.get("id") == item.get("analysis_run_id")],
+            "figures": figures,
+        }
     items = _json("evidence.json", [])
     item = _find(items, "id", evidence_id)
     if item is None:
@@ -1468,6 +1610,12 @@ def figures() -> list[dict[str, Any]]:
 @app.get("/figures/{figure_id}")
 def figure_detail(figure_id: str) -> dict[str, Any]:
     _ensure_data()
+    if figure_id.startswith("FIG-REAL-"):
+        figure = realanalysis.get_figure(figure_id)
+        if figure is None:
+            raise HTTPException(status_code=404, detail="Figure not found")
+        report = realstore.get_report(figure["study_id"])
+        return {**figure, "cited_by_report": figure_id in report.get("figure_ids", [])}
     figure = _find(_json("figures.json", []), "id", figure_id)
     if figure is None:
         raise HTTPException(status_code=404, detail="Figure not found")
@@ -1492,8 +1640,10 @@ def _section_for(artifact_id: str) -> str:
 
 
 @app.get("/report")
-def report() -> dict[str, Any]:
+def report(study_id: str = "STUDY-001") -> dict[str, Any]:
     _ensure_data()
+    if _is_real_study(study_id):
+        return realstore.get_report(study_id)
     report_artifact = _json("report.json", {})
     evidence_items = _json("evidence.json", [])
     figures_items = _json("figures.json", [])
@@ -1522,6 +1672,8 @@ def report() -> dict[str, Any]:
 def add_citation(request: CitationRequest) -> dict[str, Any]:
     """Cite an immutable evidence or figure artefact in the draft report."""
     _ensure_data()
+    if request.study_id and _is_real_study(request.study_id):
+        return realstore.cite(request.study_id, request.artifact_id, request.section)
     report_artifact = _json("report.json", {})
     section = request.section or _section_for(request.artifact_id)
     if section not in REPORT_SECTIONS:
@@ -1538,8 +1690,10 @@ def add_citation(request: CitationRequest) -> dict[str, Any]:
 
 
 @app.delete("/report/citations/{artifact_id}")
-def remove_citation(artifact_id: str) -> dict[str, Any]:
+def remove_citation(artifact_id: str, study_id: str | None = None) -> dict[str, Any]:
     _ensure_data()
+    if study_id and _is_real_study(study_id):
+        return realstore.uncite(study_id, artifact_id)
     report_artifact = _json("report.json", {})
     key = "figure_ids" if artifact_id.startswith("FIG-") else "evidence_ids"
     if artifact_id not in report_artifact.get(key, []):
@@ -1573,12 +1727,19 @@ def _validate_blocks(blocks: list[InvestigationBlock]) -> None:
 @app.get("/investigations")
 def investigations(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
     _ensure_data()
+    if _is_real_study(study_id):
+        return [item for item in realanalysis.list_investigations() if item.get("study_id") == study_id]
     return [item for item in _json("investigations.json", []) if item.get("study_id") == study_id]
 
 
 @app.get("/investigations/{investigation_id}")
 def investigation(investigation_id: str) -> dict[str, Any]:
     _ensure_data()
+    if investigation_id.startswith("INV-REAL-"):
+        item = realanalysis.get_investigation(investigation_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Investigation not found")
+        return item
     item = _find(_json("investigations.json", []), "id", investigation_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -1588,6 +1749,16 @@ def investigation(investigation_id: str) -> dict[str, Any]:
 @app.put("/investigations/{investigation_id}")
 def update_investigation(investigation_id: str, request: InvestigationUpdate) -> dict[str, Any]:
     _ensure_data()
+    if investigation_id.startswith("INV-REAL-"):
+        _validate_blocks(request.blocks)
+        try:
+            return realanalysis.update_investigation(
+                investigation_id,
+                [block.model_dump() for block in request.blocks],
+                request.base_version or 0,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
     items = _json("investigations.json", [])
     item = _find(items, "id", investigation_id)
     if item is None:
@@ -1638,6 +1809,12 @@ def lineage(
     depth: int = Query(default=3, ge=1, le=8),
 ) -> dict[str, Any]:
     _ensure_data()
+    if artifact_id.startswith(("RUN-REAL-", "EVID-REAL-", "FIG-REAL-", "DS-REAL-", "SRC-", "COHORT-REAL-", "REPORT-REAL-")):
+        try:
+            graph = realstore.lineage_graph(artifact_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return scope_lineage_graph(graph, descendant_depth=depth) if scope == "path" else graph
     graph = _lineage_for(artifact_id)
     return scope_lineage_graph(graph, descendant_depth=depth) if scope == "path" else graph
 
@@ -1680,3 +1857,96 @@ def model_scenario(request: ScenarioRequest) -> dict[str, Any]:
     result = simulate_scenario(model_run, request.future_load_au)
     digest = hashlib.sha256(json.dumps([model_run.get("id"), request.future_load_au]).encode("utf-8")).hexdigest()[:10].upper()
     return {**result, "scenario_id": f"SCN-{digest}", "persisted": False}
+
+# --------------------------------------------------------------------------- #
+# Real-data admission and measurement qualification (RES-587)
+# --------------------------------------------------------------------------- #
+
+
+@app.get("/real/sources")
+def real_sources() -> list[dict[str, Any]]:
+    summaries = realstore.list_sources()
+    snapshot_by_source = {
+        admission["source_id"]: realstore.get_snapshot(admission["dataset_snapshot_id"])
+        for admission in realstore.list_admissions()
+    }
+    result = []
+    for summary in summaries:
+        snapshot = snapshot_by_source.get(summary["id"])
+        result.append(
+            {
+                **summary,
+                "admitted": snapshot is not None,
+                "snapshot": (
+                    {
+                        "id": snapshot["id"],
+                        "label": snapshot["label"],
+                        "rows": sum(snapshot.get("row_counts", {}).values()),
+                        "admission_status": snapshot.get("admission", {}).get("status"),
+                    }
+                    if snapshot
+                    else None
+                ),
+            }
+        )
+    return result
+
+
+@app.get("/real/sources/{source_id}")
+def real_source_detail(source_id: str) -> dict[str, Any]:
+    source = realstore.get_source(source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Source not found")
+    admission = next((item for item in realstore.list_admissions() if item["source_id"] == source_id), None)
+    quality = realstore.get_quality(admission["quality_assessment_id"]) if admission else None
+    return {"source": source, "admission": admission, "quality": quality}
+
+
+@app.post("/real/admit")
+def real_admit(payload: dict[str, Any]) -> dict[str, Any]:
+    source_id = str(payload.get("source_id", ""))
+    existing = realstore.snapshot_for_source(source_id)
+    if existing is not None:
+        admission = next(
+            (item for item in realstore.list_admissions() if item["source_id"] == source_id), None
+        )
+        return {"already_admitted": True, "snapshot": existing, "admission": admission}
+    from . import ingest_real
+
+    if source_id == "SRC-MENDELEY-6P99569X66":
+        result = ingest_real.ingest_mendeley()
+    elif source_id == "SRC-ZENODO-17376717":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "MoveSmart admission is a multi-minute 676 MB signal ingestion. "
+                "Run: python -m dynamis_science.ingest_real --source movesmart"
+            ),
+        )
+    else:
+        raise HTTPException(status_code=404, detail="Unknown source")
+    return {
+        "already_admitted": False,
+        "snapshot": realstore.get_snapshot(result["snapshot"]),
+        "admission": next(
+            (item for item in realstore.list_admissions() if item["source_id"] == source_id), None
+        ),
+    }
+
+
+@app.get("/real/snapshots")
+def real_snapshots() -> list[dict[str, Any]]:
+    return realstore.list_snapshots()
+
+
+@app.get("/real/snapshots/{snapshot_id}")
+def real_snapshot_detail(snapshot_id: str) -> dict[str, Any]:
+    detail = realstore.snapshot_detail(snapshot_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return detail
+
+
+@app.get("/real/qualification")
+def real_qualification_list() -> list[dict[str, Any]]:
+    return _real_qualification_records()
