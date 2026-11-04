@@ -157,6 +157,17 @@ pnpm build
 - **76 automated tests** (47 Python, 29 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, investigation ordering rules, scenario simulation, report citations, the typed block model, lineage layout and display rules.
 - **Rendered end-to-end validation**: a scripted headless-browser walkthrough of the complete demo path (47 checks at 1440×900 and 1280×800) against the production build, with zero console or network errors.
 
+## Real-data admission (RES-587)
+
+Two rights-verified public datasets are admitted outside the public repository
+through the same workbench: Holmberg Sprint Priming (Mendeley, CC BY 4.0) and
+MoveSmart wearable IMU + force plate (Zenodo, CC0 1.0). The admission pipeline
+writes write-once Parquet snapshots with checksums and provenance, and the real
+studies run independent MixedLM, ICC(3,1) reliability and force-signal
+qualification. See [docs/RES-587_REAL_DATA_CLOSURE.md](docs/RES-587_REAL_DATA_CLOSURE.md)
+for identities, rights, measured storage, numerical comparisons, commands and
+the acceptance matrix.
+
 ## Status and limitations
 
 This is a vertical-slice MVP built to demonstrate the product and its scientific discipline.
