@@ -36,11 +36,11 @@ Measured usage:
 | qualification | 14,395 |
 | manifests | 12,844 |
 | artifacts | 491,347 |
-| reports | 2,564,243 |
+| reports | 2,559,951 |
 | tmp | 96,701 |
-| **total** | **903,847,809** |
+| **total** | **903,843,517** |
 
-Free space on `E:` after admission: approximately **294.3 GB**. The 50 GB
+Free space on `E:` after admission: approximately **294.8 GB**. The 50 GB
 working-capacity target was never approached.
 
 ## 2. Real datasets admitted
