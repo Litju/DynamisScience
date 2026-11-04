@@ -83,7 +83,7 @@ export function Workbench() {
     <div className="bench" id="workbench">
       <div className="bench-inner">
         <div className="bench-head">
-          <h2>Primary Intervention Analysis</h2>
+          <h2>{wb.study.real_data ? "Real-data scientific investigation" : "Primary Intervention Analysis"}</h2>
           <span className="faint">{wb.investigationId} · v{wb.version} · {wb.blocks.length} blocks</span>
           <span className="save" role="status">
             {wb.saveState === "saving" && "saving investigation…"}

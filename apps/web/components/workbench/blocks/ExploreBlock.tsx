@@ -5,7 +5,7 @@ import { Activity, Info, LineChart, Pin } from "lucide-react";
 import { useMemo } from "react";
 import type { ExploreReference, WorkbenchBlock } from "@/lib/types";
 import { scienceApi } from "@/lib/api";
-import { METRIC_OPTIONS, formatSig, formatSignedSig, metricOption } from "@/lib/scientific";
+import { formatSig, formatSignedSig, metricOption, metricOptionsFor } from "@/lib/scientific";
 import { createBlock, insertAfter, updateState } from "@/lib/workbench";
 import { ArmLabel, Button, ErrorBox, Loading, Readout, State } from "@/components/ui";
 import { CohortLongitudinalChart, COLORS } from "@/components/charts";
@@ -16,16 +16,19 @@ type Population = "ALL" | "INTERVENTION" | "COMPARISON";
 
 export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: number }) {
   const wb = useWorkbench();
-  const metricId = String(block.state.metric_id ?? "MET-CMJ-IMPULSE");
+  const real = wb.study.real_data;
+  const metricId = String(block.state.metric_id ?? (real ? "MET-REAL-CMJ-HEIGHT" : "MET-CMJ-IMPULSE"));
   const metric = metricOption(metricId);
+  const options = metricOptionsFor(real, wb.studyId);
   const population = (block.state.population as Population) ?? "ALL";
+  const effectivePopulation = real ? "INTERVENTION" : population;
   const reference = (block.state.reference as ExploreReference) ?? "RAW";
   const context = Array.isArray(block.state.context) ? (block.state.context as string[]) : [];
-  const showContext = context.length > 0;
+  const showContext = !real && context.length > 0;
   const set = (patch: Record<string, unknown>) => wb.setBlocks((blocks) => updateState(blocks, block.id, patch));
   const explore = useQuery({
-    queryKey: ["explore", metricId, reference, wb.excludedSubjectIds.join(",")],
-    queryFn: () => scienceApi.explore(metricId, wb.excludedSubjectIds, reference),
+    queryKey: ["explore", wb.studyId, metricId, reference, wb.excludedSubjectIds.join(",")],
+    queryFn: () => scienceApi.explore(metricId, wb.excludedSubjectIds, reference, wb.studyId),
     placeholderData: (previous) => previous,
   });
   const data = explore.data;
@@ -35,7 +38,8 @@ export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: n
   const missingWeeks = useMemo(() => (data?.summary ?? []).filter((row) => row.missing_athletes > 0 || row.excluded_trials > 0), [data]);
   const peaks = data?.annotations.load_peaks.map((peak) => peak.week) ?? [];
   const block_ = data?.annotations.intervention_block;
-  const weekRows = data?.summary.filter((row) => row.week === (wb.selection.week ?? 10)) ?? [];
+  const focusPoint = wb.selection.week ?? (real ? 4 : 10);
+  const weekRows = data?.summary.filter((row) => row.week === focusPoint) ?? [];
 
   return (
     <BlockFrame
@@ -50,25 +54,25 @@ export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: n
       <div className="block-toolbar">
         <label className="field"><span>Metric</span>
           <select className="select" value={metricId} onChange={(event) => set({ metric_id: event.target.value })} aria-label="Explore metric">
-            {METRIC_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label} ({option.unit}){option.role === "PRIMARY" ? " · primary" : ""}</option>)}
+            {options.map((option) => <option key={option.id} value={option.id}>{option.label} ({option.unit}){option.role === "PRIMARY" ? " · primary" : ""}</option>)}
           </select>
         </label>
-        <div className="field"><span>Population</span>
+        {!real && <div className="field"><span>Population</span>
           <div className="seg" role="group" aria-label="Population">
             {(["ALL", "INTERVENTION", "COMPARISON"] as Population[]).map((value) => <button key={value} type="button" aria-pressed={population === value} onClick={() => set({ population: value })}>{value === "ALL" ? "Both arms" : value === "INTERVENTION" ? "Intervention" : "Comparison"}</button>)}
           </div>
-        </div>
+        </div>}
         <div className="field"><span>Reference</span>
           <div className="seg" role="group" aria-label="Reference">
             {(["RAW", "CHANGE", "PERCENT"] as ExploreReference[]).map((value) => <button key={value} type="button" aria-pressed={reference === value} onClick={() => set({ reference: value })}>{value === "RAW" ? "Observed" : value === "CHANGE" ? "Δ baseline" : "% baseline"}</button>)}
           </div>
         </div>
-        <button type="button" className="chip" aria-pressed={showContext} onClick={() => set({ context: showContext ? [] : ["LOAD", "MATCH"] })}>Context: training load + match exposure</button>
+        {!real && <button type="button" className="chip" aria-pressed={showContext} onClick={() => set({ context: showContext ? [] : ["LOAD", "MATCH"] })}>Context: training load + match exposure</button>}
         <span className="grow" />
         <label className="field"><span>Athlete</span>
           <select className="select" value={athleteId ?? ""} onChange={(event) => { const value = event.target.value || null; wb.select({ athleteId: value, trialId: null }); if (value) wb.inspect({ kind: "athlete", id: value }); }} aria-label="Select athlete">
             <option value="">— none —</option>
-            {data?.athletes.map((athlete) => <option key={athlete.subject_id} value={athlete.subject_id}>{athlete.display_id} · {athlete.intervention_arm === "INTERVENTION" ? "INT" : "CMP"}</option>)}
+            {data?.athletes.map((athlete) => <option key={athlete.subject_id} value={athlete.subject_id}>{athlete.display_id} · {real ? "real" : athlete.intervention_arm === "INTERVENTION" ? "INT" : "CMP"}</option>)}
           </select>
         </label>
       </div>
@@ -81,10 +85,10 @@ export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: n
           <div className="chart-cap">
             <strong>{metric.label}</strong>
             <span className="mono">{data.unit}</span>
-            <span>· arm mean ± 95% CI across athletes · thin lines = individual athletes · click a line to select</span>
+            <span>· {real ? "cohort mean ± 95% CI across athletes" : "arm mean ± 95% CI across athletes"} · thin lines = individual athletes · click a line to select</span>
             <span className="legend">
-              {(population === "ALL" || population === "INTERVENTION") && <span><i className="swatch" style={{ background: COLORS.int }} />Intervention</span>}
-              {(population === "ALL" || population === "COMPARISON") && <span><i className="swatch" style={{ background: COLORS.cmp }} />Comparison</span>}
+              {(effectivePopulation === "ALL" || effectivePopulation === "INTERVENTION") && <span><i className="swatch" style={{ background: COLORS.int }} />{real ? "Single training arm" : "Intervention"}</span>}
+              {!real && (effectivePopulation === "ALL" || effectivePopulation === "COMPARISON") && <span><i className="swatch" style={{ background: COLORS.cmp }} />Comparison</span>}
               {athleteId && athleteInCohort && <span><i className="swatch" style={{ background: COLORS.signal }} />{data.athletes.find((a) => a.subject_id === athleteId)?.display_id}</span>}
             </span>
           </div>
@@ -94,7 +98,7 @@ export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: n
             context={data.context}
             unit={data.unit}
             metricLabel={metric.label}
-            population={population}
+            population={effectivePopulation}
             blockWeeks={[block_.start_week, block_.end_week]}
             loadPeaks={peaks}
             showContext={showContext}
@@ -107,12 +111,12 @@ export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: n
       )}
       {data && hasValues && (
         <div className="block-toolbar small">
-          <span className="faint">Week {wb.selection.week ?? 10}:</span>
-          {weekRows.filter((row) => population === "ALL" || row.arm === population).map((row) => (
+          <span className="faint">{real ? "Occasion" : "Week"} {focusPoint}:</span>
+          {weekRows.filter((row) => effectivePopulation === "ALL" || row.arm === effectivePopulation).map((row) => (
             <span key={row.arm}><ArmLabel arm={row.arm} /> <span className="mono">{formatSig(row.mean, 4)}</span><span className="unit">{data.unit}</span> <span className="mono faint">[{formatSig(row.ci_low, 3)}, {formatSig(row.ci_high, 3)}] n={row.n}</span></span>
           ))}
           <span className="grow" />
-          <span className="faint">{missingWeeks.length ? `incomplete weeks: ${missingWeeks.map((row) => `w${row.week}${row.arm === "INTERVENTION" ? "·I" : "·C"}`).join(" ")}` : "complete weekly coverage"}</span>
+          <span className="faint">{missingWeeks.length ? `incomplete ${real ? "occasions" : "weeks"}: ${missingWeeks.map((row) => `${real ? "o" : "w"}${row.week}${row.arm === "INTERVENTION" ? "·I" : "·C"}`).join(" ")}` : `complete ${real ? "occasion" : "weekly"} coverage`}</span>
           <span className="faint">load peak (computed): {peaks.length ? peaks.map((week) => `w${week}`).join(", ") : "none"}</span>
         </div>
       )}
@@ -126,8 +130,9 @@ export function ExploreBlock({ block, index }: { block: WorkbenchBlock; index: n
 function AthletePanel({ blockId, metricId }: { blockId: string; metricId: string }) {
   const wb = useWorkbench();
   const athleteId = wb.selection.athleteId as string;
-  const athlete = useQuery({ queryKey: ["athlete", athleteId, metricId], queryFn: () => scienceApi.athlete(athleteId, metricId) });
+  const athlete = useQuery({ queryKey: ["athlete", wb.studyId, athleteId, metricId], queryFn: () => scienceApi.athlete(athleteId, metricId, wb.studyId) });
   const data = athlete.data;
+  const real = wb.study.real_data;
   if (athlete.isLoading) return <Loading label="Loading athlete observations" />;
   if (athlete.error || !data) return <ErrorBox error={athlete.error ?? "Athlete unavailable"} />;
   const individual = data.individual;
@@ -149,18 +154,18 @@ function AthletePanel({ blockId, metricId }: { blockId: string; metricId: string
       </div>
       <div style={{ padding: 10, display: "grid", gap: 10 }}>
         <div className="readouts">
-          <Readout label="Baseline w1–2" value={formatSig(individual.baseline_mean, 4)} unit={unit} />
-          <Readout label="Post w9–10" value={formatSig(individual.post_mean, 4)} unit={unit} />
+          <Readout label={real ? "First occasion" : "Baseline w1–2"} value={formatSig(individual.baseline_mean, 4)} unit={unit} />
+          <Readout label={real ? "Final occasion" : "Post w9–10"} value={formatSig(individual.post_mean, 4)} unit={unit} />
           <Readout label="Change" value={formatSignedSig(individual.change, 3)} unit={unit} detail={individual.percent_change === null ? undefined : `${formatSignedSig(individual.percent_change, 3)} %`} />
-          <Readout label="Standardised" value={formatSignedSig(individual.standardized_change, 3)} unit="SD" detail={`cohort change SD ${formatSig(individual.cohort_change_sd, 3)}`} />
-          <Readout label="vs typical error" value={individual.exceeds_typical_error === null ? "—" : individual.exceeds_typical_error ? "EXCEEDS" : "WITHIN"} detail={`TE of change ${formatSig(individual.typical_error, 3)} ${unit}`} />
+          <Readout label="Standardised" value={individual.standardized_change === null ? "—" : formatSignedSig(individual.standardized_change, 3)} unit="SD" detail={`cohort change SD ${formatSig(individual.cohort_change_sd, 3)}`} />
+          <Readout label="vs typical error" value={individual.exceeds_typical_error === null ? "NOT ESTIMABLE" : individual.exceeds_typical_error ? "EXCEEDS" : "WITHIN"} detail={real ? "no repeated same-session trial" : `TE of change ${formatSig(individual.typical_error, 3)} ${unit}`} />
         </div>
         <div>
-          <div className="faint small" style={{ marginBottom: 4 }}>CMJ trials by week — teal outline: 1000 Hz force trace retained · hatched: EXCLUDED · dashed: not captured</div>
+          <div className="faint small" style={{ marginBottom: 4 }}>{real ? "Observations by testing occasion — one derived CMJ per occasion; no raw force trace is deposited" : "CMJ trials by week — teal outline: 1000 Hz force trace retained · hatched: EXCLUDED · dashed: not captured"}</div>
           <div className="trial-strip">
             {data.observations.map((observation) => (
               <div key={observation.week} className={`trial-week ${wb.selection.week === observation.week ? "is-selected" : ""}`}>
-                <span>w{observation.week}</span>
+                <span>{real ? "O" : "w"}{observation.week}</span>
                 {[1, 2].map((number) => {
                   const trial = observation.trials.find((item) => item.trial_number === number);
                   if (!trial) return <span key={number} className="trial-dot is-missing" title={`Week ${observation.week} trial ${number}: not captured`}>–</span>;
@@ -182,8 +187,9 @@ function AthletePanel({ blockId, metricId }: { blockId: string; metricId: string
             <span className="mono">{formatSig(selectedTrial.value, 4)}<span className="unit">{unit}</span></span>
             {selectedTrial.exclusion_reason && <span className="note bad">{selectedTrial.exclusion_reason}</span>}
             <span className="grow" />
-            <Button size="sm" onClick={pin}><Pin size={12} />Pin to investigation</Button>
-            <Button size="sm" variant="primary" onClick={() => wb.openViewer({ kind: "force", trialId: selectedTrial.trial_id })}><Activity size={12} />{selectedTrial.trace_available ? "Open force signal" : "Open trial (no raw trace)"}</Button>
+            {!real && <Button size="sm" onClick={pin}><Pin size={12} />Pin to investigation</Button>}
+            {!real && <Button size="sm" variant="primary" onClick={() => wb.openViewer({ kind: "force", trialId: selectedTrial.trial_id })}><Activity size={12} />{selectedTrial.trace_available ? "Open force signal" : "Open trial (no raw trace)"}</Button>}
+            {real && <span className="faint small">Derived scalar only; the deposit contains no force-time trace.</span>}
           </div>
         ) : (
           <div className="faint small">Select a trial to open its force signal.</div>

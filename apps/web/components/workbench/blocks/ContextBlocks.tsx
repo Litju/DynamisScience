@@ -42,9 +42,9 @@ export function QuestionBlock({ block, index }: BlockProps) {
       <div className="plan">
         <div className="plan-head">
           <Lock size={12} />
-          <strong style={{ color: "var(--text-strong)", fontWeight: 600 }}>Frozen analysis plan</strong>
+          <strong style={{ color: "var(--text-strong)", fontWeight: 600 }}>{plan.frozen_before_inspection ? "Frozen analysis plan" : "Registered analysis plan"}</strong>
           <span className="mono faint">{plan.id}</span>
-          <span className="faint">· frozen before data inspection · changes create new specs, never edits</span>
+          <span className="faint">· {plan.frozen_before_inspection ? "frozen before data inspection" : "registered after source acquisition"} · changes create new specs, never edits</span>
           <span style={{ marginLeft: "auto" }}><Button size="sm" variant="ghost" onClick={() => inspect({ kind: "design", section: "plan" })}>Inspect plan</Button></span>
         </div>
         <div className="plan-row"><span>Primary outcomes</span><span>{plan.primary_outcomes.join(" · ")}</span></div>
@@ -63,6 +63,9 @@ export function DatasetBlock({ block, index }: BlockProps) {
   const snapshot = study.snapshot;
   const health = study.data_health;
   const rows = snapshot.row_counts;
+  const real = study.real_data;
+  const source = snapshot.source;
+  const rowTotal = Object.values(rows).reduce((sum, value) => sum + value, 0);
   return (
     <BlockFrame
       block={block}
@@ -70,21 +73,33 @@ export function DatasetBlock({ block, index }: BlockProps) {
       icon={<Database size={12} />}
       title={snapshot.id}
       sub={snapshot.label}
-      states={["FROZEN", "SYNTHETIC"]}
+      states={["FROZEN", real ? "REAL DATA" : "SYNTHETIC"]}
       actions={<Link href={`/data/${snapshot.id}`} className="btn btn-sm btn-ghost" style={{ textDecoration: "none" }}><ExternalLink size={12} />Data</Link>}
     >
       <div className="readouts">
-        <Readout label="Athletes" value={snapshot.subjects.total} detail={`${study.arm_counts.INTERVENTION} intervention · ${study.arm_counts.COMPARISON} comparison`} />
-        <Readout label="Weeks" value={snapshot.subjects.weeks} detail="2 CMJ trials / week" />
-        <Readout label="CMJ trials" value={rows.cmj_trials?.toLocaleString()} detail={`${health.valid_measurements} valid · ${health.excluded_measurements} excluded`} />
-        <Readout label="Force samples" value={rows.force_traces?.toLocaleString()} detail={`${snapshot.sample_rates.force_traces_hz} Hz audit traces`} />
-        <Readout label="Tracking rows" value={rows.match_tracking?.toLocaleString()} detail={`${snapshot.sample_rates.match_tracking_hz} Hz · pose ${snapshot.pose_athletes.length} athletes`} />
+        <Readout label="Participants" value={snapshot.subjects.total} detail={real ? "real measured participants" : `${study.arm_counts.INTERVENTION} intervention · ${study.arm_counts.COMPARISON} comparison`} />
+        <Readout label={real ? "Source class" : "Weeks"} value={real ? <span className="readout-small">{String(source?.classification ?? "—")}</span> : snapshot.subjects.weeks} detail={real ? String(source?.license?.id ?? "") : "2 CMJ trials / week"} />
+        <Readout label="Rows" value={rowTotal.toLocaleString()} detail={`${Object.keys(rows).length} tables · ${health.valid_measurements} valid`} />
+        <Readout label={real ? "Source DOI" : "Force samples"} value={real ? <span className="readout-small">{String(source?.doi ?? "—")}</span> : rows.force_traces?.toLocaleString()} detail={real ? String(source?.publisher ?? "") : `${snapshot.sample_rates.force_traces_hz} Hz audit traces`} />
+        <Readout label={real ? "Admission" : "Tracking rows"} value={real ? <span className="readout-small">{String(snapshot.admission?.status ?? "—")}</span> : rows.match_tracking?.toLocaleString()} detail={real ? `${snapshot.admission?.rights_status ?? ""} · ${snapshot.admission?.admissibility_status ?? ""}` : `${snapshot.sample_rates.match_tracking_hz} Hz · pose ${snapshot.pose_athletes.length} athletes`} />
       </div>
       <div className="block-toolbar small">
-        <span className="faint">seed <span className="mono" style={{ color: "var(--text)" }}>{snapshot.seed}</span></span>
-        <span className="faint">generator <span className="mono" style={{ color: "var(--text)" }}>{snapshot.generator_version}</span></span>
-        <span className="faint">schema <span className="mono" style={{ color: "var(--text)" }}>{snapshot.schema_version}</span></span>
-        <span className="faint">cmj_trials sha256 <span className="mono" style={{ color: "var(--text)" }}>{shortChecksum(snapshot.checksums["cmj_trials.parquet"])}</span></span>
+        {real ? (
+          <>
+            <span className="faint">licence <span className="mono" style={{ color: "var(--text)" }}>{source?.license?.id}</span></span>
+            <span className="faint">privacy <span className="mono" style={{ color: "var(--text)" }}>{source?.privacy?.classification}</span></span>
+            <span className="faint">parser <span className="mono" style={{ color: "var(--text)" }}>{snapshot.generator_version}</span></span>
+            <span className="faint">schema <span className="mono" style={{ color: "var(--text)" }}>{snapshot.schema_version}</span></span>
+            <span className="faint">checksums <span className="mono" style={{ color: "var(--text)" }}>{Object.keys(snapshot.checksums).length} files</span></span>
+          </>
+        ) : (
+          <>
+            <span className="faint">seed <span className="mono" style={{ color: "var(--text)" }}>{snapshot.seed}</span></span>
+            <span className="faint">generator <span className="mono" style={{ color: "var(--text)" }}>{snapshot.generator_version}</span></span>
+            <span className="faint">schema <span className="mono" style={{ color: "var(--text)" }}>{snapshot.schema_version}</span></span>
+            <span className="faint">cmj_trials sha256 <span className="mono" style={{ color: "var(--text)" }}>{shortChecksum(snapshot.checksums["cmj_trials.parquet"])}</span></span>
+          </>
+        )}
         <span className="grow" />
         <span className="faint">missing slots <span className="mono" style={{ color: "var(--warning)" }}>{health.missing_observations}</span> · provenance <span className="mono" style={{ color: "var(--text)" }}>{health.provenance_completeness.toFixed(1)}%</span></span>
         <Button size="sm" variant="ghost" onClick={() => inspect({ kind: "block", id: block.id })}>Inspect</Button>
@@ -95,8 +110,9 @@ export function DatasetBlock({ block, index }: BlockProps) {
 
 export function CohortBlock({ block, index }: BlockProps) {
   const wb = useWorkbench();
+  const real = wb.study.real_data;
   const excluded = Array.isArray(block.state.excluded_subject_ids) ? (block.state.excluded_subject_ids as string[]) : [];
-  const cohort = useQuery({ queryKey: ["cohort", excluded.join(",")], queryFn: () => scienceApi.cohort(excluded), placeholderData: (previous) => previous });
+  const cohort = useQuery({ queryKey: ["cohort", wb.studyId, excluded.join(",")], queryFn: () => scienceApi.cohort(excluded, wb.studyId), placeholderData: (previous) => previous });
   const toggle = (subjectId: string) => {
     const next = excluded.includes(subjectId) ? excluded.filter((id) => id !== subjectId) : [...excluded, subjectId].sort();
     wb.setBlocks((blocks) => updateState(blocks, block.id, { excluded_subject_ids: next }));
@@ -114,22 +130,22 @@ export function CohortBlock({ block, index }: BlockProps) {
       states={[status]}
       actions={excluded.length > 0 ? <Button size="sm" variant="ghost" onClick={reset}><RotateCcw size={12} />Restore frozen cohort</Button> : undefined}
     >
-      {cohort.isLoading && <Loading label="Resolving cohort against DS-SYNTH-001" />}
+      {cohort.isLoading && <Loading label={`Resolving cohort against ${wb.study.snapshot.id}`} />}
       {cohort.error && <ErrorBox error={cohort.error} onRetry={() => void cohort.refetch()} />}
       {data && (
         <>
           <div className="readouts">
-            <Readout label="Athletes (n)" value={data.n} detail={excluded.length ? `${excluded.length} excluded by scientist` : "frozen COHORT-001"} />
-            <Readout label="Intervention" value={data.arm_counts.INTERVENTION} detail="strength block w3–10" />
-            <Readout label="Comparison" value={data.arm_counts.COMPARISON} detail="usual care" />
-            <Readout label="Valid trials" value={data.trial_quality.valid} detail={`of ${data.trial_quality.expected} expected`} />
+            <Readout label="Participants (n)" value={data.n} detail={excluded.length ? `${excluded.length} excluded by scientist` : data.cohort.id} />
+            <Readout label={real ? "Single arm" : "Intervention"} value={data.arm_counts.INTERVENTION} detail={real ? "no concurrent comparator" : "strength block w3–10"} />
+            {!real && <Readout label="Comparison" value={data.arm_counts.COMPARISON} detail="usual care" />}
+            <Readout label="Valid observations" value={data.trial_quality.valid} detail={`of ${data.trial_quality.expected} expected`} />
             <Readout label="Missing / excluded" value={`${data.trial_quality.missing} / ${data.trial_quality.excluded}`} detail={`missing: ${Object.entries(data.trial_quality.missing_by_arm).map(([arm, n]) => `${arm.slice(0, 3).toLowerCase()} ${n}`).join(" · ") || "none"}`} />
           </div>
-          {(["INTERVENTION", "COMPARISON"] as Arm[]).map((arm) => (
+          {(real ? (["INTERVENTION"] as Arm[]) : (["INTERVENTION", "COMPARISON"] as Arm[])).map((arm) => (
             <div key={arm}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <ArmLabel arm={arm} />
-                <span className="faint small">click a name to select the athlete · untick to exclude</span>
+                {real ? <span className="mono small">Single training arm</span> : <ArmLabel arm={arm} />}
+                <span className="faint small">click a name to select the {real ? "participant" : "athlete"} · untick to exclude</span>
               </div>
               <div className="athlete-grid">
                 {data.athletes.filter((athlete) => athlete.intervention_arm === arm).map((athlete) => (

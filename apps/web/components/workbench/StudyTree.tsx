@@ -30,9 +30,10 @@ const same = (a: InspectTarget | null, b: InspectTarget) => JSON.stringify(a) ==
 
 export function StudyTree() {
   const wb = useWorkbench();
-  const evidence = useEvidenceList();
-  const report = useReport();
+  const evidence = useEvidenceList(wb.study.study.id);
+  const report = useReport(wb.study.study.id);
   const { study } = wb;
+  const real = study.real_data;
   const questionBlock = wb.blocks.find((block) => block.type === "question");
   const datasetBlock = wb.blocks.find((block) => block.type === "dataset");
   const cohortBlock = wb.blocks.find((block) => block.type === "cohort");
@@ -66,21 +67,25 @@ export function StudyTree() {
         </Group>
         <Group label="Study design">
           <Item icon={<BookOpen size={13} />} label="Hypotheses" tag={String(study.hypotheses.length)} depth={0} current={same(wb.inspector, { kind: "design", section: "hypotheses" })} onClick={() => openDesign("hypotheses")} />
-          <Item icon={<Split size={13} />} label="Arms" tag={`${study.arm_counts.INTERVENTION}/${study.arm_counts.COMPARISON}`} current={same(wb.inspector, { kind: "design", section: "arms" })} onClick={() => openDesign("arms")} />
-          <Item icon={<CalendarRange size={13} />} label="Timeline" tag={`w${study.study.start_week}–${study.study.end_week}`} current={same(wb.inspector, { kind: "design", section: "timeline" })} onClick={() => openDesign("timeline")} />
-          <Item icon={<Lock size={13} />} label="Frozen analysis plan" tag={study.plan.status} current={same(wb.inspector, { kind: "design", section: "plan" })} onClick={() => openDesign("plan")} />
+          <Item icon={<Split size={13} />} label={real ? "Single arm" : "Arms"} tag={real ? `${study.arm_counts.INTERVENTION}` : `${study.arm_counts.INTERVENTION}/${study.arm_counts.COMPARISON}`} current={same(wb.inspector, { kind: "design", section: "arms" })} onClick={() => openDesign("arms")} />
+          <Item icon={<CalendarRange size={13} />} label={real ? "Occasions" : "Timeline"} tag={real ? `occ ${study.study.start_week}–${study.study.end_week}` : `w${study.study.start_week}–${study.study.end_week}`} current={same(wb.inspector, { kind: "design", section: "timeline" })} onClick={() => openDesign("timeline")} />
+          <Item icon={<Lock size={13} />} label={study.plan.frozen_before_inspection ? "Frozen analysis plan" : "Registered analysis plan"} tag={study.plan.status} current={same(wb.inspector, { kind: "design", section: "plan" })} onClick={() => openDesign("plan")} />
         </Group>
         <Group label="Data">
           <Item icon={<Database size={13} />} label={study.snapshot.id} tag="snapshot" current={wb.selectedBlockId === datasetBlock?.id} onClick={() => focusBlock(datasetBlock?.id)} />
           {study.protocols.map((protocol) => (
             <Item key={protocol.id} icon={<ScrollText size={13} />} label={protocol.name} tag={protocol.id.replace("PROT-", "")} depth={1} current={same(wb.inspector, { kind: "protocol", id: protocol.id })} onClick={() => wb.inspect({ kind: "protocol", id: protocol.id })} />
           ))}
-          <Item icon={<MapPin size={13} />} label="Match segment · 4 events" tag="10 Hz" depth={1} onClick={() => wb.openViewer({ kind: "match" })} title="Open the synchronized field + pose viewer" />
+          {real ? (
+            <Item icon={<MapPin size={13} />} label={`DOI ${String((study.source as { doi?: string } | undefined)?.doi ?? "")}`} tag="source" depth={1} onClick={() => wb.inspect({ kind: "design", section: "plan" })} title="Source provenance is shown in the dataset block and lineage" />
+          ) : (
+            <Item icon={<MapPin size={13} />} label="Match segment · 4 events" tag="10 Hz" depth={1} onClick={() => wb.openViewer({ kind: "match" })} title="Open the synchronized field + pose viewer" />
+          )}
         </Group>
         <Group label="Cohorts">
-          <Item icon={<Users size={13} />} label={wb.excludedSubjectIds.length ? "All participants (draft)" : "All participants"} tag={String(28 - wb.excludedSubjectIds.length)} onClick={() => focusPopulation("ALL")} />
-          <Item icon={<Users size={13} />} label="Intervention" tag={String(study.arm_counts.INTERVENTION)} depth={1} onClick={() => focusPopulation("INTERVENTION")} />
-          <Item icon={<Users size={13} />} label="Comparison" tag={String(study.arm_counts.COMPARISON)} depth={1} onClick={() => focusPopulation("COMPARISON")} />
+          <Item icon={<Users size={13} />} label={wb.excludedSubjectIds.length ? "All participants (draft)" : "All participants"} tag={String(study.cohort.subject_ids.length - wb.excludedSubjectIds.length)} onClick={() => focusPopulation("ALL")} />
+          <Item icon={<Users size={13} />} label={real ? "Single training arm" : "Intervention"} tag={String(study.arm_counts.INTERVENTION)} depth={1} onClick={() => focusPopulation("INTERVENTION")} />
+          {!real && <Item icon={<Users size={13} />} label="Comparison" tag={String(study.arm_counts.COMPARISON)} depth={1} onClick={() => focusPopulation("COMPARISON")} />}
         </Group>
         <Group label="Investigations">
           <Item icon={<FlaskConical size={13} />} label="Primary Intervention Analysis" tag={wb.investigationId} onClick={() => { wb.setMode("investigation"); document.querySelector(".bench")?.scrollTo({ top: 0, behavior: "smooth" }); }} />

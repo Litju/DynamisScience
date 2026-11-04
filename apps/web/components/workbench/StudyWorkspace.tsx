@@ -72,7 +72,7 @@ function WorkspaceFrame() {
   const [inspWidth, setInspWidth] = useStoredWidth("ds.insp.w", 356);
   const [dragging, setDragging] = useState<"tree" | "insp" | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const subjects = useSubjects();
+  const subjects = useSubjects(wb.study.study.id);
 
   // Deep links from the command palette and from other surfaces.
   const paramKey = params.toString();
@@ -158,13 +158,13 @@ function WorkspaceFrame() {
         <nav className="sbar-id" aria-label="Breadcrumb"><Link href="/research" style={{ color: "inherit", textDecoration: "none" }}>Research</Link> <ChevronRight size={10} style={{ verticalAlign: "middle" }} /> {study.study.id}</nav>
         <div className="sbar-title">
           <strong>{study.study.title}</strong>
-          <span>{study.question.statement}</span>
+          <span>{study.real_data ? `Real data · ${String((study.source as { doi?: string } | undefined)?.doi ?? "")}` : study.question.statement}</span>
         </div>
         <div className="sbar-states">
           <State>{study.study.state}</State>
-          <State title="Frozen analysis plan">{study.plan.status}</State>
-          <State tone="tone-neutral">{`${study.snapshot.id} · SEED ${study.snapshot.seed}`}</State>
-          <State>SYNTHETIC</State>
+          <State title="Analysis plan status">{study.plan.status}</State>
+          <State tone="tone-neutral">{study.real_data ? `${study.snapshot.id} · IMMUTABLE` : `${study.snapshot.id} · SEED ${study.snapshot.seed}`}</State>
+          <State>{study.real_data ? "REAL DATA" : "SYNTHETIC"}</State>
         </div>
         <div className="sbar-actions">
           <div className="mode-switch" role="group" aria-label="Study mode">
@@ -185,7 +185,7 @@ function WorkspaceFrame() {
         <span className="ctx-arrow">›</span>
         <span className={`ctx-item ${wb.excludedSubjectIds.length ? "linked" : ""}`}>
           <b>Cohort</b>
-          <span className="mono">{wb.excludedSubjectIds.length ? `DRAFT · ${28 - wb.excludedSubjectIds.length}` : `${study.cohort.id} · ${study.cohort.subject_ids.length}`}</span>
+          <span className="mono">{wb.excludedSubjectIds.length ? `DRAFT · ${study.cohort.subject_ids.length - wb.excludedSubjectIds.length}` : `${study.cohort.id} · ${study.cohort.subject_ids.length}`}</span>
           {cohortBlock && <button type="button" aria-label="Focus cohort block" onClick={() => wb.selectBlock(cohortBlock.id, { scroll: true })}><ChevronRight size={11} /></button>}
         </span>
         {analysisBlock?.state.run_id ? (

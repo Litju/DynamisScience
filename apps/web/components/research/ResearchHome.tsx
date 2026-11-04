@@ -27,7 +27,7 @@ export function ResearchHome() {
             <Link key={study.id} href={`/research/studies/${study.id}`} className="study-row">
               <div>
                 <div className="mono faint">{study.id}</div>
-                <div style={{ marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap" }}><State>{study.state}</State><State>SYNTHETIC</State></div>
+                <div style={{ marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap" }}><State>{study.state}</State><State>{study.real_data ? "REAL DATA" : "SYNTHETIC"}</State></div>
               </div>
               <div style={{ minWidth: 0 }}>
                 <strong>{study.title}</strong>
@@ -35,7 +35,7 @@ export function ResearchHome() {
               </div>
               <div className="meta">
                 <div className="mono">{study.dataset_snapshot_id}</div>
-                <div>{study.participant_count} athletes · weeks {study.start_week}–{study.end_week}</div>
+                <div>{study.participant_count} participants · {study.real_data ? `occasions ${study.start_week}–${study.end_week}` : `weeks ${study.start_week}–${study.end_week}`}</div>
               </div>
               <div className="meta">
                 <div>Plan <State plain>{study.plan_status}</State></div>

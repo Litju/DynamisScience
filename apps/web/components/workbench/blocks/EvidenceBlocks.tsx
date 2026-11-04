@@ -16,8 +16,8 @@ import { runMatchesConfig } from "./AnalysisBlocks";
 /** Resolve the analysis → run → evidence chain an evidence block points at. */
 function useEvidenceChain(evidenceBlock: WorkbenchBlock | undefined) {
   const wb = useWorkbench();
-  const runs = useRuns();
-  const evidence = useEvidenceList();
+  const runs = useRuns(wb.studyId);
+  const evidence = useEvidenceList(wb.studyId);
   const analysis = wb.blocks.find((item) => item.id === evidenceBlock?.state.analysis_block_id);
   const run = runs.data?.find((item) => item.id === analysis?.state.run_id);
   const fresh = analysis ? runMatchesConfig(run, analysis, wb.excludedSubjectIds) : false;
@@ -29,7 +29,7 @@ function useCite() {
   const wb = useWorkbench();
   const invalidate = useInvalidateScience();
   return useMutation({
-    mutationFn: (artifactId: string) => scienceApi.cite(artifactId),
+    mutationFn: (artifactId: string) => scienceApi.cite(artifactId, wb.studyId),
     onSuccess: (result) => {
       invalidate();
       wb.notify(result.already_cited ? `${result.artifact_id} is already cited in ${result.report_id}` : `${result.artifact_id} added to ${result.report_id} · ${result.section}`);
@@ -67,7 +67,7 @@ export function EvidenceCard({ evidence, run, cited, onCite, citing, diagnostics
         <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>{evidence.interpretation}</p>
         <div className="evidence-actions" style={{ marginTop: 10 }}>
           <Button size="sm" onClick={() => wb.inspect({ kind: "run", id: evidence.analysis_run_id })}><ScanSearch size={12} />Inspect run</Button>
-          <Button size="sm" onClick={() => wb.inspect({ kind: "method", id: methodId })}><Microscope size={12} />Methodology</Button>
+          {!wb.study.real_data && <Button size="sm" onClick={() => wb.inspect({ kind: "method", id: methodId })}><Microscope size={12} />Methodology</Button>}
           <Button size="sm" onClick={() => diagnosticsBlockId && wb.selectBlock(diagnosticsBlockId, { scroll: true })} disabled={!diagnosticsBlockId}><Stethoscope size={12} />Diagnostics</Button>
           <Button size="sm" onClick={() => wb.openLineage(evidence.id)}><GitBranch size={12} />Inspect lineage</Button>
           {onCite && <Button size="sm" variant={cited ? "default" : "primary"} onClick={onCite} disabled={cited || citing}><Plus size={12} />{cited ? "In report" : "Add to report"}</Button>}
@@ -96,13 +96,13 @@ export function EvidenceCard({ evidence, run, cited, onCite, citing, diagnostics
 export function EvidenceBlock({ block, index }: { block: WorkbenchBlock; index: number }) {
   const wb = useWorkbench();
   const invalidate = useInvalidateScience();
-  const report = useReport();
+  const report = useReport(wb.studyId);
   const cite = useCite();
   const { run, fresh, evidence, loading } = useEvidenceChain(block);
   const diagnosticsBlock = wb.blocks.find((item) => item.type === "diagnostics" && item.state.analysis_block_id === block.state.analysis_block_id);
   const diagnosticsComplete = run ? (run.method_id === "METH-LONG" ? Array.isArray((run.diagnostics as Record<string, unknown>).residual_qq) : Object.keys(run.diagnostics ?? {}).length > 0) : false;
   const promote = useMutation({
-    mutationFn: (runId: string) => scienceApi.promote(runId),
+    mutationFn: (runId: string) => scienceApi.promote(runId, wb.studyId),
     onSuccess: (result) => {
       wb.setBlocks((blocks) => {
         const withEvidence = updateState(blocks, block.id, { evidence_id: result.evidence_artifact.id });
@@ -123,7 +123,7 @@ export function EvidenceBlock({ block, index }: { block: WorkbenchBlock; index: 
           <Hexagon size={18} style={{ color: "var(--signal)" }} />
           <p>
             {run.id} is a completed, immutable run{run.reproduces?.length ? ` that reproduces ${run.reproduces.join(", ")}` : ""}. Promotion creates an immutable EvidenceArtifact bound to its spec, cohort, dataset and diagnostics
-            {run.plan_alignment === "EXPLORATORY" ? "; it will be classed EXPLORATORY because the run deviates from the frozen plan." : "; it will be classed from the frozen plan."}
+            {wb.study.real_data ? "; it will be classed EXPLORATORY because the analysis plan was registered after source acquisition." : run.plan_alignment === "EXPLORATORY" ? "; it will be classed EXPLORATORY because the run deviates from the frozen plan." : "; it will be classed from the frozen plan."}
             {!fresh && " The analysis configuration has changed since this run — promotion applies to the run, not the current configuration."}
           </p>
           <Button variant="primary" onClick={() => promote.mutate(run.id)} disabled={promote.isPending || !diagnosticsComplete} title={diagnosticsComplete ? undefined : "Diagnostics are missing; a result without diagnostics cannot become evidence"}>
@@ -149,7 +149,7 @@ export function FigureView({ figure }: { figure: FigureArtifact }) {
 
 export function FigureBlock({ block, index }: { block: WorkbenchBlock; index: number }) {
   const wb = useWorkbench();
-  const report = useReport();
+  const report = useReport(wb.studyId);
   const cite = useCite();
   const evidenceBlock = wb.blocks.find((item) => item.id === block.state.evidence_block_id);
   const { evidence } = useEvidenceChain(evidenceBlock);
@@ -179,7 +179,7 @@ export function FigureBlock({ block, index }: { block: WorkbenchBlock; index: nu
 
 export function InterpretationBlock({ block, index }: { block: WorkbenchBlock; index: number }) {
   const wb = useWorkbench();
-  const runs = useRuns();
+  const runs = useRuns(wb.studyId);
   const evidenceBlock = wb.blocks.find((item) => item.id === block.state.evidence_block_id);
   const { evidence } = useEvidenceChain(evidenceBlock);
   const reliability = runs.data?.find((run) => run.id === "RUN-0002");
@@ -218,11 +218,11 @@ export function InterpretationBlock({ block, index }: { block: WorkbenchBlock; i
 
 export function ReportSectionBlock({ block, index }: { block: WorkbenchBlock; index: number }) {
   const wb = useWorkbench();
-  const report = useReport();
+  const report = useReport(wb.studyId);
   const cite = useCite();
   const evidenceIds = new Set<string>();
-  const evidence = useEvidenceList();
-  const runs = useRuns();
+  const evidence = useEvidenceList(wb.studyId);
+  const runs = useRuns(wb.studyId);
   for (const item of wb.blocks.filter((entry) => entry.type === "evidence")) {
     const analysis = wb.blocks.find((entry) => entry.id === item.state.analysis_block_id);
     const found = evidence.data?.find((entry) => entry.analysis_run_id === analysis?.state.run_id);

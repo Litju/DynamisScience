@@ -107,7 +107,21 @@ export function WorkbenchProvider({ study, investigationId, children }: { study:
     const timer = window.setTimeout(async () => {
       dirty.current = false;
       try {
-        const saved = await scienceApi.saveInvestigation(investigationId, blocks, versionRef.current);
+        let saved;
+        try {
+          saved = await scienceApi.saveInvestigation(investigationId, blocks, versionRef.current);
+        } catch (error) {
+          // A rapid fork/run can overlap two debounced saves. The server keeps the
+          // first one; refetch the authoritative version and retry with the local
+          // blocks, which are the scientist's latest intent.
+          if (error instanceof ScienceError && error.status === 409) {
+            const latest = await scienceApi.investigation(investigationId);
+            versionRef.current = latest.version;
+            saved = await scienceApi.saveInvestigation(investigationId, blocks, latest.version);
+          } else {
+            throw error;
+          }
+        }
         versionRef.current = saved.version;
         setVersion(saved.version);
         setSaveState("saved");

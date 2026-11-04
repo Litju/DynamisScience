@@ -10,8 +10,8 @@ import { shortChecksum } from "@/lib/scientific";
 export function DataView({ snapshotId }: { snapshotId: string }) {
   const datasets = useQuery({ queryKey: ["datasets"], queryFn: scienceApi.datasets });
   const detail = useQuery({ queryKey: ["dataset", snapshotId], queryFn: () => scienceApi.dataset(snapshotId) });
-  const [table, setTable] = useState<string>("cmj_trials");
-  const selected = detail.data?.tables.find((item) => item.name === table);
+  const [table, setTable] = useState<string>("");
+  const selected = detail.data?.tables.find((item) => item.name === table) ?? detail.data?.tables[0];
   const snapshot = detail.data?.snapshot;
   return (
     <main className="page">
@@ -20,11 +20,11 @@ export function DataView({ snapshotId }: { snapshotId: string }) {
           <div>
             <div className="crumb">DATA / {snapshotId}</div>
             <h1>{snapshot?.label ?? snapshotId}</h1>
-            <p>Immutable analytical snapshot. Every analysis, figure and report in this workspace resolves to these files and checksums.</p>
+            <p>{snapshot?.real_data ? "Immutable snapshot of admitted third-party research data. Rights, source checksum, quality gates and provenance are recorded with the files." : "Immutable analytical snapshot. Every analysis, figure and report in this workspace resolves to these files and checksums."}</p>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <State>FROZEN</State>
-            <State>SYNTHETIC</State>
+            <State>{snapshot?.real_data ? "REAL DATA" : "SYNTHETIC"}</State>
           </div>
         </div>
         {detail.isLoading && <Loading label="Reading snapshot manifest and Parquet schemas" />}
@@ -39,7 +39,7 @@ export function DataView({ snapshotId }: { snapshotId: string }) {
                     <thead><tr><th>Table</th><th>Description</th><th className="r">Rows</th><th className="r">Rate</th><th>SHA-256</th><th>Manifest</th></tr></thead>
                     <tbody>
                       {detail.data.tables.map((item) => (
-                        <tr key={item.name} role="button" tabIndex={0} className={item.name === table ? "is-selected" : ""} onClick={() => setTable(item.name)} onKeyDown={(event) => event.key === "Enter" && setTable(item.name)}>
+                        <tr key={item.name} role="button" tabIndex={0} className={item.name === (table || detail.data?.tables[0]?.name) ? "is-selected" : ""} onClick={() => setTable(item.name)} onKeyDown={(event) => event.key === "Enter" && setTable(item.name)}>
                           <td className="mono">{item.file}</td>
                           <td className="muted">{item.description}</td>
                           <td className="r mono num">{item.rows.toLocaleString()}</td>
@@ -72,7 +72,18 @@ export function DataView({ snapshotId }: { snapshotId: string }) {
               <div className="frame">
                 <div className="frame-head"><h3>Snapshot</h3></div>
                 <div className="frame-body">
-                  <KV rows={[
+                  <KV rows={snapshot.real_data ? [
+                    ["Snapshot ID", snapshot.id, "mono"],
+                    ["Source DOI", String(snapshot.source?.doi ?? ""), "mono"],
+                    ["Publisher", String(snapshot.source?.publisher ?? "")],
+                    ["Licence", String(snapshot.source?.license?.id ?? ""), "mono"],
+                    ["Privacy", String(snapshot.source?.privacy?.classification ?? ""), "mono"],
+                    ["Admission", String(snapshot.admission?.status ?? ""), "mono"],
+                    ["Rights", String(snapshot.admission?.rights_status ?? ""), "mono"],
+                    ["Parser", snapshot.generator_version, "mono"],
+                    ["Schema", snapshot.schema_version, "mono"],
+                    ["Participants", String(snapshot.subjects.total)],
+                  ] : [
                     ["Snapshot ID", snapshot.id, "mono"],
                     ["Seed", String(snapshot.seed), "mono"],
                     ["Generator", snapshot.generator_version, "mono"],
@@ -88,9 +99,9 @@ export function DataView({ snapshotId }: { snapshotId: string }) {
                 <div className="frame-head"><h3>Quality</h3></div>
                 <div className="frame-body">
                   <KV rows={[
-                    ["Valid trials", detail.data.quality.valid_measurements.toLocaleString()],
-                    ["Excluded trials", `${detail.data.quality.excluded_measurements} (remain discoverable)`],
-                    ["Missing slots", `${detail.data.quality.missing_observations} of ${detail.data.quality.expected_slots}`],
+                    ["Valid observations", detail.data.quality.valid_measurements?.toLocaleString() ?? "—"],
+                    ["Excluded", `${detail.data.quality.excluded_measurements ?? "—"} (remain discoverable)`],
+                    ["Missing slots", `${detail.data.quality.missing_observations ?? "—"} of ${detail.data.quality.expected_slots ?? "—"}`],
                     ["Provenance complete", `${detail.data.quality.provenance_completeness.toFixed(1)}% of ${detail.data.quality.total_records} records`],
                   ]} />
                   <div className="hr" />
@@ -103,6 +114,7 @@ export function DataView({ snapshotId }: { snapshotId: string }) {
               <div className="frame">
                 <div className="frame-body">
                   <div className="note warn">{detail.data.disclaimer}</div>
+                  {snapshot.real_data && <div className="note" style={{ marginTop: 8 }}><span><b>Source.</b> {String(snapshot.source?.creators?.join(", ") ?? "")} · <a href={String(snapshot.source?.url ?? "")} target="_blank" rel="noreferrer" style={{ color: "var(--signal)" }}>{String(snapshot.source?.doi ?? "")}</a> · {String(snapshot.source?.license?.id ?? "")}. Participant-level rows remain outside the public repository.</span></div>}
                   <div className="note" style={{ marginTop: 8 }}>Used by {datasets.data?.find((item) => item.id === snapshotId)?.used_by_studies.map((id) => <Link key={id} href={`/research/studies/${id}`} className="mono" style={{ color: "var(--signal)", marginLeft: 4 }}>{id}</Link>)}</div>
                 </div>
               </div>

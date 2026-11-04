@@ -12,10 +12,25 @@ export interface Snapshot {
   row_counts: Record<string, number>;
   checksums: Record<string, string>;
   sample_rates: Record<string, number>;
-  subjects: { total: number; weeks: number; positions: string[] };
+  subjects: { total: number; weeks: number; positions?: string[] };
   pose_athletes: string[];
-  missing_observations: number | null;
+  missing_observations?: number | null;
   provenance: Record<string, unknown>;
+  real_data?: boolean;
+  source?: {
+    id: string;
+    doi: string;
+    url: string;
+    license: { id: string; name: string; url: string };
+    creators: string[];
+    publisher: string;
+    version: string;
+    privacy: { classification: string; rationale: string; incidents?: string[]; additional_obligations?: string[] };
+    classification: string;
+  };
+  admission?: { id: string; status: string; quality_assessment_id: string; rights_status: string; admissibility_status: string };
+  metric_definitions?: Record<string, unknown>[];
+  tables?: Record<string, { file: string; rows: number; columns: string[] }>;
 }
 
 export interface Study {
@@ -42,6 +57,7 @@ export interface StudySummary extends Study {
   evidence_count: number;
   last_run_at: string | null;
   investigation_ids: string[];
+  real_data?: boolean;
 }
 
 export interface ResearchQuestion {
@@ -174,6 +190,8 @@ export interface StudyDetail {
   position_counts: Record<string, number>;
   data_health: DataHealth;
   investigations: { id: string; title: string; status: string; block_count: number }[];
+  real_data?: boolean;
+  source?: Record<string, unknown>;
 }
 
 export interface Subject {
@@ -612,6 +630,18 @@ export interface DatasetSummary {
   row_total: number;
   synthetic: boolean;
   used_by_studies: string[];
+  real_data?: boolean;
+  source?: {
+    id: string;
+    doi: string;
+    url: string;
+    license?: { id: string; name: string; url: string };
+    creators?: string[];
+    publisher?: string;
+    version?: string;
+    privacy?: { classification: string; rationale: string };
+    classification?: string;
+  };
 }
 
 export interface DatasetDetail {
@@ -819,6 +849,122 @@ export interface ReportPayload {
   cohort: CohortDefinition;
   groups: Record<string, StudyGroup>;
   data_health: DataHealth;
+}
+
+export interface RealSourceFile {
+  name: string;
+  size_bytes: number;
+  sha256?: string;
+  md5?: string;
+  source_url?: string;
+  role: string;
+}
+
+export interface RealSourceLicense {
+  id: string;
+  name: string;
+  url: string;
+  evidence?: string;
+  verified_at?: string;
+}
+
+export interface RealSource {
+  id: string;
+  name: string;
+  short_name: string;
+  doi: string;
+  canonical_url: string;
+  publisher: string;
+  creators: string[];
+  version: string;
+  license: RealSourceLicense;
+  attribution: string;
+  commercial_use: string;
+  redistribution: string;
+  privacy: {
+    classification: string;
+    rationale: string;
+    incidents?: string[];
+    additional_obligations?: string[];
+  };
+  files: RealSourceFile[];
+  archive_inventory?: {
+    entries: number;
+    csv_files: number;
+    uncompressed_bytes: number;
+    path_traversal_findings: number;
+    excluded_entries: string[];
+  };
+  data_classification: string;
+  methods_documentation: {
+    available: boolean;
+    location?: string;
+    summary: string;
+    gaps?: string[];
+  };
+  scientific_admissibility: {
+    status: string;
+    supports: string[];
+    does_not_support: string[];
+    design: string;
+  };
+  rights_status: string;
+  admissibility_status: string;
+}
+
+export interface RealSourceSummary {
+  id: string;
+  name: string;
+  short_name: string;
+  doi: string;
+  canonical_url: string;
+  publisher: string;
+  creators: string[];
+  version: string;
+  license_id: string;
+  license_name: string;
+  license_url: string;
+  commercial_use: string;
+  privacy_status: string;
+  rights_status: string;
+  admissibility_status: string;
+  data_classification: string;
+  file_count: number;
+  total_bytes: number;
+  scientific_admissibility: RealSource["scientific_admissibility"];
+  methods_documentation: RealSource["methods_documentation"];
+  admitted: boolean;
+  snapshot: { id: string; label: string; rows: number; admission_status: string } | null;
+}
+
+export interface RealAdmission {
+  id: string;
+  source_id: string;
+  status: string;
+  rights_status: string;
+  admissibility_status: string;
+  quality_assessment_id: string;
+  dataset_snapshot_id: string;
+  parser_version: string;
+  counts: Record<string, number>;
+  admitted_at: string;
+}
+
+export interface RealQualityCheck {
+  check: string;
+  status: string;
+  severity: string;
+  detail: string;
+}
+
+export interface RealQualificationRecord {
+  id: string;
+  scientific_method: string;
+  status: string;
+  dynamis_run?: string;
+  reference_implementation?: string;
+  comparisons?: Record<string, { reference?: number; dynamis?: number; absolute_difference?: number; pass?: boolean }> | Array<Record<string, unknown>>;
+  known_limitations?: string[];
 }
 
 export type BlockType =

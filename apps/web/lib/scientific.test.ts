@@ -5,7 +5,9 @@ import {
   formatWithSign,
   isExcluded,
   jointAngleDegrees,
+  metricOptionsFor,
   provenanceLabel,
+  REAL_METHODS,
   qualityTone,
   uncertaintyInterval,
 } from "./scientific";
@@ -52,6 +54,22 @@ describe("scientific display contracts", () => {
     expect(uncertaintyInterval(0.5, 0.1)).toEqual([0.4, 0.6]);
     expect(uncertaintyInterval(null, 0.1)).toBeNull();
     expect(uncertaintyInterval(0.5, null)).toBeNull();
+  });
+
+  it("keeps real-study metrics and methods scoped to their dataset", () => {
+    expect(metricOptionsFor(true, "STUDY-REAL-001").map((metric) => metric.id)).toEqual([
+      "MET-REAL-CMJ-HEIGHT",
+      "MET-REAL-ISO-REL-PEAK",
+      "MET-REAL-BS-REL",
+      "MET-REAL-SPRINT-20M",
+    ]);
+    expect(metricOptionsFor(true, "STUDY-REAL-002").map((metric) => metric.id)).toEqual([
+      "MET-REAL-FZ-PEAK",
+      "MET-REAL-FZ-IMPULSE",
+    ]);
+    expect(metricOptionsFor(false, "STUDY-REAL-001").some((metric) => metric.id === "MET-CMJ-IMPULSE")).toBe(true);
+    expect(REAL_METHODS["STUDY-REAL-001"]).toContain("METH-REAL-TREND");
+    expect(REAL_METHODS["STUDY-REAL-002"]).toContain("METH-REAL-RELIABILITY");
   });
 
   it("only flags a change as interpretable when it exceeds the typical error", () => {

@@ -24,9 +24,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
-  const subjects = useQuery({ queryKey: ["subjects"], queryFn: scienceApi.subjects });
-  const evidence = useQuery({ queryKey: ["evidence"], queryFn: scienceApi.evidence });
-  const runs = useQuery({ queryKey: ["runs"], queryFn: scienceApi.runs });
+  const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => scienceApi.subjects() });
+  const evidence = useQuery({ queryKey: ["evidence"], queryFn: () => scienceApi.evidence() });
+  const runs = useQuery({ queryKey: ["runs"], queryFn: () => scienceApi.runs() });
   const library = useQuery({ queryKey: ["library"], queryFn: scienceApi.library });
 
   useEffect(() => {

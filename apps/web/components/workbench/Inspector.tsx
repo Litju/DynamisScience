@@ -71,19 +71,19 @@ function DesignInspector({ section }: { section: "hypotheses" | "arms" | "timeli
   const plan = study.plan;
   return (
     <>
-      <Head kind={`Study design · ${section}`} title={section === "plan" ? "Frozen analysis plan" : section === "arms" ? "Study arms" : section === "timeline" ? "Timeline" : "Hypotheses"} states={section === "plan" ? [plan.status] : []} />
+      <Head kind={`Study design · ${section}`} title={section === "plan" ? (plan.frozen_before_inspection ? "Frozen analysis plan" : "Registered analysis plan") : section === "arms" ? "Study arms" : section === "timeline" ? "Timeline" : "Hypotheses"} states={section === "plan" ? [plan.status] : []} />
       <div className="insp-scroll">
         {section === "plan" && (
           <>
             <Sec title="Plan"><KV rows={[["Plan ID", plan.id, "mono"], ["Status", plan.status], ["Frozen before inspection", plan.frozen_before_inspection ? "yes" : "no"], ["Primary estimand", plan.primary_estimand]]} /></Sec>
             <Sec title="Outcomes"><KV rows={[["Primary", plan.primary_outcomes.join(" · ")], ["Secondary", plan.secondary_outcomes.join(" · ")]]} /></Sec>
             <Sec title="Planned analyses"><ul>{plan.planned_models.map((item) => <li key={item}>{item}</li>)}<li>{plan.planned_reliability}</li></ul></Sec>
-            <Sec title="Frozen specifications">
+            <Sec title={plan.frozen_before_inspection ? "Frozen specifications" : "Registered specifications"}>
               {study.analysis_specs.map((spec) => (
-                <div key={spec.id} style={{ marginBottom: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span className="mono">{spec.id}</span><State plain>{spec.status}</State></div>
-                  <div className="small muted">{spec.name} · {spec.outcome_metric_id}</div>
-                  <div className="mono small faint">{JSON.stringify(spec.parameters)}</div>
+                <div key={spec.id} style={{ marginBottom: 8, display: "grid", gap: 2, minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 6, minWidth: 0 }}><span className="mono" style={{ overflowWrap: "anywhere" }}>{spec.id}</span><State plain>{spec.status}</State></div>
+                  <div className="small muted" style={{ overflowWrap: "anywhere" }}>{spec.name} · {spec.outcome_metric_id}</div>
+                  <div className="mono small faint" style={{ overflowWrap: "anywhere" }}>{JSON.stringify(spec.parameters)}</div>
                 </div>
               ))}
             </Sec>
@@ -123,6 +123,21 @@ function BlockInspector({ block }: { block: WorkbenchBlock }) {
   if (block.type === "question") return <DesignInspector section="plan" />;
   if (block.type === "dataset") {
     const snapshot = wb.study.snapshot;
+    if (wb.study.real_data) {
+      return (
+        <>
+          {head}
+          <div className="insp-scroll">
+            <Sec title="Snapshot"><KV rows={[["Snapshot ID", snapshot.id, "mono"], ["Label", snapshot.label], ["Source DOI", String(snapshot.source?.doi ?? ""), "mono"], ["Publisher", String(snapshot.source?.publisher ?? "")], ["Licence", String(snapshot.source?.license?.id ?? ""), "mono"], ["Privacy", String(snapshot.source?.privacy?.classification ?? ""), "mono"], ["Admission", String(snapshot.admission?.status ?? ""), "mono"], ["Rights", String(snapshot.admission?.rights_status ?? ""), "mono"], ["Schema", snapshot.schema_version, "mono"], ["Generated", snapshot.generated_at, "mono"]]} /></Sec>
+            <Sec title="Row counts"><KV rows={Object.entries(snapshot.row_counts).map(([name, count]) => [name, count.toLocaleString(), "mono"] as [string, string, "mono"])} /></Sec>
+            <Sec title="Checksums (SHA-256)"><KV rows={Object.entries(snapshot.checksums).map(([name, sum]) => [name.replace(".parquet", ""), shortChecksum(sum, 20), "mono"] as [string, string, "mono"])} /></Sec>
+            <Sec title="Quality"><KV rows={[["Valid observations", String(wb.study.data_health.valid_measurements)], ["Excluded", String(wb.study.data_health.excluded_measurements)], ["Missing slots", String(wb.study.data_health.missing_observations)], ["Provenance complete", `${wb.study.data_health.provenance_completeness.toFixed(1)} %`]]} /></Sec>
+            <Sec title="Privacy and attribution"><p>{String(snapshot.source?.privacy?.rationale ?? "")}</p><p style={{ marginTop: 6 }}>{String((snapshot.source as { attribution?: string } | undefined)?.attribution ?? "")}</p></Sec>
+            <div className="insp-actions" style={{ marginTop: 8 }}><Button size="sm" onClick={() => wb.openLineage(snapshot.id)}><GitBranch size={12} />Inspect lineage</Button></div>
+          </div>
+        </>
+      );
+    }
     return (
       <>
         {head}
@@ -171,8 +186,9 @@ function BlockInspector({ block }: { block: WorkbenchBlock }) {
 }
 
 function CohortInspector({ block }: { block: WorkbenchBlock }) {
+  const wb = useWorkbench();
   const excluded = Array.isArray(block.state.excluded_subject_ids) ? (block.state.excluded_subject_ids as string[]) : [];
-  const cohort = useQuery({ queryKey: ["cohort", excluded.join(",")], queryFn: () => scienceApi.cohort(excluded) });
+  const cohort = useQuery({ queryKey: ["cohort", wb.studyId, excluded.join(",")], queryFn: () => scienceApi.cohort(excluded, wb.studyId) });
   if (!cohort.data) return <div className="insp-scroll"><Loading label="Resolving cohort" /></div>;
   const data = cohort.data;
   return (
@@ -190,20 +206,21 @@ function CohortInspector({ block }: { block: WorkbenchBlock }) {
 
 function AnalysisInspector({ block }: { block: WorkbenchBlock }) {
   const wb = useWorkbench();
-  const runs = useRuns();
+  const runs = useRuns(wb.studyId);
   const { methodId, outcomeId, parameters } = analysisConfig(block);
   const run = runs.data?.find((item) => item.id === block.state.run_id);
   const spec = run?.execution?.analysis_spec;
   const result = primaryResult<Record<string, unknown>>(run?.result);
-  const isLong = methodId === "METH-LONG";
+  const isLong = methodId === "METH-LONG" || methodId === "METH-REAL-TREND";
+  const realTrend = methodId === "METH-REAL-TREND";
   return (
     <>
       <Head kind={`Analysis block · ${block.id}`} title={block.title} states={run ? [run.plan_alignment ?? "PLANNED"] : ["NOT RUN"]} />
       <div className="insp-scroll">
         <Sec title="AnalysisSpec"><KV rows={[["Spec ID", spec?.id ?? "created at execution", "mono"], ["Status", spec?.status ?? "—"], ["Method", `${methodId} · ${METHOD_LABEL[methodId]}`], ["Method version", spec?.method_version ?? "1.1.0", "mono"], ["Outcome", `${outcomeId} (${metricOption(outcomeId).unit})`, "mono"], ["Formula", spec?.model_formula ?? String(result?.formula ?? "")]]} /></Sec>
-        {isLong && <Sec title="Model structure"><KV rows={[["Predictors", "week (centred on reference), group"], ["Interaction", "week × group"], ["Random effects", "athlete intercept + week slope"], ["Repeated structure", "athlete-weeks, first valid trial"], ["Primary estimand", `difference in change, week ${String(parameters.reference_week)} → ${String(parameters.contrast_week)}`]]} /></Sec>}
+        {isLong && <Sec title="Model structure"><KV rows={realTrend ? [["Predictors", "occasion (centred on reference occasion)"], ["Random effects", "athlete intercept + occasion slope"], ["Repeated structure", "athlete-occasions, one CMJ per occasion"], ["Primary estimand", `within-athlete change per occasion; occasion ${String(parameters.reference_occasion)} → ${String(parameters.contrast_occasion)}`], ["Confidence", "Wald 95% using the fixed-effect covariance"]] : [["Predictors", "week (centred on reference), group"], ["Interaction", "week × group"], ["Random effects", "athlete intercept + week slope"], ["Repeated structure", "athlete-weeks, first valid trial"], ["Primary estimand", `difference in change, week ${String(parameters.reference_week)} → ${String(parameters.contrast_week)}`]]} /></Sec>}
         <Sec title="Parameters"><pre className="code">{JSON.stringify(parameters, null, 2)}</pre></Sec>
-        <Sec title="Inputs"><KV rows={[["Dataset", wb.study.snapshot.id, "mono"], ["Cohort", run?.cohort_id ?? (wb.excludedSubjectIds.length ? "draft" : "COHORT-001"), "mono"], ["Excluded athletes", wb.excludedSubjectIds.join(", ") || "none", "mono"]]} /></Sec>
+        <Sec title="Inputs"><KV rows={[["Dataset", wb.study.snapshot.id, "mono"], ["Cohort", run?.cohort_id ?? (wb.excludedSubjectIds.length ? "draft" : wb.study.cohort.id), "mono"], ["Excluded participants", wb.excludedSubjectIds.join(", ") || "none", "mono"]]} /></Sec>
         {isLong && Array.isArray((run?.diagnostics as Record<string, unknown> | undefined)?.assumptions) && <Sec title="Assumptions"><ul>{((run?.diagnostics as Record<string, unknown>).assumptions as string[]).map((item) => <li key={item}>{item}</li>)}</ul></Sec>}
         <Sec title="Execution state">{run ? <RunSummary run={run} /> : <p>Not executed. Running appends a new immutable AnalysisRun.</p>}</Sec>
       </div>
@@ -225,7 +242,8 @@ function RunSummary({ run }: { run: Run }) {
 }
 
 function ChainInspector({ block, runId }: { block: WorkbenchBlock; runId?: string }) {
-  const evidence = useEvidenceList();
+  const wb = useWorkbench();
+  const evidence = useEvidenceList(wb.studyId);
   const item = evidence.data?.find((entry) => entry.analysis_run_id === runId);
   if (block.type === "evidence" && item) return <EvidenceInspector id={item.id} />;
   if (block.type === "figure" && item) return <EvidenceInspector id={item.id} />;
@@ -257,7 +275,7 @@ function RunInspector({ id }: { id: string }) {
 function EvidenceInspector({ id }: { id: string }) {
   const wb = useWorkbench();
   const detail = useQuery({ queryKey: ["evidence-detail", id], queryFn: () => scienceApi.evidenceDetail(id) });
-  const report = useReport();
+  const report = useReport(wb.studyId);
   if (detail.isLoading) return <div className="insp-scroll"><Loading label={`Loading ${id}`} /></div>;
   if (detail.error || !detail.data) return <ErrorBox error={detail.error ?? id} />;
   const item = detail.data;
@@ -395,7 +413,7 @@ function TrialInspector({ id }: { id: string }) {
 
 function ReportInspector() {
   const wb = useWorkbench();
-  const report = useReport();
+  const report = useReport(wb.studyId);
   if (!report.data) return <div className="insp-scroll"><Loading label="Loading report" /></div>;
   const data = report.data;
   return (

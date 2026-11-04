@@ -133,14 +133,44 @@ export const METRIC_OPTIONS: MetricOption[] = [
   { id: "MET-CMJ-RSI-MOD", label: "RSI-mod", short: "RSI-mod", unit: "cm·s⁻¹", column: "rsi_mod", role: "CONTEXT" },
 ];
 
+export const REAL_METRIC_OPTIONS: MetricOption[] = [
+  { id: "MET-REAL-CMJ-HEIGHT", label: "Real CMJ height", short: "CMJ height", unit: "cm", column: "cmj_height_cm", role: "PRIMARY" },
+  { id: "MET-REAL-ISO-REL-PEAK", label: "Isometric relative peak force", short: "Iso peak", unit: "N/kg", column: "isometric_relative_peak_force_n_kg", role: "SECONDARY" },
+  { id: "MET-REAL-BS-REL", label: "Relative 1RM back squat", short: "Back squat", unit: "kg/kg", column: "back_squat_relative_kg_kg", role: "SECONDARY" },
+  { id: "MET-REAL-SPRINT-20M", label: "20 m sprint time", short: "20 m sprint", unit: "s", column: "sprint_20m_s", role: "SECONDARY" },
+  { id: "MET-REAL-FZ-PEAK", label: "Peak vertical GRF", short: "Peak Fz", unit: "N", column: "fz_peak_n", role: "PRIMARY" },
+  { id: "MET-REAL-FZ-IMPULSE", label: "Support-window mean force", short: "Mean Fz", unit: "N", column: "support_window_mean_n", role: "SECONDARY" },
+];
+
+export const REAL_STUDY_METRICS: Record<string, string[]> = {
+  "STUDY-REAL-001": ["MET-REAL-CMJ-HEIGHT", "MET-REAL-ISO-REL-PEAK", "MET-REAL-BS-REL", "MET-REAL-SPRINT-20M"],
+  "STUDY-REAL-002": ["MET-REAL-FZ-PEAK", "MET-REAL-FZ-IMPULSE"],
+};
+
+export function metricOptionsFor(realData: boolean | undefined, studyId?: string): MetricOption[] {
+  if (!realData) return METRIC_OPTIONS;
+  const allowed = studyId ? REAL_STUDY_METRICS[studyId] : undefined;
+  return allowed ? REAL_METRIC_OPTIONS.filter((metric) => allowed.includes(metric.id)) : REAL_METRIC_OPTIONS;
+}
+
 export function metricOption(id: string | undefined | null): MetricOption {
-  return METRIC_OPTIONS.find((metric) => metric.id === id) ?? METRIC_OPTIONS[0];
+  return [...METRIC_OPTIONS, ...REAL_METRIC_OPTIONS].find((metric) => metric.id === id) ?? METRIC_OPTIONS[0];
 }
 
 export const METHOD_LABEL: Record<string, string> = {
   "METH-LONG": "Group × time longitudinal model",
   "METH-REL": "Repeated-trial reliability",
   "METH-IND": "Individual change context",
+  "METH-REAL-TREND": "Linear mixed-effects change model",
+  "METH-REAL-DESC": "Descriptive occasion trajectory",
+  "METH-REAL-SIGNAL-QA": "Signal qualification",
+  "METH-REAL-RELIABILITY": "Repeated-trial reliability",
+  "METH-REAL-BODYWEIGHT": "Body-weight recovery",
+};
+
+export const REAL_METHODS: Record<string, string[]> = {
+  "STUDY-REAL-001": ["METH-REAL-TREND", "METH-REAL-DESC"],
+  "STUDY-REAL-002": ["METH-REAL-SIGNAL-QA", "METH-REAL-RELIABILITY", "METH-REAL-BODYWEIGHT"],
 };
 
 /** Seeded longitudinal runs nest the primary model under ``primary``; executed runs do not. */

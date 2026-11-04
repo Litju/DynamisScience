@@ -23,7 +23,7 @@ function headline(run: Run): string {
 /** The immutable run ledger, available from the study bar rather than as a destination. */
 export function RunHistoryDrawer() {
   const wb = useWorkbench();
-  const runs = useRuns();
+  const runs = useRuns(wb.studyId);
   const [selected, setSelected] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
