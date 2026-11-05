@@ -2,6 +2,12 @@
 
 Status: **owner-requested synthesis rendered. Production untouched. Decision pending.**
 
+> **Later addition:** after this synthesis was reviewed, the owner asked what
+> the design was *for* and what to do with it. **Direction E — Fieldlab**
+> ([`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md))
+> adds a decision brief and an evidence ladder on top of this visual language.
+> D remains the calm reading-first direction; E is the latest recommendation.
+
 This is the fourth design direction, created after the owner asked for a mix of
 A, B and C that is more insightful, intuitive, simple, non-invasive and
 crafted — a “renaissance” research studio rather than a dashboard, a notebook

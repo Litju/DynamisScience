@@ -1,0 +1,94 @@
+[
+  {
+    "page": "brief",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 836,
+        "h": 230,
+        "top": 313
+      },
+      "brief": {
+        "w": 890,
+        "h": 820,
+        "top": 64
+      },
+      "mainScrollH": 852,
+      "mainClientH": 852
+    },
+    "console": []
+  },
+  {
+    "page": "lab",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": null,
+      "brief": null,
+      "mainScrollH": null,
+      "mainClientH": null
+    },
+    "console": []
+  },
+  {
+    "page": "brief",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 1138,
+        "h": 220,
+        "top": 278
+      },
+      "brief": {
+        "w": 1184,
+        "h": 720,
+        "top": 64
+      },
+      "mainScrollH": 752,
+      "mainClientH": 752
+    },
+    "console": []
+  },
+  {
+    "page": "lab",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": null,
+      "brief": null,
+      "mainScrollH": null,
+      "mainClientH": null
+    },
+    "console": []
+  }
+]

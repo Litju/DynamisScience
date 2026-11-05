@@ -4,17 +4,25 @@ This directory contains the evidence for **Section 11 (P0 UX/UI Product Reset)**
 of RES-588. The current production experience has been audited and rejected as
 the product baseline. No production UI was modified during this gate.
 
-**Latest owner-requested synthesis:** Direction D, **The Research Atelier** —
-[`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md) and
-[`compare/atelier.html`](compare/atelier.html). It combines A’s activity model,
-B’s editorial margin and C’s object thread.
+**Latest owner-requested impact design:** Direction E, **Fieldlab** —
+[`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md) and
+[`compare/fieldlab.html`](compare/fieldlab.html). It answers *what changed, how
+sure, whether it matters, who responded and what to do next*, with a Model Lab
+behind the decision brief.
+
+**Previous synthesis:** Direction D, **The Research Atelier** —
+[`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md). It
+combines A’s activity model, B’s editorial margin and C’s object thread.
 
 Start with:
 
+- [`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md) —
+  the recommended impact design: Decision Brief + Model Lab.
 - [`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md) —
-  the recommended hybrid: four screens, design rationale, cost and tradeoffs.
+  the calm editorial synthesis.
 - [`RES-588_UX_AUDIT_AND_DIRECTIONS.md`](RES-588_UX_AUDIT_AND_DIRECTIONS.md) —
   the original audit, directions A/B/C, comparison and decision request.
+- [`compare/fieldlab.html`](compare/fieldlab.html) — the Direction E gallery.
 - [`compare/atelier.html`](compare/atelier.html) — the Direction D gallery.
 - [`compare/index.html`](compare/index.html) — the A/B/C comparison gallery.
 
@@ -24,7 +32,7 @@ Start with:
 |---|---|
 | `audit/production/` | Production screenshots at 1440, 1280 and 1024, layout metrics, keyboard/interaction audit and runtime request receipts |
 | `screens/` | Rendered design-direction screenshots at 1440×900 and 1280×800 |
-| `prototypes/a|b|c|d/` | Static, read-only HTML/CSS/JS prototypes; `d/` is the Research Atelier synthesis |
+| `prototypes/a|b|c|d|e/` | Static, read-only HTML/CSS/JS prototypes; `d/` is the Research Atelier, `e/` is Fieldlab |
 | `prototypes/shared/` | Aggregate-only data fixture and dependency-free SVG chart renderers |
 | `compare/` | Contact sheets, the A/B/C gallery and the Direction D atelier gallery |
 
@@ -37,6 +45,7 @@ The prototypes use aggregate values only from the persisted real-data study
 - Occasion means 38.53, 39.60, 41.12 and 41.40 cm.
 - MixedLM random slope: +0.998 cm/occasion (95% CI 0.622–1.375).
 - Occasion 1→4 change: +2.995 cm (95% CI 1.866–4.124).
+- 19 complete pairs: 16 rose, 3 fell; median +1.69 cm; 2 missing occasion-4 rows.
 - Single-arm observational design; occasions are not calendar weeks.
 
 No participant-level records, names, free-text identifiers or private raw data
@@ -52,6 +61,8 @@ See §12 of the audit document and the scripts in `scripts/`:
 - `res588_render_atelier.py` — render the four Direction D screens at both viewports.
 - `res588_capture_gallery.py` — capture the A/B/C comparison gallery.
 - `res588_capture_atelier_gallery.py` — capture the Direction D gallery.
+- `res588_render_fieldlab.py` — render the Decision Brief and Model Lab at both viewports.
+- `res588_capture_fieldlab_gallery.py` — capture the Direction E gallery.
 
 The design prototypes are served as static files from the repository root:
 `python -m http.server 4173 --bind 127.0.0.1`.

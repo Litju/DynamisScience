@@ -48,6 +48,11 @@ window.RES588Charts = (() => {
       observed: "#2f5d50", observedSoft: "rgba(47,93,80,.10)", model: "#9b4a32",
       missing: "#9e4034", font: "'Iowan Old Style', 'Palatino Linotype', Georgia, serif", mono: "'IBM Plex Mono', Consolas, monospace",
     },
+    fieldlab: {
+      grid: "#e0d7c4", axis: "#9b8f7a", text: "#17231c", muted: "#706f62",
+      observed: "#1e5a4b", observedSoft: "rgba(30,90,75,.10)", model: "#cf5b37",
+      missing: "#a83b2e", font: "'Iowan Old Style', 'Palatino Linotype', Georgia, serif", mono: "'IBM Plex Mono', Consolas, monospace",
+    },
   };
 
   function observeResize(container, render) {
@@ -253,5 +258,42 @@ window.RES588Charts = (() => {
     container.replaceChildren(svg);
   }
 
-  return { trajectory, forest, monitoring, themes, observeResize };
+  function responseBars(container, options = {}) {
+    const theme = themes[options.theme || "fieldlab"];
+    const width = Math.max(220, options.width || container.clientWidth || 260);
+    const height = Math.max(220, options.height || 300);
+    const bins = options.bins || [
+      { label: "Fell", count: 3, color: theme.missing },
+      { label: "+0–2", count: 7, color: theme.observed },
+      { label: "+2–4", count: 4, color: theme.observed },
+      { label: "≥ +4", count: 5, color: theme.model },
+    ];
+    const margin = { l: 52, r: 28, t: 26, b: 48 };
+    const plotW = width - margin.l - margin.r;
+    const plotH = height - margin.t - margin.b;
+    const max = Math.max(8, ...bins.map((b) => b.count));
+    const svg = svgEl("svg", {
+      viewBox: `0 0 ${width} ${height}`, width: "100%", height: "100%", role: "img",
+      "aria-label": "Descriptive distribution of within-athlete change from occasion 1 to 4: 3 fell, 7 changed 0 to 2 centimetres, 4 changed 2 to 4 centimetres, 5 changed 4 centimetres or more; 19 complete pairs.",
+    });
+    // Vertical grid.
+    for (let value = 0; value <= max; value += 1) {
+      const x = margin.l + (value / max) * plotW;
+      line(svg, x, margin.t, x, margin.t + plotH, { stroke: theme.grid, "stroke-width": 1 });
+      txt(svg, x, height - 26, String(value), { fill: theme.muted, "font-family": theme.mono, "font-size": 8.5, "text-anchor": "middle" });
+    }
+    const rowH = plotH / bins.length;
+    bins.forEach((bin, index) => {
+      const y = margin.t + index * rowH + rowH / 2;
+      const barH = Math.min(20, rowH * 0.44);
+      const barW = (bin.count / max) * plotW;
+      txt(svg, margin.l - 9, y + 3, bin.label, { fill: theme.text, "font-family": theme.mono, "font-size": 8.5, "text-anchor": "end" });
+      svg.appendChild(svgEl("rect", { x: margin.l, y: y - barH / 2, width: Math.max(2, barW), height: barH, rx: 1.5, fill: bin.color, opacity: 0.9 }));
+      txt(svg, margin.l + barW + 6, y + 3, String(bin.count), { fill: theme.text, "font-family": theme.mono, "font-size": 9, "text-anchor": "start" });
+    });
+    txt(svg, margin.l, height - 8, "athletes · n=19 complete pairs", { fill: theme.muted, "font-family": theme.mono, "font-size": 8 });
+    container.replaceChildren(svg);
+  }
+
+  return { trajectory, forest, monitoring, responseBars, themes, observeResize };
 })();

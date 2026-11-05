@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fieldlab — Longitudinal Brief</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-brief" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 11h6M9 15h6M9 18h4" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-study" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6M4.5 11.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.5 15h9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 20h14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">D</span><b>Dynamis Fieldlab</b><span>longitudinal evidence</span></div>
+    <div class="project-path"><span>CMJ longitudinal research</span><span class="sep">/</span><span>STUDY-U-EE7514BB</span></div>
+    <span class="brief-pill">Longitudinal brief</span>
+    <div class="top-search"><svg width="12" height="12"><use href="#i-search"/></svg><span>Search runs, evidence, athletes</span><kbd>Ctrl K</kbd></div>
+    <div class="env"><i></i>local · 8000</div>
+    <button class="btn ghost lab-toggle" type="button" id="lab-toggle" aria-expanded="false" aria-controls="lab">Model lab</button>
+    <button class="btn primary" type="button" data-toast="Prototype: export a one-page decision brief with the evidence chain and limitations.">Export brief <svg width="10" height="10"><use href="#i-export"/></svg></button>
+  </header>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Research context">
+      <div class="rail-project">
+        <div class="kicker">Project · PRJ-FB8A479E</div>
+        <h2>CMJ longitudinal research</h2>
+        <p>Within-athlete jump change in an admitted real dataset.</p>
+      </div>
+      <nav class="rail-nav" aria-label="Brief sections">
+        <div class="rail-label">This study</div>
+        <a class="rail-item active" href="brief.html" aria-current="page"><span class="ico"><svg width="14" height="14"><use href="#i-brief"/></svg></span><span class="label">Decision brief</span><span class="tag">LIVE</span></a>
+        <a class="rail-item" href="lab.html"><span class="ico"><svg width="14" height="14"><use href="#i-lab"/></svg></span><span class="label">Model lab</span><span class="tag">v1</span></a>
+        <button class="rail-item" type="button" data-toast="The monitoring program remains prospective; no new readings are claimed."><span class="ico"><svg width="14" height="14"><use href="#i-monitor"/></svg></span><span class="label">Monitoring</span><span class="tag">8</span></button>
+        <button class="rail-item" type="button" data-toast="Data remains the authority for admitted snapshots and checksums."><span class="ico"><svg width="14" height="14"><use href="#i-data"/></svg></span><span class="label">Data</span><span class="tag">21</span></button>
+        <button class="rail-item" type="button" data-toast="Report v3 is frozen; export is deterministic HTML with a manifest."><span class="ico"><svg width="14" height="14"><use href="#i-report"/></svg></span><span class="label">Report v3</span><span class="tag">FROZEN</span></button>
+      </nav>
+      <div class="passport">
+        <div class="k">Study passport</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+          <div class="stat"><b>21</b><span>athletes</span></div>
+          <div class="stat"><b>82</b><span>observations</span></div>
+          <div class="stat"><b>4</b><span>occasions</span></div>
+          <div class="stat"><b>2</b><span>missing</span></div>
+        </div>
+        <div class="note"><b>Plan frozen</b> locally · single-arm observational<br>RUN-U-0001 · 2026-11-05</div>
+      </div>
+    </aside>
+
+    <main class="main" aria-label="Longitudinal decision brief">
+      <article class="brief">
+        <div class="brief-head">
+          <div class="lead">
+            <div class="eyebrow">Longitudinal brief · RUN-U-0001 · PLAN-7103044E</div>
+            <h1>Did countermovement jump height change across the four testing occasions?</h1>
+            <p class="answer">Yes — the cohort rose by about <b>3 cm</b> across the four occasions. The data cannot tell us whether sprint priming caused it.</p>
+          </div>
+          <span class="stamp">Real data · single arm</span>
+        </div>
+
+        <div class="stat-strip" aria-label="Primary result">
+          <div class="stat">
+            <div class="k">Change · occasion 1 → 4</div>
+            <div class="v">+2.995<span class="unit">cm</span></div>
+            <div class="s">95% CI 1.866 – 4.124 · SE 0.576</div>
+          </div>
+          <div class="stat">
+            <div class="k">Per occasion</div>
+            <div class="v">+0.998<span class="unit">cm</span></div>
+            <div class="s">95% CI 0.622 – 1.375</div>
+          </div>
+          <div class="stat">
+            <div class="k">Athlete response</div>
+            <div class="v">16 / 19</div>
+            <div class="s">rose · 3 fell · 2 missing</div>
+          </div>
+          <div class="stat">
+            <div class="k">Median change</div>
+            <div class="v">+1.69<span class="unit">cm</span></div>
+            <div class="s">range −2.3 to +8.4</div>
+          </div>
+        </div>
+
+        <section class="chart-block" aria-label="Cohort trajectory">
+          <div class="chart-head">
+            <h2>What the cohort did</h2>
+            <div class="legend"><span><i></i>Observed mean</span><span><i class="ci"></i>95% CI</span><span><i class="dash"></i>MixedLM fit</span></div>
+          </div>
+          <div class="chart-wrap" id="fieldlab-trajectory"></div>
+          <div class="chart-caption">
+            <span><b>n=21</b> occasions 1–3 · <b>n=19</b> occasion 4</span>
+            <span><b>2 missing</b>, not zero</span>
+            <span><b>Axis</b> 28–52 cm</span>
+            <span class="right">Model fit is not a causal effect.</span>
+          </div>
+        </section>
+
+        <section class="response" aria-label="Athlete response distribution">
+          <div class="response-head"><h3>How the athletes responded</h3><span>descriptive bins · no SWC prespecified</span></div>
+          <div class="response-grid">
+            <div class="resp fell"><div class="label"><span>Fell</span><b>3</b></div><div class="bar"><i style="width:43%"></i></div><div class="note">change &lt; 0 cm</div></div>
+            <div class="resp"><div class="label"><span>+0–2</span><b>7</b></div><div class="bar"><i style="width:100%"></i></div><div class="note">small positive</div></div>
+            <div class="resp"><div class="label"><span>+2–4</span><b>4</b></div><div class="bar"><i style="width:57%"></i></div><div class="note">moderate positive</div></div>
+            <div class="resp high"><div class="label"><span>≥ +4</span><b>5</b></div><div class="bar"><i style="width:71%"></i></div><div class="note">large positive</div></div>
+          </div>
+        </section>
+
+        <section class="ladder" aria-label="Evidence ladder">
+          <div class="ladder-head"><h2>How far the evidence goes</h2><span>statistical → practical → causal → operational</span></div>
+          <div class="ladder-grid">
+            <div class="ladder-step"><div class="n">01 · Statistical</div><div class="q">Is there a signal?</div><div class="v">CI excludes zero</div><div class="status ok">Supported</div></div>
+            <div class="ladder-step"><div class="n">02 · Practical</div><div class="q">Is it meaningful?</div><div class="v">No SWC prespecified</div><div class="status warn">Not established</div></div>
+            <div class="ladder-step"><div class="n">03 · Causal</div><div class="q">Did priming cause it?</div><div class="v">No control arm</div><div class="status bad">Not supported</div></div>
+            <div class="ladder-step"><div class="n">04 · Operational</div><div class="q">What should we do?</div><div class="v">Monitor &amp; follow up</div><div class="status next">Next action</div></div>
+          </div>
+        </section>
+
+        <section class="actions" aria-label="What to do next">
+          <div class="actions-head"><h2>What to do next</h2><span>based on this evidence, not on the dashboard</span></div>
+          <div class="action-list">
+            <div class="action-row"><span class="n">01</span><div><b>Continue the weekly monitoring.</b><p>Next window: week 5. Eight planned weeks; no new readings are claimed yet.</p></div><span class="role">Performance team</span></div>
+            <div class="action-row"><span class="n">02</span><div><b>Follow up the two missing occasion-4 athletes.</b><p>Treat missing as missing; do not impute or move them to zero.</p></div><span class="role">Scientist</span></div>
+            <div class="action-row"><span class="n">03</span><div><b>Do not change the programme yet.</b><p>This is single-arm observational evidence. Pre-specify an SWC before the next block if a practical threshold is needed.</p></div><span class="role">Decision</span></div>
+          </div>
+        </section>
+
+        <div class="trace" aria-label="Evidence chain">
+          <span class="node"><i></i><b>Snapshot</b> DS-REAL-MENDELEY…</span><span class="arrow">›</span>
+          <span class="node"><i></i><b>Cohort</b> COHORT-U-A3C5D499</span><span class="arrow">›</span>
+          <span class="node"><i></i><b>Frozen plan</b> PLAN-7103044E</span><span class="arrow">›</span>
+          <span class="node"><i></i><b>Run</b> RUN-U-0001</span><span class="arrow">›</span>
+          <span class="node"><i></i><b>Evidence</b> EVID-U-0001</span><span class="arrow">›</span>
+          <span class="node"><i></i><b>Report</b> RPT-EE7514BB v3</span>
+          <span class="right">Open trace →</span>
+        </div>
+      </article>
+    </main>
+
+    <aside class="lab" id="lab" aria-label="Model lab">
+      <div class="lab-head"><div class="kicker">Model lab</div><h2>Why this answer holds</h2><div class="status">Converged · plan matched</div></div>
+      <div class="lab-tabs" role="tablist" aria-label="Model lab sections">
+        <button role="tab" aria-selected="true" data-pane="model">Model</button>
+        <button role="tab" aria-selected="false" data-pane="checks">Checks</button>
+        <button role="tab" aria-selected="false" data-pane="sensitivity">Sensitivity</button>
+        <button role="tab" aria-selected="false" data-pane="reproduce">Reproduce</button>
+      </div>
+      <div class="lab-scroll">
+        <div data-panel="model">
+          <div class="lab-sec"><h4>Specification</h4><div class="formula">cmj_height_cm ~ occasion_c<br>+ (1 + occasion_c | subject_id)<br>ML · random intercept + slope</div></div>
+          <div class="lab-sec"><h4>Estimates</h4><dl class="kv"><dt>Slope</dt><dd class="mono">+0.998 cm/occ.</dd><dt>95% CI</dt><dd class="mono">0.622 – 1.375</dd><dt>Change 1→4</dt><dd class="mono">+2.995 cm</dd><dt>95% CI</dt><dd class="mono">1.866 – 4.124</dd><dt>Effect</dt><dd class="mono">0.36 baseline SD</dd></dl></div>
+          <div class="lab-sec"><h4>Random effects</h4><dl class="kv"><dt>Intercept var.</dt><dd class="mono">62.576</dd><dt>Slope var.</dt><dd class="mono">0.1680</dd><dt>Covariance</dt><dd class="mono">−0.2572</dd><dt>Residual var.</dt><dd class="mono">2.819</dd><dt>Log likelihood</dt><dd class="mono">−208.3118</dd></dl></div>
+          <div class="lab-sec"><div class="lab-callout"><b>Optimizer warning.</b> BFGS failed; Nelder–Mead selected. The attempt is recorded with the run.</div></div>
+          <div class="lab-sec"><div class="lab-note"><b>Why MixedLM?</b> Repeated occasions within athlete, unbalanced occasion 4, and an explicit random intercept + slope. The model estimates within-athlete change, not a between-arm effect.</div></div>
+          <div class="lab-actions"><a class="btn" href="lab.html">Open full model lab</a><button class="btn ghost" type="button" data-toast="Full diagnostics preserve residual, Q–Q and missingness evidence.">Full diagnostics</button></div>
+        </div>
+        <div data-panel="checks" hidden>
+          <div class="lab-sec"><h4>Convergence</h4><div class="lab-callout ok"><b>Converged.</b> Nelder–Mead after BFGS failure. Log likelihood −208.3118.</div></div>
+          <div class="lab-sec"><h4>Residuals</h4><dl class="kv"><dt>RMSE</dt><dd class="mono">8.148 cm</dd><dt>Max |residual|</dt><dd class="mono">21.68 cm</dd><dt>Mean residual</dt><dd class="mono">0.020 cm</dd><dt>SD residual</dt><dd class="mono">8.198 cm</dd></dl></div>
+          <div class="lab-sec"><h4>Missingness</h4><div class="lab-callout"><b>2 of 82 rows missing.</b> Occasion 4 has 19 athletes. Complete-case analysis; not imputed.</div></div>
+          <div class="lab-sec"><h4>Assumptions</h4><div class="lab-note">Linear occasion effect; normal athlete intercepts and slopes; missing at random conditional on athlete. The four COND values are ordered testing occasions, not randomised conditions.</div></div>
+        </div>
+        <div data-panel="sensitivity" hidden>
+          <div class="lab-sec"><h4>What could move the answer</h4><div class="lab-callout"><b>Missing occasion-4 rows.</b> Two athletes are absent at occasion 4. The estimate could move if their change differs systematically; no imputation is used.</div></div>
+          <div class="lab-sec"><h4>Design limits</h4><div class="lab-note"><b>No control arm.</b> The deposit is single-arm. No causal priming effect is identified.<br><br><b>Occasions ≠ weeks.</b> COND 1–4 are deposited testing blocks; no calendar mapping is claimed.<br><br><b>No raw force traces.</b> CMJ height cannot be independently recomputed.</div></div>
+          <div class="lab-sec"><h4>Practical threshold</h4><div class="lab-callout"><b>No SWC prespecified.</b> The 3 cm change is statistically supported but not automatically practically meaningful. Define a smallest worthwhile change before the next block.</div></div>
+        </div>
+        <div data-panel="reproduce" hidden>
+          <div class="lab-sec"><h4>Run identity</h4><dl class="kv"><dt>Run</dt><dd class="mono">RUN-U-0001</dd><dt>Digest</dt><dd class="mono">e5e6f7dc8426797b</dd><dt>Spec</dt><dd class="mono">SPEC-U-71095CFB</dd><dt>Plan</dt><dd class="mono">PLAN-7103044E</dd><dt>Software</dt><dd class="mono">dynamis-science@0.3.0</dd></dl></div>
+          <div class="lab-sec"><h4>Environment</h4><div class="codeblock">statsmodels MixedLM<br>optimizer: nm<br>converged: true<br>n_obs: 82 · n_subjects: 21</div></div>
+          <div class="lab-sec"><h4>Export</h4><div class="lab-note">Report v3 is frozen and pinned to this run. Export includes the machine-readable manifest.</div><button class="btn small" type="button" data-toast="Prototype: report v3 export is deterministic HTML.">Open report v3</button></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

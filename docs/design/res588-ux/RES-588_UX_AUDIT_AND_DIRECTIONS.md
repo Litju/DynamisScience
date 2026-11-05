@@ -6,8 +6,11 @@ Date: 2026-11-05 · Native Windows / PowerShell · production build served at
 
 > **Owner follow-up.** After reviewing A, B and C, the owner requested a hybrid
 > that is more insightful, intuitive, simple, non-invasive and crafted.
-> **Direction D — The Research Atelier** has been added and is the recommended
-> synthesis. See
+> **Direction D — The Research Atelier** was added as that synthesis. After the
+> owner asked “what is this for / what do I do with it?”, **Direction E —
+> Fieldlab** was added as the decision-first impact design. It is the latest
+> recommendation. See
+> [`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md) and
 > [`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md).
 > Directions A, B and C remain in this document as the evidence base; they are
 > not withdrawn.

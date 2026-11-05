@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fieldlab — Model Lab</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-brief" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 11h6M9 15h6M9 18h4" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-study" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6M4.5 11.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.5 15h9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 20h14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">D</span><b>Dynamis Fieldlab</b><span>longitudinal evidence</span></div>
+    <div class="project-path"><span>CMJ longitudinal research</span><span class="sep">/</span><span>STUDY-U-EE7514BB</span></div>
+    <span class="brief-pill" style="border-color:rgba(232,119,69,.35);color:var(--orange)">Model lab</span>
+    <div class="top-search"><svg width="12" height="12"><use href="#i-search"/></svg><span>Search runs, evidence, athletes</span><kbd>Ctrl K</kbd></div>
+    <div class="env"><i></i>local · 8000</div>
+    <button class="btn ghost lab-toggle" type="button" id="lab-toggle" aria-expanded="false" aria-controls="lab">Decision impact</button>
+    <a class="btn" href="brief.html"><svg width="10" height="10"><use href="#i-back"/></svg>Back to brief</a>
+  </header>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Research context">
+      <div class="rail-project">
+        <div class="kicker">Project · PRJ-FB8A479E</div>
+        <h2>CMJ longitudinal research</h2>
+        <p>Within-athlete jump change in an admitted real dataset.</p>
+      </div>
+      <nav class="rail-nav" aria-label="Brief sections">
+        <div class="rail-label">This study</div>
+        <a class="rail-item" href="brief.html"><span class="ico"><svg width="14" height="14"><use href="#i-brief"/></svg></span><span class="label">Decision brief</span><span class="tag">LIVE</span></a>
+        <a class="rail-item active" href="lab.html" aria-current="page"><span class="ico"><svg width="14" height="14"><use href="#i-lab"/></svg></span><span class="label">Model lab</span><span class="tag">v1</span></a>
+        <button class="rail-item" type="button" data-toast="The monitoring program remains prospective; no new readings are claimed."><span class="ico"><svg width="14" height="14"><use href="#i-monitor"/></svg></span><span class="label">Monitoring</span><span class="tag">8</span></button>
+        <button class="rail-item" type="button" data-toast="Data remains the authority for admitted snapshots and checksums."><span class="ico"><svg width="14" height="14"><use href="#i-data"/></svg></span><span class="label">Data</span><span class="tag">21</span></button>
+        <button class="rail-item" type="button" data-toast="Report v3 is frozen; export is deterministic HTML with a manifest."><span class="ico"><svg width="14" height="14"><use href="#i-report"/></svg></span><span class="label">Report v3</span><span class="tag">FROZEN</span></button>
+      </nav>
+      <div class="passport">
+        <div class="k">Study passport</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+          <div class="stat"><b>21</b><span>athletes</span></div>
+          <div class="stat"><b>82</b><span>observations</span></div>
+          <div class="stat"><b>4</b><span>occasions</span></div>
+          <div class="stat"><b>2</b><span>missing</span></div>
+        </div>
+        <div class="note"><b>Plan frozen</b> locally · single-arm observational<br>RUN-U-0001 · 2026-11-05</div>
+      </div>
+    </aside>
+
+    <main class="lab-page" aria-label="Model lab">
+      <div class="lab-title">
+        <div>
+          <div class="kicker">Model lab · RUN-U-0001 · FROZEN PLAN</div>
+          <h1>MixedLM random slope</h1>
+          <p>Repeated occasions within athlete, explicit random intercept and slope, ML with Nelder–Mead after BFGS failed.</p>
+        </div>
+        <div class="right"><button class="btn" type="button" data-toast="Prototype: full diagnostics open in this canvas.">Diagnostics</button><button class="btn" type="button" data-toast="Prototype: export model card and diagnostics.">Export model card</button></div>
+      </div>
+
+      <div class="lab-grid">
+        <section class="lab-panel" aria-label="Fixed effects">
+          <div class="lab-panel-head"><h2>Fixed effects</h2><span>estimate · SE · 95% CI</span></div>
+          <div class="lab-panel-body">
+            <table class="coef">
+              <thead><tr><th>Term</th><th class="r">Estimate</th><th class="r">SE</th><th class="r">95% CI</th></tr></thead>
+              <tbody>
+                <tr><td>Intercept</td><td class="r mono">38.650</td><td class="r mono">1.753</td><td class="r mono">35.213 – 42.087</td></tr>
+                <tr><td>occasion_c</td><td class="r mono">+0.998</td><td class="r mono">0.192</td><td class="r mono">0.622 – 1.375</td></tr>
+              </tbody>
+            </table>
+            <div class="lab-note" style="margin-top:8px"><b>Contrast.</b> Occasion 1 → 4: +2.995 cm (95% CI 1.866 – 4.124); effect 0.36 baseline SD.</div>
+          </div>
+        </section>
+
+        <section class="lab-panel" aria-label="Random effects">
+          <div class="lab-panel-head"><h2>Variance components</h2><span>athlete random effects</span></div>
+          <div class="lab-panel-body">
+            <dl class="kv"><dt>Intercept var.</dt><dd class="mono">62.576</dd><dt>Slope var.</dt><dd class="mono">0.16796</dd><dt>Intercept–slope cov.</dt><dd class="mono">−0.25722</dd><dt>Residual var.</dt><dd class="mono">2.81926</dd><dt>Log likelihood</dt><dd class="mono">−208.3118</dd><dt>Observations</dt><dd class="mono">82 · 21 athletes</dd></dl>
+          </div>
+        </section>
+
+        <section class="lab-panel" aria-label="Diagnostics">
+          <div class="lab-panel-head"><h2>Diagnostics</h2><span>computed</span></div>
+          <div class="lab-panel-body">
+            <div class="diag-grid">
+              <div class="mini"><div class="k">Residual RMSE</div><div class="v">8.148</div><div class="s">cm · max |res| 21.68</div></div>
+              <div class="mini warn"><div class="k">Optimizer</div><div class="v">NM</div><div class="s">BFGS failed · attempt recorded</div></div>
+              <div class="mini"><div class="k">Missing</div><div class="v">2 / 82</div><div class="s">occasion 4 n=19 · no imputation</div></div>
+              <div class="mini"><div class="k">Convergence</div><div class="v" style="color:var(--lime)">TRUE</div><div class="s">logLik −208.3118</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lab-panel" aria-label="Sensitivity">
+          <div class="lab-panel-head"><h2>Sensitivity &amp; limits</h2><span>what could move the answer</span></div>
+          <div class="lab-panel-body">
+            <div class="sens-row"><span class="n">01</span><div><b>Two missing occasion-4 rows</b><p>Complete-case analysis. If their change differs systematically, the estimate could move.</p></div><span class="state">OPEN</span></div>
+            <div class="sens-row"><span class="n">02</span><div><b>No concurrent control</b><p>Single-arm observational design; no causal priming effect is identified.</p></div><span class="state">LIMIT</span></div>
+            <div class="sens-row"><span class="n">03</span><div><b>No SWC prespecified</b><p>Practical meaningfulness is not established by this dataset.</p></div><span class="state">DECIDE</span></div>
+            <div class="sens-row"><span class="n">04</span><div><b>Occasions ≠ calendar weeks</b><p>COND 1–4 are deposited testing blocks; no time spacing is imputed.</p></div><span class="state">LIMIT</span></div>
+          </div>
+        </section>
+
+        <section class="lab-panel" aria-label="Reproduce">
+          <div class="lab-panel-head"><h2>Reproduce</h2><span>append-only run</span></div>
+          <div class="lab-panel-body">
+            <div class="codeblock">cmj_height_cm ~ occasion_c + (1 + occasion_c | subject_id)<br>estimator: MixedLM_RANDOM_SLOPE<br>optimizer: nm · converged: true<br>digest: e5e6f7dc8426797b</div>
+            <dl class="kv" style="margin-top:7px"><dt>Run</dt><dd class="mono">RUN-U-0001</dd><dt>Spec</dt><dd class="mono">SPEC-U-71095CFB</dd><dt>Plan</dt><dd class="mono">PLAN-7103044E</dd></dl>
+          </div>
+        </section>
+
+        <section class="lab-panel" aria-label="Assumptions">
+          <div class="lab-panel-head"><h2>Assumptions</h2><span>review before sharing</span></div>
+          <div class="lab-panel-body">
+            <div class="lab-note"><b>Linearity.</b> Linear occasion effect on the model scale.<br><br><b>Normality.</b> Athlete intercepts and slopes normally distributed.<br><br><b>Missingness.</b> Missing at random conditional on athlete; complete-case analysis.<br><br><b>Design.</b> The four COND values are ordered testing occasions, not randomised conditions.</div>
+          </div>
+        </section>
+
+        <section class="lab-panel" style="grid-column:1 / -1" aria-label="Run ledger">
+          <div class="lab-panel-head"><h2>Run ledger</h2><span>append-only · historical outputs remain pinned</span></div>
+          <div class="lab-panel-body">
+            <table class="coef">
+              <thead><tr><th>Run</th><th>Status</th><th>Plan / spec</th><th class="r">Digest</th><th class="r">Evidence</th><th class="r">Report</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">RUN-U-0001</td><td><span class="status ok" style="font-family:var(--mono);font-size:7px">COMPLETED</span></td><td class="mono">PLAN-7103044E · SPEC-U-71095CFB</td><td class="r mono">e5e6f7dc8426797b</td><td class="r mono">EVID-U-0001</td><td class="r mono">RPT-EE7514BB v3</td></tr>
+              </tbody>
+            </table>
+            <div class="lab-note" style="margin-top:6px">A rerun appends a new run; it never overwrites this result. The report remains pinned to the original evidence.</div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="lab" aria-label="Decision impact">
+      <div class="lab-head"><div class="kicker">Decision impact</div><h2>The answer, in context</h2><div class="status">Statistical signal · not causal</div></div>
+      <div class="lab-scroll">
+        <div class="lab-sec"><div class="lab-note"><b>+2.995 cm</b> from occasion 1 to 4 (95% CI 1.866 – 4.124); slope <b>+0.998 cm/occasion</b>.</div></div>
+        <div class="lab-sec"><h4>What this supports</h4><div class="lab-callout ok"><b>A consistent cohort signal.</b> The confidence interval excludes zero; 16 of 19 complete-pair athletes rose.</div></div>
+        <div class="lab-sec"><h4>What it does not support</h4><div class="lab-callout"><b>No causal priming effect.</b> No control arm.<br><br><b>No practical threshold.</b> No SWC was prespecified.<br><br><b>No calendar claim.</b> Occasions are not weeks.</div></div>
+        <div class="lab-sec"><h4>Next action</h4><div class="lab-note">Continue the weekly monitoring; follow up the two missing athletes; pre-specify a smallest worthwhile change before the next block.</div></div>
+        <div class="lab-actions"><a class="btn primary" href="brief.html">Back to decision brief</a><button class="btn" type="button" data-toast="Prototype: report v3 is frozen and exportable.">Open report v3</button></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES-588 — Fieldlab</title>
+<style>
+  @font-face { font-family: "IBM Plex Sans"; src: url("/apps/web/node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+  @font-face { font-family: "IBM Plex Sans"; src: url("/apps/web/node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("/apps/web/node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07100c; color: #e9efdf; font-family: "IBM Plex Sans", "Segoe UI", sans-serif; }
+  .wrap { max-width: 1720px; margin: 0 auto; padding: 38px 30px 48px; }
+  .kicker { font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .16em; color: #9fb1a1; text-transform: uppercase; }
+  h1 { font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; font-size: 42px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 6px; color: #f7f1e1; }
+  .lede { max-width: 900px; color: #c2cfc1; font-size: 13px; line-height: 1.65; }
+  .lede b { color: #c9f36b; font-weight: 500; }
+  .rule { height: 1px; background: rgba(233,239,223,.2); margin: 22px 0 18px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: #f7f1e3; color: #16231b; border: 1px solid #c9bda3; overflow: hidden; }
+  .card img { display: block; width: 100%; height: auto; border-bottom: 1px solid #ddd4c0; }
+  .cap { padding: 12px 15px 14px; }
+  .cap b { display: block; font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; font-size: 18px; font-weight: 600; }
+  .cap span { display: block; margin-top: 3px; color: #6d7468; font-size: 10.5px; line-height: 1.5; }
+  .qa { margin-top: 24px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .qa .item { border-top: 1px solid rgba(233,239,223,.25); padding-top: 9px; }
+  .qa .n { font-family: "IBM Plex Mono", monospace; font-size: 8px; letter-spacing: .12em; color: #e87745; text-transform: uppercase; }
+  .qa b { display: block; margin-top: 4px; font-family: "Iowan Old Style", Georgia, serif; font-size: 17px; font-weight: 600; color: #f7f1e1; }
+  .qa span { display: block; margin-top: 3px; color: #9fb1a1; font-size: 9.5px; line-height: 1.5; }
+  .strip { margin-top: 18px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; }
+  .strip .card { padding: 18px 20px; }
+  .strip h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 22px; margin: 0; }
+  .strip p { color: #6d7468; font-size: 10.5px; line-height: 1.6; margin-top: 8px; }
+  .strip .big { font-family: "IBM Plex Mono", monospace; color: #1d5a4b; font-size: 22px; letter-spacing: -.03em; }
+  .note { margin-top: 22px; color: #8fa294; font-family: "IBM Plex Mono", monospace; font-size: 8.5px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">RES-588 · Direction E · owner-requested impact design</div>
+  <h1>Fieldlab — the longitudinal decision brief</h1>
+  <p class="lede">Not a dashboard. Not a notebook. A <b>decision instrument</b>: the first page answers what changed, how sure we are, whether it matters, who responded, and what to do next. The model lab opens only when you need to defend the answer.</p>
+
+  <div class="rule"></div>
+
+  <div class="grid">
+    <div class="card"><img src="../screens/e-brief-1440x900.png" alt="Fieldlab brief"><div class="cap"><b>Decision brief · the answer is the page</b><span>Question, answer, cohort signal, athlete response, evidence ladder and three concrete actions — all on one screen.</span></div></div>
+    <div class="card"><img src="../screens/e-lab-1440x900.png" alt="Fieldlab lab"><div class="cap"><b>Model lab · the statistics behind the claim</b><span>Fixed and random effects, diagnostics, sensitivity, assumptions, reproduce block and append-only run ledger.</span></div></div>
+  </div>
+
+  <div class="qa">
+    <div class="item"><div class="n">01 · What changed?</div><b>+2.995 cm</b><span>Occasion 1 → 4; slope +0.998 cm/occasion.</span></div>
+    <div class="item"><div class="n">02 · How sure?</div><b>95% CI 1.87–4.12</b><span>The interval excludes zero; the model is converged.</span></div>
+    <div class="item"><div class="n">03 · Does it matter?</div><b>Not established</b><span>No smallest worthwhile change was prespecified.</span></div>
+    <div class="item"><div class="n">04 · Who responded?</div><b>16 of 19</b><span>Rose; 3 fell; 2 missing occasion-4 rows.</span></div>
+    <div class="item"><div class="n">05 · What now?</div><b>Monitor &amp; follow up</b><span>Continue weeks 5–12; collect missing; no programme change.</span></div>
+  </div>
+
+  <div class="strip">
+    <div class="card">
+      <h2>What makes it different</h2>
+      <p>It borrows the working grammar of serious statistical software — explicit model specification, coefficient table, random effects, diagnostics, sensitivity and reproducibility — and puts a sports-science decision layer in front of it. The evidence ladder separates <b>statistical signal</b> from <b>practical meaning</b>, <b>causal attribution</b> and <b>operational action</b>. That is the distinction that stops a beautiful chart from becoming a false claim.</p>
+    </div>
+    <div class="card">
+      <h2>What it refuses to do</h2>
+      <p>It does not call a single-arm trend a priming effect. It does not call 3 cm “meaningful” without an SWC. It does not hide two missing rows. It does not turn a monitoring schedule into invented readings. It does not present a dashboard as a decision.</p>
+      <p class="big">A brief you can defend.<br>A lab you can inspect.</p>
+    </div>
+  </div>
+
+  <div class="note">Prototype only · aggregate values from RUN-U-0001 · no participant-level records · production UI untouched · RES-588 remains In Progress.</div>
+</div>
+</body>
+</html>
