@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focused Research Studio — Analyze</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6M4.5 11.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-hex" viewBox="0 0 24 24"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4l8-4.6Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m8.5 12 2.2 2.2 4.8-5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.2a3.2 3.2 0 0 1 0 6.2M17.5 14.8c2.2.5 3.8 2.3 3.8 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="m4 20 1-5L16.5 3.5l4 4L9 19l-5 1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m14.5 5.5 4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.8 8.2-2.2 5.4-5.4 2.2 2.2-5.4 5.4-2.2Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-sigma" viewBox="0 0 24 24"><path d="M18 5H7l6 7-6 7h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-publish" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 20h14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24"><path d="m12 3 9 17H3L12 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 9v5M12 17.2v.1" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 6.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">D</span>
+      <div><div class="brand-name">DynamisScience</div><div class="brand-sub">research studio</div></div>
+    </div>
+    <div class="project-switch" title="Research project context">
+      <span class="dot"></span>
+      <span class="label">PROJECT</span>
+      <select aria-label="Switch research project">
+        <option>CMJ longitudinal research</option>
+        <option>Movement measurement research</option>
+      </select>
+    </div>
+    <nav class="activity" aria-label="Research activity">
+      <a href="design.html"><svg width="14" height="14"><use href="#i-pen"/></svg>Design</a>
+      <button type="button" data-toast="Explore keeps the large trajectory canvas and adds cohort filters. Prototype only."><svg width="14" height="14"><use href="#i-compass"/></svg>Explore</button>
+      <a href="analyze.html" class="active" aria-current="page"><svg width="14" height="14"><use href="#i-sigma"/></svg>Analyze <span class="num">04</span></a>
+      <button type="button" data-toast="Publish opens the report with the same evidence chain. Prototype only."><svg width="14" height="14"><use href="#i-publish"/></svg>Publish</button>
+    </nav>
+    <div class="top-actions">
+      <div class="search"><svg width="13" height="13"><use href="#i-search"/></svg><span>Search studies, runs, evidence</span><kbd>Ctrl K</kbd></div>
+      <div class="local"><i></i>LOCAL · 8000</div>
+      <div class="avatar">JR</div>
+    </div>
+  </header>
+
+  <div class="subbar">
+    <div class="breadcrumb"><span>Research</span><span class="sep">/</span><span>CMJ longitudinal research</span><span class="sep">/</span></div>
+    <div class="study-switch">
+      <select aria-label="Switch study">
+        <option>Sprint priming longitudinal study</option>
+        <option>Weekly CMJ monitoring program</option>
+      </select>
+      <span class="chip ok">COMPLETED</span>
+      <span class="chip">REAL DATA</span>
+    </div>
+    <div class="right">
+      <span class="chip amber">PLAN FROZEN</span>
+      <button class="btn small" type="button" data-toast="Report v3 is frozen and exports the current evidence. Prototype only.">Export report</button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Project context">
+      <div class="rail-project">
+        <div class="kicker">PROJECT · PRJ-FB8A479E</div>
+        <h2>CMJ longitudinal research</h2>
+        <p>Within-athlete jump change in an admitted real dataset.</p>
+        <div class="rail-progress" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      </div>
+
+      <div class="rail-section">
+        <div class="rail-label">Objects</div>
+        <button class="rail-item active" type="button" title="Sprint priming longitudinal study">
+          <span class="ico"><svg width="15" height="15"><use href="#i-flask"/></svg></span>
+          <span class="body"><span class="name">Sprint priming</span><span class="meta">STUDY · COMPLETED</span></span>
+          <span class="count">1</span>
+        </button>
+        <button class="rail-item" type="button" data-toast="Monitoring opens in Explore with the weekly schedule and readings kept separate." title="Weekly CMJ monitoring program">
+          <span class="ico"><svg width="15" height="15"><use href="#i-calendar"/></svg></span>
+          <span class="body"><span class="name">Weekly CMJ monitoring</span><span class="meta">PROGRAM · READY</span></span>
+        </button>
+        <button class="rail-item" type="button" data-toast="The data view is unchanged and remains the authority for snapshots and checksums." title="Admitted data">
+          <span class="ico"><svg width="15" height="15"><use href="#i-database"/></svg></span>
+          <span class="body"><span class="name">Admitted data</span><span class="meta">MENDELEY · 21 ATHLETES</span></span>
+        </button>
+      </div>
+
+      <div class="rail-section">
+        <div class="rail-label">Outputs</div>
+        <button class="rail-item" type="button" data-toast="Evidence EVID-U-0001 is current and cited in report v3." title="Evidence">
+          <span class="ico"><svg width="15" height="15"><use href="#i-hex"/></svg></span>
+          <span class="body"><span class="name">Evidence</span><span class="meta">EVID-U-0001 · CURRENT</span></span>
+          <span class="count">1</span>
+        </button>
+        <button class="rail-item" type="button" data-toast="RPT-EE7514BB v3 is frozen. Historical versions remain pinned to their evidence." title="Report">
+          <span class="ico"><svg width="15" height="15"><use href="#i-file"/></svg></span>
+          <span class="body"><span class="name">Report</span><span class="meta">RPT-EE7514BB · v3 FROZEN</span></span>
+        </button>
+        <button class="rail-item" type="button" data-toast="RUN-U-0001 is immutable; rerunning appends a new run." title="Run ledger">
+          <span class="ico"><svg width="15" height="15"><use href="#i-play"/></svg></span>
+          <span class="body"><span class="name">Run ledger</span><span class="meta">RUN-U-0001 · COMPLETED</span></span>
+        </button>
+      </div>
+
+      <div class="rail-foot">
+        <div class="snapshot-mini">DS-REAL-MENDELEY-<br>2C44490E08AD<br><span style="color:var(--teal)">97.6% provenance</span></div>
+        <a class="btn small" href="design.html" style="justify-content:center">＋ New study</a>
+      </div>
+    </aside>
+
+    <main class="main" aria-label="Analyze">
+      <div class="view-head">
+        <div>
+          <div class="eyebrow">ANALYZE · RUN-U-0001 · PLAN PLAN-7103044E</div>
+          <h1>Change in countermovement jump height</h1>
+          <p>Within-athlete change across four deposited testing occasions · 21 athletes · 82 complete observations · single-arm observational design.</p>
+        </div>
+        <div class="actions">
+          <span class="chip" style="--tone:var(--red);margin-right:2px">SINGLE ARM</span>
+          <button class="btn" type="button" data-toast="Evidence promotion is explicit and idempotent; EVID-U-0001 already exists for this run.">Promote evidence</button>
+          <button class="btn primary" type="button" data-toast="The report is composed from evidence, figures and provenance. Report v3 is already frozen.">Publish report</button>
+        </div>
+      </div>
+
+      <section class="result-band" aria-label="Primary result">
+        <div class="result-cell">
+          <div class="label">Change · occasion 1 → 4</div>
+          <div class="value">+2.995<span class="unit">cm</span></div>
+          <div class="sub"><b>95% CI</b> 1.866 to 4.124 · SE 0.576</div>
+        </div>
+        <div class="result-cell slope">
+          <div class="label">Within-athlete slope</div>
+          <div class="value">+0.998<span class="unit">cm / occasion</span></div>
+          <div class="sub"><b>95% CI</b> 0.622 to 1.375</div>
+        </div>
+        <div class="result-cell">
+          <div class="label">Model &amp; uncertainty</div>
+          <div class="value" style="font-size:17px;color:var(--text-2)">MixedLM · ML</div>
+          <div class="sub">Effect 0.36 · logLik −208.312</div>
+        </div>
+      </section>
+
+      <section class="analysis-bar" aria-label="Analysis configuration">
+        <div class="control">
+          <span>Method</span>
+          <select aria-label="Analysis method"><option>MixedLM · random slope</option><option>Descriptive trajectory</option><option>Individual change vs TE</option></select>
+        </div>
+        <div class="control">
+          <span>Outcome</span>
+          <select aria-label="Outcome"><option>CMJ height · cm</option><option>Isometric relative peak force · N/kg</option></select>
+        </div>
+        <div class="control">
+          <span>Cohort</span>
+          <strong>All eligible · 21</strong>
+        </div>
+        <div class="control">
+          <span>Plan alignment</span>
+          <strong style="color:var(--teal)">Matches frozen plan</strong>
+        </div>
+        <div class="spacer"></div>
+        <div class="plan-note">SPEC-U-71095CFB<br>digest e5e6f7dc8426797b</div>
+        <button class="btn small" type="button" data-toast="This prototype does not execute analyses. The production run is RUN-U-0001."><svg width="12" height="12"><use href="#i-play"/></svg>Re-run</button>
+      </section>
+
+      <section class="chart-card" aria-label="Primary scientific chart">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title">Observed trajectory and model fit</div>
+            <div class="chart-sub">Occasion means with 95% confidence intervals; dashed line is the fixed-effect MixedLM fit.</div>
+          </div>
+          <div class="legend" aria-label="Legend">
+            <span><i></i>Observed mean</span>
+            <span><i class="ci"></i>95% CI</span>
+            <span><i class="dash"></i>MixedLM fit</span>
+          </div>
+        </div>
+        <div class="chart-wrap" id="trajectory"></div>
+        <div class="chart-foot">
+          <span><b>n=21</b> / <b>n=19</b> at occasion 4</span>
+          <span><b>2 missing</b>, not zero</span>
+          <span><b>Means</b> 38.53 → 41.40 cm</span>
+          <span><b>Axis</b> 28–52 cm</span>
+        </div>
+      </section>
+
+      <div class="lineage" aria-label="Provenance chain">
+        <span class="node"><i></i><b>Snapshot</b> DS-REAL-MENDELEY…</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Cohort</b> COHORT-U-A3C5D499</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Plan</b> PLAN-7103044E</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Run</b> RUN-U-0001</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Evidence</b> EVID-U-0001</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Report</b> RPT-EE7514BB v3</span>
+        <span class="right">Open lineage →</span>
+      </div>
+    </main>
+
+    <aside class="inspector" aria-label="Scientific inspector">
+      <div class="insp-tabs" role="tablist" aria-label="Inspector sections">
+        <button role="tab" aria-selected="true">Method</button>
+        <button role="tab" aria-selected="false" data-toast="Diagnostics are the same scientific content as the current Diagnostics block.">Diagnostics</button>
+        <button role="tab" aria-selected="false" data-toast="Provenance resolves report → evidence → run → spec → cohort → snapshot → DOI.">Provenance</button>
+      </div>
+      <div class="insp-body">
+        <div class="insp-head">
+          <div class="kicker">METHOD &amp; ASSUMPTIONS</div>
+          <h2>MixedLM random slope</h2>
+          <p>Random intercept and random occasion slope per athlete, fitted by maximum likelihood.</p>
+        </div>
+        <div class="insp-section">
+          <h4>Specification</h4>
+          <div class="formula">cmj_height_cm ~ occasion_c<br>+ (1 + occasion_c | subject_id)</div>
+          <dl class="kv" style="margin-top:8px">
+            <dt>Estimator</dt><dd>Random intercept + slope</dd>
+            <dt>Optimizer</dt><dd>Nelder–Mead</dd>
+            <dt>Log likelihood</dt><dd class="mono">−208.3118</dd>
+            <dt>Observations</dt><dd class="mono">82 · 21 athletes</dd>
+          </dl>
+        </div>
+        <div class="insp-section">
+          <h4>Variance components</h4>
+          <dl class="kv">
+            <dt>Intercept var.</dt><dd class="mono">62.576</dd>
+            <dt>Slope var.</dt><dd class="mono">0.1680</dd>
+            <dt>Intercept–slope cov.</dt><dd class="mono">−0.2572</dd>
+            <dt>Residual var.</dt><dd class="mono">2.819</dd>
+          </dl>
+        </div>
+        <div class="insp-section">
+          <h4>Assumptions &amp; limits</h4>
+          <ul class="bullets">
+            <li>Linear occasion effect on the model scale; normal athlete intercepts and slopes.</li>
+            <li>Missing CMJ rows are missing at random conditional on athlete.</li>
+            <li>Single-arm design; no causal contrast against a concurrent control.</li>
+            <li>No raw force traces, so CMJ height cannot be independently recomputed.</li>
+          </ul>
+        </div>
+        <div class="insp-section">
+          <div class="callout"><b>Optimizer warning.</b> BFGS attempt failed; Nelder–Mead was selected. Convergence is recorded with the run, not hidden.</div>
+        </div>
+        <div class="insp-section">
+          <h4>Missingness</h4>
+          <div class="callout red"><b>2 of 82 observations absent</b> at occasion 4 (n=19). Complete-case analysis; no imputation.</div>
+        </div>
+        <div class="insp-footer">
+          <button class="btn small" type="button" data-toast="Full diagnostics preserve the residual, Q–Q and missingness evidence.">Full diagnostics</button>
+          <button class="btn small ghost" type="button" data-toast="RUN-U-0001 is append-only; a rerun creates a new run.">Run history</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

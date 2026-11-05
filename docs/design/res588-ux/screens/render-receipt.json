@@ -1,0 +1,282 @@
+[
+  {
+    "slug": "a-analyze",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 784,
+        "h": 405,
+        "top": 419
+      },
+      "page": null,
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "a-design",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": null,
+      "page": null,
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "b-analyze",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 1204
+      },
+      "chart": {
+        "w": 834,
+        "h": 310,
+        "top": 508
+      },
+      "page": {
+        "w": 900,
+        "h": 1104,
+        "top": 66
+      },
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "b-new-study",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 925
+      },
+      "chart": null,
+      "page": {
+        "w": 900,
+        "h": 825,
+        "top": 66
+      },
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "c-analyze",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 594,
+        "h": 338,
+        "top": 241
+      },
+      "page": null,
+      "canvas": {
+        "w": 890,
+        "h": 818,
+        "top": 82
+      }
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "c-monitoring",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 554,
+        "h": 290,
+        "top": 260
+      },
+      "page": null,
+      "canvas": {
+        "w": 890,
+        "h": 818,
+        "top": 82
+      }
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "a-analyze",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 832,
+        "h": 307,
+        "top": 417
+      },
+      "page": null,
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "a-design",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": null,
+      "page": null,
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "b-analyze",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 1138
+      },
+      "chart": {
+        "w": 994,
+        "h": 270,
+        "top": 487
+      },
+      "page": {
+        "w": 1048,
+        "h": 1042,
+        "top": 64
+      },
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "b-new-study",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 914
+      },
+      "chart": null,
+      "page": {
+        "w": 1048,
+        "h": 818,
+        "top": 64
+      },
+      "canvas": null
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "c-analyze",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 732,
+        "h": 360,
+        "top": 238
+      },
+      "page": null,
+      "canvas": {
+        "w": 1006,
+        "h": 718,
+        "top": 82
+      }
+    },
+    "console_errors": []
+  },
+  {
+    "slug": "c-monitoring",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 722,
+        "h": 290,
+        "top": 202
+      },
+      "page": null,
+      "canvas": {
+        "w": 1006,
+        "h": 718,
+        "top": 82
+      }
+    },
+    "console_errors": []
+  }
+]

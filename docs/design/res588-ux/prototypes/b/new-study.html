@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scientific Notebook — New study</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="notebook-app">
+  <header class="topbar">
+    <div class="brand"><b>DynamisScience</b><span>research notebook</span></div>
+    <nav class="topnav" aria-label="Primary">
+      <a href="analyze.html">Notebook</a>
+      <a href="#" data-toast="Data and Library remain unchanged in this direction.">Data</a>
+      <a href="#" data-toast="Data and Library remain unchanged in this direction.">Library</a>
+    </nav>
+    <div class="top-right">
+      <span class="save">Draft · autosaved locally</span>
+      <button class="btn small" type="button" data-toast="Cancel discards the uncommitted page; persisted studies are untouched.">Cancel</button>
+      <button class="btn small primary" type="button" data-toast="Create study persists the page and opens its first analysis cell.">Create study</button>
+    </div>
+  </header>
+
+  <div class="notebook-grid">
+    <aside class="contents" aria-label="Notebook contents">
+      <div class="project-kicker">Project · PRJ-FB8A479E</div>
+      <div class="project-title">CMJ longitudinal research</div>
+      <div class="project-meta">Draft page · not yet persisted</div>
+      <div class="toc-label">New study</div>
+      <nav class="toc" aria-label="Draft study sections">
+        <a href="#d1" class="active"><span class="n">01</span><span>Question</span><span class="tag">open</span></a>
+        <a href="#d2"><span class="n">02</span><span>Data</span><span class="tag">bind</span></a>
+        <a href="#d3"><span class="n">03</span><span>Design</span><span class="tag">choose</span></a>
+        <a href="#d4"><span class="n">04</span><span>Cohort</span><span class="tag">21</span></a>
+        <a href="#d5"><span class="n">05</span><span>Plan</span><span class="tag">draft</span></a>
+      </nav>
+      <div class="toc-foot">
+        <div class="other">Existing work</div>
+        <button type="button" data-toast="Open the completed study in the notebook.">Sprint priming study ↗</button>
+        <button type="button" data-toast="The monitoring program keeps its schedule separate from readings.">Weekly CMJ monitoring ↗</button>
+        <button type="button" data-toast="Draft pages are local only until Create study.">Discard draft</button>
+      </div>
+    </aside>
+
+    <div class="page-wrap">
+      <article class="page" aria-label="New study notebook page">
+        <div class="draft-head">
+          <div>
+            <div class="page-kicker">Study notebook · new page</div>
+            <h1>A new study</h1>
+            <div class="byline">Draft inside CMJ longitudinal research · nothing is persisted until you create it</div>
+          </div>
+          <span class="stamp warn" style="margin-left:auto">Draft</span>
+        </div>
+        <div class="rule"></div>
+
+        <section class="draft-cell" id="d1">
+          <div class="cell-label"><span class="num">01</span><h3>Question</h3><span class="hint">the question drives the rest</span></div>
+          <div class="ghost-input" contenteditable="true" spellcheck="false" data-placeholder="Write the question this study will answer…"></div>
+          <div class="field-row">
+            <label class="field"><span>Estimand</span><input class="input" placeholder="e.g. within-athlete change per occasion (cm)"></label>
+            <label class="field"><span>Primary hypothesis</span><input class="input" placeholder="Optional; state direction if you have one"></label>
+          </div>
+        </section>
+
+        <section class="draft-cell" id="d2">
+          <div class="cell-label"><span class="num">02</span><h3>Data</h3><span class="hint">one admitted snapshot per study</span></div>
+          <div class="snapshot-line">
+            <div>
+              <div style="font-family:var(--sans);font-size:11.5px;font-weight:600">Holmberg sprint priming — four repeated testing occasions</div>
+              <div class="id">DS-REAL-MENDELEY-2C44490E08AD · CC BY 4.0 · DOI 10.17632/6p99569x66.1</div>
+            </div>
+            <div class="stats"><span>21 athletes</span><span>82 obs.</span><span>4 tables</span></div>
+          </div>
+          <div class="field-row">
+            <label class="field"><span>Primary metric</span><select class="select"><option>Countermovement jump height · cm</option><option>Isometric relative peak force · N/kg</option></select></label>
+            <label class="field"><span>Protocol</span><select class="select"><option>Countermovement jump height acquisition</option></select></label>
+          </div>
+        </section>
+
+        <section class="draft-cell" id="d3">
+          <div class="cell-label"><span class="num">03</span><h3>Design</h3><span class="hint">only qualified designs</span></div>
+          <div class="chips" role="group" aria-label="Study design">
+            <button class="chip on" type="button">Observational longitudinal</button>
+            <button class="chip" type="button" data-toast="Repeated-measures measurement is available for the MoveSmart snapshot.">Repeated measures</button>
+            <button class="chip off" type="button" disabled title="No comparator in this snapshot">Between groups</button>
+          </div>
+          <div class="field-row" style="margin-top:10px">
+            <label class="field"><span>Population</span><input class="input" placeholder="Describe the eligible population"></label>
+            <label class="field"><span>Time axis</span><select class="select"><option>Four deposited testing occasions</option></select></label>
+          </div>
+        </section>
+
+        <section class="draft-cell" id="d4">
+          <div class="cell-label"><span class="num">04</span><h3>Cohort</h3><span class="hint">snapshot-bound and versioned</span></div>
+          <div class="snapshot-line" style="background:rgba(47,93,80,.055)">
+            <div><div style="font-family:var(--sans);font-size:11.5px;font-weight:600">All eligible participants</div><div class="id">COHORT-U-A3C5D499 · resolved from the bound snapshot</div></div>
+            <div class="stats"><span>21 included</span><span>0 excluded</span><span>2 missing rows</span></div>
+          </div>
+        </section>
+
+        <section class="draft-cell" id="d5">
+          <div class="cell-label"><span class="num">05</span><h3>Plan</h3><span class="hint">freeze before inspection if possible</span></div>
+          <div class="snapshot-line" style="background:transparent;border-style:dashed">
+            <div><div style="font-family:var(--sans);font-size:11.5px;font-weight:600">Draft analysis plan</div><div class="id">Suggested eligible method: MixedLM random slope · content hash on freeze</div></div>
+            <div class="stats"><span style="color:var(--gold)">NOT FROZEN</span></div>
+          </div>
+          <div class="note-inline" style="margin-top:9px"><b>Retrospective is not preregistered.</b> If you freeze after inspecting the data, the notebook records that timing explicitly.</div>
+        </section>
+
+        <div class="draft-actions">
+          <button class="btn primary" type="button" data-toast="Create study persists the page and opens its first analysis cell. Prototype only.">Create study</button>
+          <a class="btn ghost" href="analyze.html">Cancel</a>
+          <span class="hint">Creates the study, its cohort binding and first investigation. No dataset is copied or modified.</span>
+        </div>
+      </article>
+    </div>
+
+    <aside class="margin-notes" aria-label="Margin notes">
+      <div class="margin-note"><div class="label">Readiness</div><div class="readiness">
+        <div class="ready-row"><span>Question</span><span class="status draft">MISSING</span></div>
+        <div class="ready-row"><span>Dataset</span><span class="status ok">BOUND</span></div>
+        <div class="ready-row"><span>Cohort</span><span class="status ok">21 INCLUDED</span></div>
+        <div class="ready-row"><span>Plan</span><span class="status draft">DRAFT</span></div>
+      </div></div>
+      <div class="margin-note"><div class="label">Note 1 · persistence</div><b>Nothing is persisted until Create study.</b> Cancel discards this page; persisted studies, runs and reports are untouched.</div>
+      <div class="margin-note"><div class="label">Note 2 · data</div><b>One snapshot per study.</b> The study binds an immutable admitted snapshot; it does not copy participant rows.</div>
+      <div class="margin-note"><div class="label">Note 3 · plan</div><b>Freeze records timing.</b> A plan frozen after inspection is retrospective, not prospectively preregistered.</div>
+      <div class="margin-note"><div class="label">Note 4 · context</div><b>This is not a new project.</b> The page belongs to CMJ longitudinal research and inherits its admitted data.</div>
+      <div class="end">Prototype · no participant-level records</div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

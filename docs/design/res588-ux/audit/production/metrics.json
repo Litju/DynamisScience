@@ -1,0 +1,4663 @@
+[
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 860
+      },
+      "pageInner": {
+        "x": 60,
+        "y": 40,
+        "w": 1320,
+        "h": 1070
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 14,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Research",
+        "top": 83
+      },
+      {
+        "tag": "H2",
+        "text": "Research projects",
+        "top": 187
+      },
+      {
+        "tag": "H2",
+        "text": "Studies",
+        "top": 395
+      },
+      {
+        "tag": "H2",
+        "text": "Monitoring programs",
+        "top": 950
+      }
+    ],
+    "overflow": [],
+    "slug": "research-home",
+    "path": "/research",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 860
+      },
+      "pageInner": {
+        "x": 60,
+        "y": 40,
+        "w": 1320,
+        "h": 603
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 14,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "CMJ longitudinal research",
+        "top": 83
+      },
+      {
+        "tag": "H2",
+        "text": "Studies",
+        "top": 323
+      },
+      {
+        "tag": "H2",
+        "text": "Monitoring programs",
+        "top": 449
+      }
+    ],
+    "overflow": [],
+    "slug": "project-cmj",
+    "path": "/research/projects/PRJ-FB8A479E",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1440,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1440,
+        "h": 780
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 780
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 780
+      },
+      "inspector": {
+        "x": 1084,
+        "y": 120,
+        "w": 356,
+        "h": 780
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 3921
+      },
+      "firstBlock": {
+        "x": 310,
+        "y": 170,
+        "w": 752,
+        "h": 470
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 123,
+      "blocks": 10,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 28,
+      "canvases": 3
+    },
+    "canvases": [
+      {
+        "w": 234,
+        "h": 150,
+        "top": 2088
+      },
+      {
+        "w": 234,
+        "h": 150,
+        "top": 2103
+      },
+      {
+        "w": 724,
+        "h": 260,
+        "top": 3178
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 234,
+        "h": 150,
+        "top": 2088
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 234,
+        "h": 150,
+        "top": 2088
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 234,
+        "h": 150,
+        "top": 2103
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 234,
+        "h": 150,
+        "top": 2103
+      },
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 726,
+        "h": 315,
+        "top": 3124
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 724,
+        "h": 260,
+        "top": 3178
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 724,
+        "h": 260,
+        "top": 3178
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Real-data scientific investigation",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 375
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 464
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 544
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 683
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 801
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 371,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 294,
+        "cw": 168
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 227,
+        "cw": 137
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 302,
+        "cw": 182
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 100,
+        "cw": 91
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 274,
+        "cw": 249
+      },
+      {
+        "tag": "DIV",
+        "cls": "readout",
+        "sw": 142,
+        "cw": 138
+      },
+      {
+        "tag": "DIV",
+        "cls": "v ",
+        "sw": 132,
+        "cw": 118
+      }
+    ],
+    "slug": "study-mendeley",
+    "path": "/research/studies/STUDY-U-EE7514BB",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1440,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1440,
+        "h": 780
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 780
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 780
+      },
+      "inspector": {
+        "x": 1084,
+        "y": 120,
+        "w": 356,
+        "h": 780
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 766
+      },
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 47,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 6,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Study setup",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 375
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 464
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 544
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 683
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 801
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 371,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 294,
+        "cw": 168
+      }
+    ],
+    "slug": "study-mendeley-setup",
+    "path": "/research/studies/STUDY-U-EE7514BB?mode=setup",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1440,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1440,
+        "h": 780
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 780
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 780
+      },
+      "inspector": {
+        "x": 1084,
+        "y": 120,
+        "w": 356,
+        "h": 780
+      },
+      "benchInner": null,
+      "firstBlock": null,
+      "report": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 1779
+      }
+    },
+    "counts": {
+      "visibleButtonsLinks": 53,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 0,
+      "canvases": 1
+    },
+    "canvases": [
+      {
+        "w": 664,
+        "h": 260,
+        "top": 1056
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 666,
+        "h": 262,
+        "top": 1055
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 664,
+        "h": 260,
+        "top": 1056
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 664,
+        "h": 260,
+        "top": 1056
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Research report \u00b7 Sprint priming longitudinal study",
+        "top": 255
+      },
+      {
+        "tag": "H2",
+        "text": "1Question and design",
+        "top": 336
+      },
+      {
+        "tag": "H2",
+        "text": "2Dataset and cohort",
+        "top": 502
+      },
+      {
+        "tag": "H2",
+        "text": "3Methods and estimand",
+        "top": 640
+      },
+      {
+        "tag": "H2",
+        "text": "4Results",
+        "top": 772
+      },
+      {
+        "tag": "H3",
+        "text": "Primary result",
+        "top": 798
+      },
+      {
+        "tag": "H3",
+        "text": "Exploratory results",
+        "top": 1024
+      },
+      {
+        "tag": "H2",
+        "text": "6Interpretation",
+        "top": 1392
+      },
+      {
+        "tag": "H2",
+        "text": "7Limitations",
+        "top": 1503
+      },
+      {
+        "tag": "H2",
+        "text": "8Provenance and reproducibility",
+        "top": 1635
+      },
+      {
+        "tag": "H4",
+        "text": "Composition",
+        "top": 205
+      },
+      {
+        "tag": "H4",
+        "text": "Citations",
+        "top": 376
+      },
+      {
+        "tag": "H4",
+        "text": "Source runs",
+        "top": 460
+      },
+      {
+        "tag": "H4",
+        "text": "Provenance",
+        "top": 519
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 371,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 294,
+        "cw": 168
+      }
+    ],
+    "slug": "study-mendeley-report",
+    "path": "/research/studies/STUDY-U-EE7514BB?mode=report",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1440,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1440,
+        "h": 780
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 780
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 780
+      },
+      "inspector": {
+        "x": 1084,
+        "y": 120,
+        "w": 356,
+        "h": 780
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 2463
+      },
+      "firstBlock": {
+        "x": 310,
+        "y": 170,
+        "w": 752,
+        "h": 451
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 95,
+      "blocks": 7,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 24,
+      "canvases": 1
+    },
+    "canvases": [
+      {
+        "w": 724,
+        "h": 330,
+        "top": 1645
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 726,
+        "h": 359,
+        "top": 1617
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 724,
+        "h": 330,
+        "top": 1645
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 724,
+        "h": 330,
+        "top": 1645
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Monitoring program investigation",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 356
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 445
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 525
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 631
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 749
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 293,
+        "cw": 174
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 122,
+        "cw": 90
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 177,
+        "cw": 130
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 227,
+        "cw": 137
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 302,
+        "cw": 182
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 242,
+        "cw": 198
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 247,
+        "cw": 203
+      }
+    ],
+    "slug": "monitoring-program",
+    "path": "/research/studies/PROG-U-7B9AB9FE",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1440,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1440,
+        "h": 780
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 780
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 780
+      },
+      "inspector": {
+        "x": 1084,
+        "y": 120,
+        "w": 356,
+        "h": 780
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 828,
+        "h": 3580
+      },
+      "firstBlock": {
+        "x": 310,
+        "y": 170,
+        "w": 752,
+        "h": 470
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 111,
+      "blocks": 10,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 17,
+      "canvases": 2
+    },
+    "canvases": [
+      {
+        "w": 724,
+        "h": 330,
+        "top": 1249
+      },
+      {
+        "w": 724,
+        "h": 200,
+        "top": 2916
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 726,
+        "h": 359,
+        "top": 1221
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 724,
+        "h": 330,
+        "top": 1249
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 724,
+        "h": 330,
+        "top": 1249
+      },
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 726,
+        "h": 255,
+        "top": 2862
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 724,
+        "h": 200,
+        "top": 2916
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 724,
+        "h": 200,
+        "top": 2916
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Real-data scientific investigation",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 375
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 483
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 562
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 668
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 786
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 232,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 269,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 190,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 405,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 347,
+        "cw": 168
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 236,
+        "cw": 149
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 267,
+        "cw": 169
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 251,
+        "cw": 203
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 246,
+        "cw": 199
+      },
+      {
+        "tag": "DIV",
+        "cls": "k",
+        "sw": 146,
+        "cw": 124
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 422,
+        "cw": 281
+      }
+    ],
+    "slug": "study-movesmart",
+    "path": "/research/studies/STUDY-U-AE0D7A3C",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 860
+      },
+      "pageInner": {
+        "x": 60,
+        "y": 40,
+        "w": 1320,
+        "h": 899
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 7,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Synthetic football longitudinal snapshot",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Tables",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "cmj_trials.parquet",
+        "top": 483
+      },
+      {
+        "tag": "H3",
+        "text": "Snapshot",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "Quality",
+        "top": 470
+      }
+    ],
+    "overflow": [],
+    "slug": "data",
+    "path": "/data",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 860
+      },
+      "pageInner": {
+        "x": 60,
+        "y": 40,
+        "w": 1320,
+        "h": 912
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 10,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Holmberg sprint priming \u2014 four repeated testing occasions",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Tables",
+        "top": 194
+      },
+      {
+        "tag": "H3",
+        "text": "cmj_occasions.parquet",
+        "top": 386
+      },
+      {
+        "tag": "H3",
+        "text": "Snapshot",
+        "top": 194
+      },
+      {
+        "tag": "H3",
+        "text": "Quality",
+        "top": 534
+      }
+    ],
+    "overflow": [],
+    "slug": "dataset-detail",
+    "path": "/data/DS-REAL-MENDELEY-2C44490E08AD",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 860
+      },
+      "pageInner": {
+        "x": 60,
+        "y": 40,
+        "w": 1320,
+        "h": 787
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 9,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Library",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "CMJ / Concentric Impulse",
+        "top": 220
+      },
+      {
+        "tag": "H4",
+        "text": "Definition",
+        "top": 282
+      },
+      {
+        "tag": "H4",
+        "text": "Dependencies",
+        "top": 488
+      },
+      {
+        "tag": "H4",
+        "text": "Known limitations",
+        "top": 584
+      },
+      {
+        "tag": "H4",
+        "text": "Usages",
+        "top": 678
+      }
+    ],
+    "overflow": [],
+    "slug": "library",
+    "path": "/library",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1440,
+      "h": 900
+    },
+    "doc": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "scrollH": 900,
+      "clientH": 900
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1440,
+        "h": 860
+      },
+      "pageInner": {
+        "x": 60,
+        "y": 40,
+        "w": 1320,
+        "h": 1105
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 15,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 6,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Source admission",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Sources",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "Sprint Priming - Longitudinal Study",
+        "top": 177
+      },
+      {
+        "tag": "H3",
+        "text": "Rights and integrity gates",
+        "top": 431
+      },
+      {
+        "tag": "H3",
+        "text": "Deposited files",
+        "top": 481
+      },
+      {
+        "tag": "H3",
+        "text": "Scientific admissibility",
+        "top": 531
+      },
+      {
+        "tag": "H3",
+        "text": "Quality assessment",
+        "top": 581
+      },
+      {
+        "tag": "H3",
+        "text": "Admission",
+        "top": 631
+      },
+      {
+        "tag": "H2",
+        "text": "Admitted snapshots",
+        "top": 883
+      },
+      {
+        "tag": "H2",
+        "text": "Scientific qualification",
+        "top": 1038
+      },
+      {
+        "tag": "H3",
+        "text": "Independent method checks",
+        "top": 1070
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "DIV",
+        "cls": "page-inner",
+        "sw": 1325,
+        "cw": 1320
+      },
+      {
+        "tag": "DIV",
+        "cls": "adm-grid",
+        "sw": 1301,
+        "cw": 1272
+      },
+      {
+        "tag": "DIV",
+        "cls": "",
+        "sw": 967,
+        "cw": 938
+      },
+      {
+        "tag": "DIV",
+        "cls": "frame",
+        "sw": 966,
+        "cw": 936
+      },
+      {
+        "tag": "DIV",
+        "cls": "frame-body",
+        "sw": 966,
+        "cw": 936
+      },
+      {
+        "tag": "DIV",
+        "cls": "readouts",
+        "sw": 955,
+        "cw": 914
+      },
+      {
+        "tag": "DIV",
+        "cls": "d",
+        "sw": 235,
+        "cw": 208
+      },
+      {
+        "tag": "DIV",
+        "cls": "readout",
+        "sw": 269,
+        "cw": 229
+      },
+      {
+        "tag": "DIV",
+        "cls": "v ",
+        "sw": 259,
+        "cw": 209
+      }
+    ],
+    "slug": "admission",
+    "path": "/data/admission",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 1070
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 14,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Research",
+        "top": 83
+      },
+      {
+        "tag": "H2",
+        "text": "Research projects",
+        "top": 187
+      },
+      {
+        "tag": "H2",
+        "text": "Studies",
+        "top": 395
+      },
+      {
+        "tag": "H2",
+        "text": "Monitoring programs",
+        "top": 950
+      }
+    ],
+    "overflow": [],
+    "slug": "research-home",
+    "path": "/research",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 603
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 14,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "CMJ longitudinal research",
+        "top": 83
+      },
+      {
+        "tag": "H2",
+        "text": "Studies",
+        "top": 323
+      },
+      {
+        "tag": "H2",
+        "text": "Monitoring programs",
+        "top": 449
+      }
+    ],
+    "overflow": [],
+    "slug": "project-cmj",
+    "path": "/research/projects/PRJ-FB8A479E",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1280,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1280,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 680
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 680
+      },
+      "inspector": {
+        "x": 924,
+        "y": 120,
+        "w": 356,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 4485
+      },
+      "firstBlock": {
+        "x": 310,
+        "y": 170,
+        "w": 592,
+        "h": 491
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 123,
+      "blocks": 10,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 28,
+      "canvases": 3
+    },
+    "canvases": [
+      {
+        "w": 277,
+        "h": 150,
+        "top": 2291
+      },
+      {
+        "w": 277,
+        "h": 150,
+        "top": 2533
+      },
+      {
+        "w": 564,
+        "h": 260,
+        "top": 3724
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 277,
+        "h": 150,
+        "top": 2291
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 277,
+        "h": 150,
+        "top": 2291
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 277,
+        "h": 150,
+        "top": 2533
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 277,
+        "h": 150,
+        "top": 2533
+      },
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 566,
+        "h": 315,
+        "top": 3670
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 564,
+        "h": 260,
+        "top": 3724
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 564,
+        "h": 260,
+        "top": 3724
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Real-data scientific investigation",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 375
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 464
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 544
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 683
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 801
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "STRONG",
+        "cls": "",
+        "sw": 213,
+        "cw": 132
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 183,
+        "cw": 132
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 371,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 294,
+        "cw": 168
+      },
+      {
+        "tag": "DIV",
+        "cls": "block-cols",
+        "sw": 569,
+        "cw": 566
+      },
+      {
+        "tag": "DIV",
+        "cls": "",
+        "sw": 279,
+        "cw": 276
+      },
+      {
+        "tag": "DIV",
+        "cls": "hyp",
+        "sw": 279,
+        "cw": 276
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 101,
+        "cw": 98
+      }
+    ],
+    "slug": "study-mendeley",
+    "path": "/research/studies/STUDY-U-EE7514BB",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1280,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1280,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 680
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 680
+      },
+      "inspector": {
+        "x": 924,
+        "y": 120,
+        "w": 356,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 817
+      },
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 47,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 6,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Study setup",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 375
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 464
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 544
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 683
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 801
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "STRONG",
+        "cls": "",
+        "sw": 213,
+        "cw": 132
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 183,
+        "cw": 132
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 371,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 294,
+        "cw": 168
+      }
+    ],
+    "slug": "study-mendeley-setup",
+    "path": "/research/studies/STUDY-U-EE7514BB?mode=setup",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1280,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1280,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 680
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 680
+      },
+      "inspector": {
+        "x": 924,
+        "y": 120,
+        "w": 356,
+        "h": 680
+      },
+      "benchInner": null,
+      "firstBlock": null,
+      "report": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 2016
+      }
+    },
+    "counts": {
+      "visibleButtonsLinks": 53,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 0,
+      "canvases": 1
+    },
+    "canvases": [
+      {
+        "w": 504,
+        "h": 260,
+        "top": 1212
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 506,
+        "h": 262,
+        "top": 1211
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 504,
+        "h": 260,
+        "top": 1212
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 504,
+        "h": 260,
+        "top": 1212
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Research report \u00b7 Sprint priming longitudinal study",
+        "top": 276
+      },
+      {
+        "tag": "H2",
+        "text": "1Question and design",
+        "top": 387
+      },
+      {
+        "tag": "H2",
+        "text": "2Dataset and cohort",
+        "top": 574
+      },
+      {
+        "tag": "H2",
+        "text": "3Methods and estimand",
+        "top": 734
+      },
+      {
+        "tag": "H2",
+        "text": "4Results",
+        "top": 888
+      },
+      {
+        "tag": "H3",
+        "text": "Primary result",
+        "top": 914
+      },
+      {
+        "tag": "H3",
+        "text": "Exploratory results",
+        "top": 1180
+      },
+      {
+        "tag": "H2",
+        "text": "6Interpretation",
+        "top": 1547
+      },
+      {
+        "tag": "H2",
+        "text": "7Limitations",
+        "top": 1680
+      },
+      {
+        "tag": "H2",
+        "text": "8Provenance and reproducibility",
+        "top": 1856
+      },
+      {
+        "tag": "H4",
+        "text": "Composition",
+        "top": 205
+      },
+      {
+        "tag": "H4",
+        "text": "Citations",
+        "top": 376
+      },
+      {
+        "tag": "H4",
+        "text": "Source runs",
+        "top": 460
+      },
+      {
+        "tag": "H4",
+        "text": "Provenance",
+        "top": 519
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "STRONG",
+        "cls": "",
+        "sw": 213,
+        "cw": 132
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 183,
+        "cw": 132
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 371,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 294,
+        "cw": 168
+      }
+    ],
+    "slug": "study-mendeley-report",
+    "path": "/research/studies/STUDY-U-EE7514BB?mode=report",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1280,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1280,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 680
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 680
+      },
+      "inspector": {
+        "x": 924,
+        "y": 120,
+        "w": 356,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 2693
+      },
+      "firstBlock": {
+        "x": 310,
+        "y": 170,
+        "w": 592,
+        "h": 526
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 95,
+      "blocks": 7,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 24,
+      "canvases": 1
+    },
+    "canvases": [
+      {
+        "w": 564,
+        "h": 330,
+        "top": 1849
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 566,
+        "h": 411,
+        "top": 1770
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 564,
+        "h": 330,
+        "top": 1849
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 564,
+        "h": 330,
+        "top": 1849
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Monitoring program investigation",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 356
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 445
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 525
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 631
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 749
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "STRONG",
+        "cls": "",
+        "sw": 211,
+        "cw": 164
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 183,
+        "cw": 164
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 222,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 248,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 177,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 293,
+        "cw": 174
+      },
+      {
+        "tag": "DIV",
+        "cls": "block-cols",
+        "sw": 569,
+        "cw": 566
+      },
+      {
+        "tag": "DIV",
+        "cls": "",
+        "sw": 279,
+        "cw": 276
+      },
+      {
+        "tag": "DIV",
+        "cls": "hyp",
+        "sw": 279,
+        "cw": 276
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 101,
+        "cw": 98
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 122,
+        "cw": 26
+      }
+    ],
+    "slug": "monitoring-program",
+    "path": "/research/studies/PROG-U-7B9AB9FE",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1280,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1280,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 256,
+        "h": 680
+      },
+      "bench": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 680
+      },
+      "inspector": {
+        "x": 924,
+        "y": 120,
+        "w": 356,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 256,
+        "y": 120,
+        "w": 668,
+        "h": 3905
+      },
+      "firstBlock": {
+        "x": 310,
+        "y": 170,
+        "w": 592,
+        "h": 504
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 111,
+      "blocks": 10,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 17,
+      "canvases": 2
+    },
+    "canvases": [
+      {
+        "w": 564,
+        "h": 330,
+        "top": 1430
+      },
+      {
+        "w": 564,
+        "h": 200,
+        "top": 3240
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 566,
+        "h": 411,
+        "top": 1350
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 564,
+        "h": 330,
+        "top": 1430
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 564,
+        "h": 330,
+        "top": 1430
+      },
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 566,
+        "h": 255,
+        "top": 3186
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 564,
+        "h": 200,
+        "top": 3240
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 564,
+        "h": 200,
+        "top": 3240
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Real-data scientific investigation",
+        "top": 138
+      },
+      {
+        "tag": "H4",
+        "text": "Plan",
+        "top": 187
+      },
+      {
+        "tag": "H4",
+        "text": "Outcomes",
+        "top": 375
+      },
+      {
+        "tag": "H4",
+        "text": "Planned analyses",
+        "top": 483
+      },
+      {
+        "tag": "H4",
+        "text": "Registered specifications",
+        "top": 562
+      },
+      {
+        "tag": "H4",
+        "text": "Rules",
+        "top": 668
+      },
+      {
+        "tag": "H4",
+        "text": "Exclusion criteria",
+        "top": 786
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "STRONG",
+        "cls": "",
+        "sw": 270,
+        "cw": 126
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "sw": 194,
+        "cw": 126
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 232,
+        "cw": 156
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 269,
+        "cw": 106
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 190,
+        "cw": 154
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 123,
+        "cw": 120
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 405,
+        "cw": 144
+      },
+      {
+        "tag": "SPAN",
+        "cls": "label",
+        "sw": 347,
+        "cw": 168
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 236,
+        "cw": 74
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 267,
+        "cw": 84
+      },
+      {
+        "tag": "DIV",
+        "cls": "d",
+        "sw": 133,
+        "cw": 120
+      },
+      {
+        "tag": "DIV",
+        "cls": "readout",
+        "sw": 161,
+        "cw": 140
+      }
+    ],
+    "slug": "study-movesmart",
+    "path": "/research/studies/STUDY-U-AE0D7A3C",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 899
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 7,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Synthetic football longitudinal snapshot",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Tables",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "cmj_trials.parquet",
+        "top": 483
+      },
+      {
+        "tag": "H3",
+        "text": "Snapshot",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "Quality",
+        "top": 470
+      }
+    ],
+    "overflow": [],
+    "slug": "data",
+    "path": "/data",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 912
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 10,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Holmberg sprint priming \u2014 four repeated testing occasions",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Tables",
+        "top": 194
+      },
+      {
+        "tag": "H3",
+        "text": "cmj_occasions.parquet",
+        "top": 386
+      },
+      {
+        "tag": "H3",
+        "text": "Snapshot",
+        "top": 194
+      },
+      {
+        "tag": "H3",
+        "text": "Quality",
+        "top": 534
+      }
+    ],
+    "overflow": [],
+    "slug": "dataset-detail",
+    "path": "/data/DS-REAL-MENDELEY-2C44490E08AD",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 787
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 9,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Library",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "CMJ / Concentric Impulse",
+        "top": 220
+      },
+      {
+        "tag": "H4",
+        "text": "Definition",
+        "top": 282
+      },
+      {
+        "tag": "H4",
+        "text": "Dependencies",
+        "top": 488
+      },
+      {
+        "tag": "H4",
+        "text": "Known limitations",
+        "top": 584
+      },
+      {
+        "tag": "H4",
+        "text": "Usages",
+        "top": 678
+      }
+    ],
+    "overflow": [],
+    "slug": "library",
+    "path": "/library",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1280,
+      "clientW": 1280,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1280,
+        "h": 1105
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 15,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 6,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Source admission",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Sources",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "Sprint Priming - Longitudinal Study",
+        "top": 177
+      },
+      {
+        "tag": "H3",
+        "text": "Rights and integrity gates",
+        "top": 431
+      },
+      {
+        "tag": "H3",
+        "text": "Deposited files",
+        "top": 481
+      },
+      {
+        "tag": "H3",
+        "text": "Scientific admissibility",
+        "top": 531
+      },
+      {
+        "tag": "H3",
+        "text": "Quality assessment",
+        "top": 581
+      },
+      {
+        "tag": "H3",
+        "text": "Admission",
+        "top": 631
+      },
+      {
+        "tag": "H2",
+        "text": "Admitted snapshots",
+        "top": 883
+      },
+      {
+        "tag": "H2",
+        "text": "Scientific qualification",
+        "top": 1038
+      },
+      {
+        "tag": "H3",
+        "text": "Independent method checks",
+        "top": 1070
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "MAIN",
+        "cls": "page",
+        "sw": 1295,
+        "cw": 1280
+      },
+      {
+        "tag": "DIV",
+        "cls": "page-inner",
+        "sw": 1295,
+        "cw": 1280
+      },
+      {
+        "tag": "DIV",
+        "cls": "adm-grid",
+        "sw": 1271,
+        "cw": 1232
+      },
+      {
+        "tag": "DIV",
+        "cls": "",
+        "sw": 937,
+        "cw": 898
+      },
+      {
+        "tag": "DIV",
+        "cls": "frame",
+        "sw": 936,
+        "cw": 896
+      },
+      {
+        "tag": "DIV",
+        "cls": "frame-body",
+        "sw": 936,
+        "cw": 896
+      },
+      {
+        "tag": "DIV",
+        "cls": "readouts",
+        "sw": 925,
+        "cw": 874
+      },
+      {
+        "tag": "DIV",
+        "cls": "d",
+        "sw": 235,
+        "cw": 198
+      },
+      {
+        "tag": "DIV",
+        "cls": "readout",
+        "sw": 269,
+        "cw": 219
+      },
+      {
+        "tag": "DIV",
+        "cls": "v ",
+        "sw": 259,
+        "cw": 199
+      }
+    ],
+    "slug": "admission",
+    "path": "/data/admission",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 1131
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 14,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Research",
+        "top": 83
+      },
+      {
+        "tag": "H2",
+        "text": "Research projects",
+        "top": 187
+      },
+      {
+        "tag": "H2",
+        "text": "Studies",
+        "top": 404
+      },
+      {
+        "tag": "H2",
+        "text": "Monitoring programs",
+        "top": 994
+      }
+    ],
+    "overflow": [],
+    "slug": "research-home",
+    "path": "/research",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 622
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 14,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "CMJ longitudinal research",
+        "top": 83
+      },
+      {
+        "tag": "H2",
+        "text": "Studies",
+        "top": 342
+      },
+      {
+        "tag": "H2",
+        "text": "Monitoring programs",
+        "top": 468
+      }
+    ],
+    "overflow": [],
+    "slug": "project-cmj",
+    "path": "/research/projects/PRJ-FB8A479E",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1024,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "bench": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "inspector": {
+        "x": 1024,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 4580
+      },
+      "firstBlock": {
+        "x": 54,
+        "y": 170,
+        "w": 948,
+        "h": 467
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 97,
+      "blocks": 10,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 28,
+      "canvases": 3
+    },
+    "canvases": [
+      {
+        "w": 922,
+        "h": 150,
+        "top": 2391
+      },
+      {
+        "w": 922,
+        "h": 150,
+        "top": 2587
+      },
+      {
+        "w": 920,
+        "h": 260,
+        "top": 3856
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 922,
+        "h": 150,
+        "top": 2391
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 922,
+        "h": 150,
+        "top": 2391
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 922,
+        "h": 150,
+        "top": 2587
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 922,
+        "h": 150,
+        "top": 2587
+      },
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 922,
+        "h": 289,
+        "top": 3828
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 920,
+        "h": 260,
+        "top": 3856
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 920,
+        "h": 260,
+        "top": 3856
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Real-data scientific investigation",
+        "top": 138
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 227,
+        "cw": 218
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 302,
+        "cw": 290
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 383,
+        "cw": 285
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 192,
+        "cw": 143
+      }
+    ],
+    "slug": "study-mendeley",
+    "path": "/research/studies/STUDY-U-EE7514BB",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1024,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "bench": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "inspector": {
+        "x": 1024,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 766
+      },
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 21,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 0,
+      "inputs": 6,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Study setup",
+        "top": 138
+      }
+    ],
+    "overflow": [],
+    "slug": "study-mendeley-setup",
+    "path": "/research/studies/STUDY-U-EE7514BB?mode=setup",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1024,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "bench": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "inspector": {
+        "x": 1024,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "benchInner": null,
+      "firstBlock": null,
+      "report": {
+        "x": 62,
+        "y": 120,
+        "w": 900,
+        "h": 1664
+      }
+    },
+    "counts": {
+      "visibleButtonsLinks": 24,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 0,
+      "canvases": 1
+    },
+    "canvases": [
+      {
+        "w": 784,
+        "h": 260,
+        "top": 995
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 786,
+        "h": 262,
+        "top": 994
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 784,
+        "h": 260,
+        "top": 995
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 784,
+        "h": 260,
+        "top": 995
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Research report \u00b7 Sprint priming longitudinal study",
+        "top": 243
+      },
+      {
+        "tag": "H2",
+        "text": "1Question and design",
+        "top": 324
+      },
+      {
+        "tag": "H2",
+        "text": "2Dataset and cohort",
+        "top": 468
+      },
+      {
+        "tag": "H2",
+        "text": "3Methods and estimand",
+        "top": 606
+      },
+      {
+        "tag": "H2",
+        "text": "4Results",
+        "top": 739
+      },
+      {
+        "tag": "H3",
+        "text": "Primary result",
+        "top": 764
+      },
+      {
+        "tag": "H3",
+        "text": "Exploratory results",
+        "top": 963
+      },
+      {
+        "tag": "H2",
+        "text": "6Interpretation",
+        "top": 1330
+      },
+      {
+        "tag": "H2",
+        "text": "7Limitations",
+        "top": 1441
+      },
+      {
+        "tag": "H2",
+        "text": "8Provenance and reproducibility",
+        "top": 1574
+      }
+    ],
+    "overflow": [],
+    "slug": "study-mendeley-report",
+    "path": "/research/studies/STUDY-U-EE7514BB?mode=report",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1024,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "bench": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "inspector": {
+        "x": 1024,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 2385
+      },
+      "firstBlock": {
+        "x": 54,
+        "y": 170,
+        "w": 948,
+        "h": 467
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 72,
+      "blocks": 7,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 24,
+      "canvases": 1
+    },
+    "canvases": [
+      {
+        "w": 920,
+        "h": 330,
+        "top": 1583
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 922,
+        "h": 359,
+        "top": 1555
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 920,
+        "h": 330,
+        "top": 1583
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 920,
+        "h": 330,
+        "top": 1583
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Monitoring program investigation",
+        "top": 138
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 227,
+        "cw": 218
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 302,
+        "cw": 290
+      }
+    ],
+    "slug": "monitoring-program",
+    "path": "/research/studies/PROG-U-7B9AB9FE",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": null,
+      "pageInner": null,
+      "studyBar": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 50
+      },
+      "contextBar": {
+        "x": 0,
+        "y": 90,
+        "w": 1024,
+        "h": 30
+      },
+      "studyBody": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "tree": {
+        "x": 0,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "bench": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 680
+      },
+      "inspector": {
+        "x": 1024,
+        "y": 120,
+        "w": 0,
+        "h": 680
+      },
+      "benchInner": {
+        "x": 0,
+        "y": 120,
+        "w": 1024,
+        "h": 3532
+      },
+      "firstBlock": {
+        "x": 54,
+        "y": 170,
+        "w": 948,
+        "h": 444
+      },
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 85,
+      "blocks": 10,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 17,
+      "canvases": 2
+    },
+    "canvases": [
+      {
+        "w": 920,
+        "h": 330,
+        "top": 1203
+      },
+      {
+        "w": 920,
+        "h": 200,
+        "top": 2885
+      }
+    ],
+    "charts": [
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 922,
+        "h": 359,
+        "top": 1175
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 920,
+        "h": 330,
+        "top": 1203
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 920,
+        "h": 330,
+        "top": 1203
+      },
+      {
+        "tag": "DIV",
+        "cls": "chart-frame",
+        "w": 922,
+        "h": 229,
+        "top": 2857
+      },
+      {
+        "tag": "DIV",
+        "cls": "echarts-for-react ",
+        "w": 920,
+        "h": 200,
+        "top": 2885
+      },
+      {
+        "tag": "CANVAS",
+        "cls": "",
+        "w": 920,
+        "h": 200,
+        "top": 2885
+      }
+    ],
+    "headings": [
+      {
+        "tag": "H2",
+        "text": "Real-data scientific investigation",
+        "top": 138
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "STRONG",
+        "cls": "",
+        "sw": 270,
+        "cw": 260
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 422,
+        "cw": 419
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title",
+        "sw": 422,
+        "cw": 295
+      },
+      {
+        "tag": "SPAN",
+        "cls": "block-title-sub",
+        "sw": 192,
+        "cw": 134
+      }
+    ],
+    "slug": "study-movesmart",
+    "path": "/research/studies/STUDY-U-AE0D7A3C",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 1467
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 7,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Synthetic football longitudinal snapshot",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Tables",
+        "top": 194
+      },
+      {
+        "tag": "H3",
+        "text": "cmj_trials.parquet",
+        "top": 502
+      },
+      {
+        "tag": "H3",
+        "text": "Snapshot",
+        "top": 932
+      },
+      {
+        "tag": "H3",
+        "text": "Quality",
+        "top": 1177
+      }
+    ],
+    "overflow": [],
+    "slug": "data",
+    "path": "/data",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 1398
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 10,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 2,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Holmberg sprint priming \u2014 four repeated testing occasions",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Tables",
+        "top": 194
+      },
+      {
+        "tag": "H3",
+        "text": "cmj_occasions.parquet",
+        "top": 386
+      },
+      {
+        "tag": "H3",
+        "text": "Snapshot",
+        "top": 816
+      },
+      {
+        "tag": "H3",
+        "text": "Quality",
+        "top": 1106
+      }
+    ],
+    "overflow": [],
+    "slug": "dataset-detail",
+    "path": "/data/DS-REAL-MENDELEY-2C44490E08AD",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 956
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 9,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 1,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Library",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "CMJ / Concentric Impulse",
+        "top": 479
+      },
+      {
+        "tag": "H4",
+        "text": "Definition",
+        "top": 541
+      },
+      {
+        "tag": "H4",
+        "text": "Dependencies",
+        "top": 710
+      },
+      {
+        "tag": "H4",
+        "text": "Known limitations",
+        "top": 805
+      },
+      {
+        "tag": "H4",
+        "text": "Usages",
+        "top": 880
+      }
+    ],
+    "overflow": [],
+    "slug": "library",
+    "path": "/library",
+    "status": 200
+  },
+  {
+    "viewport": {
+      "w": 1024,
+      "h": 800
+    },
+    "doc": {
+      "scrollW": 1024,
+      "clientW": 1024,
+      "scrollH": 800,
+      "clientH": 800
+    },
+    "regions": {
+      "globalBar": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 40
+      },
+      "page": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 760
+      },
+      "pageInner": {
+        "x": 0,
+        "y": 40,
+        "w": 1024,
+        "h": 1382
+      },
+      "studyBar": null,
+      "contextBar": null,
+      "studyBody": null,
+      "tree": null,
+      "bench": null,
+      "inspector": null,
+      "benchInner": null,
+      "firstBlock": null,
+      "report": null
+    },
+    "counts": {
+      "visibleButtonsLinks": 15,
+      "blocks": 0,
+      "collapsedBlocks": 0,
+      "tables": 6,
+      "inputs": 0,
+      "canvases": 0
+    },
+    "canvases": [],
+    "charts": [],
+    "headings": [
+      {
+        "tag": "H1",
+        "text": "Source admission",
+        "top": 83
+      },
+      {
+        "tag": "H3",
+        "text": "Sources",
+        "top": 175
+      },
+      {
+        "tag": "H3",
+        "text": "Sprint Priming - Longitudinal Study",
+        "top": 453
+      },
+      {
+        "tag": "H3",
+        "text": "Rights and integrity gates",
+        "top": 708
+      },
+      {
+        "tag": "H3",
+        "text": "Deposited files",
+        "top": 758
+      },
+      {
+        "tag": "H3",
+        "text": "Scientific admissibility",
+        "top": 808
+      },
+      {
+        "tag": "H3",
+        "text": "Quality assessment",
+        "top": 858
+      },
+      {
+        "tag": "H3",
+        "text": "Admission",
+        "top": 908
+      },
+      {
+        "tag": "H2",
+        "text": "Admitted snapshots",
+        "top": 1159
+      },
+      {
+        "tag": "H2",
+        "text": "Scientific qualification",
+        "top": 1314
+      },
+      {
+        "tag": "H3",
+        "text": "Independent method checks",
+        "top": 1346
+      }
+    ],
+    "overflow": [
+      {
+        "tag": "DIV",
+        "cls": "adm-grid",
+        "sw": 995,
+        "cw": 976
+      },
+      {
+        "tag": "DIV",
+        "cls": "",
+        "sw": 995,
+        "cw": 976
+      },
+      {
+        "tag": "DIV",
+        "cls": "frame",
+        "sw": 994,
+        "cw": 974
+      },
+      {
+        "tag": "DIV",
+        "cls": "frame-body",
+        "sw": 994,
+        "cw": 974
+      },
+      {
+        "tag": "DIV",
+        "cls": "readouts",
+        "sw": 983,
+        "cw": 952
+      },
+      {
+        "tag": "DIV",
+        "cls": "d",
+        "sw": 235,
+        "cw": 217
+      },
+      {
+        "tag": "DIV",
+        "cls": "readout",
+        "sw": 269,
+        "cw": 238
+      },
+      {
+        "tag": "DIV",
+        "cls": "v ",
+        "sw": 259,
+        "cw": 218
+      }
+    ],
+    "slug": "admission",
+    "path": "/data/admission",
+    "status": 200
+  }
+]

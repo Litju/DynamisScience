@@ -1,0 +1,33 @@
+{
+  "width": 1440,
+  "console": [
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)"
+  ],
+  "page": [],
+  "failed": [
+    "GET http://localhost:3001/research/projects/PRJ-FB8A479E?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/projects/PRJ-52A0723C?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-001?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-REAL-001?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-REAL-002?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-U-EE7514BB?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-U-AE0D7A3C?_rsc=taWenDuVBzUfn4QI :: net::ERR_ABORTED",
+    "GET http://localhost:3001/data/DS-REAL-MENDELEY-2C44490E08AD?_rsc=CDxNt69c6CxsJgpp :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-U-EE7514BB?_rsc=CDxNt69c6CxsJgpp :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/PROG-U-7B9AB9FE?_rsc=CDxNt69c6CxsJgpp :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-REAL-001?_rsc=LC_ka7PgrR747oFF :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-U-EE7514BB?_rsc=LC_ka7PgrR747oFF :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/PROG-U-7B9AB9FE?_rsc=LC_ka7PgrR747oFF :: net::ERR_ABORTED",
+    "GET http://localhost:3001/data/DS-REAL-MENDELEY-2C44490E08AD?_rsc=jf3tLzcGPOHkZ145 :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-REAL-001?_rsc=jf3tLzcGPOHkZ145 :: net::ERR_ABORTED",
+    "GET http://localhost:3001/data/DS-REAL-MOVESMART-805259588272?_rsc=jf3tLzcGPOHkZ145 :: net::ERR_ABORTED",
+    "GET http://localhost:3001/research/studies/STUDY-REAL-002?_rsc=jf3tLzcGPOHkZ145 :: net::ERR_ABORTED"
+  ],
+  "palette_open": true,
+  "palette_closed": true
+}

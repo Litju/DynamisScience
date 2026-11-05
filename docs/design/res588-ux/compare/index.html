@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RES-588 — Three UX directions</title>
+<style>
+  @font-face { font-family: "IBM Plex Sans"; src: url("/apps/web/node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+  @font-face { font-family: "IBM Plex Sans"; src: url("/apps/web/node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "IBM Plex Mono"; src: url("/apps/web/node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #16191a; color: #eef1ed; font-family: "IBM Plex Sans", "Segoe UI", sans-serif; }
+  .wrap { max-width: 2300px; margin: 0 auto; padding: 34px 28px 50px; }
+  .kicker { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .14em; color: #8c9993; text-transform: uppercase; }
+  h1 { font-size: 32px; letter-spacing: -.02em; margin: 8px 0 4px; font-weight: 600; }
+  .lede { color: #a7b2ad; font-size: 13px; max-width: 900px; line-height: 1.6; }
+  .section { margin-top: 34px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid #303838; padding-bottom: 8px; margin-bottom: 14px; }
+  .section-head h2 { font-size: 18px; margin: 0; font-weight: 600; }
+  .section-head span { color: #8c9993; font-family: "IBM Plex Mono", monospace; font-size: 10px; }
+  .grid { display: grid; gap: 14px; }
+  .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { border: 1px solid #2d3638; background: #101415; border-radius: 5px; overflow: hidden; }
+  .card img { display: block; width: 100%; height: auto; border-bottom: 1px solid #2d3638; }
+  .cap { padding: 11px 13px 13px; }
+  .cap b { display: block; font-size: 13px; font-weight: 600; color: #f3f6f2; }
+  .cap span { display: block; margin-top: 3px; color: #98a49f; font-size: 10.5px; line-height: 1.45; }
+  .note { margin-top: 16px; color: #8c9993; font-family: "IBM Plex Mono", monospace; font-size: 9.5px; }
+  .tag { display: inline-block; padding: 2px 6px; border: 1px solid #3a474a; color: #d9a85e; font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .05em; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">RES-588 · P0 UX/UI product reset · Step B design gate</div>
+  <h1>Three directions for the same research studio</h1>
+  <p class="lede">Same real study: Sprint priming longitudinal study · 21 athletes · 82 observations · MixedLM random slope +0.998 cm/occasion (95% CI 0.622–1.375). These are isolated, read-only prototypes rendered at the required desktop viewports. No production UI was modified.</p>
+
+  <section class="section" id="directions">
+    <div class="section-head"><h2>1440 × 900 — flagship study and second view</h2><span>Image width 720 px per panel · aggregate values only</span></div>
+    <div class="grid three">
+      <div class="card"><img src="../screens/a-analyze-1440x900.png" alt="Direction A analyze"><div class="cap"><b>A · Focused Research Studio — Analyze</b><span>Project context, four activity modes, result first, 784 × 405 px chart, contextual scientific inspector.</span></div></div>
+      <div class="card"><img src="../screens/b-analyze-1440x900.png" alt="Direction B analyze"><div class="cap"><b>B · Scientific Notebook — Results</b><span>Ordered research narrative, collapsible methods, full-width 834 × 310 px figure, persistent contents and margin notes.</span></div></div>
+      <div class="card"><img src="../screens/c-analyze-1440x900.png" alt="Direction C analyze"><div class="cap"><b>C · Investigation Workspace — Analyze</b><span>Research-object navigator, open-object tabs, 594 × 338 px chart, result panel and contextual instrument tray.</span></div></div>
+      <div class="card"><img src="../screens/a-design-1440x900.png" alt="Direction A design"><div class="cap"><b>A · Design — create a study</b><span>One design canvas with question, data, design, readiness and project context; no wizard sprawl.</span></div></div>
+      <div class="card"><img src="../screens/b-new-study-1440x900.png" alt="Direction B new study"><div class="cap"><b>B · Notebook — new study</b><span>A blank study page authored as ordered cells; methods and plan remain collapsible.</span></div></div>
+      <div class="card"><img src="../screens/c-monitoring-1440x900.png" alt="Direction C monitoring"><div class="cap"><b>C · Monitoring — weekly CMJ</b><span>Eight planned weeks and four historical readings kept in separate lanes; no readiness or injury score.</span></div></div>
+    </div>
+    <div class="note">Real values: occasion means 38.53 → 41.40 cm; model change +2.995 cm [1.866, 4.124]; 2 missing occasion-4 rows. No participant-level records are included.</div>
+  </section>
+
+  <section class="section" id="compact">
+    <div class="section-head"><h2>1280 × 800 — compact treatment</h2><span>Charts remain large; navigation degrades deliberately</span></div>
+    <div class="grid three">
+      <div class="card"><img src="../screens/a-analyze-1280x800.png" alt="Direction A 1280"><div class="cap"><b>A · 1280 × 800</b><span>236 px rail becomes a 70 px icon rail; chart 832 × 307 px; inspector 312 px.</span></div></div>
+      <div class="card"><img src="../screens/b-analyze-1280x800.png" alt="Direction B 1280"><div class="cap"><b>B · 1280 × 800</b><span>Margin notes fold away; figure stays full width; contents rail narrows.</span></div></div>
+      <div class="card"><img src="../screens/c-analyze-1280x800.png" alt="Direction C 1280"><div class="cap"><b>C · 1280 × 800</b><span>Instrument tray becomes a 56 px rail; chart grows to 732 × 360 px.</span></div></div>
+    </div>
+  </section>
+
+  <section class="section" id="current-vs-a">
+    <div class="section-head"><h2>Current production vs Direction A — the same first screen</h2><span>Structural difference, not a restyle</span></div>
+    <div class="grid two">
+      <div class="card"><img src="../audit/production/study-mendeley-1440x900.png" alt="Current production"><div class="cap"><b>Current production · first screen</b><span>Setup metadata and plan cards occupy the viewport; the primary figure begins 3,151 px down. 256 px tree + 356 px inspector leave 828 px for work.</span></div></div>
+      <div class="card"><img src="../screens/a-analyze-1440x900.png" alt="Direction A"><div class="cap"><b>Direction A · first screen</b><span>Result and 784 × 405 px chart are visible without scrolling; methods, assumptions and missingness stay inspectable in the right dock.</span></div></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

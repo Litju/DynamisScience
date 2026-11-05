@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Investigation Workspace — Monitoring</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6M4.5 11.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5.2a3.2 3.2 0 0 1 0 6.2M17.5 14.8c2.2.5 3.8 2.3 3.8 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-hex" viewBox="0 0 24 24"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4l8-4.6Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m8.5 12 2.2 2.2 4.8-5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-.8.7-1.7 1.2-1.7 2.7M12 17.3v.1" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10" width="15" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M7 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+</svg>
+
+<div class="workspace">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">D</span><b>DynamisScience</b><span>investigation workspace</span></div>
+    <div class="project-pill"><span class="dot"></span>CMJ longitudinal research<span class="id">PRJ-FB8A479E</span></div>
+    <div class="top-search"><svg width="12" height="12"><use href="#i-search"/></svg><span>Search objects, runs, evidence</span><kbd>Ctrl K</kbd></div>
+    <div class="env"><i></i>local · 8000</div>
+  </header>
+
+  <div class="tabbar" role="tablist" aria-label="Open research objects">
+    <a class="tab" href="analyze.html"><span class="state" style="background:var(--amber)"></span>CMJ trajectories</a>
+    <a class="tab" href="analyze.html"><span class="state"></span>MixedLM · random slope</a>
+    <a class="tab active" href="monitoring.html" aria-current="page"><span class="state" style="background:var(--violet)"></span>Weekly CMJ monitoring<span class="x">×</span></a>
+    <button class="tab add" type="button" title="Open another object">+</button>
+    <div class="tab-right"><span class="mono faint small">PROG-U-7B9AB9FE · READY</span><button class="btn small" type="button" data-toast="Prototype: schedule is prospective; no new readings exist.">Schedule</button></div>
+  </div>
+
+  <div class="shell">
+    <aside class="navigator" aria-label="Research object navigator">
+      <div class="nav-head">
+        <div class="kicker">Monitoring program</div>
+        <h2>Weekly CMJ monitoring program</h2>
+        <div class="id">PROG-U-7B9AB9FE · INV-U-0877DB29</div>
+      </div>
+      <div class="nav-tabs" role="tablist" aria-label="Navigator view">
+        <button role="tab" aria-selected="true">Objects</button>
+        <button role="tab" aria-selected="false" data-toast="No runs exist for this program; no new readings are claimed.">Runs 0</button>
+      </div>
+      <div class="nav-search"><svg width="11" height="11"><use href="#i-search"/></svg>Filter objects…</div>
+      <div class="nav-scroll">
+        <div class="nav-group">
+          <div class="nav-group-title">Program <span class="rule"></span></div>
+          <button class="nav-item" type="button" data-toast="The research question is descriptive and prospective."><span class="ico"><svg width="13" height="13"><use href="#i-help"/></svg></span><span class="body"><span class="name">Research question</span><span class="meta">RQ-U-83A5740D</span></span></button>
+          <button class="nav-item active" type="button" aria-current="true"><span class="ico"><svg width="13" height="13"><use href="#i-calendar"/></svg></span><span class="body"><span class="name">Schedule &amp; readings</span><span class="meta">8 PLANNED · 4 HISTORICAL</span></span><span class="dot"></span></button>
+          <button class="nav-item" type="button" data-toast="The cohort includes 21 monitored athletes."><span class="ico"><svg width="13" height="13"><use href="#i-users"/></svg></span><span class="body"><span class="name">Monitored cohort</span><span class="meta">COHORT-U-F8C9ED80 · 21</span></span></button>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group-title">Data <span class="rule"></span></div>
+          <button class="nav-item" type="button" data-toast="Same admitted snapshot as the completed study."><span class="ico"><svg width="13" height="13"><use href="#i-database"/></svg></span><span class="body"><span class="name">Mendeley sprint priming</span><span class="meta">DS-REAL-MENDELEY-…08AD</span></span></button>
+          <button class="nav-item" type="button" data-toast="CMJ height is registered in the MetricDefinition library."><span class="ico"><svg width="13" height="13"><use href="#i-chart"/></svg></span><span class="body"><span class="name">CMJ height · cm</span><span class="meta">MET-REAL-CMJ-HEIGHT</span></span></button>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group-title">Analysis <span class="rule"></span></div>
+          <button class="nav-item" type="button" data-toast="The plan is frozen; no new readings exist to execute."><span class="ico"><svg width="13" height="13"><use href="#i-lock"/></svg></span><span class="body"><span class="name">Frozen plan</span><span class="meta">PLAN-21E40B84 · FROZEN</span></span></button>
+          <button class="nav-item" type="button" data-toast="Descriptive longitudinal summary only; no readiness score."><span class="ico"><svg width="13" height="13"><use href="#i-chart"/></svg></span><span class="body"><span class="name">Descriptive summary</span><span class="meta">NOT RUN · 0 NEW READINGS</span></span></button>
+        </div>
+        <div class="nav-group">
+          <div class="nav-group-title">Outputs <span class="rule"></span></div>
+          <button class="nav-item" type="button" data-toast="No evidence is promoted because no new readings exist."><span class="ico"><svg width="13" height="13"><use href="#i-hex"/></svg></span><span class="body"><span class="name">Evidence</span><span class="meta">NONE CLAIMED</span></span><span class="count">0</span></button>
+          <button class="nav-item" type="button" data-toast="A report can be composed later; no result currently exists."><span class="ico"><svg width="13" height="13"><use href="#i-file"/></svg></span><span class="body"><span class="name">Report</span><span class="meta">NOT COMPOSED</span></span><span class="count">0</span></button>
+          <button class="nav-item" type="button" data-toast="Open the related completed study."><span class="ico"><svg width="13" height="13"><use href="#i-flask"/></svg></span><span class="body"><span class="name">Sprint priming study</span><span class="meta">STUDY-U-EE7514BB · COMPLETED</span></span></button>
+        </div>
+      </div>
+      <div class="nav-foot">
+        <button class="btn" type="button" data-toast="Prototype: adding a reading requires a permitted source, not manual invention."><svg width="11" height="11"><use href="#i-plus"/></svg>Add reading</button>
+        <button class="btn primary" type="button" data-toast="The schedule is prospective and persisted; no readings are generated.">Open schedule</button>
+      </div>
+    </aside>
+
+    <main class="canvas" aria-label="Monitoring canvas">
+      <div class="canvas-head">
+        <div>
+          <div class="kicker">Monitoring · PROG-U-7B9AB9FE · READY</div>
+          <h1>Weekly CMJ monitoring program</h1>
+          <p>Prospective weekly schedule weeks 5–12 · 21 monitored athletes · 4 historical readings kept separate · 0 new readings claimed</p>
+        </div>
+        <div class="canvas-actions">
+          <button class="btn" type="button" data-toast="Schedule editing is prospective and does not fabricate readings.">Edit schedule</button>
+          <button class="btn primary" type="button" data-toast="No new readings exist; a descriptive run requires readings, not zeroes.">Open analysis →</button>
+        </div>
+      </div>
+
+      <div class="summary-strip" aria-label="Monitoring summary">
+        <div class="item"><div class="k">Monitored athletes</div><div class="v">21</div><div class="s">COHORT-U-F8C9ED80</div></div>
+        <div class="item"><div class="k">Planned measurements</div><div class="v">8</div><div class="s">weeks 5–12 · weekly</div></div>
+        <div class="item"><div class="k">Historical readings</div><div class="v">4</div><div class="s">occasions 1–4 · not weeks</div></div>
+        <div class="item"><div class="k">New readings</div><div class="v" style="color:var(--amber)">0</div><div class="s">no result is claimed</div></div>
+      </div>
+
+      <div class="monitor-grid">
+        <div>
+          <section class="panel" aria-label="Schedule and readings timeline">
+            <div class="panel-head"><h2>Schedule and readings</h2><span class="aside">PLANNED ≠ OBSERVED</span></div>
+            <div class="monitor-timeline" id="monitor-timeline"></div>
+            <div class="chart-foot" style="border-top:1px solid var(--line)"><span><b>Weeks 5–12</b> prospective</span><span><b>Occasions 1–4</b> historical</span><span><b>Missing</b> is not zero</span><span><b>No</b> readiness score</span></div>
+          </section>
+
+          <section class="panel monitor-table" style="margin-top:10px" aria-label="Monitoring ledger">
+            <div class="panel-head"><h2>Monitoring ledger</h2><span class="aside">SCHEDULE VS READINGS</span></div>
+            <table>
+              <thead><tr><th>Week</th><th>Planned protocol</th><th>Reading</th><th>Status</th><th>Quality / note</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">Week 5</td><td>CMJ height acquisition</td><td>—</td><td class="planned">PLANNED</td><td>No reading implied</td></tr>
+                <tr><td class="mono">Week 6</td><td>CMJ height acquisition</td><td>—</td><td class="planned">PLANNED</td><td>No reading implied</td></tr>
+                <tr><td class="mono">Week 7</td><td>CMJ height acquisition</td><td>—</td><td class="planned">PLANNED</td><td>No reading implied</td></tr>
+                <tr><td class="mono">Week 8</td><td>CMJ height acquisition</td><td>—</td><td class="planned">PLANNED</td><td>No reading implied</td></tr>
+                <tr><td colspan="5" style="padding-top:7px;padding-bottom:3px;background:rgba(167,139,250,.04)"><span class="hist">HISTORICAL READINGS · NOT SCHEDULED WEEKS</span></td></tr>
+                <tr><td class="mono">Occasion 1</td><td>Deposited testing block</td><td class="mono">38.53 cm · n=21</td><td class="hist">HISTORICAL</td><td>Not mapped to week 5</td></tr>
+                <tr><td class="mono">Occasion 2</td><td>Deposited testing block</td><td class="mono">39.60 cm · n=21</td><td class="hist">HISTORICAL</td><td>Not mapped to week 6</td></tr>
+                <tr><td class="mono">Occasion 3</td><td>Deposited testing block</td><td class="mono">41.12 cm · n=21</td><td class="hist">HISTORICAL</td><td>Not mapped to week 7</td></tr>
+                <tr><td class="mono">Occasion 4</td><td>Deposited testing block</td><td class="mono">41.40 cm · n=19</td><td class="hist">HISTORICAL</td><td>2 missing rows · not zero</td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+
+        <div>
+          <section class="panel" aria-label="Schedule rules">
+            <div class="panel-head"><h2>Schedule rules</h2><span class="aside">PERSISTED</span></div>
+            <div style="padding:9px 11px" class="bullets">
+              <ul class="bullets" style="font-size:9.5px">
+                <li>A scheduled measurement without a reading is <b style="color:var(--red)">MISSING</b>, not zero.</li>
+                <li>No readiness score and no injury/fatigue diagnosis is computed.</li>
+                <li>Historical readings are not relabelled as future measurements.</li>
+                <li>No new readings exist; no run or evidence is claimed.</li>
+              </ul>
+            </div>
+          </section>
+          <section class="panel" style="margin-top:10px" aria-label="Analysis settings">
+            <div class="panel-head"><h2>Analysis settings</h2><span class="aside">DESCRIPTIVE</span></div>
+            <div style="padding:9px 11px">
+              <dl class="kv">
+                <dt>Analysis</dt><dd>Descriptive trajectories</dd>
+                <dt>Baseline</dt><dd>Individual &amp; cohort when readings exist</dd>
+                <dt>Irregular</dt><dd>Actual dates; no undeclared interpolation</dd>
+                <dt>Missing policy</dt><dd>Never imputed</dd>
+              </dl>
+            </div>
+          </section>
+          <section class="panel" style="margin-top:10px" aria-label="Protocol">
+            <div class="panel-head"><h2>Protocol</h2><span class="aside">REGISTRY</span></div>
+            <div style="padding:9px 11px">
+              <dl class="kv">
+                <dt>Protocol</dt><dd>CMJ height acquisition</dd>
+                <dt>Metric</dt><dd>CMJ height · cm</dd>
+                <dt>Frequency</dt><dd>Weekly · 8 weeks</dd>
+                <dt>Window</dt><dd>Week 5 → Week 12</dd>
+              </dl>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="lineage-bar" aria-label="Program provenance">
+        <span class="node"><i></i><b>Snapshot</b> DS-REAL-MENDELEY…</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Cohort</b> COHORT-U-F8C9ED80</span><span class="arrow">›</span>
+        <span class="node"><i></i><b>Frozen plan</b> PLAN-21E40B84</span><span class="arrow">›</span>
+        <span class="node"><i style="background:var(--amber)"></i><b>Schedule</b> 8 planned weeks</span><span class="arrow">›</span>
+        <span class="node"><i style="background:var(--violet)"></i><b>Readings</b> 4 historical</span><span class="arrow">›</span>
+        <span class="node"><i style="background:var(--faint)"></i><b>Evidence</b> none claimed</span>
+        <span class="right">Inspect chain →</span>
+      </div>
+    </main>
+
+    <aside class="tray" aria-label="Contextual instruments">
+      <div class="tray-tabs" role="tablist" aria-label="Instrument tray">
+        <button role="tab" aria-selected="true">Program</button>
+        <button role="tab" aria-selected="false" data-toast="Missingness rules are explicit and persisted.">Missingness</button>
+        <button role="tab" aria-selected="false" data-toast="Provenance resolves to the admitted snapshot and DOI.">Provenance</button>
+      </div>
+      <div class="tray-scroll">
+        <div class="tray-head">
+          <div class="kicker">Operational program</div>
+          <h2>Weekly CMJ monitoring</h2>
+          <p>Prospective schedule with historical readings kept separate.</p>
+        </div>
+        <div class="tray-sec">
+          <h4>Readings</h4>
+          <dl class="kv">
+            <dt>Planned</dt><dd>8 · weeks 5–12</dd>
+            <dt>Available</dt><dd>4 · occasions 1–4</dd>
+            <dt>New</dt><dd>0</dd>
+            <dt>Runs</dt><dd>0</dd>
+            <dt>Evidence</dt><dd>0</dd>
+          </dl>
+        </div>
+        <div class="tray-sec">
+          <h4>Quality policy</h4>
+          <ul class="bullets">
+            <li>MISSING ≠ 0.</li>
+            <li>No readiness or injury score.</li>
+            <li>No interpolation without a declared rule.</li>
+            <li>Historical readings remain historical.</li>
+          </ul>
+        </div>
+        <div class="tray-sec">
+          <div class="callout"><b>No result is claimed.</b> The program can be composed now; a descriptive run requires new readings.</div>
+        </div>
+        <div class="tray-sec">
+          <h4>Source</h4>
+          <dl class="kv">
+            <dt>Snapshot</dt><dd class="mono">DS-REAL-MENDELEY-2C44490E08AD</dd>
+            <dt>DOI</dt><dd class="mono">10.17632/6p99569x66.1</dd>
+            <dt>Licence</dt><dd>CC BY 4.0</dd>
+          </dl>
+        </div>
+        <div class="tray-foot"><button class="btn small" type="button" data-toast="The completed study remains unchanged and separate.">Open study</button><button class="btn small ghost" type="button" data-toast="Schedule history is persisted.">History</button></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

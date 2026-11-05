@@ -4,6 +4,15 @@ Status: **PASS** for every independently executable engineering, scientific and
 rendered-product gate. The external practitioner-validation gate inherited from
 RES-587 remains open and is not reclassified here.
 
+> **2026-11-05 — Section 11 supersedes the UX acceptance in this document.**
+> The product owner rejected the evolved research experience. The engineering,
+> scientific and persistence results below remain valid, but the existing
+> navigation, three-pane geometry, long block document and visual design are
+> **not** an accepted product baseline. See
+> [`docs/design/res588-ux/`](design/res588-ux/) for the Step A audit, the three
+> rendered directions and the owner-selection gate. RES-588 remains
+> **In Progress** until a direction is selected and implemented.
+
 This document records what was executed on native Windows on 2026-11-05. The
 authoritative scientific records are the immutable snapshots under
 `$DYNAMISSCIENCE_DATA_ROOT`, and the mutable research metadata is the SQLite

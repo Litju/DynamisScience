@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scientific Notebook — Results</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="notebook-app">
+  <header class="topbar">
+    <div class="brand"><b>DynamisScience</b><span>research notebook</span></div>
+    <nav class="topnav" aria-label="Primary">
+      <a href="analyze.html" class="active">Notebook</a>
+      <a href="#" data-toast="Data and Library remain unchanged in this direction.">Data</a>
+      <a href="#" data-toast="Data and Library remain unchanged in this direction.">Library</a>
+    </nav>
+    <div class="top-right">
+      <span class="save">Saved 09:03 UTC</span>
+      <button class="btn small" type="button" data-toast="Prototype: the report is already frozen as RPT-EE7514BB v3.">Share</button>
+      <button class="btn small primary" type="button" data-toast="Prototype: HTML export is deterministic and includes the embedded manifest.">Export HTML</button>
+    </div>
+  </header>
+
+  <div class="notebook-grid">
+    <aside class="contents" aria-label="Notebook contents">
+      <div class="project-kicker">Project · PRJ-FB8A479E</div>
+      <div class="project-title">CMJ longitudinal research</div>
+      <div class="project-meta">One study · one monitoring program</div>
+
+      <div class="toc-label">Contents</div>
+      <nav class="toc" aria-label="Study sections">
+        <a href="#s1"><span class="n">01</span><span>Question</span><span class="tag">RQ</span></a>
+        <a href="#s2"><span class="n">02</span><span>Design</span><span class="tag">H-001</span></a>
+        <a href="#s3"><span class="n">03</span><span>Data &amp; cohort</span><span class="tag">21</span></a>
+        <a href="#s4"><span class="n">04</span><span>Explore</span><span class="tag">82</span></a>
+        <a href="#s5"><span class="n">05</span><span>Analysis cell</span><span class="tag">v1</span></a>
+        <a href="#s6" class="active"><span class="n">06</span><span>Results</span><span class="tag">RUN</span></a>
+        <a href="#s7"><span class="n">07</span><span>Diagnostics</span><span class="tag">2</span></a>
+        <a href="#s8"><span class="n">08</span><span>Interpretation</span><span class="tag">note</span></a>
+        <a href="#s9"><span class="n">09</span><span>Publish</span><span class="tag">v3</span></a>
+      </nav>
+
+      <div class="toc-foot">
+        <div class="other">Other work</div>
+        <button type="button" data-toast="The monitoring program is a separate notebook with a prospective weekly schedule.">Weekly CMJ monitoring ↗</button>
+        <button type="button" data-toast="Create a new study page inside the same project.">New study +</button>
+        <button type="button" data-toast="Runs, evidence and reports remain append-only.">Run ledger ↗</button>
+      </div>
+    </aside>
+
+    <div class="page-wrap">
+      <article class="page" aria-label="Sprint priming longitudinal study notebook">
+        <div class="page-kicker">Study notebook · STUDY-U-EE7514BB</div>
+        <h1>Sprint priming longitudinal study</h1>
+        <div class="byline">Observational longitudinal repeated measures · 21 athletes · four deposited testing occasions</div>
+        <div class="stamps">
+          <span class="stamp ok">Completed</span>
+          <span class="stamp">Real data</span>
+          <span class="stamp">Plan frozen</span>
+          <span class="stamp warn">Single arm</span>
+          <span class="stamp">DOI 10.17632/6p99569x66.1</span>
+        </div>
+
+        <div class="narrative-strip" aria-label="Narrative position">
+          <span>Question</span><span class="arrow">→</span><span>Design</span><span class="arrow">→</span><span>Data</span><span class="arrow">→</span><span>Analysis</span><span class="arrow">→</span><span class="on">Results</span><span class="arrow">→</span><span>Publish</span>
+        </div>
+
+        <div class="rule"></div>
+
+        <details class="collapsed" id="methods">
+          <summary><span class="num" style="white-space:nowrap">01–04</span><span><span class="title">Methods at a glance</span><span class="summary-text">Question · design · data · explore</span></span><span class="action">open</span></summary>
+          <div class="detail">
+            <p id="s1"><b>Question.</b> Does countermovement jump height change across four repeated testing occasions in the admitted sprint-priming cohort? Estimand: within-subject change in CMJ height per testing occasion; single-arm and observational.</p>
+            <p id="s2"><b>Design.</b> Observational longitudinal repeated measures. Four deposited testing occasions, not calendar weeks. Population: 21 highly trained male collegiate athletes.</p>
+            <p id="s3"><b>Data &amp; cohort.</b> Snapshot DS-REAL-MENDELEY-2C44490E08AD · 439 rows across 4 tables · CC BY 4.0. Cohort COHORT-U-A3C5D499 includes all 21 athletes; two occasion-4 rows are missing and not imputed.</p>
+            <p id="s4"><b>Explore.</b> Observed means rise from 38.53 cm to 41.40 cm. The fourth occasion contains 19 athletes; missing rows are reported, never replaced with zero.</p>
+          </div>
+        </details>
+
+        <section class="section" id="s5">
+          <div class="section-head"><span class="num">05</span><h2>Analysis cell</h2><span class="aside">editable · run appended, never overwritten</span></div>
+          <div class="cell">
+            <div class="cell-head">
+              <span class="kicker">Cell 05</span><b>MixedLM · random intercept + random occasion slope</b>
+              <span class="run">RUN-U-0001 · COMPLETED · 1.6 s</span>
+            </div>
+            <div class="cell-body">
+              <div class="cell-spec">cmj_height_cm ~ occasion_c<br>+ (1 + occasion_c | subject_id) · ML</div>
+              <div class="cell-meta">Plan <b>PLAN-7103044E</b> matches · cohort <b>COHORT-U-A3C5D499</b> · 82 obs / 21 athletes<br>optimizer <b>Nelder–Mead</b> after BFGS failed · logLik <b>−208.312</b></div>
+              <div class="cell-actions">
+                <button class="btn small" type="button" data-toast="Prototype: a rerun would append a new immutable run, not edit RUN-U-0001.">Re-run</button>
+                <button class="btn small ghost" type="button" data-toast="The spec, cohort, snapshot and estimator are fixed for this run.">Spec</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="s6">
+          <div class="section-head"><span class="num">06</span><h2>Results</h2><span class="aside">primary · EVID-U-0001</span></div>
+
+          <div class="result-line">
+            <div class="big-result">+2.995<span class="unit"> cm</span></div>
+            <div class="result-side">
+              <div class="item"><div class="label">95% CI</div><div class="value">1.866 – 4.124</div></div>
+              <div class="item"><div class="label">Slope</div><div class="value">+0.998 cm / occ.</div></div>
+              <div class="item"><div class="label">Effect</div><div class="value">0.36 SD</div></div>
+              <div class="item"><div class="label">Context</div><div class="value">21 athletes · 82 obs.</div></div>
+            </div>
+          </div>
+
+          <div class="chart-frame">
+            <div class="chart-wrap" id="notebook-trajectory"></div>
+          </div>
+          <div class="figure-caption">
+            <span><b>Figure 1.</b> Occasion means with 95% CI; dashed line is the MixedLM fixed-effect fit.</span>
+            <span><b>Missing:</b> 2 occasion-4 rows, not zero.</span>
+            <span><b>Axis:</b> 28–52 cm.</span>
+          </div>
+          <div class="note-inline"><b>Read this as within-athlete change.</b> There is no concurrent control, so the model does not identify a causal effect of sprint priming. Occasions are not calendar weeks.</div>
+        </section>
+
+        <details class="collapsed" id="s7">
+          <summary><span class="num">07</span><span><span class="title">Diagnostics</span><span class="summary-text">RMSE 8.15 cm · 2 missing · BFGS→Nelder–Mead · converged</span></span><span class="action">open</span></summary>
+          <div class="detail">
+            <p><b>Model status.</b> Converged; log likelihood −208.3118; residual RMSE 8.1477 cm; maximum absolute residual 21.68 cm. Residual means by occasion range from −0.244 to +0.475 cm.</p>
+            <p><b>Assumptions.</b> Linear occasion effect; normal athlete intercepts and slopes; missing at random conditional on athlete. The four COND values are ordered testing occasions, not randomised conditions.</p>
+            <p><b>Optimizer.</b> BFGS attempt failed; Nelder–Mead selected. The attempt is recorded with the run.</p>
+          </div>
+        </details>
+
+        <section class="section" id="s8">
+          <div class="section-head"><span class="num">08</span><h2>Interpretation</h2><span class="aside">scientist-authored note</span></div>
+          <div class="interpretation">
+            <p>Countermovement jump height was higher at later deposited testing occasions: the random-slope model estimates +0.998 cm per occasion (95% CI 0.622 to 1.375), or +2.995 cm from occasion 1 to 4 (95% CI 1.866 to 4.124).</p>
+            <p>This is a within-athlete observational change. The deposit does not map occasions to calendar weeks and contains no raw force traces, so the result cannot be read as a causal priming effect or as season-long monitoring.</p>
+          </div>
+          <div class="byline-small">Scientist note · saved with investigation INV-U-F5E29F9D · 2026-11-05</div>
+        </section>
+
+        <section id="s9">
+          <div class="publish-bar">
+            <span class="status">REPORT RPT-EE7514BB · v3 FROZEN</span>
+            <b>Report ready to export</b>
+            <span class="muted small">1 evidence · 1 figure · manifest embedded</span>
+            <span class="right">
+              <button class="btn small" type="button" data-toast="The lineage drawer resolves report → evidence → run → spec → cohort → snapshot → DOI.">Lineage</button>
+              <button class="btn small primary" type="button" data-toast="Prototype: export is local, deterministic HTML with an embedded manifest.">Export HTML</button>
+            </span>
+          </div>
+        </section>
+      </article>
+    </div>
+
+    <aside class="margin-notes" aria-label="Margin notes">
+      <div class="margin-note"><div class="label">Note 1 · design</div><b>Single arm.</b> The model estimates within-athlete change; it does not identify a causal effect. <em>Do not add a comparison label.</em></div>
+      <div class="margin-note"><div class="label">Note 2 · missingness</div><b>Occasion 4 has 19 athletes.</b> Two rows are missing, not zero. Missingness is part of the result, not a footnote.</div>
+      <div class="margin-note"><div class="label">Note 3 · plan</div><b>Frozen locally before inspection.</b> The plan is not externally preregistered and is not described as such.</div>
+      <div class="margin-note"><div class="label">Note 4 · provenance</div><b>Everything resolves.</b> Report v3 → EVID-U-0001 → RUN-U-0001 → SPEC-U-71095CFB → cohort → admitted snapshot → DOI.</div>
+      <div class="margin-note"><div class="label">Reading order</div>The notebook is ordered, not a dashboard. Collapse methods when reading results; open them when reviewing a claim.</div>
+      <div class="end">Prototype · aggregate values only<br>No participant-level records</div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

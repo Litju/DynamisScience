@@ -1,0 +1,180 @@
+{
+  "click_path": {
+    "project_url": "http://localhost:3001/research",
+    "study_url": "http://localhost:3001/research/studies/STUDY-U-EE7514BB",
+    "clicks_from_research_home": 2
+  },
+  "study_document": {
+    "page_scroll_height": 900,
+    "viewport_height": 900,
+    "scroll_screens": 1.0,
+    "blocks": [
+      {
+        "index": 1,
+        "type": "Question",
+        "top": 170,
+        "h": 470
+      },
+      {
+        "index": 2,
+        "type": "Dataset",
+        "top": 643,
+        "h": 161
+      },
+      {
+        "index": 3,
+        "type": "Cohort",
+        "top": 809,
+        "h": 361
+      },
+      {
+        "index": 4,
+        "type": "Explore",
+        "top": 1195,
+        "h": 182
+      },
+      {
+        "index": 5,
+        "type": "Analysis",
+        "top": 1402,
+        "h": 572
+      },
+      {
+        "index": 6,
+        "type": "Diagnostics",
+        "top": 1999,
+        "h": 561
+      },
+      {
+        "index": 7,
+        "type": "Evidence",
+        "top": 2585,
+        "h": 442
+      },
+      {
+        "index": 8,
+        "type": "Figure",
+        "top": 3052,
+        "h": 373
+      },
+      {
+        "index": 9,
+        "type": "Interpretation",
+        "top": 3450,
+        "h": 271
+      },
+      {
+        "index": 10,
+        "type": "Report Section",
+        "top": 3747,
+        "h": 111
+      }
+    ],
+    "analysis_scroll_y": 0,
+    "bench_scroll_height": 3894,
+    "bench_client_height": 780,
+    "bench_scroll_screens": 4.99,
+    "chart_boxes": [
+      {
+        "w": 234,
+        "h": 150,
+        "document_top": 2061
+      },
+      {
+        "w": 234,
+        "h": 150,
+        "document_top": 2077
+      },
+      {
+        "w": 724,
+        "h": 260,
+        "document_top": 3151
+      }
+    ]
+  },
+  "focus_stops": [
+    {
+      "tag": "A",
+      "text": "\u2202DynamisSciencescientific workbench",
+      "cls": "brand"
+    },
+    {
+      "tag": "A",
+      "text": "Research",
+      "cls": ""
+    },
+    {
+      "tag": "A",
+      "text": "Data",
+      "cls": ""
+    },
+    {
+      "tag": "A",
+      "text": "Library",
+      "cls": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Open command palette",
+      "cls": "search-trigger"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Collapse study tree",
+      "cls": "icon-btn"
+    },
+    {
+      "tag": "A",
+      "text": "Research",
+      "cls": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Investigation",
+      "cls": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Setup",
+      "cls": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Report",
+      "cls": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Run history (immutable ledger)",
+      "cls": "icon-btn"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Collapse inspector",
+      "cls": "icon-btn"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Focus cohort block",
+      "cls": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Inspect run",
+      "cls": ""
+    }
+  ],
+  "label_occurrences": {
+    "Study setup": 1,
+    "Research question": 2,
+    "Hypotheses": 1,
+    "Single arm": 1,
+    "Occasions": 4,
+    "DS-REAL-MENDELEY-2C44490E08AD": 7,
+    "Cohort": 2
+  },
+  "palette": {
+    "visible": true,
+    "text": "Esc\nACTIONS\nOpen study \u00b7 CMJ Response to 8-Week Strength Intervention\nSTUDY-001\nJump to investigation \u00b7 Primary Intervention Analysis\nINV-001\nJump to report\nREPORT-001\nOpen dataset DS-SYNTH-001\nData\nOpen Library\nMetrics \u00b7 Protocols \u00b7 Methods \u00b7 Models\nOpen Research\nStudies\nATHLETES\nATH-001 \u00b7 GK \u00b7 intervention\nSUB-001\nATH-002 \u00b7 RB \u00b7 comparison\nSUB-002\nATH-003 \u00b7 CB \u00b7 intervention\nSUB-003\nATH-004 \u00b7 LB \u00b7 comparison\nSUB-004\nATH-005 \u00b7 DM \u00b7 intervention\nSUB-005\nATH-006 \u00b7 CM \u00b7 comparison\nSUB-006\nATH-007 "
+  }
+}
