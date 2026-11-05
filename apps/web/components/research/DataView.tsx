@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { scienceApi } from "@/lib/api";
@@ -22,7 +23,8 @@ export function DataView({ snapshotId }: { snapshotId: string }) {
             <h1>{snapshot?.label ?? snapshotId}</h1>
             <p>{snapshot?.real_data ? "Immutable snapshot of admitted third-party research data. Rights, source checksum, quality gates and provenance are recorded with the files." : "Immutable analytical snapshot. Every analysis, figure and report in this workspace resolves to these files and checksums."}</p>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <Link href="/data/admission" className="btn btn-sm btn-ghost" style={{ textDecoration: "none" }}>Sources &amp; admission <ArrowRight size={12} /></Link>
             <State>FROZEN</State>
             <State>{snapshot?.real_data ? "REAL DATA" : "SYNTHETIC"}</State>
           </div>

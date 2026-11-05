@@ -80,17 +80,20 @@ export function DatasetBlock({ block, index }: BlockProps) {
         <Readout label="Participants" value={snapshot.subjects.total} detail={real ? "real measured participants" : `${study.arm_counts.INTERVENTION} intervention · ${study.arm_counts.COMPARISON} comparison`} />
         <Readout label={real ? "Source class" : "Weeks"} value={real ? <span className="readout-small">{String(source?.classification ?? "—")}</span> : snapshot.subjects.weeks} detail={real ? String(source?.license?.id ?? "") : "2 CMJ trials / week"} />
         <Readout label="Rows" value={rowTotal.toLocaleString()} detail={`${Object.keys(rows).length} tables · ${health.valid_measurements} valid`} />
-        <Readout label={real ? "Source DOI" : "Force samples"} value={real ? <span className="readout-small">{String(source?.doi ?? "—")}</span> : rows.force_traces?.toLocaleString()} detail={real ? String(source?.publisher ?? "") : `${snapshot.sample_rates.force_traces_hz} Hz audit traces`} />
-        <Readout label={real ? "Admission" : "Tracking rows"} value={real ? <span className="readout-small">{String(snapshot.admission?.status ?? "—")}</span> : rows.match_tracking?.toLocaleString()} detail={real ? `${snapshot.admission?.rights_status ?? ""} · ${snapshot.admission?.admissibility_status ?? ""}` : `${snapshot.sample_rates.match_tracking_hz} Hz · pose ${snapshot.pose_athletes.length} athletes`} />
+        {real ? (
+          <Readout label="Valid observations" value={health.valid_measurements.toLocaleString()} detail={`${health.missing_observations} missing slots · never imputed`} />
+        ) : (
+          <>
+            <Readout label="Force samples" value={rows.force_traces?.toLocaleString()} detail={`${snapshot.sample_rates.force_traces_hz} Hz audit traces`} />
+            <Readout label="Tracking rows" value={rows.match_tracking?.toLocaleString()} detail={`${snapshot.sample_rates.match_tracking_hz} Hz · pose ${snapshot.pose_athletes.length} athletes`} />
+          </>
+        )}
       </div>
       <div className="block-toolbar small">
         {real ? (
           <>
-            <span className="faint">licence <span className="mono" style={{ color: "var(--text)" }}>{source?.license?.id}</span></span>
-            <span className="faint">privacy <span className="mono" style={{ color: "var(--text)" }}>{source?.privacy?.classification}</span></span>
-            <span className="faint">parser <span className="mono" style={{ color: "var(--text)" }}>{snapshot.generator_version}</span></span>
-            <span className="faint">schema <span className="mono" style={{ color: "var(--text)" }}>{snapshot.schema_version}</span></span>
-            <span className="faint">checksums <span className="mono" style={{ color: "var(--text)" }}>{Object.keys(snapshot.checksums).length} files</span></span>
+            <span className="faint">source <span className="mono" style={{ color: "var(--text)" }}>{source?.id}</span></span>
+            <span className="faint">snapshot files <span className="mono" style={{ color: "var(--text)" }}>{Object.keys(snapshot.checksums).length}</span></span>
           </>
         ) : (
           <>

@@ -52,15 +52,20 @@ export function AdmissionView() {
   const source = detail.data?.source;
   const admission = detail.data?.admission;
   const quality = detail.data?.quality;
+  const qualityChecks = quality?.checks ?? [];
+  const qualityPasses = qualityChecks.filter((check) => check.status === "PASS").length;
+  const qualityFailures = qualityChecks.filter((check) => check.status === "FAIL").length;
+  const qualificationRecords = qualification.data ?? [];
+  const qualifiedRecords = qualificationRecords.filter((record) => record.status === "QUALIFIED").length;
 
   return (
     <main className="page">
       <div className="page-inner">
         <div className="page-head">
           <div>
-            <div className="crumb">DATA / ADMISSION</div>
-            <h1>Real-data admission</h1>
-            <p>Rights, integrity, schema, units, quality and immutable snapshot admission for third-party research data. Real admissions are kept separate from synthetic fixtures and never enter the public Git tree.</p>
+            <div className="crumb"><Link href="/data" style={{ color: "inherit", textDecoration: "none" }}>DATA</Link> / ADMISSION</div>
+            <h1>Source admission</h1>
+            <p>Review rights, integrity, quality and scientific scope before creating an immutable DatasetSnapshot.</p>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <State>REAL DATA</State>
@@ -71,10 +76,10 @@ export function AdmissionView() {
 
         <div className="adm-grid">
           <div className="frame">
-            <div className="frame-head"><h3>Sources</h3><span className="faint small">verified 4 Nov 2026</span></div>
+            <div className="frame-head"><h3>Sources</h3><span className="faint small">{(sources.data ?? []).length} reviewed</span></div>
             <div className="frame-body" style={{ display: "grid", gap: 10 }}>
               {(sources.data ?? []).map((item) => (
-                <button key={item.id} type="button" className={`source-card ${current === item.id ? "is-selected" : ""}`} onClick={() => setSelected(item.id)}>
+                <button key={item.id} type="button" aria-pressed={current === item.id} className={`source-card ${current === item.id ? "is-selected" : ""}`} onClick={() => setSelected(item.id)}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                     <strong>{item.short_name}</strong>
                     <State tone={item.admitted ? "tone-valid" : "tone-warning"}>{item.admitted ? "ADMITTED" : "NOT ADMITTED"}</State>
@@ -92,14 +97,13 @@ export function AdmissionView() {
           </div>
 
           <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
-            {!source && <div className="frame"><div className="frame-body"><Loading label={detail.isLoading ? "Reading verified source assessment" : "Select a source"} /></div></div>}
+            {!source && <div className="frame"><div className="frame-body">{detail.error ? <ErrorBox error={detail.error} onRetry={() => void detail.refetch()} /> : <Loading label={detail.isLoading ? "Reading verified source assessment" : "Select a source"} />}</div></div>}
             {source && (
               <>
                 <div className="frame">
                   <div className="frame-head"><h3>{source.name}</h3><a href={source.canonical_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-ghost" style={{ textDecoration: "none" }}><ExternalLink size={12} />Publisher</a></div>
                   <div className="frame-body">
                     <div className="readouts">
-                      <Readout label="DOI" value={<span style={{ fontSize: 12 }}>{source.doi}</span>} detail={source.publisher} />
                       <Readout label="Licence" value={source.license.id} detail={source.license.name} />
                       <Readout label="Commercial use" value={source.commercial_use} detail="rights, not scientific validity" />
                       <Readout label="Privacy" value={source.privacy.classification} detail="participant-level data" />
@@ -115,8 +119,8 @@ export function AdmissionView() {
                   </div>
                 </div>
 
-                <div className="frame">
-                  <div className="frame-head"><h3>Rights and integrity gates</h3></div>
+                <details className="frame admission-detail" open={!admission}>
+                  <summary className="frame-head"><h3>Rights and integrity gates</h3><State tone="tone-valid">{source.rights_status}</State></summary>
                   <div className="frame-body">
                     <div className="check-list">
                       <Check label={`Licence evidence: ${source.license.name} (${source.license.url})`} status="PASS" />
@@ -128,10 +132,10 @@ export function AdmissionView() {
                     </div>
                     <div className="note" style={{ marginTop: 8 }}><CheckCircle2 size={12} /><span>Rights status <b>{source.rights_status}</b>; admissibility <b>{source.scientific_admissibility.status}</b>. A permissive licence does not remove privacy obligations.</span></div>
                   </div>
-                </div>
+                </details>
 
-                <div className="frame">
-                  <div className="frame-head"><h3>Deposited files</h3><span className="faint small">{source.files.length} {source.files.length === 1 ? "file" : "files"} · {bytes(source.files.reduce((sum: number, file: { size_bytes: number }) => sum + file.size_bytes, 0))}</span></div>
+                <details className="frame admission-detail" open={!admission}>
+                  <summary className="frame-head"><h3>Deposited files</h3><span className="faint small">{source.files.length} {source.files.length === 1 ? "file" : "files"} · {bytes(source.files.reduce((sum: number, file: { size_bytes: number }) => sum + file.size_bytes, 0))}</span></summary>
                   <div className="table-wrap">
                     <table className="table">
                       <thead><tr><th>File</th><th>Role</th><th className="r">Bytes</th><th>Checksum</th></tr></thead>
@@ -153,10 +157,10 @@ export function AdmissionView() {
                       ]} />
                     </div>
                   )}
-                </div>
+                </details>
 
-                <div className="frame">
-                  <div className="frame-head"><h3>Scientific admissibility</h3></div>
+                <details className="frame admission-detail" open={!admission}>
+                  <summary className="frame-head"><h3>Scientific admissibility</h3><State>{source.scientific_admissibility.status.replaceAll("_", " ")}</State></summary>
                   <div className="frame-body">
                     <p className="muted">{source.scientific_admissibility.design}</p>
                     <div className="block-cols" style={{ marginTop: 10 }}>
@@ -172,7 +176,23 @@ export function AdmissionView() {
                     <div className="note warn" style={{ marginTop: 8 }}><AlertTriangle size={12} /><span>{source.methods_documentation.summary}</span></div>
                     {source.methods_documentation.gaps?.map((gap: string) => <div key={gap} className="note bad" style={{ marginTop: 4 }}><span>{gap}</span></div>)}
                   </div>
-                </div>
+                </details>
+
+                {quality && (
+                  <details className="frame admission-detail" open={!admission}>
+                    <summary className="frame-head"><h3>Quality assessment</h3><State tone={qualityFailures ? "tone-warning" : "tone-valid"}>{`${qualityPasses} PASS · ${qualityFailures} FAIL`}</State></summary>
+                    <div className="table-wrap">
+                      <table className="table">
+                        <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+                        <tbody>
+                          {qualityChecks.map((check: { check: string; status: string; severity: string; detail: string }) => (
+                            <tr key={check.check}><td className="mono">{check.check}</td><td><State plain tone={check.status === "PASS" ? "tone-valid" : "tone-warning"}>{check.status}</State></td><td className="muted">{check.detail}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
 
                 <div className="frame">
                   <div className="frame-head"><h3>Admission</h3><State tone={admission ? "tone-valid" : "tone-warning"}>{admission ? admission.status : "NOT ADMITTED"}</State></div>
@@ -196,7 +216,7 @@ export function AdmissionView() {
                     ) : (
                       <div className="promote">
                         <ShieldCheck size={18} style={{ color: "var(--signal)" }} />
-                        <p>Rights and source integrity are verified. Admission will parse the source, write a content-addressed snapshot, and record quality gates and provenance.</p>
+                        <p>Rights and source integrity are verified. Admission parses the source, records quality gates and provenance, then writes a content-addressed snapshot.</p>
                         <Button variant="primary" onClick={() => admit.mutate(source.id)} disabled={admit.isPending}>{admit.isPending ? "Admitting…" : "Admit source"}</Button>
                       </div>
                     )}
@@ -204,22 +224,6 @@ export function AdmissionView() {
                     {admit.data?.already_admitted && <div className="note" style={{ marginTop: 8 }}><CheckCircle2 size={12} /><span>Identical content already admitted; the existing immutable snapshot was returned.</span></div>}
                   </div>
                 </div>
-
-                {quality && (
-                  <div className="frame">
-                    <div className="frame-head"><h3>Quality assessment</h3><span className="faint small">{quality.checks?.length ?? 0} checks</span></div>
-                    <div className="table-wrap">
-                      <table className="table">
-                        <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
-                        <tbody>
-                          {(quality.checks ?? []).map((check: { check: string; status: string; severity: string; detail: string }) => (
-                            <tr key={check.check}><td className="mono">{check.check}</td><td><State plain tone={check.status === "PASS" ? "tone-valid" : "tone-warning"}>{check.status}</State></td><td className="muted">{check.detail}</td></tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -247,9 +251,11 @@ export function AdmissionView() {
         </div>
 
         <div className="section-title"><h2>Scientific qualification</h2><span>real-data records only</span></div>
-        <div className="frame">
+        <details className="frame admission-detail">
+          <summary className="frame-head"><h3>Independent method checks</h3><State tone={qualification.error || !qualificationRecords.length || qualifiedRecords !== qualificationRecords.length ? "tone-warning" : "tone-valid"}>{qualification.error ? "UNAVAILABLE" : `${qualifiedRecords}/${qualificationRecords.length} QUALIFIED`}</State></summary>
           <div className="frame-body" style={{ display: "grid", gap: 10 }}>
-            {(qualification.data ?? []).map((record) => (
+            {qualification.error && <ErrorBox error={qualification.error} onRetry={() => void qualification.refetch()} />}
+            {qualificationRecords.map((record) => (
               <div key={record.id} className="evidence-card">
                 <div className="evidence-main">
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -286,7 +292,7 @@ export function AdmissionView() {
               </div>
             ))}
           </div>
-        </div>
+        </details>
       </div>
     </main>
   );

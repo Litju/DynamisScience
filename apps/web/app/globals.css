@@ -266,6 +266,11 @@ textarea.input { height: auto; padding: 6px 8px; line-height: 1.5; resize: verti
 .source-card { display: block; width: 100%; text-align: left; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text); cursor: pointer; }
 .source-card:hover { border-color: var(--line-strong); }
 .source-card.is-selected { border-color: var(--signal); box-shadow: inset 2px 0 0 var(--signal); }
+.admission-detail > summary { cursor: pointer; list-style: none; }
+.admission-detail > summary::-webkit-details-marker { display: none; }
+.admission-detail > summary::after { content: "+"; margin-left: auto; color: var(--text-3); font-family: var(--font-mono); }
+.admission-detail[open] > summary::after { content: "−"; }
+.admission-detail > summary:focus-visible { outline: var(--focus); outline-offset: -2px; }
 @media (max-width: 1024px) { .adm-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ------------------------------------------------------------------------ */
@@ -382,10 +387,10 @@ textarea.input { height: auto; padding: 6px 8px; line-height: 1.5; resize: verti
 .readout { padding: 7px 10px; border-right: 1px solid var(--line); min-width: 0; }
 .readout:last-child { border-right: 0; }
 .readout .k { color: var(--text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.readout .v { font-family: var(--font-mono); font-size: 16px; color: var(--text-strong); margin-top: 1px; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.readout .v { font-family: var(--font-mono); font-size: 16px; color: var(--text-strong); margin-top: 1px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .readout .v.lg { font-size: 22px; letter-spacing: -0.02em; }
 .readout .v .readout-small { font-size: 12px; line-height: 1.25; }
-.readout .d { color: var(--text-3); font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
+.readout .d { color: var(--text-3); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .estimate-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; padding: 10px 12px; border: 1px solid var(--line); border-left: 2px solid var(--signal); background: var(--surface-2); border-radius: var(--radius); }
 .estimate-line .label { color: var(--text-2); font-size: 12px; width: 100%; }
