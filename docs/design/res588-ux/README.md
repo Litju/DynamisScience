@@ -4,7 +4,14 @@ This directory contains the evidence for **Section 11 (P0 UX/UI Product Reset)**
 of RES-588. The current production experience has been audited and rejected as
 the product baseline. No production UI was modified during this gate.
 
-**Latest owner-requested impact design:** Direction E, **Fieldlab** —
+**Latest sports-science pattern:** **Dynamis Performance OS** —
+[`SPORTS_SCIENCE_DESIGN_PATTERN.md`](SPORTS_SCIENCE_DESIGN_PATTERN.md) and
+[`compare/performance-os.html`](compare/performance-os.html). It defines the
+daily/per-week/per-season practice model, 6 workspaces, 16 modules, domain and
+analytical models, component/chart/table inventory, and the full unit registry,
+with a synthetic-data Squad Command exemplar.
+
+**Latest impact design:** Direction E, **Fieldlab** —
 [`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md) and
 [`compare/fieldlab.html`](compare/fieldlab.html). It answers *what changed, how
 sure, whether it matters, who responded and what to do next*, with a Model Lab
@@ -16,6 +23,8 @@ combines A’s activity model, B’s editorial margin and C’s object thread.
 
 Start with:
 
+- [`SPORTS_SCIENCE_DESIGN_PATTERN.md`](SPORTS_SCIENCE_DESIGN_PATTERN.md) —
+  the sports-science-native pattern: models, modules, components, charts, units.
 - [`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md) —
   the recommended impact design: Decision Brief + Model Lab.
 - [`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md) —
@@ -23,6 +32,7 @@ Start with:
 - [`RES-588_UX_AUDIT_AND_DIRECTIONS.md`](RES-588_UX_AUDIT_AND_DIRECTIONS.md) —
   the original audit, directions A/B/C, comparison and decision request.
 - [`compare/fieldlab.html`](compare/fieldlab.html) — the Direction E gallery.
+- [`compare/performance-os.html`](compare/performance-os.html) — the Performance OS gallery.
 - [`compare/atelier.html`](compare/atelier.html) — the Direction D gallery.
 - [`compare/index.html`](compare/index.html) — the A/B/C comparison gallery.
 
@@ -32,7 +42,7 @@ Start with:
 |---|---|
 | `audit/production/` | Production screenshots at 1440, 1280 and 1024, layout metrics, keyboard/interaction audit and runtime request receipts |
 | `screens/` | Rendered design-direction screenshots at 1440×900 and 1280×800 |
-| `prototypes/a|b|c|d|e/` | Static, read-only HTML/CSS/JS prototypes; `d/` is the Research Atelier, `e/` is Fieldlab |
+| `prototypes/a|b|c|d|e|f/` | Static, read-only prototypes; `d/` Research Atelier, `e/` Fieldlab, `f/` Performance OS |
 | `prototypes/shared/` | Aggregate-only data fixture and dependency-free SVG chart renderers |
 | `compare/` | Contact sheets, the A/B/C gallery and the Direction D atelier gallery |
 
@@ -63,6 +73,9 @@ See §12 of the audit document and the scripts in `scripts/`:
 - `res588_capture_atelier_gallery.py` — capture the Direction D gallery.
 - `res588_render_fieldlab.py` — render the Decision Brief and Model Lab at both viewports.
 - `res588_capture_fieldlab_gallery.py` — capture the Direction E gallery.
+- `res588_render_performance.py` — render Squad Command and the component atlas.
+- `res588_capture_atlas.py` — capture the full component atlas.
+- `res588_capture_performance_gallery.py` — capture the Performance OS gallery.
 
 The design prototypes are served as static files from the repository root:
 `python -m http.server 4173 --bind 127.0.0.1`.

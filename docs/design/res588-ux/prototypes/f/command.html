@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance OS — Squad Command</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-today" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17M8 14h3M8 17h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M7 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-test" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.5 15h9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-research" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h4" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M5 3h14v18H5z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 8h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">D</span><b>Dynamis Performance OS</b><span>sports science</span></div>
+    <div class="club"><b>Northside FC</b><span>U21</span><span class="sep">/</span><span>Performance</span></div>
+    <span class="season-pill">2026/27 · Week 16 · Build</span>
+    <div class="top-search"><svg width="12" height="12"><use href="#i-search"/></svg><span>Search athletes, sessions, tests</span><kbd>Ctrl K</kbd></div>
+    <div class="role">Role <b>Head of Performance</b></div>
+    <div class="avatar">HP</div>
+  </header>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Performance navigation">
+      <div class="club-badge"><span class="crest">NFC</span><div><b>Northside FC</b><span>U21 · 28 athletes</span></div></div>
+      <nav class="rail-nav" aria-label="Modules">
+        <div class="rail-label">Daily</div>
+        <a class="rail-item active" href="command.html" aria-current="page"><span class="ico"><svg width="14" height="14"><use href="#i-today"/></svg></span><span class="label">Today</span><span class="tag">LIVE</span></a>
+        <a class="rail-item" href="atlas.html"><span class="ico"><svg width="14" height="14"><use href="#i-plan"/></svg></span><span class="label">Plan</span><span class="tag">W16</span></a>
+        <a class="rail-item" href="atlas.html"><span class="ico"><svg width="14" height="14"><use href="#i-monitor"/></svg></span><span class="label">Monitor</span><span class="tag">28</span></a>
+        <a class="rail-item" href="atlas.html"><span class="ico"><svg width="14" height="14"><use href="#i-test"/></svg></span><span class="label">Test</span><span class="tag">CMJ</span></a>
+        <div class="rail-label" style="margin-top:8px">Evidence</div>
+        <a class="rail-item" href="atlas.html"><span class="ico"><svg width="14" height="14"><use href="#i-research"/></svg></span><span class="label">Research</span><span class="tag">1</span></a>
+        <a class="rail-item" href="atlas.html"><span class="ico"><svg width="14" height="14"><use href="#i-report"/></svg></span><span class="label">Reports</span><span class="tag">3</span></a>
+      </nav>
+      <div class="squad-block">
+        <div class="k">Squad availability</div>
+        <div class="number">28<span>/ 28 active</span></div>
+        <div class="bar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="note"><b>No injury table admitted</b><br>Availability below is roster status only.</div>
+      </div>
+    </aside>
+
+    <main class="main" aria-label="Squad command">
+      <div class="main-head">
+        <div>
+          <div class="kicker">Thursday 05 November 2026 · Week 16 · Build</div>
+          <h1>Squad command</h1>
+          <p>One screen for the daily performance question: who needs attention, what changed, and what do we do next?</p>
+        </div>
+        <div class="actions"><button class="btn" type="button" data-toast="Prototype: weekly planner is a separate module.">Open week plan</button><button class="btn primary" type="button" data-toast="Prototype: session logging captures planned vs actual load, RPE and attendance."><svg width="10" height="10"><use href="#i-plus"/></svg>Log session</button></div>
+      </div>
+
+      <div class="pulse" aria-label="Squad pulse">
+        <div class="cell"><div class="k">Roster active</div><div class="v">28<span class="u">/ 28</span></div><div class="s"><b>0</b> unavailable · roster only</div></div>
+        <div class="cell"><div class="k">Readiness</div><div class="v">7.1<span class="u">/ 10</span></div><div class="s"><b class="warn">1</b> below 5.5 · 28 records</div></div>
+        <div class="cell"><div class="k">Load ratio</div><div class="v">1.19<span class="u">AU</span></div><div class="s"><b class="warn">6</b> above 1.30 · 4-week baseline</div></div>
+        <div class="cell"><div class="k">CMJ height</div><div class="v">42.34<span class="u">cm</span></div><div class="s"><b>+0.7%</b> vs baseline · n=28</div></div>
+        <div class="cell"><div class="k">Data quality</div><div class="v">883<span class="u">/ 884</span></div><div class="s"><b class="warn">12</b> missing slots · 1 excluded</div></div>
+      </div>
+
+      <div class="row top">
+        <section class="module" aria-label="Athletes to review">
+          <div class="module-head"><h2>Athletes to review</h2><span class="sub">today · ranked by readiness, load, CMJ</span><span class="right"><span class="chip warn">5 flags</span></span></div>
+          <div class="module-body attention">
+            <div class="ath-row">
+              <div class="ath-id"><b>ATH-003</b><span>CB · age 18</span></div>
+              <div class="ath-metrics">
+                <div class="ath-metric"><div class="k">Readiness</div><div class="v bad">4.9</div></div>
+                <div class="ath-metric"><div class="k">Sleep</div><div class="v">6.5 h</div></div>
+                <div class="ath-metric"><div class="k">CMJ</div><div class="v">+4.0%</div></div>
+              </div>
+              <div class="ath-flag"><span class="chip bad">Readiness</span><small>lowest readiness</small><span class="review">Review →</span></div>
+            </div>
+            <div class="ath-row">
+              <div class="ath-id"><b>ATH-028</b><span>RW · age 25</span></div>
+              <div class="ath-metrics">
+                <div class="ath-metric"><div class="k">Load ratio</div><div class="v warn">1.46</div></div>
+                <div class="ath-metric"><div class="k">Fatigue</div><div class="v">4.75</div></div>
+                <div class="ath-metric"><div class="k">Readiness</div><div class="v">6.6</div></div>
+              </div>
+              <div class="ath-flag"><span class="chip warn">Load spike</span><small>4-week baseline</small><span class="review">Review →</span></div>
+            </div>
+            <div class="ath-row">
+              <div class="ath-id"><b>ATH-022</b><span>RB · age 21</span></div>
+              <div class="ath-metrics">
+                <div class="ath-metric"><div class="k">CMJ</div><div class="v bad">−6.1%</div></div>
+                <div class="ath-metric"><div class="k">Baseline</div><div class="v">44.7 cm</div></div>
+                <div class="ath-metric"><div class="k">Latest</div><div class="v">42.0 cm</div></div>
+              </div>
+              <div class="ath-flag"><span class="chip warn">CMJ drop</span><small>vs weeks 1–4</small><span class="review">Review →</span></div>
+            </div>
+            <div class="ath-row">
+              <div class="ath-id"><b>ATH-002</b><span>RB · age 19</span></div>
+              <div class="ath-metrics">
+                <div class="ath-metric"><div class="k">CMJ</div><div class="v bad">−5.1%</div></div>
+                <div class="ath-metric"><div class="k">Baseline</div><div class="v">40.4 cm</div></div>
+                <div class="ath-metric"><div class="k">Latest</div><div class="v">38.4 cm</div></div>
+              </div>
+              <div class="ath-flag"><span class="chip warn">CMJ drop</span><small>vs weeks 1–4</small><span class="review">Review →</span></div>
+            </div>
+            <div class="ath-row">
+              <div class="ath-id"><b>ATH-015</b><span>DM · age 18</span></div>
+              <div class="ath-metrics">
+                <div class="ath-metric"><div class="k">Load ratio</div><div class="v warn">1.45</div></div>
+                <div class="ath-metric"><div class="k">Soreness</div><div class="v">4.88</div></div>
+                <div class="ath-metric"><div class="k">Readiness</div><div class="v">6.2</div></div>
+              </div>
+              <div class="ath-flag"><span class="chip warn">Load spike</span><small>soreness 4.9/10</small><span class="review">Review →</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="module" aria-label="Weekly training load">
+          <div class="module-head"><h2>Weekly training impulse</h2><span class="sub">team mean · AU · 16 weeks</span><span class="right"><span class="chip info">BUILD</span></span></div>
+          <div class="chart-body">
+            <div class="load-chart" id="load-chart"></div>
+            <div class="chart-foot"><span><b>Week 16</b> 264.7 AU</span><span><b>4-week mean</b> 264.0 AU</span><span><b>Match weeks</b> 4 · 8 · 12 · 15</span><span class="right">Descriptive, not an injury predictor</span></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="row bottom">
+        <section class="module" aria-label="CMJ force lab">
+          <div class="module-head"><h2>CMJ force–time</h2><span class="sub">audit trial CMJ-001-01-1 · 1000 Hz</span><span class="right"><span class="chip ok">VALID</span><span class="chip info">SYNTHETIC</span></span></div>
+          <div class="module-body">
+            <div class="force-grid">
+              <div class="force-chart" id="force-chart"></div>
+              <div class="force-metrics">
+                <div class="fm"><div class="k">Jump height</div><div class="v">42.33<span class="u">cm</span></div><div class="s">flight-time method</div></div>
+                <div class="fm"><div class="k">Peak force</div><div class="v">1,568<span class="u">N</span></div><div class="s">body mass 79.2 kg</div></div>
+                <div class="fm"><div class="k">Concentric impulse</div><div class="v">1.630<span class="u">N·s/kg</span></div><div class="s">phase integration</div></div>
+                <div class="fm"><div class="k">RSI modified</div><div class="v">173.3<span class="u">cm/s</span></div><div class="s">jump / propulsion</div></div>
+              </div>
+            </div>
+            <div class="force-legend"><span><i style="background:rgba(127,145,157,.5)"></i>Standing</span><span><i style="background:rgba(95,212,232,.5)"></i>Unweight</span><span><i style="background:rgba(224,164,88,.5)"></i>Brake</span><span><i style="background:rgba(200,243,107,.5)"></i>Propulsion</span><span><i style="background:rgba(167,139,250,.5)"></i>Flight</span><span><i style="background:rgba(239,107,99,.5)"></i>Landing</span><span class="right">Trial length 2.35 s · 1000 Hz · body weight 776 N</span></div>
+          </div>
+        </section>
+
+        <section class="module" aria-label="Research and next actions">
+          <div class="module-head"><h2>Research &amp; next actions</h2><span class="sub">evidence → decision</span></div>
+          <div class="module-body research-body">
+            <div class="research-card"><div class="k">Linked study · synthetic</div><b>Synthetic football longitudinal study</b><p>28 athletes · 16 weeks · group × time CMJ response. Snapshot DS-SYNTH-001.</p><span class="link">Open research →</span></div>
+            <div class="research-card"><div class="k">Today's decision</div><b>Review 5 flags before the session</b><p>ATH-003 readiness, ATH-028/015 load spikes, ATH-022/002 CMJ drops. Do not infer injury or readiness from a single metric.</p><span class="link">Open triage →</span></div>
+            <div class="research-card"><div class="k">Movement · bounded segment</div><b>3-minute tracking window</b><p>PLAYER-14 216 m · 81 m HSR · 6.3 m/s max. Segment only; not full-match distance.</p><span class="link">Open movement →</span></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="aside" aria-label="Daily context">
+      <div class="aside-sec">
+        <h3>Today's checklist</h3>
+        <div class="check"><span class="tick done">✓</span>Wellness received<span class="status done">28 / 28</span></div>
+        <div class="check"><span class="tick"></span>Session RPE logged<span class="status pending">0 / 28</span></div>
+        <div class="check"><span class="tick done">✓</span>CMJ testing complete<span class="status done">28 / 28</span></div>
+        <div class="check"><span class="tick"></span>Weekly report shared<span class="status">DRAFT</span></div>
+      </div>
+      <div class="aside-sec">
+        <h3>Readiness distribution</h3>
+        <div class="dist" aria-label="Readiness bands: 1 below 5.5, 2 from 5.5 to 6.5, 16 from 6.5 to 7.5, 9 above 7.5">
+          <i class="l1" style="width:3.6%"></i><i class="l2" style="width:7.1%"></i><i class="l3" style="width:57.1%"></i><i class="l4" style="width:32.1%"></i>
+        </div>
+        <div class="dist-legend"><span><i class="l1" style="background:var(--red)"></i>&lt;5.5 · 1</span><span><i class="l2" style="background:var(--amber)"></i>5.5–6.5 · 2</span><span><i class="l3" style="background:var(--cyan)"></i>6.5–7.5 · 16</span><span><i class="l4" style="background:var(--lime)"></i>≥7.5 · 9</span></div>
+      </div>
+      <div class="aside-sec">
+        <h3>Data admission</h3>
+        <dl class="kv"><dt>Snapshot</dt><dd>DS-SYNTH-001</dd><dt>Type</dt><dd>SYNTHETIC</dd><dt>Valid trials</dt><dd>883 / 884</dd><dt>Missing slots</dt><dd>12</dd><dt>Force rate</dt><dd>1000 Hz</dd></dl>
+      </div>
+      <div class="aside-sec"><div class="callout"><b>Injury module unavailable.</b> This snapshot has no injury or exposure table. Availability is roster status only; do not infer injury risk.</div></div>
+      <div class="aside-sec"><div class="callout info"><b>GPS is a bounded segment.</b> Match tracking covers a 3-minute window, not full-match distance. Use the Movement module for the admitted segment only.</div></div>
+      <div class="foot">Prototype · synthetic data only<br>No real athletes, clubs or matches<br>UNIT REGISTRY · cm · N · N·s/kg · AU · h</div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

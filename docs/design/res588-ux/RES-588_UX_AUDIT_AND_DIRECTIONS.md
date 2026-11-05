@@ -8,8 +8,12 @@ Date: 2026-11-05 · Native Windows / PowerShell · production build served at
 > that is more insightful, intuitive, simple, non-invasive and crafted.
 > **Direction D — The Research Atelier** was added as that synthesis. After the
 > owner asked “what is this for / what do I do with it?”, **Direction E —
-> Fieldlab** was added as the decision-first impact design. It is the latest
-> recommendation. See
+> Fieldlab** was added as the decision-first impact design. The owner then asked
+> whether the product truly supports daily sports-science practice; the
+> **Sports Science Design Pattern — Dynamis Performance OS**
+> ([`SPORTS_SCIENCE_DESIGN_PATTERN.md`](SPORTS_SCIENCE_DESIGN_PATTERN.md)) defines
+> the full practice model, modules, models, components, charts and units, with a
+> synthetic-data Squad Command exemplar. It is the latest deliverable. See
 > [`RES-588_UX_DIRECTION_E_FIELDLAB.md`](RES-588_UX_DIRECTION_E_FIELDLAB.md) and
 > [`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md).
 > Directions A, B and C remain in this document as the evidence base; they are
