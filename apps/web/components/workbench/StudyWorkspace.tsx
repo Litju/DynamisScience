@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { ChevronRight, FileText, History, Layers, PanelLeft, PanelRight, X } from "lucide-react";
+import { ChevronRight, FileText, History, Layers, PanelLeft, PanelRight, Settings2, X } from "lucide-react";
 import { ErrorBox, IconButton, Loading, State } from "@/components/ui";
 import { useStudy, useSubjects } from "./data";
 import { WorkbenchProvider, useWorkbench, type InspectTarget } from "./context";
@@ -15,12 +15,15 @@ import { MatchViewer } from "@/components/viewers/MatchViewer";
 import { LineageDrawer } from "@/components/viewers/LineageDrawer";
 import { RunHistoryDrawer } from "@/components/viewers/RunHistoryDrawer";
 import { ReportDocument } from "@/components/report/ReportDocument";
+import { StudySetup } from "./StudySetup";
 
 export function StudyWorkspace({ studyId }: { studyId: string }) {
   const study = useStudy(studyId);
+  const params = useSearchParams();
   if (study.isLoading) return <main className="page"><div className="page-inner"><Loading label={`Opening ${studyId}`} /></div></main>;
   if (study.error || !study.data) return <main className="page"><div className="page-inner"><ErrorBox error={study.error ?? "Study not found"} onRetry={() => void study.refetch()} /></div></main>;
-  const investigationId = study.data.investigations[0]?.id ?? "INV-001";
+  const requested = params.get("investigation");
+  const investigationId = study.data.investigations.find((item) => item.id === requested)?.id ?? study.data.investigations[0]?.id ?? "INV-001";
   return (
     <WorkbenchProvider study={study.data} investigationId={investigationId}>
       <WorkspaceFrame />
@@ -98,6 +101,7 @@ function WorkspaceFrame() {
     }
     const mode = params.get("mode");
     if (mode === "report") setMode("report");
+    if (mode === "setup") setMode("setup");
     const viewer = params.get("viewer");
     if (viewer?.startsWith("force:")) openViewer({ kind: "force", trialId: viewer.slice(6) });
     if (viewer?.startsWith("match:")) openViewer({ kind: "match", eventId: viewer.slice(6) || undefined });
@@ -169,6 +173,7 @@ function WorkspaceFrame() {
         <div className="sbar-actions">
           <div className="mode-switch" role="group" aria-label="Study mode">
             <button type="button" aria-pressed={wb.mode === "investigation"} onClick={() => wb.setMode("investigation")}><Layers size={13} />Investigation</button>
+            <button type="button" aria-pressed={wb.mode === "setup"} onClick={() => wb.setMode("setup")}><Settings2 size={13} />Setup</button>
             <button type="button" aria-pressed={wb.mode === "report"} onClick={() => wb.setMode("report")}><FileText size={13} />Report</button>
           </div>
           <span className="sbar-sep" />
@@ -214,7 +219,7 @@ function WorkspaceFrame() {
 
       <div ref={bodyRef} className={`study-body ${treeOpen ? "" : "no-tree"} ${inspOpen ? "" : "no-insp"}`} style={bodyStyle}>
         <div className={`pane pane-tree ${treeOpen ? "is-open" : ""}`}>{treeOpen && <StudyTree />}</div>
-        <div className="pane pane-bench">{wb.mode === "report" ? <div className="bench"><ReportDocument /></div> : <Workbench />}</div>
+        <div className="pane pane-bench">{wb.mode === "report" ? <div className="bench"><ReportDocument /></div> : wb.mode === "setup" ? <StudySetup /> : <Workbench />}</div>
         <div className={`pane pane-insp ${inspOpen ? "is-open" : ""}`}>{inspOpen && <Inspector />}</div>
         {treeOpen && <div className={`resizer ${dragging === "tree" ? "dragging" : ""}`} style={{ left: treeWidth - 4 }} onPointerDown={startDrag("tree")} role="separator" aria-orientation="vertical" aria-label="Resize study tree" />}
         {inspOpen && <div className={`resizer ${dragging === "insp" ? "dragging" : ""}`} style={{ right: inspWidth - 4 }} onPointerDown={startDrag("insp")} role="separator" aria-orientation="vertical" aria-label="Resize inspector" />}

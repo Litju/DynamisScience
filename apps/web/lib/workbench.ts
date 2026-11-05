@@ -7,9 +7,10 @@ import type { BlockType, WorkbenchBlock } from "./types";
  */
 
 export const BLOCK_META: Record<BlockType, { label: string; code: string; description: string; addable: boolean }> = {
-  question: { label: "Question", code: "Q", description: "Research question, hypotheses and the frozen analysis plan", addable: false },
+  question: { label: "Question", code: "Q", description: "Research question, hypotheses and the frozen analysis plan", addable: true },
   dataset: { label: "Dataset", code: "D", description: "Immutable dataset snapshot and its quality", addable: false },
-  cohort: { label: "Cohort", code: "C", description: "Cohort definition, inclusion and exclusions", addable: false },
+  cohort: { label: "Cohort", code: "C", description: "Cohort definition, inclusion and exclusions", addable: true },
+  schedule: { label: "Schedule", code: "S", description: "Planned monitoring measurements, distinct from recorded readings", addable: false },
   table: { label: "Table", code: "T", description: "Per-athlete individual change table", addable: true },
   explore: { label: "Explore", code: "E", description: "Longitudinal exploration of a metric across the cohort", addable: true },
   force_trial: { label: "Force Trial", code: "F", description: "A pinned CMJ trial with its evidence passport", addable: false },
@@ -110,6 +111,8 @@ export function createBlock(blocks: WorkbenchBlock[], type: BlockType, options: 
         },
       };
     }
+    case "schedule":
+      return { ...base, title: options.title ?? "Monitoring schedule", state: { program_id: options.state?.program_id, ...options.state } };
     case "diagnostics":
       return { ...base, title: options.title ?? "Diagnostics", state: { analysis_block_id: options.from?.id, ...options.state } };
     case "evidence":

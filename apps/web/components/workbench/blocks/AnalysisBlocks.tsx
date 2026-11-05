@@ -24,6 +24,8 @@ const DEFAULT_PARAMETERS: Record<string, Dict> = {
   "METH-REAL-SIGNAL-QA": {},
   "METH-REAL-RELIABILITY": { activity: "Walking", max_trials: 8 },
   "METH-REAL-BODYWEIGHT": { activities: ["Walking", "Heel drop"] },
+  "METH-U-CHANGE": { reference_week: 1, contrast_week: 4 },
+  "METH-U-DESC": {},
 };
 
 const stable = (value: unknown) => JSON.stringify(value, Object.keys((value as object) ?? {}).sort());
@@ -49,12 +51,18 @@ export function runMatchesConfig(run: Run | undefined, block: WorkbenchBlock, ex
 export function AnalysisBlock({ block, index }: { block: WorkbenchBlock; index: number }) {
   const wb = useWorkbench();
   const real = wb.study.real_data;
+  const research = Boolean(wb.study.research);
   const runs = useRuns(wb.studyId);
   const invalidate = useInvalidateScience();
   const { methodId, outcomeId, parameters } = analysisConfig(block);
   const metric = metricOption(outcomeId);
-  const metricOptions = metricOptionsFor(real, wb.studyId);
-  const methodOptions = real ? REAL_METHODS[wb.studyId] ?? [] : ["METH-LONG", "METH-REL", "METH-IND"];
+  const metricOptions = wb.study.metrics?.length
+    ? wb.study.metrics.map((item) => ({ id: item.id, label: item.label, short: item.label, unit: item.unit, column: item.column, role: item.role === "PRIMARY" ? "PRIMARY" as const : item.role === "SECONDARY" ? "SECONDARY" as const : "CONTEXT" as const }))
+    : metricOptionsFor(real, wb.studyId);
+  const eligibleMethods = wb.study.eligibility?.filter((item) => item.status === "ELIGIBLE").map((item) => item.method_id);
+  const methodOptions = eligibleMethods?.length
+    ? [...new Set([methodId, ...eligibleMethods])]
+    : real ? REAL_METHODS[wb.studyId] ?? [] : ["METH-LONG", "METH-REL", "METH-IND"];
   const runId = block.state.run_id as string | undefined;
   const run = runs.data?.find((item) => item.id === runId);
   const fresh = runMatchesConfig(run, block, wb.excludedSubjectIds);
@@ -89,7 +97,7 @@ export function AnalysisBlock({ block, index }: { block: WorkbenchBlock; index: 
     wb.selectBlock(withRun.id, { scroll: true });
   };
 
-  const alignment = run && fresh ? run.plan_alignment ?? "PLANNED" : real && planned ? "REGISTERED" : planned ? "PLANNED" : "EXPLORATORY";
+  const alignment = run && fresh ? run.plan_alignment ?? "PLANNED" : planned ? (research || !real ? "PLANNED" : "REGISTERED") : "EXPLORATORY";
   const states: (string | { label: string; tone?: string; title?: string })[] = [alignment];
   if (run && fresh) states.push(run.status);
   else states.push({ label: "NOT RUN", title: "The configuration differs from the displayed run; execute to create a new immutable run" });
@@ -144,8 +152,14 @@ export function AnalysisBlock({ block, index }: { block: WorkbenchBlock; index: 
             <label className="field"><span>Max trials / participant</span><input className="input input-num" type="number" min={2} max={8} value={Number(parameters.max_trials ?? 8)} onChange={(event) => setParam("max_trials", Number(event.target.value))} /></label>
           </>
         )}
+        {methodId === "METH-U-CHANGE" && (
+          <>
+            <label className="field"><span>Reference</span><input className="input input-num" type="number" min={1} value={Number(parameters.reference_week ?? 1)} onChange={(event) => setParam("reference_week", Number(event.target.value))} /></label>
+            <label className="field"><span>Contrast</span><input className="input input-num" type="number" min={2} value={Number(parameters.contrast_week ?? 4)} onChange={(event) => setParam("contrast_week", Number(event.target.value))} /></label>
+          </>
+        )}
         <span className="grow" />
-        <span className="faint small">{planned ? `${real ? "matches registered" : "matches frozen"} ${frozenSpec?.id}` : `deviates from the ${real ? "registered" : "frozen"} plan → exploratory spec`}</span>
+        <span className="faint small">{planned ? `${research || !real ? "matches frozen" : "matches registered"} ${frozenSpec?.id}` : "deviates from the frozen plan → exploratory spec"}</span>
         <Button variant="primary" onClick={() => execute.mutate()} disabled={execute.isPending}><Play size={12} />{execute.isPending ? "Executing…" : run && fresh ? "Re-run" : "Run analysis"}</Button>
       </div>
       <div className="small faint">
@@ -232,26 +246,47 @@ function RunResult({ run }: { run: Run }) {
       </>
     );
   }
-  if (run.method_id === "METH-REAL-DESC") {
+  if (run.method_id === "METH-REAL-DESC" || run.method_id === "METH-U-DESC") {
     const result_ = result as Dict;
-    const occasions = (result_.occasions ?? []) as Dict[];
+    const occasions = (result_.points ?? result_.occasions ?? []) as Dict[];
+    const axis = String(result_.axis ?? "occasion");
     return (
       <>
         <div className="readouts">
-          <Readout label="Change 1 → 4" value={formatSignedSig(Number(result_.change_first_to_last), 3)} unit={String(result_.unit ?? metric.unit)} />
+          <Readout label="Change first → last" value={formatSignedSig(Number(result_.change_first_to_last), 3)} unit={String(result_.unit ?? metric.unit)} />
           <Readout label="Percent change" value={formatSignedSig(Number(result_.percent_change_first_to_last), 2)} unit="%" />
           <Readout label="Athletes" value={String(result_.n_subjects)} />
           <Readout label="Observations" value={String(result_.n_observations)} />
         </div>
         <table className="table">
-          <thead><tr><th>Occasion</th><th className="r">n</th><th className="r">Mean</th><th className="r">SD</th><th className="r">95% CI</th></tr></thead>
+          <thead><tr><th>{String(result_.axis_label ?? "Point")}</th><th className="r">n</th><th className="r">Mean</th><th className="r">SD</th><th className="r">95% CI</th></tr></thead>
           <tbody>
             {occasions.map((item) => (
-              <tr key={String(item.occasion)}><td className="mono">Occasion {String(item.occasion)}</td><td className="r mono">{String(item.n)}</td><td className="r mono">{formatSig(Number(item.mean), 3)} {metric.unit}</td><td className="r mono">{formatSig(Number(item.sd), 3)}</td><td className="r mono">[{formatSig(Number(item.ci_low), 3)}, {formatSig(Number(item.ci_high), 3)}]</td></tr>
+              <tr key={String(item[axis])}><td className="mono">{String(item[axis])}</td><td className="r mono">{String(item.n)}</td><td className="r mono">{formatSig(Number(item.mean), 3)} {metric.unit}</td><td className="r mono">{formatSig(Number(item.sd), 3)}</td><td className="r mono">[{formatSig(Number(item.ci_low), 3)}, {formatSig(Number(item.ci_high), 3)}]</td></tr>
             ))}
           </tbody>
         </table>
-        <div className="note"><Info size={12} />Descriptive only; no model-based inference. Missing occasion-4 rows are shown as missing and not imputed.</div>
+        <div className="note"><Info size={12} />Descriptive only; no model-based inference. Missing observations are shown as missing and not imputed.</div>
+        {runChip}
+      </>
+    );
+  }
+  if (run.method_id === "METH-U-CHANGE") {
+    const result_ = result as Dict;
+    const athletes = (result_.athletes ?? []) as Dict[];
+    return (
+      <>
+        <div className="readouts">
+          <Readout label="Median change" value={formatSignedSig(Number(result_.median_change), 3)} unit={metric.unit} />
+          <Readout label="Standardised" value={formatSignedSig(Number(result_.standardized_change), 2)} unit="SD" />
+          <Readout label="Typical error" value={result_.typical_error === null ? "NOT ESTIMABLE" : formatSig(Number(result_.typical_error), 3)} unit={metric.unit} />
+          <Readout label="Complete pairs" value={String(result_.n_subjects)} />
+        </div>
+        <table className="table">
+          <thead><tr><th>Participant</th><th className="r">Reference</th><th className="r">Contrast</th><th className="r">Change</th><th className="r">vs TE</th></tr></thead>
+          <tbody>{athletes.map((item) => <tr key={String(item.subject_id)}><td className="mono">{String(item.subject_id)}</td><td className="r mono">{formatSig(Number(item.baseline), 3)}</td><td className="r mono">{formatSig(Number(item.post), 3)}</td><td className="r mono">{formatSignedSig(Number(item.change), 3)}</td><td className="r mono">{item.exceeds_typical_error === null ? "—" : item.exceeds_typical_error ? "EXCEEDS" : "WITHIN"}</td></tr>)}</tbody>
+        </table>
+        <div className="note warn"><Info size={12} />Descriptive individual change; the typical error is cohort context, not a same-session measurement-error estimate.</div>
         {runChip}
       </>
     );

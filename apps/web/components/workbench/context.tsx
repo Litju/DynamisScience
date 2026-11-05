@@ -60,8 +60,8 @@ interface WorkbenchValue {
   closeLineage: () => void;
   historyOpen: boolean;
   setHistoryOpen: (open: boolean) => void;
-  mode: "investigation" | "report";
-  setMode: (mode: "investigation" | "report") => void;
+  mode: "investigation" | "report" | "setup";
+  setMode: (mode: "investigation" | "report" | "setup") => void;
   notice: string | null;
   notify: (message: string) => void;
 }
@@ -169,7 +169,7 @@ export function WorkbenchProvider({ study, investigationId, children }: { study:
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [lineageFor, setLineageFor] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [mode, setMode] = useState<"investigation" | "report">("investigation");
+  const [mode, setMode] = useState<"investigation" | "report" | "setup">("investigation");
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
   const notify = useCallback((message: string) => {
@@ -213,9 +213,10 @@ export function WorkbenchProvider({ study, investigationId, children }: { study:
       historyOpen,
       setHistoryOpen,
       mode,
-      setMode: (next: "investigation" | "report") => {
+      setMode: (next: "investigation" | "report" | "setup") => {
         setMode(next);
         if (next === "report") inspect({ kind: "report" });
+        if (next === "setup") inspect(null);
       },
       notice,
       notify,

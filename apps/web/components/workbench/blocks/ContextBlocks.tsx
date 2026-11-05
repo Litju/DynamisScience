@@ -42,9 +42,9 @@ export function QuestionBlock({ block, index }: BlockProps) {
       <div className="plan">
         <div className="plan-head">
           <Lock size={12} />
-          <strong style={{ color: "var(--text-strong)", fontWeight: 600 }}>{plan.frozen_before_inspection ? "Frozen analysis plan" : "Registered analysis plan"}</strong>
+          <strong style={{ color: "var(--text-strong)", fontWeight: 600 }}>{plan.frozen_before_inspection || study.research ? "Frozen analysis plan" : "Registered analysis plan"}</strong>
           <span className="mono faint">{plan.id}</span>
-          <span className="faint">· {plan.frozen_before_inspection ? "frozen before data inspection" : "registered after source acquisition"} · changes create new specs, never edits</span>
+          <span className="faint">· {study.research ? "frozen locally, not externally preregistered" : plan.frozen_before_inspection ? "frozen before data inspection" : "registered after source acquisition"} · changes create new specs, never edits</span>
           <span style={{ marginLeft: "auto" }}><Button size="sm" variant="ghost" onClick={() => inspect({ kind: "design", section: "plan" })}>Inspect plan</Button></span>
         </div>
         <div className="plan-row"><span>Primary outcomes</span><span>{plan.primary_outcomes.join(" · ")}</span></div>

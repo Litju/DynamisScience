@@ -58,6 +58,9 @@ export interface StudySummary extends Study {
   last_run_at: string | null;
   investigation_ids: string[];
   real_data?: boolean;
+  kind?: "STUDY" | "MONITORING" | string;
+  project_id?: string;
+  version?: number;
 }
 
 export interface ResearchQuestion {
@@ -121,6 +124,15 @@ export interface StudyPlan {
   planned_reliability: string;
   post_plan_rule: string;
   immutability_rule: string;
+  parameters?: Record<string, unknown>;
+  method_id?: string;
+  outcome_metric_id?: string;
+  cohort_id?: string;
+  spec_id?: string | null;
+  version?: number;
+  content_hash?: string | null;
+  freeze_note?: string;
+  prospective?: boolean;
 }
 
 export interface CohortDefinition {
@@ -192,6 +204,144 @@ export interface StudyDetail {
   investigations: { id: string; title: string; status: string; block_count: number }[];
   real_data?: boolean;
   source?: Record<string, unknown>;
+  research?: boolean;
+  kind?: "STUDY" | "MONITORING" | string;
+  project?: ResearchProject | null;
+  cohorts?: CohortDefinition[];
+  current_cohort?: CohortDefinition & { rules?: Array<Record<string, unknown>>; min_metric_observations?: number; activity?: string | null; version?: number };
+  plans?: AnalysisPlan[];
+  current_plan?: AnalysisPlan | null;
+  metrics?: ResearchMetric[];
+  methods?: ResearchMethod[];
+  eligibility?: ResearchEligibility[];
+  designs?: { id: string; label: string }[];
+  state_history?: { state: string; at: string }[];
+  allowed_transitions?: string[];
+  entity_version?: number;
+  investigation_documents?: Investigation[];
+  program?: ProgramSchedule;
+  schedule?: { kind?: string; axis?: string; label?: string; points?: Array<string | number | Record<string, unknown>>; start_week?: number; weeks?: number; note?: string };
+  resolved_cohort?: Record<string, unknown>;
+}
+
+export interface ResearchProject {
+  id: string;
+  title: string;
+  description: string;
+  objectives: string[];
+  dataset_snapshot_ids: string[];
+  status: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  archived_at?: string | null;
+  study_ids?: string[];
+  monitoring_program_ids?: string[];
+  study_count?: number;
+  program_count?: number;
+  studies?: StudySummary[];
+  monitoring_programs?: StudySummary[];
+  datasets?: ResearchDataset[];
+}
+
+export interface ResearchMetric {
+  id: string;
+  metric_id: string;
+  label: string;
+  unit: string;
+  column: string;
+  table: string;
+  definition_id: string;
+  status: string;
+  role: string;
+}
+
+export interface ResearchMethod {
+  id: string;
+  name: string;
+  version: string;
+  qualification: { status: string; record: string; reference: string; basis: string };
+  supported_designs: string[];
+  required_tables: string[];
+  required_shape: string;
+  constraints: string[];
+  missingness: string;
+  parameter_schema: Record<string, unknown>;
+  assumptions: string[];
+  diagnostics: string[];
+  output_schema: string[];
+}
+
+export interface ResearchEligibility {
+  method_id: string;
+  name: string;
+  status: "ELIGIBLE" | "INELIGIBLE" | "REJECTED" | string;
+  issues: string[];
+  qualification: { status: string; record: string; reference: string; basis: string };
+  constraints: string[];
+  missingness: string;
+}
+
+export interface ResearchDataset {
+  id: string;
+  label: string;
+  synthetic: boolean;
+  real_data: boolean;
+  source: Record<string, unknown>;
+  row_counts: Record<string, number>;
+  checksums: Record<string, string>;
+  tables: string[];
+  metrics: ResearchMetric[];
+  subjects: Record<string, unknown>;
+  used_by_studies: string[];
+}
+
+export interface AnalysisPlan {
+  id: string;
+  study_id: string;
+  name: string;
+  status: string;
+  version: number;
+  method_id: string;
+  method_version: string;
+  outcome_metric_id: string;
+  cohort_id: string;
+  snapshot_id: string;
+  primary_estimand: string;
+  hypotheses: string[];
+  covariates: string[];
+  fixed_effects: string[];
+  random_effects: string[];
+  time_coding: string;
+  contrasts: string[];
+  inclusion_criteria: string;
+  exclusion_criteria: string[];
+  missing_data: string;
+  diagnostics: string[];
+  parameters: Record<string, unknown>;
+  planned_models: string[];
+  planned_reliability: string;
+  prospective: boolean;
+  frozen_before_inspection: boolean;
+  parent_id?: string | null;
+  spec_id?: string | null;
+  content_hash?: string | null;
+  frozen_at?: string | null;
+  freeze_note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProgramSchedule {
+  schedule: Record<string, unknown> & { points?: Array<Record<string, unknown>>; quality_rules?: string[]; missing_policy?: string };
+  planned: Array<Record<string, unknown>>;
+  observed_available: Array<string | number>;
+  observed_label: string;
+  observed_note: string;
+  planned_count: number;
+  observed_count: number;
+  status: string;
+  limitations: string[];
 }
 
 export interface Subject {
@@ -849,6 +999,19 @@ export interface ReportPayload {
   cohort: CohortDefinition;
   groups: Record<string, StudyGroup>;
   data_health: DataHealth;
+  version?: number;
+  project?: ResearchProject;
+  research?: {
+    kind: string;
+    design: string;
+    protocols: Protocol[];
+    methods: AnalysisSpec[];
+    eligibility: ResearchEligibility[];
+    limitations: string[];
+    provenance_note: string;
+    program?: ProgramSchedule | null;
+  };
+  export_url?: string;
 }
 
 export interface RealSourceFile {
@@ -971,6 +1134,7 @@ export type BlockType =
   | "question"
   | "dataset"
   | "cohort"
+  | "schedule"
   | "table"
   | "explore"
   | "force_trial"

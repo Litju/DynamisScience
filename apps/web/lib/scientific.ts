@@ -166,6 +166,8 @@ export const METHOD_LABEL: Record<string, string> = {
   "METH-REAL-SIGNAL-QA": "Signal qualification",
   "METH-REAL-RELIABILITY": "Repeated-trial reliability",
   "METH-REAL-BODYWEIGHT": "Body-weight recovery",
+  "METH-U-CHANGE": "Individual change",
+  "METH-U-DESC": "Descriptive trajectory",
 };
 
 export const REAL_METHODS: Record<string, string[]> = {

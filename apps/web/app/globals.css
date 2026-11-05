@@ -614,3 +614,12 @@ input[type="range"] { accent-color: var(--signal); }
   .brand small { display: none; }
   .report-paper { padding: 22px; }
 }
+
+/* RES-588 authoring surfaces keep the accepted workbench geometry and tokens. */
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; align-items: end; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.tree-actions { display: flex; gap: 4px; padding: 4px 8px 2px calc(8px + 18px); }
+.tree-mini { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line-2); background: transparent; color: var(--text-2); border-radius: 4px; height: 20px; padding: 0 6px; font-size: 10.5px; }
+.tree-mini:hover { border-color: var(--line-3); color: var(--text-strong); background: var(--surface-3); }
+.tree-mini:focus-visible { outline: 1px solid var(--signal); outline-offset: 2px; }
+@media (max-width: 860px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }

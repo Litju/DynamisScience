@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { GitBranch, X } from "lucide-react";
+import { Download, GitBranch, Snowflake, X } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Evidence } from "@/lib/types";
+import type { Evidence, ReportPayload } from "@/lib/types";
 import { scienceApi } from "@/lib/api";
 import { formatSig, formatSignedSig, metricOption, primaryResult, shortChecksum } from "@/lib/scientific";
 import { Button, ErrorBox, Loading, State } from "@/components/ui";
@@ -64,6 +64,107 @@ function Result({ evidence, reproductions, onRemove }: { evidence: Evidence; rep
   );
 }
 
+export function ResearchReportDocument({ data }: { data: ReportPayload }) {
+  const wb = useWorkbench();
+  const invalidate = useInvalidateScience();
+  const freeze = useMutation({
+    mutationFn: () => scienceApi.freezeReport(data.study_id),
+    onSuccess: (result) => { invalidate(); wb.notify(`Report frozen at version ${String(result.version)} · ${String(result.content_hash).slice(0, 12)}`); },
+  });
+  const research = data.research;
+  if (!research) return null;
+  const citationSection = (id: string) => data.citations.find((citation) => citation.artifact_id === id)?.section ?? "Results";
+  const sections = [...new Set(data.citations.map((citation) => citation.section))];
+  const note = wb.blocks.find((block) => block.type === "interpretation")?.state.note;
+  const groups = groupReproductions(data.evidence);
+  const figureNumber = { current: 0 };
+  return (
+    <article className="report" aria-label={data.title}>
+      <div className="report-paper">
+        <div className="report-meta">
+          <span>{data.id}</span><span>{data.status}</span><span>v{data.version ?? 1}</span><span>{data.study.id}</span><span>{data.snapshot.id} · immutable</span><span>{data.evidence.length} evidence · {data.figures.length} figures cited</span>
+          <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <Button size="sm" onClick={() => wb.openLineage(data.id)}><GitBranch size={12} />Lineage</Button>
+            <Button size="sm" onClick={() => freeze.mutate()} disabled={freeze.isPending}><Snowflake size={12} />{freeze.isPending ? "Freezing…" : "Freeze version"}</Button>
+            <a className="btn btn-sm btn-primary" href={scienceApi.reportExportUrl(data.study_id, data.status === "FROZEN" ? data.version : undefined)} style={{ textDecoration: "none" }}><Download size={12} />Export HTML</a>
+          </span>
+        </div>
+        <h1>{data.title}</h1>
+        <p className="lede">{data.study.title} · {data.project?.title ?? ""}</p>
+
+        <Section n="1" title="Question and design">
+          <p>{data.question.statement}</p>
+          <p style={{ marginTop: 6 }}>{String(data.study.design)}</p>
+          <ul>{data.hypotheses.map((hypothesis) => <li key={hypothesis.id}><span className="mono faint">{hypothesis.id}</span> ({hypothesis.status.toLowerCase()}) {hypothesis.statement}</li>)}</ul>
+        </Section>
+
+        <Section n="2" title="Dataset and cohort">
+          <p>
+            Snapshot <span className="mono">{data.snapshot.id}</span> ({data.snapshot.generator_version}, {data.snapshot.schema_version}; {sumRows(data.snapshot.row_counts).toLocaleString()} rows).
+            Source DOI <span className="mono">{String(data.snapshot.source?.doi ?? "—")}</span>, licence <span className="mono">{String(data.snapshot.source?.license?.id ?? "—")}</span>, privacy <span className="mono">{String(data.snapshot.source?.privacy?.classification ?? "—")}</span>.
+            Cohort <span className="mono">{data.cohort.id}</span> ({data.cohort.status}) includes {data.cohort.subject_ids.length} participants. {data.cohort.description}
+          </p>
+          <p style={{ marginTop: 6 }}>{data.data_health.valid_measurements} valid observations; {data.data_health.missing_observations} missing slots. Missing values are reported, never imputed.</p>
+        </Section>
+
+        <Section n="3" title="Methods and estimand">
+          <p>{data.plan.primary_estimand}</p>
+          <p className="faint"><span className="mono">{String(data.plan.method_id ?? "")}</span> · {data.plan.status} · <span className="mono">{JSON.stringify(data.plan.parameters ?? {})}</span></p>
+          <p className="faint small">The analysis plan is frozen locally. It is not described as externally preregistered; changes after freeze create exploratory specifications.</p>
+        </Section>
+
+        <Section n="4" title="Results">
+          {groups.length === 0 && <p className="faint">No evidence is cited. Promote a run and add it to the report from the workbench.</p>}
+          {sections.length > 0 ? sections.map((section) => (
+            <div key={section}>
+              <h3 style={{ fontSize: 13, marginTop: 10 }}>{section}</h3>
+              {data.evidence.filter((item) => citationSection(item.id) === section).map((item) => <Result key={item.id} evidence={item} reproductions={[]} />)}
+              {data.figures.filter((figure) => citationSection(figure.id) === section).map((figure) => {
+                figureNumber.current += 1;
+                return (
+                  <figure key={figure.id} className="report-fig">
+                    <div className="chart-frame"><FigureView figure={figure} /></div>
+                    <figcaption><strong>Figure {figureNumber.current}.</strong> {figure.title}. Computed from {figure.dataset_snapshot_id}; bound to {figure.evidence_ids.map((id) => <Cite key={id} id={id} kind="evidence" />)} · <Cite id={figure.id} kind="figure" /></figcaption>
+                  </figure>
+                );
+              })}
+            </div>
+          )) : groups.map((group) => <Result key={group.primary.id} evidence={group.primary} reproductions={group.reproductions} />)}
+        </Section>
+
+        {research.program && (
+          <Section n="5" title="Monitoring schedule">
+            <p>{(research.program.planned ?? []).length} planned measurements. {(research.program.observed_available ?? []).length} readings are available from the bound snapshot ({research.program.observed_label}). {research.program.observed_note}</p>
+            <p className="faint small">{research.program.limitations.join(" ")}</p>
+          </Section>
+        )}
+
+        <Section n="6" title="Interpretation">
+          {data.evidence.map((item) => <p key={item.id}><State plain>COMPUTED</State> {item.interpretation} <Cite id={item.id} kind="evidence" /></p>)}
+          {typeof note === "string" && note.trim() && <p><State plain tone="tone-neutral">SCIENTIST</State> {note}</p>}
+        </Section>
+
+        <Section n="7" title="Limitations">
+          <ul>{research.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
+        </Section>
+
+        <Section n="8" title="Provenance and reproducibility">
+          <table className="report-table">
+            <thead><tr><th>Evidence</th><th>Run</th><th>Spec</th><th>Cohort</th><th>Snapshot</th><th>Digest</th></tr></thead>
+            <tbody>{data.evidence.map((item) => <tr key={item.id}><td><Cite id={item.id} kind="evidence" /></td><td><Cite id={item.analysis_run_id} kind="run" /></td><td className="mono">{item.analysis_spec_id}</td><td className="mono">{item.cohort_id}</td><td className="mono">{item.dataset_snapshot_id}</td><td className="mono faint">{item.result_digest}</td></tr>)}</tbody>
+          </table>
+          <p className="faint small" style={{ marginTop: 8 }}>{research.provenance_note}</p>
+        </Section>
+      </div>
+      {freeze.error && <ErrorBox error={freeze.error} />}
+    </article>
+  );
+}
+
+function sumRows(rows: Record<string, number> | undefined): number {
+  return Object.values(rows ?? {}).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
 export function ReportDocument() {
   const wb = useWorkbench();
   const report = useReport(wb.studyId);
@@ -73,6 +174,7 @@ export function ReportDocument() {
   if (report.isLoading) return <div className="report"><Loading label="Composing report from cited artifacts" /></div>;
   if (report.error || !report.data) return <div className="report"><ErrorBox error={report.error ?? "Report unavailable"} /></div>;
   const data = report.data;
+  if (data.research) return <ResearchReportDocument data={data} />;
   const real = Boolean(data.snapshot.real_data);
   const measurement = data.study.id === "STUDY-REAL-002";
   const sourceChecksum = real ? data.snapshot.checksums["cmj_occasions.parquet"] ?? data.snapshot.checksums["signal_trials.parquet"] : data.snapshot.checksums["cmj_trials.parquet"];

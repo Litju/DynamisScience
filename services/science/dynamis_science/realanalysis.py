@@ -664,7 +664,7 @@ def _reliability_matrix(values: np.ndarray) -> dict[str, Any]:
     }
 
 
-def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contrast: int) -> dict[str, Any]:
+def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contrast: int, unit: str = "cm") -> dict[str, Any]:
     import statsmodels.api as sm
 
     rows = [
@@ -778,7 +778,7 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
         "method": "statsmodels MixedLM with athlete random intercept and random occasion slope",
         "formula": f"{outcome} ~ occasion_c + (1 + occasion_c | subject_id), ML",
         "outcome": outcome,
-        "unit": metric("MET-REAL-CMJ-HEIGHT")["unit"] if outcome == "cmj_height_cm" else "",
+        "unit": unit,
         "reference_occasion": reference,
         "contrast_occasion": contrast,
         "n_observations": int(len(rows)),
@@ -805,16 +805,16 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
                 "std_error": slope_se,
                 "ci_low": slope - Z_CRITICAL * slope_se,
                 "ci_high": slope + Z_CRITICAL * slope_se,
-                "unit": "cm per occasion",
-                "contrast": "Within-athlete change in CMJ height per testing occasion",
-                "interpretation": "Positive values indicate higher jumps at later occasions.",
+                "unit": f"{unit} per occasion",
+                "contrast": f"Within-athlete change in {outcome} per testing occasion",
+                "interpretation": "Positive values indicate higher outcome values at later occasions.",
             },
             f"occasion_{reference}_to_{contrast}": {
                 "estimate": change,
                 "std_error": change_se,
                 "ci_low": change - Z_CRITICAL * change_se,
                 "ci_high": change + Z_CRITICAL * change_se,
-                "unit": "cm",
+                "unit": unit,
                 "contrast": f"Change from occasion {reference} to occasion {contrast}",
                 "interpretation": "Model-implied within-athlete change over the observed span.",
             },
@@ -876,10 +876,8 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
     return result
 
 
-def descriptive_trend(study_id: str, outcome: str, cohort_ids: list[str]) -> dict[str, Any]:
-    study = get_study(study_id)
-    assert study is not None
-    frame = read_table(study["snapshot"]["id"], "cmj_occasions")
+def descriptive_trend(snapshot_id: str, outcome: str, cohort_ids: list[str], unit: str = "cm") -> dict[str, Any]:
+    frame = read_table(snapshot_id, "cmj_occasions")
     rows = [row for row in frame.iter_rows(named=True) if row["subject_id"] in cohort_ids and row.get(outcome) is not None]
     occasions = sorted({int(row["occasion"]) for row in rows})
     summary = []
@@ -896,7 +894,7 @@ def descriptive_trend(study_id: str, outcome: str, cohort_ids: list[str]) -> dic
         "method": "Descriptive occasion means with normal 95% intervals",
         "status": "COMPUTED",
         "outcome": outcome,
-        "unit": "cm",
+        "unit": unit,
         "occasions": summary,
         "change_first_to_last": change,
         "percent_change_first_to_last": (change / first["mean"] * 100) if change is not None and first and first["mean"] else None,
@@ -906,10 +904,8 @@ def descriptive_trend(study_id: str, outcome: str, cohort_ids: list[str]) -> dic
     }
 
 
-def signal_qa(study_id: str, cohort_ids: list[str]) -> dict[str, Any]:
-    study = get_study(study_id)
-    assert study is not None
-    trials = read_table(study["snapshot"]["id"], "signal_trials")
+def signal_qa(snapshot_id: str, cohort_ids: list[str]) -> dict[str, Any]:
+    trials = read_table(snapshot_id, "signal_trials")
     rows = [row for row in trials.iter_rows(named=True) if row["subject_id"] in cohort_ids]
     activities = sorted({row["activity"] for row in rows})
     summary = []
@@ -933,7 +929,7 @@ def signal_qa(study_id: str, cohort_ids: list[str]) -> dict[str, Any]:
                 "clock_offset_sd_s": float(offsets.std(ddof=1)) if offsets.size > 1 else None,
             }
         )
-    imu = read_table(study["snapshot"]["id"], "imu_trials")
+    imu = read_table(snapshot_id, "imu_trials")
     imu_rows = [row for row in imu.iter_rows(named=True) if row["subject_id"] in cohort_ids]
     rates = np.array([float(row["sampling_hz_median"]) for row in imu_rows if row["sampling_hz_median"] is not None])
     gravity = np.array([float(row["gravity_mean_g"]) for row in imu_rows if row["gravity_mean_g"] is not None])
@@ -986,10 +982,8 @@ def signal_qa(study_id: str, cohort_ids: list[str]) -> dict[str, Any]:
     }
 
 
-def reliability(study_id: str, cohort_ids: list[str], activity: str, max_trials: int = 8) -> dict[str, Any]:
-    study = get_study(study_id)
-    assert study is not None
-    trials = read_table(study["snapshot"]["id"], "signal_trials")
+def reliability(snapshot_id: str, cohort_ids: list[str], activity: str, max_trials: int = 8) -> dict[str, Any]:
+    trials = read_table(snapshot_id, "signal_trials")
     rows = [row for row in trials.iter_rows(named=True) if row["subject_id"] in cohort_ids and row["activity"] == activity]
     by_subject: dict[str, list[float]] = {}
     for row in rows:
@@ -1071,10 +1065,11 @@ def execute(
             cohort_ids,
             int(parameters.get("reference_occasion", 1)),
             int(parameters.get("contrast_occasion", 4)),
+            metric(outcome_metric_id)["unit"],
         )
         diagnostics = result["diagnostics"]
     elif method_id == "METH-REAL-DESC":
-        result = descriptive_trend(study_id, metric(outcome_metric_id)["column"], cohort_ids)
+        result = descriptive_trend(study["snapshot"]["id"], metric(outcome_metric_id)["column"], cohort_ids, metric(outcome_metric_id)["unit"])
         diagnostics = {
             "status": "COMPUTED",
             "occasions": len(result["occasions"]),
@@ -1084,7 +1079,7 @@ def execute(
             "limitations": result["limitations"],
         }
     elif method_id == "METH-REAL-SIGNAL-QA":
-        result = signal_qa(study_id, cohort_ids)
+        result = signal_qa(study["snapshot"]["id"], cohort_ids)
         diagnostics = {
             "status": "COMPUTED",
             "activities": len(result["activities"]),
@@ -1094,7 +1089,7 @@ def execute(
             "limitations": result["limitations"],
         }
     elif method_id == "METH-REAL-BODYWEIGHT":
-        qa = signal_qa(study_id, cohort_ids)
+        qa = signal_qa(study["snapshot"]["id"], cohort_ids)
         result = {"method": "Body-weight recovery from support-phase impulse", "status": "COMPUTED", **qa["body_weight"], "activities": qa["activities"], "limitations": qa["limitations"]}
         diagnostics = {
             "status": "COMPUTED",
@@ -1106,7 +1101,7 @@ def execute(
         }
     elif method_id == "METH-REAL-RELIABILITY":
         activity = str(parameters.get("activity", "Walking"))
-        result = reliability(study_id, cohort_ids, activity, int(parameters.get("max_trials", 8)))
+        result = reliability(study["snapshot"]["id"], cohort_ids, activity, int(parameters.get("max_trials", 8)))
         diagnostics = {
             "status": result.get("status"),
             "activity": activity,

@@ -11,6 +11,7 @@ import { ExploreBlock } from "./blocks/ExploreBlock";
 import { AnalysisBlock, DiagnosticsBlock } from "./blocks/AnalysisBlocks";
 import { EvidenceBlock, FigureBlock, InterpretationBlock, ReportSectionBlock } from "./blocks/EvidenceBlocks";
 import { ForceTrialBlock, MatchEventBlock, ModelBlock, TableBlock } from "./blocks/ExtraBlocks";
+import { ScheduleBlock } from "./blocks/ScheduleBlock";
 
 function BlockBody({ block, index }: { block: WorkbenchBlock; index: number }) {
   switch (block.type) {
@@ -20,6 +21,8 @@ function BlockBody({ block, index }: { block: WorkbenchBlock; index: number }) {
       return <DatasetBlock block={block} index={index} />;
     case "cohort":
       return <CohortBlock block={block} index={index} />;
+    case "schedule":
+      return <ScheduleBlock block={block} index={index} />;
     case "explore":
       return <ExploreBlock block={block} index={index} />;
     case "analysis":
@@ -83,7 +86,7 @@ export function Workbench() {
     <div className="bench" id="workbench">
       <div className="bench-inner">
         <div className="bench-head">
-          <h2>{wb.study.real_data ? "Real-data scientific investigation" : "Primary Intervention Analysis"}</h2>
+          <h2>{wb.study.kind === "MONITORING" ? "Monitoring program investigation" : wb.study.real_data ? "Real-data scientific investigation" : "Primary Intervention Analysis"}</h2>
           <span className="faint">{wb.investigationId} · v{wb.version} · {wb.blocks.length} blocks</span>
           <span className="save" role="status">
             {wb.saveState === "saving" && "saving investigation…"}

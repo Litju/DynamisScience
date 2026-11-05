@@ -34,6 +34,7 @@ Every number on screen is computed from data, every result carries its uncertain
 
 ## Highlights
 
+- **Persistent research projects.** Projects contain scientist-authored studies, monitoring programs and named investigations. Studies, cohorts, frozen plans, runs, evidence and report versions are stored in a transactional local SQLite store, while admitted Parquet snapshots remain immutable.
 - **One persistent study workspace.** Study tree · ordered investigation · contextual inspector, with resizable and collapsible panes and a context strip showing exactly which cohort, run, athlete, trial and event are linked.
 - **Typed, serialisable investigation.** The workbench is an ordered document of typed blocks (Question, Dataset, Cohort, Explore, Analysis, Diagnostics, Evidence, Figure, Model, Match Event, Interpretation, Report Section). Blocks reference domain objects by ID and never hold scientific values themselves; the service persists the document with version checks and rejects orderings that break dependencies.
 - **Pre-registration that means something.** A frozen analysis plan defines the primary estimand — *difference in change from week 1 to week 10, intervention minus comparison*. Executions that match a frozen spec are `PLANNED`; any change of method, outcome, parameters, cohort or exclusions produces a content-addressed `EXPLORATORY` spec instead of silently rewriting the plan.
@@ -154,8 +155,8 @@ pnpm typecheck
 pnpm build
 ```
 
-- **76 automated tests** (47 Python, 29 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, investigation ordering rules, scenario simulation, report citations, the typed block model, lineage layout and display rules.
-- **Rendered end-to-end validation**: a scripted headless-browser walkthrough of the complete demo path (47 checks at 1440×900 and 1280×800) against the production build, with zero console or network errors.
+- **103 automated tests** (73 Python, 30 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, investigation ordering rules, scenario simulation, report citations, the typed block model, lineage layout, display rules, the complete research lifecycle, frozen-plan and report-version immutability, monitoring schedules and restart/regeneration safety.
+- **Rendered end-to-end validation**: scripted headless-browser walkthroughs of the synthetic and real workflows, and of both RES-588 demonstrations, at 1440×900, 1280×800 and 1024×800 against the production build, with zero console/page/network errors and no horizontal overflow.
 
 ## Real-data admission (RES-587)
 
@@ -168,6 +169,29 @@ qualification. See [docs/RES-587_REAL_DATA_CLOSURE.md](docs/RES-587_REAL_DATA_CL
 for identities, rights, measured storage, numerical comparisons, commands and
 the acceptance matrix.
 
+## Complete research lifecycle (RES-588)
+
+A scientist can originate a research project from a blank workspace, author a
+study or monitoring program, bind an admitted snapshot, build a declarative
+cohort, freeze and fork an analysis plan, execute qualified methods, promote
+evidence and export a versioned HTML report. The accepted Research / Data /
+Library navigation and Study Tree → Workbench → Inspector layout are unchanged.
+
+| | |
+|---|---|
+| ![Research projects](docs/screenshots/res588-research.png) | **Projects and monitoring programs.** Projects persist objectives, associated admitted datasets, studies, programs and version history. |
+| ![Study setup](docs/screenshots/res588-setup.png) | **Authoring and qualification.** Frozen plan, content hash, cohort binding and registered method eligibility — including the explicitly rejected body-weight estimator. |
+| ![Longitudinal analysis](docs/screenshots/res588-analysis.png) | **Real longitudinal execution.** The Mendeley study gives a within-athlete CMJ change of +3.00 cm (95% CI 1.87–4.12), matching the R/lme4-qualified implementation. |
+| ![Evidence report](docs/screenshots/res588-report.png) | **Versioned evidence report.** Cited evidence and figure, frozen report version, embedded provenance manifest and a working standalone HTML export. |
+| ![Measurement workflow](docs/screenshots/res588-measurement.png) | **A second real-data workflow.** MoveSmart repeated walking trials give ICC(3,1) 0.9511 (95% CI 0.8795–0.9870), typical error 49.711 N and CV 4.206%. |
+| ![Monitoring program](docs/screenshots/res588-monitoring.png) | **Prospective monitoring.** Eight planned weekly measurements are kept distinct from four available historical readings; a planned point without a reading is MISSING, never zero. |
+
+Both demonstrations were created from blank projects through the production UI,
+executed, promoted to evidence, exported, and reopened after a full service and
+web restart. See [docs/RES-588_RESEARCH_LIFECYCLE.md](docs/RES-588_RESEARCH_LIFECYCLE.md)
+for exact IDs, results, commands, browser receipts, commits and the PASS/FAIL/
+BLOCKED matrix.
+
 ## Status and limitations
 
 This is a vertical-slice MVP built to demonstrate the product and its scientific discipline.
@@ -176,7 +200,8 @@ This is a vertical-slice MVP built to demonstrate the product and its scientific
 - Force traces are internally coherent demonstrations; flight time and propulsive impulse are generated independently, so the impulse-momentum jump-height definition is registered but deliberately not materialised.
 - The longitudinal model uses a linear week term; the week-11 load spike and week-12 suppression appear as structured residuals, which the diagnostics surface.
 - The training-response model is an aggregate prototype; on this dataset its standardised fit RMSE exceeds 1, which the workbench states explicitly.
-- Metadata lives in local JSON behind a replaceable adapter; there is no authentication or multi-tenancy.
+- Mutable research metadata lives in a transactional local SQLite store; admitted snapshots stay write-once. There is no authentication or multi-tenancy.
+- Monitoring schedules are prospective plans, not observations; a planned measurement without a reading is MISSING and no readiness, fatigue or injury score is inferred.
 
 ## Licence
 

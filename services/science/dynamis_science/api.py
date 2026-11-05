@@ -17,6 +17,7 @@ import polars as pl
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .admission import (
@@ -50,7 +51,7 @@ from .analysis import (
 from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID, generate_data
 from .lineage import build_lineage_graph, scope_lineage_graph
 from .qualification import list_qualification_records, run_qualification
-from . import qualification_real, realanalysis, realstore
+from . import qualification_real, realanalysis, realstore, researchanalysis, researchstore
 
 
 @asynccontextmanager
@@ -82,6 +83,7 @@ BLOCK_TYPES = {
     "question",
     "dataset",
     "cohort",
+    "schedule",
     "table",
     "explore",
     "force_trial",
@@ -148,6 +150,79 @@ class InvestigationUpdate(BaseModel):
     base_version: int | None = None
 
 
+class ResearchObjectRequest(BaseModel):
+    title: str | None = None
+    short_title: str | None = None
+    description: str | None = None
+    objectives: list[str] | None = None
+    dataset_snapshot_ids: list[str] | None = None
+    research_question: str | None = None
+    question: str | None = None
+    design: str | None = None
+    dataset_snapshot_id: str | None = None
+    primary_metric_id: str | None = None
+    secondary_metric_ids: list[str] | None = None
+    population: str | None = None
+    eligibility: list[str] | None = None
+    exclusions: list[str] | None = None
+    intervention: str | None = None
+    hypotheses: list[Any] | None = None
+    estimand: str | None = None
+    exposure: str | None = None
+    time_horizon: str | None = None
+    schedule: dict[str, Any] | None = None
+    start_week: int | None = None
+    weeks: int | None = None
+    frequency: str | None = None
+    quality_rules: list[str] | None = None
+    missing_policy: str | None = None
+    base_version: int | None = None
+
+
+class CohortRequestModel(BaseModel):
+    name: str
+    description: str = ""
+    include_subject_ids: list[str] = Field(default_factory=list)
+    exclude_subject_ids: list[str] = Field(default_factory=list)
+    rules: list[dict[str, Any]] = Field(default_factory=list)
+    min_metric_observations: int = 1
+    activity: str | None = None
+    freeze: bool = False
+    base_version: int | None = None
+
+
+class PlanRequestModel(BaseModel):
+    name: str | None = None
+    method_id: str | None = None
+    outcome_metric_id: str | None = None
+    cohort_id: str | None = None
+    primary_estimand: str | None = None
+    hypotheses: list[Any] | None = None
+    covariates: list[str] | None = None
+    fixed_effects: list[str] | None = None
+    random_effects: list[str] | None = None
+    time_coding: str | None = None
+    contrasts: list[str] | None = None
+    inclusion_criteria: str | None = None
+    exclusion_criteria: list[str] | None = None
+    missing_data: str | None = None
+    diagnostics: list[str] | None = None
+    parameters: dict[str, Any] | None = None
+    planned_models: list[str] | None = None
+    planned_reliability: str | None = None
+    base_version: int | None = None
+
+
+class StateRequest(BaseModel):
+    state: str
+
+
+class InvestigationCreateRequest(BaseModel):
+    title: str = "New investigation"
+    blocks: list[InvestigationBlock] | None = None
+    parent_id: str | None = None
+
+
 # --------------------------------------------------------------------------- #
 # Local artefact store
 # --------------------------------------------------------------------------- #
@@ -201,6 +276,26 @@ def _now() -> str:
 
 def _is_real_study(study_id: str | None) -> bool:
     return bool(study_id) and study_id in realstore.real_study_ids()
+
+
+def _user_entity(study_id: str | None) -> dict[str, Any] | None:
+    if not study_id or not str(study_id).startswith(("STUDY-U-", "PROG-U-")):
+        return None
+    return researchstore.get_entity(str(study_id))
+
+
+def _is_research_study(study_id: str | None) -> bool:
+    return _user_entity(study_id) is not None
+
+
+def _research_http_error(error: Exception) -> HTTPException:
+    if isinstance(error, researchstore.ResearchNotFound):
+        return HTTPException(status_code=404, detail=str(error))
+    if isinstance(error, researchstore.ResearchConflict):
+        return HTTPException(status_code=409, detail=str(error))
+    if isinstance(error, researchstore.ResearchValidation):
+        return HTTPException(status_code=422, detail=str(error))
+    return HTTPException(status_code=500, detail=str(error))
 
 
 def _real_qualification_records() -> list[dict[str, Any]]:
@@ -391,12 +486,34 @@ def _study_summary(study: dict[str, Any]) -> dict[str, Any]:
 def studies() -> list[dict[str, Any]]:
     _ensure_data()
     real = realstore.list_studies()
-    return [_study_summary(_study()), *real]
+    user = []
+    for entity in researchstore.list_entities(include_archived=True):
+        try:
+            detail = researchstore.study_detail(entity["id"])
+        except Exception:
+            continue
+        user.append(
+            {
+                **detail["study"],
+                "plan_status": detail["plan"]["status"],
+                "run_count": len(detail["runs"]),
+                "evidence_count": len(detail["evidence"]),
+                "last_run_at": max((run["created_at"] for run in detail["runs"]), default=None),
+                "investigation_ids": [item["id"] for item in detail["investigations"]],
+                "real_data": detail["real_data"],
+            }
+        )
+    return [_study_summary(_study()), *real, *user]
 
 
 @app.get("/studies/{study_id}")
 def study_detail(study_id: str) -> dict[str, Any]:
     _ensure_data()
+    if _is_research_study(study_id):
+        try:
+            return researchstore.study_detail(study_id)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if _is_real_study(study_id):
         real = realstore.get_study(study_id)
         if real is None:
@@ -431,7 +548,11 @@ def subjects(
     study_id: str = "STUDY-001",
 ) -> list[dict[str, Any]]:
     _ensure_data()
-    if _is_real_study(study_id):
+    if _is_research_study(study_id):
+        entity = _user_entity(study_id)
+        assert entity is not None
+        frame = researchstore.read_snapshot_table(entity["dataset_snapshot_id"], "subjects")
+    elif _is_real_study(study_id):
         study = realstore.get_study(study_id)
         if study is None:
             raise HTTPException(status_code=404, detail="Real-data study not admitted yet")
@@ -540,6 +661,16 @@ def subject_longitudinal(
     study_id: str = "STUDY-001",
 ) -> dict[str, Any]:
     _ensure_data()
+    if _is_research_study(study_id):
+        entity = _user_entity(study_id)
+        assert entity is not None
+        cohort = researchstore.get_cohort(entity.get("cohort_id") or "")
+        if cohort is None:
+            raise HTTPException(status_code=404, detail="Cohort not found")
+        try:
+            return researchanalysis.athlete_longitudinal(entity, cohort, subject_id, metric_id)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if _is_real_study(study_id):
         try:
             return realanalysis.athlete_longitudinal(study_id, subject_id, metric_id)
@@ -556,6 +687,16 @@ def subject_longitudinal(
 @app.post("/cohorts/resolve")
 def resolve_cohort(request: CohortRequest) -> dict[str, Any]:
     _ensure_data()
+    if _is_research_study(request.study_id):
+        entity = _user_entity(request.study_id)
+        assert entity is not None
+        cohort = researchstore.get_cohort(entity.get("cohort_id") or "")
+        if cohort is None:
+            raise HTTPException(status_code=404, detail="Cohort not found")
+        try:
+            return researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"], excluded_subject_ids=request.excluded_subject_ids)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if _is_real_study(request.study_id):
         try:
             return realanalysis._cohort(request.study_id, request.excluded_subject_ids)
@@ -634,6 +775,16 @@ def explore_longitudinal(
     """
     _ensure_data()
     excluded = [value for value in exclude.split(",") if value]
+    if _is_research_study(study_id):
+        entity = _user_entity(study_id)
+        assert entity is not None
+        cohort = researchstore.get_cohort(entity.get("cohort_id") or "")
+        if cohort is None:
+            raise HTTPException(status_code=404, detail="Cohort not found")
+        try:
+            return researchanalysis.explore(entity, cohort, metric_id, excluded, reference)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if _is_real_study(study_id):
         try:
             return realanalysis.explore(study_id, metric_id, excluded, reference)
@@ -1122,6 +1273,10 @@ def datasets() -> list[dict[str, Any]]:
                     realstore.get_study(realstore.STUDY_MOVESMART),
                 )
                 if study and study["snapshot"]["id"] == item["id"]
+            ] + [
+                entity["id"]
+                for entity in researchstore.list_entities()
+                if entity.get("dataset_snapshot_id") == item["id"]
             ],
         }
         for item in realstore.list_snapshots()
@@ -1197,6 +1352,21 @@ def _run_view(run: dict[str, Any], runs: list[dict[str, Any]], evidence: list[di
 @app.get("/runs")
 def runs(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
     _ensure_data()
+    if _is_research_study(study_id):
+        items = researchstore.list_runs(study_id)[::-1]
+        evidence = researchstore.list_evidence(study_id)
+        result = []
+        for run in items:
+            reproduces = [
+                other["id"]
+                for other in items
+                if other["id"] != run["id"]
+                and other.get("reproducibility_key") == run.get("reproducibility_key")
+                and other.get("result_digest") == run.get("result_digest")
+                and other["id"] < run["id"]
+            ]
+            result.append({**run, "reproduces": reproduces, "evidence_ids": [item["id"] for item in evidence if item["analysis_run_id"] == run["id"]]})
+        return result
     if _is_real_study(study_id):
         return [run for run in realanalysis.list_runs() if run["study_id"] == study_id][::-1]
     all_runs = _json("analysis_runs.json", [])
@@ -1207,6 +1377,15 @@ def runs(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
 @app.get("/runs/{run_id}")
 def run_detail(run_id: str) -> dict[str, Any]:
     _ensure_data()
+    if run_id.startswith("RUN-U-"):
+        run = researchstore.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return {
+            **run,
+            "lineage": researchstore.lineage(run_id),
+            "evidence": [item for item in researchstore.list_evidence(run["study_id"]) if item.get("analysis_run_id") == run_id],
+        }
     if run_id.startswith("RUN-REAL-"):
         run = realanalysis.get_run(run_id)
         if run is None:
@@ -1268,6 +1447,34 @@ def execute_analysis(request: AnalysisRequest) -> dict[str, Any]:
     an EvidenceArtifact only exists after an explicit promotion of a run.
     """
     _ensure_data()
+    if _is_research_study(request.study_id):
+        entity = _user_entity(request.study_id)
+        assert entity is not None
+        if entity.get("state") == "ARCHIVED":
+            raise HTTPException(status_code=409, detail="Archived studies cannot execute analyses")
+        cohort = researchstore.get_cohort(entity.get("cohort_id") or "")
+        if cohort is None:
+            raise HTTPException(status_code=404, detail="Cohort not found")
+        plan = researchstore.get_plan(entity.get("analysis_plan_id") or "") if entity.get("analysis_plan_id") else None
+        try:
+            run = researchanalysis.execute(
+                entity,
+                cohort,
+                plan,
+                request.method_id,
+                request.outcome_metric_id,
+                request.parameters,
+                request.excluded_subject_ids,
+            )
+        except Exception as error:
+            raise _research_http_error(error) from error
+        current = researchstore.get_entity(request.study_id)
+        if current and current.get("state") in {"READY", "ACTIVE"}:
+            try:
+                researchstore.transition_entity(request.study_id, "ANALYSIS")
+            except Exception:
+                pass
+        return run
     if _is_real_study(request.study_id):
         try:
             return realanalysis.execute(
@@ -1501,6 +1708,11 @@ def _evidence_view(item: dict[str, Any], evidence: list[dict[str, Any]], report:
 def promote_evidence(request: PromotionRequest) -> dict[str, Any]:
     """Explicitly promote a completed run to an immutable EvidenceArtifact."""
     _ensure_data()
+    if request.run_id.startswith("RUN-U-"):
+        try:
+            return researchanalysis.promote(request.run_id)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if request.run_id.startswith("RUN-REAL-"):
         try:
             return realanalysis.promote(request.run_id)
@@ -1539,6 +1751,10 @@ def promote_evidence(request: PromotionRequest) -> dict[str, Any]:
 @app.get("/evidence")
 def evidence(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
     _ensure_data()
+    if _is_research_study(study_id):
+        report = researchstore.get_report_document(study_id)
+        cited = set(report.get("evidence_ids", []))
+        return [{**item, "cited_by_report": item["id"] in cited} for item in researchstore.list_evidence(study_id)]
     if _is_real_study(study_id):
         report = realstore.get_report(study_id)
         cited = set(report.get("evidence_ids", []))
@@ -1555,6 +1771,15 @@ def evidence(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
 @app.get("/evidence/{evidence_id}")
 def evidence_detail(evidence_id: str) -> dict[str, Any]:
     _ensure_data()
+    if evidence_id.startswith("EVID-U-"):
+        item = researchstore.get_evidence(evidence_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        return {
+            **item,
+            "figures": [figure for figure in researchstore.list_figures(item["study_id"]) if evidence_id in figure.get("evidence_ids", [])],
+            "source_runs": [run for run in researchstore.list_runs(item["study_id"]) if run["id"] == item["analysis_run_id"]],
+        }
     if evidence_id.startswith("EVID-REAL-"):
         item = realanalysis.get_evidence(evidence_id)
         if item is None:
@@ -1610,6 +1835,12 @@ def figures() -> list[dict[str, Any]]:
 @app.get("/figures/{figure_id}")
 def figure_detail(figure_id: str) -> dict[str, Any]:
     _ensure_data()
+    if figure_id.startswith("FIG-U-"):
+        figure = researchstore.get_figure(figure_id)
+        if figure is None:
+            raise HTTPException(status_code=404, detail="Figure not found")
+        report = researchstore.get_report_document(figure["study_id"])
+        return {**figure, "cited_by_report": figure_id in report.get("figure_ids", [])}
     if figure_id.startswith("FIG-REAL-"):
         figure = realanalysis.get_figure(figure_id)
         if figure is None:
@@ -1642,6 +1873,11 @@ def _section_for(artifact_id: str) -> str:
 @app.get("/report")
 def report(study_id: str = "STUDY-001") -> dict[str, Any]:
     _ensure_data()
+    if _is_research_study(study_id):
+        try:
+            return researchstore.report_payload(study_id)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if _is_real_study(study_id):
         return realstore.get_report(study_id)
     report_artifact = _json("report.json", {})
@@ -1672,6 +1908,11 @@ def report(study_id: str = "STUDY-001") -> dict[str, Any]:
 def add_citation(request: CitationRequest) -> dict[str, Any]:
     """Cite an immutable evidence or figure artefact in the draft report."""
     _ensure_data()
+    if request.study_id and _is_research_study(request.study_id):
+        try:
+            return researchstore.cite_artifact(request.study_id, request.artifact_id, request.section)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if request.study_id and _is_real_study(request.study_id):
         return realstore.cite(request.study_id, request.artifact_id, request.section)
     report_artifact = _json("report.json", {})
@@ -1692,6 +1933,11 @@ def add_citation(request: CitationRequest) -> dict[str, Any]:
 @app.delete("/report/citations/{artifact_id}")
 def remove_citation(artifact_id: str, study_id: str | None = None) -> dict[str, Any]:
     _ensure_data()
+    if study_id and _is_research_study(study_id):
+        try:
+            return researchstore.uncite_artifact(study_id, artifact_id)
+        except Exception as error:
+            raise _research_http_error(error) from error
     if study_id and _is_real_study(study_id):
         return realstore.uncite(study_id, artifact_id)
     report_artifact = _json("report.json", {})
@@ -1727,6 +1973,8 @@ def _validate_blocks(blocks: list[InvestigationBlock]) -> None:
 @app.get("/investigations")
 def investigations(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
     _ensure_data()
+    if _is_research_study(study_id):
+        return researchstore.list_investigations(study_id)
     if _is_real_study(study_id):
         return [item for item in realanalysis.list_investigations() if item.get("study_id") == study_id]
     return [item for item in _json("investigations.json", []) if item.get("study_id") == study_id]
@@ -1735,6 +1983,11 @@ def investigations(study_id: str = "STUDY-001") -> list[dict[str, Any]]:
 @app.get("/investigations/{investigation_id}")
 def investigation(investigation_id: str) -> dict[str, Any]:
     _ensure_data()
+    if investigation_id.startswith("INV-U-"):
+        item = researchstore.get_investigation(investigation_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Investigation not found")
+        return item
     if investigation_id.startswith("INV-REAL-"):
         item = realanalysis.get_investigation(investigation_id)
         if item is None:
@@ -1749,6 +2002,17 @@ def investigation(investigation_id: str) -> dict[str, Any]:
 @app.put("/investigations/{investigation_id}")
 def update_investigation(investigation_id: str, request: InvestigationUpdate) -> dict[str, Any]:
     _ensure_data()
+    if investigation_id.startswith("INV-U-"):
+        _validate_blocks(request.blocks)
+        try:
+            return researchstore.update_investigation_research(
+                investigation_id,
+                [block.model_dump() for block in request.blocks],
+                request.base_version or 0,
+                request.title,
+            )
+        except Exception as error:
+            raise _research_http_error(error) from error
     if investigation_id.startswith("INV-REAL-"):
         _validate_blocks(request.blocks)
         try:
@@ -1809,6 +2073,12 @@ def lineage(
     depth: int = Query(default=3, ge=1, le=8),
 ) -> dict[str, Any]:
     _ensure_data()
+    if artifact_id.startswith(("RUN-U-", "EVID-U-", "FIG-U-", "STUDY-U-", "PROG-U-", "COHORT-U-", "PLAN-U-", "INV-U-", "RPT-", "PRJ-")):
+        try:
+            graph = researchstore.lineage(artifact_id)
+        except Exception as error:
+            raise _research_http_error(error) from error
+        return scope_lineage_graph(graph, descendant_depth=depth) if scope == "path" else graph
     if artifact_id.startswith(("RUN-REAL-", "EVID-REAL-", "FIG-REAL-", "DS-REAL-", "SRC-", "COHORT-REAL-", "REPORT-REAL-")):
         try:
             graph = realstore.lineage_graph(artifact_id)
@@ -1950,3 +2220,347 @@ def real_snapshot_detail(snapshot_id: str) -> dict[str, Any]:
 @app.get("/real/qualification")
 def real_qualification_list() -> list[dict[str, Any]]:
     return _real_qualification_records()
+
+# --------------------------------------------------------------------------- #
+# Research lifecycle: projects, studies, monitoring programs, cohorts, plans
+# --------------------------------------------------------------------------- #
+
+
+@app.get("/research/datasets")
+def research_datasets() -> list[dict[str, Any]]:
+    _ensure_data()
+    return researchstore.dataset_catalogue()
+
+
+@app.get("/research/methods")
+def research_methods() -> dict[str, Any]:
+    return {
+        "methods": list(researchstore.METHODS.values()),
+        "rejected": list(researchstore.REJECTED_METHODS.values()),
+    }
+
+
+@app.get("/research/projects")
+def research_projects(include_archived: bool = True) -> list[dict[str, Any]]:
+    return researchstore.list_projects(include_archived=include_archived)
+
+
+@app.post("/research/projects")
+def research_project_create(request: ResearchObjectRequest) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    try:
+        project = researchstore.create_project(
+            str(payload.get("title", "")),
+            str(payload.get("description", "")),
+            payload.get("objectives") or [],
+            payload.get("dataset_snapshot_ids") or [],
+        )
+    except Exception as error:
+        raise _research_http_error(error) from error
+    return researchstore.get_project(project["id"]) or project
+
+
+@app.get("/research/projects/{project_id}")
+def research_project_detail(project_id: str) -> dict[str, Any]:
+    project = researchstore.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Research project not found")
+    return project
+
+
+@app.patch("/research/projects/{project_id}")
+def research_project_update(project_id: str, request: ResearchObjectRequest) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    base = payload.pop("base_version", None)
+    try:
+        researchstore.update_project(project_id, payload, base_version=base)
+    except Exception as error:
+        raise _research_http_error(error) from error
+    return researchstore.get_project(project_id) or {}
+
+
+@app.post("/research/projects/{project_id}/archive")
+def research_project_archive(project_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.set_project_archived(project_id, True)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/projects/{project_id}/restore")
+def research_project_restore(project_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.set_project_archived(project_id, False)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/projects/{project_id}/history")
+def research_project_history(project_id: str) -> list[dict[str, Any]]:
+    return researchstore.project_history(project_id)
+
+
+@app.post("/research/projects/{project_id}/studies")
+def research_study_create(project_id: str, request: ResearchObjectRequest) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    try:
+        return researchstore.create_study(project_id, payload)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/projects/{project_id}/programs")
+def research_program_create(project_id: str, request: ResearchObjectRequest) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    try:
+        return researchstore.create_monitoring_program(project_id, payload)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/studies/{study_id}")
+def research_study_detail(study_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.study_detail(study_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.patch("/research/studies/{study_id}")
+def research_study_update(study_id: str, request: ResearchObjectRequest) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    base = payload.pop("base_version", None)
+    patch = {key: value for key, value in payload.items() if key not in {"dataset_snapshot_ids", "title"}}
+    if "title" in payload:
+        patch["title"] = payload["title"]
+    try:
+        researchstore.update_entity(study_id, patch, base_version=base)
+        return researchstore.study_detail(study_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/studies/{study_id}/state")
+def research_study_state(study_id: str, request: StateRequest) -> dict[str, Any]:
+    try:
+        researchstore.transition_entity(study_id, request.state)
+        return researchstore.study_detail(study_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/studies/{study_id}/archive")
+def research_study_archive(study_id: str) -> dict[str, Any]:
+    try:
+        researchstore.transition_entity(study_id, "ARCHIVED")
+        return researchstore.study_detail(study_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/studies/{study_id}/restore")
+def research_study_restore(study_id: str) -> dict[str, Any]:
+    entity = researchstore.get_entity(study_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Research object not found")
+    target = entity.get("state_before_archive") or "DRAFT"
+    try:
+        researchstore.transition_entity(study_id, target)
+        return researchstore.study_detail(study_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/studies/{study_id}/history")
+def research_study_history(study_id: str) -> list[dict[str, Any]]:
+    return researchstore.entity_history(study_id)
+
+
+@app.get("/research/studies/{study_id}/eligibility")
+def research_study_eligibility(study_id: str) -> list[dict[str, Any]]:
+    try:
+        return researchstore.study_detail(study_id)["eligibility"]
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/studies/{study_id}/schedule")
+def research_study_schedule(study_id: str) -> dict[str, Any]:
+    entity = researchstore.get_entity(study_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Research object not found")
+    return researchstore.program_schedule(entity)
+
+
+@app.get("/research/studies/{study_id}/cohorts")
+def research_cohorts(study_id: str) -> list[dict[str, Any]]:
+    return researchstore.list_cohorts(study_id)
+
+
+@app.post("/research/studies/{study_id}/cohorts")
+def research_cohort_create(study_id: str, request: CohortRequestModel) -> dict[str, Any]:
+    entity = researchstore.get_entity(study_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Research object not found")
+    definition = {
+        "snapshot_id": entity["dataset_snapshot_id"],
+        "include_subject_ids": request.include_subject_ids,
+        "exclude_subject_ids": request.exclude_subject_ids,
+        "rules": request.rules,
+        "min_metric_observations": request.min_metric_observations,
+        "activity": request.activity,
+        "require_metric_id": (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id"),
+        "description": request.description,
+    }
+    try:
+        return researchstore.create_cohort(study_id, request.name, definition, freeze=request.freeze)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/cohorts/{cohort_id}")
+def research_cohort_detail(cohort_id: str) -> dict[str, Any]:
+    cohort = researchstore.get_cohort(cohort_id)
+    if cohort is None:
+        raise HTTPException(status_code=404, detail="Cohort not found")
+    return cohort
+
+
+@app.patch("/research/cohorts/{cohort_id}")
+def research_cohort_update(cohort_id: str, request: CohortRequestModel) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    payload.pop("freeze", None)
+    base = payload.pop("base_version", None)
+    try:
+        return researchstore.update_cohort(cohort_id, payload, base_version=base)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/cohorts/{cohort_id}/freeze")
+def research_cohort_freeze(cohort_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.freeze_cohort(cohort_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/cohorts/{cohort_id}/fork")
+def research_cohort_fork(cohort_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.fork_cohort(cohort_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/cohorts/{cohort_id}/resolve")
+def research_cohort_resolve(cohort_id: str, excluded: str = "") -> dict[str, Any]:
+    cohort = researchstore.get_cohort(cohort_id)
+    if cohort is None:
+        raise HTTPException(status_code=404, detail="Cohort not found")
+    excluded_ids = [item for item in excluded.split(",") if item]
+    try:
+        return researchstore.resolve_cohort(cohort, cohort["snapshot_id"], excluded_subject_ids=excluded_ids)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/cohorts/{cohort_id}/history")
+def research_cohort_history(cohort_id: str) -> list[dict[str, Any]]:
+    return researchstore.cohort_history(cohort_id)
+
+
+@app.get("/research/studies/{study_id}/plans")
+def research_plans(study_id: str) -> list[dict[str, Any]]:
+    return researchstore.list_plans(study_id)
+
+
+@app.post("/research/studies/{study_id}/plans")
+def research_plan_create(study_id: str, request: PlanRequestModel) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    try:
+        return researchstore.create_plan(study_id, payload)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/plans/{plan_id}")
+def research_plan_detail(plan_id: str) -> dict[str, Any]:
+    plan = researchstore.get_plan(plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Analysis plan not found")
+    return plan
+
+
+@app.patch("/research/plans/{plan_id}")
+def research_plan_update(plan_id: str, request: PlanRequestModel) -> dict[str, Any]:
+    payload = request.model_dump(exclude_none=True)
+    base = payload.pop("base_version", None)
+    try:
+        return researchstore.update_plan(plan_id, payload, base_version=base)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/plans/{plan_id}/freeze")
+def research_plan_freeze(plan_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.freeze_plan(plan_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/plans/{plan_id}/fork")
+def research_plan_fork(plan_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.fork_plan(plan_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/plans/{plan_id}/history")
+def research_plan_history(plan_id: str) -> list[dict[str, Any]]:
+    return researchstore.plan_history(plan_id)
+
+
+@app.post("/research/studies/{study_id}/investigations")
+def research_investigation_create(study_id: str, request: InvestigationCreateRequest) -> dict[str, Any]:
+    blocks = [block.model_dump() for block in request.blocks] if request.blocks else None
+    try:
+        return researchstore.create_investigation(study_id, request.title, blocks, request.parent_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/investigations/{investigation_id}/fork")
+def research_investigation_fork(investigation_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.fork_investigation(investigation_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.post("/research/studies/{study_id}/report/freeze")
+def research_report_freeze(study_id: str) -> dict[str, Any]:
+    try:
+        return researchstore.freeze_report(study_id)
+    except Exception as error:
+        raise _research_http_error(error) from error
+
+
+@app.get("/research/studies/{study_id}/report/versions")
+def research_report_versions(study_id: str) -> list[dict[str, Any]]:
+    return researchstore.report_versions(study_id)
+
+
+@app.get("/research/studies/{study_id}/report/export")
+def research_report_export(study_id: str, version: int | None = None) -> HTMLResponse:
+    try:
+        content = researchstore.export_html(study_id, version)
+        filename = researchstore.report_export_filename(study_id, version)
+    except Exception as error:
+        raise _research_http_error(error) from error
+    return HTMLResponse(
+        content=content,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
