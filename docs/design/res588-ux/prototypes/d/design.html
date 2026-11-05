@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Atelier — Design</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-project" viewBox="0 0 24 24"><path d="M3.5 6.5h6l2 2h9v11h-17z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-study" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6M4.5 11.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-evidence" viewBox="0 0 24 24"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4l8-4.6Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m8.5 12 2.2 2.2 4.8-5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-outline" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-publish" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 20h14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">D</span><b>DynamisScience</b><span>research atelier</span></div>
+    <div class="project-path"><span>CMJ longitudinal research</span><span class="sep">/</span><span>PRJ-FB8A479E</span></div>
+    <div class="top-search"><svg width="12" height="12"><use href="#i-search"/></svg><span>Search studies, runs, evidence</span><kbd>Ctrl K</kbd></div>
+    <div class="env"><i></i>local · 8000</div>
+  </header>
+
+  <div class="arcbar">
+    <div class="study-id">
+      <div class="kicker">Project · PRJ-FB8A479E</div>
+      <h1>New study · draft</h1>
+    </div>
+    <nav class="arc" aria-label="Research activity">
+      <a href="design.html" class="active" aria-current="page"><span class="n">01</span>Design</a>
+      <span class="connector"></span>
+      <button type="button" data-toast="Explore becomes available after the study is created and its snapshot is bound."><span class="n">02</span>Explore</button>
+      <span class="connector"></span>
+      <button type="button" data-toast="Analyze becomes available after the study is created and its plan is configured."><span class="n">03</span>Analyze</button>
+      <span class="connector"></span>
+      <button type="button" data-toast="Publish becomes available after the first analysis run and evidence promotion."><span class="n">04</span>Publish</button>
+    </nav>
+    <div class="arc-actions">
+      <button class="btn ghost notes-toggle" type="button" id="notes-toggle" aria-expanded="false" aria-controls="evidence-margin">Notes · 4</button>
+      <button class="btn ghost" type="button" data-toast="Draft saved locally; no research object is created until Create study.">Save draft</button>
+      <button class="btn primary" type="button" data-toast="Create study persists the question, design, cohort binding and first investigation. Prototype only.">Create study</button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <aside class="thread" aria-label="Research thread">
+      <div class="thread-mark"><span>D</span></div>
+      <div class="thread-items">
+        <button class="thread-item" type="button" title="Project" data-toast="Project: CMJ longitudinal research · PRJ-FB8A479E"><svg width="15" height="15"><use href="#i-project"/></svg><span class="label">Project</span></button>
+        <button class="thread-item active" type="button" title="New study" data-toast="New study draft · not yet persisted"><svg width="15" height="15"><use href="#i-study"/></svg><span class="label">Study</span></button>
+        <a class="thread-item" href="monitoring.html" title="Monitoring"><svg width="15" height="15"><use href="#i-monitor"/></svg><span class="label">Monitor</span></a>
+        <button class="thread-item" type="button" title="Data" data-toast="One admitted snapshot will be bound to this study."><svg width="15" height="15"><use href="#i-data"/></svg><span class="label">Data</span></button>
+        <button class="thread-item" type="button" title="Evidence" data-toast="No evidence exists for a draft study."><svg width="15" height="15"><use href="#i-evidence"/></svg><span class="label">Evidence</span></button>
+        <button class="thread-item" type="button" title="Report" data-toast="A report becomes available after analysis and evidence."><svg width="15" height="15"><use href="#i-report"/></svg><span class="label">Report</span></button>
+      </div>
+      <div class="thread-foot">
+        <button type="button" id="outline-toggle" aria-expanded="false" aria-controls="outline-panel"><svg width="15" height="15"><use href="#i-outline"/></svg>Outline</button>
+      </div>
+    </aside>
+
+    <div class="outline-panel" id="outline-panel" aria-label="Draft outline">
+      <div class="outline-head"><div class="kicker">Draft thread</div><h2>New study</h2></div>
+      <div class="outline-list">
+        <button class="outline-item active" type="button"><span class="n">01</span><span>Question</span><span class="tag">open</span></button>
+        <button class="outline-item" type="button"><span class="n">02</span><span>Data &amp; measures</span><span class="tag">bind</span></button>
+        <button class="outline-item" type="button"><span class="n">03</span><span>Design</span><span class="tag">choose</span></button>
+        <button class="outline-item" type="button"><span class="n">04</span><span>Plan</span><span class="tag">draft</span></button>
+      </div>
+    </div>
+
+    <main class="main" aria-label="Design a study">
+      <article class="page">
+        <div class="page-head compact">
+          <div class="lead">
+            <div class="eyebrow">Design · draft study</div>
+            <h1>A question, a dataset, a defensible plan.</h1>
+            <div class="byline">The project supplies context. This page asks only for the decisions that change the science.</div>
+          </div>
+          <div class="plaque" style="border-left-color:var(--rule)">
+            <div class="label">Draft status</div>
+            <div class="number" style="font-size:24px;color:var(--brass)">4 of 5</div>
+            <div class="ci">question · data · cohort · plan</div>
+            <div class="secondary">Nothing is persisted until <b>Create study</b>. Cancel discards this page only.</div>
+          </div>
+        </div>
+
+        <div class="protocol">
+          <section class="step">
+            <div class="step-num">01</div>
+            <div>
+              <h2>Question <span class="hint">the question drives the rest</span></h2>
+              <div class="statement" contenteditable="true" spellcheck="false">Does countermovement jump height change across four repeated testing occasions in the admitted sprint-priming cohort?</div>
+              <div class="field-row">
+                <label class="field"><span>Estimand</span><input class="input" value="Within-athlete change per occasion (cm)" aria-label="Estimand"></label>
+                <label class="field"><span>Primary hypothesis</span><input class="input" value="CMJ height changes across the four deposited occasions." aria-label="Primary hypothesis"></label>
+              </div>
+            </div>
+          </section>
+
+          <section class="step">
+            <div class="step-num">02</div>
+            <div>
+              <h2>Data &amp; measures <span class="hint">one snapshot, one primary outcome</span></h2>
+              <div class="data-row">
+                <div class="snap"><b>Holmberg sprint priming — four repeated testing occasions</b><div class="id">DS-REAL-MENDELEY-2C44490E08AD · CC BY 4.0 · DOI 10.17632/6p99569x66.1</div></div>
+                <div class="stat"><b>21</b><span>athletes</span></div>
+                <div class="stat"><b>82</b><span>valid obs.</span></div>
+                <div class="stat"><b>4</b><span>tables</span></div>
+              </div>
+              <div class="metric-line">
+                <span class="on">Countermovement jump height · cm</span>
+                <span>Isometric relative peak force · N/kg</span>
+                <span>Relative 1RM back squat · kg/kg</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="step">
+            <div class="step-num">03</div>
+            <div>
+              <h2>Design &amp; population <span class="hint">only designs backed by a qualified method</span></h2>
+              <div class="field-row">
+                <label class="field"><span>Study design</span>
+                  <div class="seg" role="group" aria-label="Study design">
+                    <button type="button" aria-pressed="true">Longitudinal</button>
+                    <button type="button" aria-pressed="false" data-toast="Repeated-measures measurement is available for the MoveSmart snapshot.">Repeated</button>
+                    <button type="button" disabled title="No comparator in this snapshot">Between</button>
+                  </div>
+                </label>
+                <label class="field"><span>Population</span><input class="input" value="21 highly trained male collegiate athletes" aria-label="Population"></label>
+              </div>
+              <div class="field-row" style="margin-top:6px">
+                <label class="field"><span>Time axis</span><select class="select" aria-label="Time axis"><option>Four deposited testing occasions</option></select></label>
+                <label class="field"><span>Cohort</span><select class="select" aria-label="Cohort"><option>All eligible participants · 21</option></select></label>
+              </div>
+              <div class="byline" style="font-size:9px;margin-top:5px">Between-group allocation is disabled because the admitted snapshot has no comparator. The UI does not invent one.</div>
+            </div>
+          </section>
+
+          <section class="step">
+            <div class="step-num">04</div>
+            <div>
+              <h2>Plan <span class="hint">freeze before inspection if possible</span></h2>
+              <div class="field-row">
+                <label class="field"><span>Eligible method</span><select class="select" aria-label="Eligible method"><option>MixedLM random slope</option><option>Descriptive trajectory</option></select></label>
+                <label class="field"><span>Plan status</span><input class="input" value="Draft · not frozen" aria-label="Plan status" readonly></label>
+              </div>
+              <div class="byline" style="font-size:9px;margin-top:5px">A plan frozen after data inspection is recorded as retrospective and cannot be described as prospectively preregistered.</div>
+            </div>
+          </section>
+        </div>
+
+        <div class="actions-row">
+          <button class="btn primary" type="button" data-toast="Create study persists this draft and opens its first investigation. Prototype only.">Create study</button>
+          <a class="btn ghost" href="analyze.html">Cancel</a>
+          <div class="note">Creates the study, its cohort binding and first investigation. No dataset is copied or modified.</div>
+        </div>
+      </article>
+    </main>
+
+    <aside class="margin" id="evidence-margin" aria-label="Design margin">
+      <div class="label">Design margin</div>
+      <div class="note"><div class="n">Readiness</div><b>4 of 5 decisions complete.</b><p>Question, data, cohort and design are ready. The analysis plan is a draft and can be frozen later.</p></div>
+      <div class="note"><div class="n">01 · Persistence</div><b>Nothing is persisted until Create study.</b><p>Cancel discards this page; existing studies, runs and reports are untouched.</p></div>
+      <div class="note"><div class="n">02 · Data</div><b>One snapshot per study.</b><p>The study binds an immutable snapshot; it does not copy participant rows.</p></div>
+      <div class="note"><div class="n">03 · Plan</div><b>Freeze records timing.</b><p>Retrospective is not preregistered. The notebook keeps the distinction explicit.</p></div>
+      <div class="links"><a href="monitoring.html">Open existing monitoring program →</a></div>
+      <div class="foot">Prototype · aggregate values only<br>No participant-level records</div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

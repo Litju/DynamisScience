@@ -1,0 +1,210 @@
+[
+  {
+    "page": "analyze",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 986,
+        "h": 300,
+        "top": 337
+      },
+      "page": {
+        "w": 1060,
+        "h": 754,
+        "top": 126
+      },
+      "pageScrollH": 796,
+      "pageClientH": 792
+    },
+    "console": []
+  },
+  {
+    "page": "design",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": null,
+      "page": {
+        "w": 1060,
+        "h": 713,
+        "top": 126
+      },
+      "pageScrollH": 792,
+      "pageClientH": 792
+    },
+    "console": []
+  },
+  {
+    "page": "monitoring",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 986,
+        "h": 275,
+        "top": 350
+      },
+      "page": {
+        "w": 1060,
+        "h": 780,
+        "top": 126
+      },
+      "pageScrollH": 822,
+      "pageClientH": 792
+    },
+    "console": []
+  },
+  {
+    "page": "publish",
+    "viewport": "1440x900",
+    "metrics": {
+      "viewport": {
+        "w": 1440,
+        "h": 900
+      },
+      "scroll": {
+        "w": 1440,
+        "h": 900
+      },
+      "chart": {
+        "w": 699,
+        "h": 210,
+        "top": 590
+      },
+      "page": {
+        "w": 1060,
+        "h": 773,
+        "top": 126
+      },
+      "pageScrollH": 815,
+      "pageClientH": 792
+    },
+    "console": []
+  },
+  {
+    "page": "analyze",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 1114,
+        "h": 280,
+        "top": 311
+      },
+      "page": {
+        "w": 1172,
+        "h": 663,
+        "top": 126
+      },
+      "pageScrollH": 705,
+      "pageClientH": 692
+    },
+    "console": []
+  },
+  {
+    "page": "design",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": null,
+      "page": {
+        "w": 1172,
+        "h": 676,
+        "top": 126
+      },
+      "pageScrollH": 718,
+      "pageClientH": 692
+    },
+    "console": []
+  },
+  {
+    "page": "monitoring",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 1114,
+        "h": 260,
+        "top": 344
+      },
+      "page": {
+        "w": 1172,
+        "h": 750,
+        "top": 126
+      },
+      "pageScrollH": 792,
+      "pageClientH": 692
+    },
+    "console": []
+  },
+  {
+    "page": "publish",
+    "viewport": "1280x800",
+    "metrics": {
+      "viewport": {
+        "w": 1280,
+        "h": 800
+      },
+      "scroll": {
+        "w": 1280,
+        "h": 800
+      },
+      "chart": {
+        "w": 867,
+        "h": 210,
+        "top": 587
+      },
+      "page": {
+        "w": 1172,
+        "h": 762,
+        "top": 126
+      },
+      "pageScrollH": 804,
+      "pageClientH": 692
+    },
+    "console": []
+  }
+]

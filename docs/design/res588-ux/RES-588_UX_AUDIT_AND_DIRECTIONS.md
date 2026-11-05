@@ -4,6 +4,14 @@ Status: **Step A + Step B complete. Production UX untouched. Owner decision requ
 Date: 2026-11-05 · Native Windows / PowerShell · production build served at
 `http://localhost:3001` with the local science service at `http://127.0.0.1:8000`.
 
+> **Owner follow-up.** After reviewing A, B and C, the owner requested a hybrid
+> that is more insightful, intuitive, simple, non-invasive and crafted.
+> **Direction D — The Research Atelier** has been added and is the recommended
+> synthesis. See
+> [`RES-588_UX_DIRECTION_D_ATELIER.md`](RES-588_UX_DIRECTION_D_ATELIER.md).
+> Directions A, B and C remain in this document as the evidence base; they are
+> not withdrawn.
+
 This document records the evidence-based audit and three rendered design
 directions required by Section 11 of RES-588. It does **not** claim visual
 approval. No production component, route, backend contract, dataset, research

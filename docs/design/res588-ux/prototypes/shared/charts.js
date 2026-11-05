@@ -43,6 +43,11 @@ window.RES588Charts = (() => {
       observed: "#58c7d6", observedSoft: "rgba(88,199,214,.12)", model: "#a78bfa",
       missing: "#e08a83", font: "'Segoe UI Variable', 'Segoe UI', Inter, sans-serif", mono: "'Cascadia Code', 'IBM Plex Mono', Consolas, monospace",
     },
+    atelier: {
+      grid: "#ddd5c4", axis: "#9a8f7c", text: "#1f2a24", muted: "#706f63",
+      observed: "#2f5d50", observedSoft: "rgba(47,93,80,.10)", model: "#9b4a32",
+      missing: "#9e4034", font: "'Iowan Old Style', 'Palatino Linotype', Georgia, serif", mono: "'IBM Plex Mono', Consolas, monospace",
+    },
   };
 
   function observeResize(container, render) {

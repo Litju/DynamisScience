@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Atelier — Publish</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-project" viewBox="0 0 24 24"><path d="M3.5 6.5h6l2 2h9v11h-17z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-study" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 8.5A2.5 2.5 0 0 0 7.2 21h9.6a2.5 2.5 0 0 0 2.2-3.5L14 9V3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 3v4M17 3v4M3.5 10h17" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 5.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6M4.5 11.5v6c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-evidence" viewBox="0 0 24 24"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4l8-4.6Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m8.5 12 2.2 2.2 4.8-5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 2.8h7l5 5V21H6z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 2.8v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-outline" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-publish" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 20h14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">D</span><b>DynamisScience</b><span>research atelier</span></div>
+    <div class="project-path"><span>CMJ longitudinal research</span><span class="sep">/</span><span>PRJ-FB8A479E</span></div>
+    <div class="top-search"><svg width="12" height="12"><use href="#i-search"/></svg><span>Search studies, runs, evidence</span><kbd>Ctrl K</kbd></div>
+    <div class="env"><i></i>local · 8000</div>
+  </header>
+
+  <div class="arcbar">
+    <div class="study-id">
+      <div class="kicker">Report · RPT-EE7514BB · v3 FROZEN</div>
+      <h1>Sprint priming longitudinal study</h1>
+    </div>
+    <nav class="arc" aria-label="Research activity">
+      <a href="design.html"><span class="n">01</span>Design</a>
+      <span class="connector"></span>
+      <a href="monitoring.html"><span class="n">02</span>Explore</a>
+      <span class="connector"></span>
+      <a href="analyze.html"><span class="n">03</span>Analyze</a>
+      <span class="connector"></span>
+      <a href="publish.html" class="active" aria-current="page"><span class="n">04</span>Publish</a>
+    </nav>
+    <div class="arc-actions">
+      <button class="btn ghost notes-toggle" type="button" id="notes-toggle" aria-expanded="false" aria-controls="evidence-margin">Notes · 4</button>
+      <button class="btn ghost" type="button" data-toast="The report is frozen; export is deterministic HTML with an embedded manifest.">Freeze version</button>
+      <button class="btn primary" type="button" data-toast="Prototype: export is local, deterministic HTML with an embedded manifest.">Export HTML <svg width="10" height="10"><use href="#i-publish"/></svg></button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <aside class="thread" aria-label="Research thread">
+      <div class="thread-mark"><span>D</span></div>
+      <div class="thread-items">
+        <button class="thread-item" type="button" title="Project" data-toast="Project: CMJ longitudinal research · PRJ-FB8A479E"><svg width="15" height="15"><use href="#i-project"/></svg><span class="label">Project</span></button>
+        <a class="thread-item" href="analyze.html" title="Study"><svg width="15" height="15"><use href="#i-study"/></svg><span class="label">Study</span></a>
+        <a class="thread-item" href="monitoring.html" title="Monitoring"><svg width="15" height="15"><use href="#i-monitor"/></svg><span class="label">Monitor</span></a>
+        <button class="thread-item" type="button" title="Data" data-toast="Snapshot DS-REAL-MENDELEY-2C44490E08AD is the source for this report."><svg width="15" height="15"><use href="#i-data"/></svg><span class="label">Data</span></button>
+        <button class="thread-item" type="button" title="Evidence" data-toast="EVID-U-0001 is current and cited in this report."><svg width="15" height="15"><use href="#i-evidence"/></svg><span class="label">Evidence</span></button>
+        <a class="thread-item active" href="publish.html" title="Report"><svg width="15" height="15"><use href="#i-report"/></svg><span class="label">Report</span></a>
+      </div>
+      <div class="thread-foot">
+        <button type="button" id="outline-toggle" aria-expanded="false" aria-controls="outline-panel"><svg width="15" height="15"><use href="#i-outline"/></svg>Outline</button>
+      </div>
+    </aside>
+
+    <div class="outline-panel" id="outline-panel" aria-label="Report outline">
+      <div class="outline-head"><div class="kicker">Report thread</div><h2>Report v3</h2></div>
+      <div class="outline-list">
+        <button class="outline-item" type="button"><span class="n">01</span><span>Question &amp; design</span><span class="tag">RQ</span></button>
+        <button class="outline-item" type="button"><span class="n">02</span><span>Dataset &amp; cohort</span><span class="tag">21</span></button>
+        <button class="outline-item" type="button"><span class="n">03</span><span>Methods &amp; estimand</span><span class="tag">PLAN</span></button>
+        <button class="outline-item active" type="button"><span class="n">04</span><span>Results</span><span class="tag">EV</span></button>
+        <button class="outline-item" type="button"><span class="n">05</span><span>Limitations</span><span class="tag">note</span></button>
+        <button class="outline-item" type="button"><span class="n">06</span><span>Provenance</span><span class="tag">RUN</span></button>
+      </div>
+    </div>
+
+    <main class="main" aria-label="Publish">
+      <article class="page">
+        <div class="page-head compact">
+          <div class="lead">
+            <div class="eyebrow">Publish · report v3 · frozen 2026-11-05</div>
+            <h1>A report that shows its evidence.</h1>
+            <div class="byline">Frozen report version, pinned to EVID-U-0001 and RUN-U-0001. Export is a standalone HTML document with an embedded manifest.</div>
+            <div class="guard-chip">Historical version pinned · no silent rewrite</div>
+          </div>
+          <div class="plaque" style="border-left-color:var(--rule)">
+            <div class="label">Version</div>
+            <div class="number" style="font-size:28px;color:var(--brass)">v3</div>
+            <div class="ci">RPT-EE7514BB · content hash 3ed124b4…</div>
+            <div class="secondary">1 evidence · 1 figure · 8 provenance rows<br>Frozen, downloadable, deterministic.</div>
+          </div>
+        </div>
+
+        <div class="publish-grid">
+          <section class="report-sheet" aria-label="Report preview">
+            <div class="report-meta">RPT-EE7514BB · FROZEN v3 · STUDY-U-EE7514BB · DS-REAL-MENDELEY-2C44490E08AD</div>
+            <h1>Countermovement jump height across four testing occasions</h1>
+            <p class="muted">Sprint priming longitudinal study · CMJ longitudinal research · 2026-11-05</p>
+
+            <h2>1 · Question and design</h2>
+            <p>Does countermovement jump height change across four repeated testing occasions in the admitted sprint-priming cohort? Observational longitudinal repeated measures; single-arm; 21 athletes.</p>
+
+            <h2>2 · Methods and estimand</h2>
+            <p>MixedLM random intercept + random occasion slope, ML, Nelder–Mead after BFGS failed. Estimand: within-athlete change in CMJ height per testing occasion. Plan PLAN-7103044E frozen locally; not externally preregistered.</p>
+
+            <h2>3 · Primary result</h2>
+            <p><b style="font-family:var(--mono);font-size:13px;color:var(--green)">+2.995 cm [1.866, 4.124]</b> from occasion 1 to 4; slope <b>+0.998 cm/occasion [0.622, 1.375]</b>; 82 observations in 21 athletes; 2 missing occasion-4 rows.</p>
+            <div class="report-figure"><div class="chart-wrap" id="atelier-report-chart"></div></div>
+
+            <h2>4 · Limitations</h2>
+            <p>Single-arm observational data; no causal intervention effect. Occasions are deposited testing blocks, not calendar weeks. Two missing occasion-4 rows are not imputed. No raw force traces; CMJ height cannot be independently recomputed.</p>
+          </section>
+
+          <aside class="report-side" aria-label="Report margin">
+            <h3>Report composition</h3>
+            <div class="item"><b>Evidence</b>EVID-U-0001 · current<div class="mono">PLANNED · VALID</div></div>
+            <div class="item"><b>Figure</b>FIG-U-0001 · cited<div class="mono">deterministic inline SVG</div></div>
+            <div class="item"><b>Source run</b>RUN-U-0001<div class="mono">digest e5e6f7dc8426797b</div></div>
+            <div class="item"><b>Frozen plan</b>PLAN-7103044E<div class="mono">SPEC-U-71095CFB</div></div>
+            <h3 style="margin-top:12px">Version history</h3>
+            <div class="item"><b>v3 · current</b>2026-11-05 09:03Z<div class="mono">3ed124b4…c6644</div></div>
+            <div class="item"><b>v2</b>2026-11-05 08:41Z<div class="mono">historical · pinned</div></div>
+            <div class="buttons">
+              <button class="btn primary" type="button" data-toast="Prototype: standalone HTML export with embedded manifest.">Export HTML</button>
+              <button class="btn" type="button" data-toast="Lineage resolves report → evidence → run → plan → cohort → snapshot → DOI.">Open lineage</button>
+            </div>
+          </aside>
+        </div>
+      </article>
+    </main>
+
+    <aside class="margin" id="evidence-margin" aria-label="Publish margin">
+      <div class="label">Publish margin</div>
+      <div class="note"><div class="n">01 · Version</div><b>v3 is frozen.</b><p>Historical versions remain pinned to their own evidence; new runs do not rewrite old conclusions.</p></div>
+      <div class="note"><div class="n">02 · Export</div><b>Standalone HTML.</b><p>No external scripts, fonts or network assets. Includes an embedded machine-readable manifest.</p></div>
+      <div class="note"><div class="n">03 · Privacy</div><b>No participant rows.</b><p>Only aggregate results and reported uncertainty are exported.</p></div>
+      <div class="note"><div class="n">04 · Provenance</div><b>Every result resolves.</b><p>Report → evidence → run → spec → cohort → snapshot → DOI 10.17632/6p99569x66.1.</p></div>
+      <div class="foot">Prototype · aggregate values only<br>RPT-EE7514BB · v3 FROZEN</div>
+    </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../shared/data.js"></script>
+<script src="../shared/charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
