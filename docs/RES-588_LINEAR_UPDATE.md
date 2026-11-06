@@ -72,6 +72,12 @@ Screenshots:
 | Full regression/lint/typecheck/build/browser validation | Receipt + logs | Met |
 | Final product acceptance | Owner review | Pending |
 
+## Commits
+
+- `103e8cc` — domain service and tests.
+- `6863160` — six workspaces and atlas.
+- `f23a1e7` — validation evidence and screenshots.
+
 ## Remaining limitations
 
 - Synthetic squad fixture: no external validity.

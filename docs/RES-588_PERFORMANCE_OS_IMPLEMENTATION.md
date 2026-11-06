@@ -308,7 +308,15 @@ computed value is retained rather than copied from the exemplar.
 | Linear update with verified evidence | No Linear access in environment; update draft supplied | Blocked by credentials |
 | Final product acceptance | Owner review | Pending |
 
-## 9. Run locally
+## 9. Commits
+
+Local, unpushed implementation commits:
+
+- `103e8cc` — compose Performance OS workspaces from admitted snapshot.
+- `6863160` — implement six workspaces and component atlas.
+- `f23a1e7` — record validation, screenshots and acceptance matrix.
+
+## 10. Run locally
 
 ```powershell
 $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
