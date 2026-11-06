@@ -1,0 +1,281 @@
+{
+  "generated_at": "2026-11-06T08:51:12.140261+00:00",
+  "base_url": "http://127.0.0.1:3000",
+  "synthetic_snapshot": "DS-SYNTH-001",
+  "viewports": [
+    "1440x900",
+    "1280x800",
+    "1024x800"
+  ],
+  "screens": [
+    {
+      "image": "docs/design/res588-ux/implemented/today-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/plan-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/monitor-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/test-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/research-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/report-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/atlas-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/athlete-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/today-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/plan-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/monitor-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/test-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/research-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/report-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/atlas-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/athlete-1280.png",
+      "innerWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "rootScrollWidth": 1280,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/today-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/plan-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/monitor-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/test-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/research-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/report-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/atlas-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/athlete-1024.png",
+      "innerWidth": 1024,
+      "bodyScrollWidth": 1024,
+      "rootScrollWidth": 1024,
+      "bodyScrollHeight": 800
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-athlete-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-test-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-evidence-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-evidence-workbench-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-model-lab-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-report-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-plan-published-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/workflow-role-medical-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/scientific-report-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 900
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/comparison-command-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 899
+    },
+    {
+      "image": "docs/design/res588-ux/implemented/comparison-atlas-1440.png",
+      "innerWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "rootScrollWidth": 1440,
+      "bodyScrollHeight": 899
+    }
+  ],
+  "console_errors": [],
+  "workflows": {
+    "today_to_athlete": "http://127.0.0.1:3000/athletes/ATH-003",
+    "athlete_to_monitor": "http://127.0.0.1:3000/monitor?athlete=ATH-003",
+    "monitor_to_test": "http://127.0.0.1:3000/test",
+    "evidence_to_workbench": "http://127.0.0.1:3000/research/studies/STUDY-001",
+    "report_preview": "Squad performance report",
+    "plan_publish_persisted_au": "54",
+    "plan_to_load": "http://127.0.0.1:3000/monitor?metric=load",
+    "testing_to_report": "http://127.0.0.1:3000/report"
+  },
+  "checks": {
+    "model_scenario": true,
+    "medical_role_default_report": "MEDICAL \u00b7 1 VERSION",
+    "injury_module_unavailable": true,
+    "roster_only": true,
+    "bounded_gps": true,
+    "unit_chip_present": true,
+    "threshold_owner_visible": true,
+    "unit_registry_visible": true,
+    "no_fake_injury_rate": true,
+    "no_horizontal_overflow": true,
+    "no_console_errors": true
+  }
+}
