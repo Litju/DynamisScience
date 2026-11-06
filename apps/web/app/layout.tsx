@@ -6,11 +6,12 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "reactflow/dist/style.css";
 import "./globals.css";
+import "./performance.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "DynamisScience",
-  description: "Local, deterministic scientific workbench for sports science: from question to reproducible evidence.",
+  title: "Dynamis Performance OS",
+  description: "Local sports-science operating system: squad command, monitoring, testing, research and evidence-linked reports.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

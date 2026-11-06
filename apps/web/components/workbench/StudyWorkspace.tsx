@@ -73,6 +73,14 @@ function WorkspaceFrame() {
   const [inspOpen, setInspOpen] = useState(true);
   const [treeWidth, setTreeWidth] = useStoredWidth("ds.tree.w", 256);
   const [inspWidth, setInspWidth] = useStoredWidth("ds.insp.w", 356);
+
+  // The Performance OS rail narrows the workbench at standard desktop widths.
+  // Default the inspector closed so the investigation keeps a readable measure;
+  // the existing toolbar toggle still opens it at any time.
+  useEffect(() => {
+    if (window.innerWidth < 1600) setInspOpen(false);
+    if (window.innerWidth < 1100) setTreeOpen(false);
+  }, []);
   const [dragging, setDragging] = useState<"tree" | "insp" | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const subjects = useSubjects(wb.study.study.id);

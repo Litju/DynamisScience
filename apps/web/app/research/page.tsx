@@ -1,5 +1,5 @@
-import { ResearchHome } from "@/components/research/ResearchHome";
+import { ResearchWorkspaceView } from "@/components/performance/ResearchWorkspaceView";
 
 export default function ResearchPage() {
-  return <ResearchHome />;
+  return <ResearchWorkspaceView />;
 }

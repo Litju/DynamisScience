@@ -2,7 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { GlobalBar } from "@/components/shell/GlobalBar";
+import { PerformanceBar } from "@/components/shell/PerformanceBar";
+import { PerformanceRail } from "@/components/shell/PerformanceRail";
+import { RoleProvider } from "@/components/shell/RoleContext";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -22,11 +24,16 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <div className="app">
-        <GlobalBar onOpenPalette={() => setPaletteOpen(true)} />
-        {children}
-      </div>
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      <RoleProvider>
+        <div className="pos-app">
+          <PerformanceBar onOpenPalette={() => setPaletteOpen(true)} />
+          <div className="pos-shell">
+            <PerformanceRail />
+            <div className="pos-content">{children}</div>
+          </div>
+        </div>
+        {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      </RoleProvider>
     </QueryClientProvider>
   );
 }
