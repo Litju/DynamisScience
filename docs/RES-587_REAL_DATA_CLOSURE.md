@@ -255,8 +255,9 @@ $env:DYNAMISSCIENCE_BROWSER_BASE = 'http://localhost:3001'
 ```
 
 `pnpm` and `npm` corepack shims were broken on this machine; the equivalent
-direct Node binaries under `apps/web/node_modules/.bin` were used. Playwright
-uses the installed Microsoft Edge, so no browser download is required. R and
+direct Node binaries under `apps/web/node_modules/.bin` were used. The recorded
+browser run used Microsoft Edge; the portable validation script now uses
+Playwright-managed Chromium. R and
 lme4 are installed under `configured R installation` (R 4.6.2, lme4 2.1-0).
 
 ## 7. Acceptance matrix

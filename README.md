@@ -2,7 +2,7 @@
 
 # DynamisScience
 
-**A scientific workbench for sports science — from a research question to reproducible, inspectable evidence, in one continuous workspace.**
+**A local sports-science operating system connecting daily performance work to reproducible research and evidence.**
 
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-local%20service-009688?logo=fastapi&logoColor=white)
@@ -17,6 +17,12 @@
 </div>
 
 ---
+
+## Dynamis Performance OS
+
+Six connected workspaces cover the practitioner lifecycle: **Today → Plan → Monitor → Test → Research → Report**. Research remains a full scientific environment inside the OS, with projects, studies, immutable snapshots, analyses, evidence, provenance and reports.
+
+![Dynamis Performance OS Squad Command](docs/design/res588-ux/implemented/today-1440.png)
 
 ## Why this exists
 
@@ -135,15 +141,23 @@ DynamisScience/
 
 ## Running it locally
 
-Requirements: Node.js 20+, pnpm 11+, Python 3.12+ and [`uv`](https://docs.astral.sh/uv/).
+```powershell
+git clone https://github.com/Litju/DynamisScience.git
+Set-Location .\DynamisScience
+```
+
+Requirements: Node.js 22+, the repository-pinned pnpm 11.24.0, Python 3.12+ and [`uv`](https://docs.astral.sh/uv/). pnpm 11 requires Node.js 22 or newer ([pnpm compatibility](https://pnpm.io/installation)).
 
 ```bash
-pnpm install
-pnpm data:generate   # deterministic snapshot + seed artifacts (also resets local state)
-pnpm dev             # science service on :8000, workbench on :3000
+npm install --global pnpm@11.24.0
+uv sync --locked --directory services/science
+pnpm install --frozen-lockfile
+pnpm dev   # regenerates the deterministic synthetic fixture, then starts the service and web app
 ```
 
 Open <http://localhost:3000>. The science service's OpenAPI documentation is at <http://localhost:8000/docs>.
+
+Private real datasets, admitted Parquet snapshots, reports and local research state are not in GitHub. Keep them in a separate private data root and set `DYNAMISSCIENCE_DATA_ROOT` before starting the app. The SQLite database is `research/research.db` under that root. For another machine, transfer the complete data root through a secure channel while the science service is stopped, then verify dataset manifests and file hashes; never put that root in the repository.
 
 ## Testing and validation
 
@@ -155,7 +169,13 @@ pnpm typecheck
 pnpm build
 ```
 
-- **103 automated tests** (73 Python, 30 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, investigation ordering rules, scenario simulation, report citations, the typed block model, lineage layout, display rules, the complete research lifecycle, frozen-plan and report-version immutability, monitoring schedules and restart/regeneration safety.
+For rendered browser validation, install Playwright's managed Chromium once:
+
+```powershell
+uv run --directory services/science playwright install chromium
+```
+
+- **119 automated tests** (84 Python, 35 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, investigation ordering rules, scenario simulation, report citations, the typed block model, lineage layout, display rules, the complete research lifecycle, frozen-plan and report-version immutability, monitoring schedules and restart/regeneration safety.
 - **Rendered end-to-end validation**: scripted headless-browser walkthroughs of the synthetic and real workflows, and of both RES-588 demonstrations, at 1440×900, 1280×800 and 1024×800 against the production build, with zero console/page/network errors and no horizontal overflow.
 
 ## Real-data admission (RES-587)
@@ -174,8 +194,8 @@ the acceptance matrix.
 A scientist can originate a research project from a blank workspace, author a
 study or monitoring program, bind an admitted snapshot, build a declarative
 cohort, freeze and fork an analysis plan, execute qualified methods, promote
-evidence and export a versioned HTML report. The accepted Research / Data /
-Library navigation and Study Tree → Workbench → Inspector layout are unchanged.
+evidence and export a versioned HTML report. Research is one of the six integrated
+Performance OS workspaces; its scientific workbench and capabilities remain available there.
 
 | | |
 |---|---|
@@ -196,7 +216,7 @@ BLOCKED matrix.
 
 This is a vertical-slice MVP built to demonstrate the product and its scientific discipline.
 
-- All data are synthetic and have no external validity.
+- The operational squad fixture is synthetic and has no external validity. Rights-verified Mendeley and MoveSmart research datasets are admitted separately and remain outside the public repository.
 - Force traces are internally coherent demonstrations; flight time and propulsive impulse are generated independently, so the impulse-momentum jump-height definition is registered but deliberately not materialised.
 - The longitudinal model uses a linear week term; the week-11 load spike and week-12 suppression appear as structured residuals, which the diagnostics surface.
 - The training-response model is an aggregate prototype; on this dataset its standardised fit RMSE exceeds 1, which the workbench states explicitly.

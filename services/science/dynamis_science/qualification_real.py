@@ -37,12 +37,6 @@ def _rscript() -> str | None:
     found = shutil.which("Rscript")
     if found:
         return found
-    for candidate in (
-        Path(r"$DYNAMISSCIENCE_RSCRIPT"),
-        Path(r"Rscript"),
-    ):
-        if candidate.exists():
-            return str(candidate)
     return None
 
 

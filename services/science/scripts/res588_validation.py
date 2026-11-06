@@ -3,7 +3,7 @@
 Run while the science service (port 8000) and the production Next.js build
 (port 3001) are running:
 
-    $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
+    $env:DYNAMISSCIENCE_DATA_ROOT = '$DYNAMISSCIENCE_DATA_ROOT'
     $env:DYNAMISSCIENCE_BROWSER_BASE = 'http://localhost:3001'
     python scripts/res588_validation.py
 
@@ -73,11 +73,7 @@ def run() -> dict:
         "viewports": [],
     }
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            headless=True,
-            executable_path=edge_path(),
-            args=["--disable-gpu"],
-        )
+        browser = playwright.chromium.launch(headless=True, args=["--disable-gpu"])
         try:
             for viewport in VIEWPORTS:
                 context = browser.new_context(viewport={"width": viewport["width"], "height": viewport["height"]}, accept_downloads=True)

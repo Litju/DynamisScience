@@ -55,7 +55,6 @@ def _overflow(page) -> dict:
 def run() -> dict:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     results = {"started_at": datetime.now(timezone.utc).isoformat(), "base": BASE, "viewports": []}
-    edge = _edge_path()
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True, args=["--disable-gpu"])
         try:
