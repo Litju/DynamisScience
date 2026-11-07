@@ -24,14 +24,19 @@ $env:DYNAMISSCIENCE_SCIENCE_API = ""
 $env:HTTP_PROXY = "http://127.0.0.1:9"
 $env:HTTPS_PROXY = "http://127.0.0.1:9"
 
-function Invoke-PackagedSmoke([string]$Executable, [string]$Label, [string]$DataRoot) {
+function Invoke-PackagedSmoke(
+    [string]$Executable,
+    [string]$Label,
+    [string]$DataRoot,
+    [string]$PerformancePage = ""
+) {
     $env:DYNAMISSCIENCE_DATA_ROOT = $DataRoot
     $env:DYNAMISSCIENCE_SETTINGS_FILE = Join-Path $testRoot ($Label + "-settings.json")
     $ready = Join-Path $testRoot ($Label + "-ready.txt")
     $clock = [System.Diagnostics.Stopwatch]::StartNew()
-    $process = Start-Process -FilePath $Executable `
-        -ArgumentList @("--data-root", $DataRoot, "--benchmark-ready-file", $ready, "--benchmark-exit-after-ready") `
-        -PassThru
+    $launchArgs = @("--data-root", $DataRoot, "--benchmark-ready-file", $ready, "--benchmark-exit-after-ready")
+    if ($PerformancePage) { $launchArgs += @("--benchmark-performance-page", $PerformancePage) }
+    $process = Start-Process -FilePath $Executable -ArgumentList $launchArgs -PassThru
     $peakWorkingSet = 0L
     $listeners = [System.Collections.Generic.HashSet[int]]::new()
     try {
@@ -78,6 +83,7 @@ try {
     $installedExe = Join-Path $installRoot "DynamisScience.exe"
     if (-not (Test-Path -LiteralPath $installedExe)) { throw "The installer did not place DynamisScience.exe in the selected install directory." }
     $benchmarks.runs += Invoke-PackagedSmoke $installedExe "installed" $installedDataRoot
+    $benchmarks.runs += Invoke-PackagedSmoke $installedExe "installed-performance" $installedDataRoot "today"
 
     $workerRequestPath = Join-Path $installedDataRoot "tmp\packaged-worker-request.json"
     $workerResponsePath = Join-Path $installedDataRoot "tmp\packaged-worker-response.json"
@@ -98,6 +104,7 @@ run = s.execute_analysis_run(study["id"], payload)
 base = Path(os.environ["DYNAMISSCIENCE_DATA_ROOT"]) / "tmp"
 (base / "packaged-worker-request.json").write_text(json.dumps(request), encoding="utf-8")
 (base / "packaged-worker-expected.json").write_text(json.dumps({"result_digest": run["result_digest"]}), encoding="utf-8")
+(base / "figure-worker-request.json").write_text(json.dumps({"operation": "figure_export", "data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"], "output_dir": str(base / "packaged-figures"), "run": run}, default=str), encoding="utf-8")
 (base / "qualification-worker-request.json").write_text(json.dumps({"operation": "real_qualification", "data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"]}), encoding="utf-8")
 '@
     Push-Location $serviceRoot
@@ -122,6 +129,30 @@ base = Path(os.environ["DYNAMISSCIENCE_DATA_ROOT"]) / "tmp"
         status = $workerResult.status
         result_digest_matches_direct = $true
         elapsed_ms = [Math]::Round($workerClock.Elapsed.TotalMilliseconds, 2)
+    }
+
+    $figureRequestPath = Join-Path $installedDataRoot "tmp\figure-worker-request.json"
+    $figureResponsePath = Join-Path $installedDataRoot "tmp\figure-worker-response.json"
+    $figureProcess = Start-Process -FilePath $installedExe `
+        -ArgumentList @("--worker", $figureRequestPath, $figureResponsePath) `
+        -PassThru -Wait -WindowStyle Hidden
+    if ($figureProcess.ExitCode -ne 0) { throw "The packaged Matplotlib export worker failed ($($figureProcess.ExitCode))." }
+    $figureResult = Get-Content -LiteralPath $figureResponsePath -Raw | ConvertFrom-Json
+    $expectedDigest = (Get-Content -LiteralPath $workerExpectedPath -Raw | ConvertFrom-Json).result_digest
+    if ($figureResult.result_digest -ne $expectedDigest) { throw "The packaged figure uses a different scientific result digest." }
+    foreach ($extension in @("png", "pdf", "svg")) {
+        $export = $figureResult.exports.$extension
+        if ($export.bytes -le 0 -or -not (Test-Path -LiteralPath $export.path)) {
+            throw "The packaged Matplotlib $extension export is missing or empty."
+        }
+    }
+    if (-not (Select-String -LiteralPath $figureResult.exports.svg.path -Pattern $expectedDigest -Quiet)) {
+        throw "The packaged SVG export is missing its result provenance digest."
+    }
+    $benchmarks.matplotlib_exports = @{
+        extensions = @("png", "pdf", "svg")
+        result_digest_matches_direct = $true
+        provenance_embedded = $true
     }
 
     if (-not (Test-Path -LiteralPath (Join-Path $installRoot "_internal\scripts\real_mixedlm.R"))) {

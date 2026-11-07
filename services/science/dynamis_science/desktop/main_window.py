@@ -50,7 +50,7 @@ from .dialogs import (
 from .investigation_editor import InvestigationEditor
 from .library_dialog import ScientificLibraryDialog
 from .lineage_dialog import LineageDialog
-from .performance_workbench import PerformanceHeader, PerformanceRail, PerformanceWorkbench
+from .performance_navigation import PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES
 from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .tasks import TaskRunner
@@ -125,28 +125,12 @@ class MainWindow(QMainWindow):
         self.workspace.addWidget(self.welcome)
         self.research = ResearchWorkbench(self)
         self.workspace.addWidget(self.research)
-        self.performance = PerformanceWorkbench(self)
-        self.performance.open_research_study.connect(self._open_research_study)
-        self.performance.athlete_inspected.connect(self._show_athlete_inspector)
-        self.performance.context_panel.back_to_daily.connect(self._show_daily_context)
-        self.performance.context_panel.open_full_athlete.connect(self._open_full_athlete_profile)
-        self.inspector_stack.addWidget(self.performance.context_panel)
-        self.workspace.addWidget(self.performance)
+        self.performance = None
+        self.performance_header = None
+        self.performance_rail = None
+        self.performance_toolbar = None
         layout.addWidget(self.workspace, 1)
         self.setCentralWidget(central)
-
-        self.performance_header = PerformanceHeader(self)
-        self.performance_header.search_requested.connect(self._search_performance)
-        self.performance_rail = PerformanceRail(self)
-        self.performance_rail.page_selected.connect(self.show_performance_page)
-        self.navigator_stack.addWidget(self.performance_rail)
-        self.performance_toolbar = QToolBar("Performance OS", self)
-        self.performance_toolbar.setObjectName("PerformanceToolbar")
-        self.performance_toolbar.setMovable(False)
-        self.performance_toolbar.setFloatable(False)
-        self.performance_toolbar.addWidget(self.performance_header)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
-        self.performance_toolbar.hide()
 
         self.status_text = QLabel("Starting")
         self.progress = QProgressBar()
@@ -267,7 +251,36 @@ class MainWindow(QMainWindow):
         for action in (self.action_new_project, self.action_new_study, self.action_admit):
             self.research_toolbar.addAction(action)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.research_toolbar)
+
+    def _ensure_performance(self) -> None:
+        if self.performance is not None:
+            return
+        from .performance_workbench import (
+            PerformanceHeader,
+            PerformanceRail,
+            PerformanceWorkbench,
+        )
+
+        self.performance = PerformanceWorkbench(self)
+        self.performance.open_research_study.connect(self._open_research_study)
+        self.performance.athlete_inspected.connect(self._show_athlete_inspector)
+        self.performance.context_panel.back_to_daily.connect(self._show_daily_context)
+        self.performance.context_panel.open_full_athlete.connect(self._open_full_athlete_profile)
+        self.inspector_stack.addWidget(self.performance.context_panel)
+        self.workspace.addWidget(self.performance)
+        self.performance_header = PerformanceHeader(self)
+        self.performance_header.search_requested.connect(self._search_performance)
         self.performance_header.set_menu_actions(self.menuBar().actions())
+        self.performance_rail = PerformanceRail(self)
+        self.performance_rail.page_selected.connect(self.show_performance_page)
+        self.navigator_stack.addWidget(self.performance_rail)
+        self.performance_toolbar = QToolBar("Performance OS", self)
+        self.performance_toolbar.setObjectName("PerformanceToolbar")
+        self.performance_toolbar.setMovable(False)
+        self.performance_toolbar.setFloatable(False)
+        self.performance_toolbar.addWidget(self.performance_header)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
+        self.performance_toolbar.hide()
 
     def _open_third_party_licenses(self) -> None:
         if getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None):
@@ -393,6 +406,7 @@ class MainWindow(QMainWindow):
         )
 
     def _show_performance_mode(self) -> None:
+        self._ensure_performance()
         self.menuBar().hide()
         self.research_header.hide()
         self.provenance.hide()
@@ -429,7 +443,8 @@ class MainWindow(QMainWindow):
 
     def _show_research_mode(self) -> None:
         self.menuBar().show()
-        self.performance_toolbar.hide()
+        if self.performance_toolbar is not None:
+            self.performance_toolbar.hide()
         self.research_toolbar.show()
         self.research_header.show()
         self.provenance.show()
@@ -444,6 +459,7 @@ class MainWindow(QMainWindow):
         self.inspector_dock.setMaximumWidth(16777215)
 
     def show_performance_page(self, page: str) -> None:
+        self._ensure_performance()
         self._show_performance_mode()
         page_alias = {"athlete": "today", "match": "monitor"}
         if page in page_alias:
@@ -590,7 +606,7 @@ class MainWindow(QMainWindow):
         performance_root = QTreeWidgetItem(["Performance OS · synthetic fixture"])
         performance_root.setData(0, Qt.ItemDataRole.UserRole, {"type": "performance_root"})
         self.navigator.addTopLevelItem(performance_root)
-        for page, label in zip(self.performance.page_keys, self.performance.page_names):
+        for page, label in zip(PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES):
             item = QTreeWidgetItem([label])
             item.setData(
                 0,

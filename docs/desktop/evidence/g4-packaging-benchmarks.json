@@ -4,15 +4,22 @@
     {
       "label": "onedir",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 2421.2525,
-      "peak_working_set_mb": 219.3,
+      "startup_to_catalogue_ms": 3502.6117000000004,
+      "peak_working_set_mb": 110.66,
       "process_exit_code": 0
     },
     {
       "label": "installed",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 3578.0741000000003,
-      "peak_working_set_mb": 211.93,
+      "startup_to_catalogue_ms": 1733.5649,
+      "peak_working_set_mb": 118.72,
+      "process_exit_code": 0
+    },
+    {
+      "label": "installed-performance",
+      "listener_count": 0,
+      "startup_to_catalogue_ms": 3330.2878,
+      "peak_working_set_mb": 245.5,
       "process_exit_code": 0
     }
   ],
@@ -21,21 +28,30 @@
     "method_id": "METH-U-DESC",
     "status": "COMPLETED",
     "result_digest_matches_direct": true,
-    "elapsed_ms": 1218.79
+    "elapsed_ms": 2519.49
+  },
+  "matplotlib_exports": {
+    "provenance_embedded": true,
+    "extensions": [
+      "png",
+      "pdf",
+      "svg"
+    ],
+    "result_digest_matches_direct": true
   },
   "qualification_worker": {
     "empty_state": true,
     "status": "NO_REAL_SNAPSHOTS"
   },
   "sqlite_recovery": {
-    "elapsed_ms": 1224.28,
+    "elapsed_ms": 2260.54,
     "logical_hash_preserved": true,
     "operational_database_unchanged": true,
     "restore_reopened": true,
     "integrity_check": "ok"
   },
-  "data_root": "D:\\SWE_HOME\\tmp\\dynamis-g4-installer-8f91d59746874752b4d1df66075b42cb\\installed-data",
+  "data_root": "D:\\SWE_HOME\\tmp\\dynamis-g4-installer-d351244bb8c0481f82f35d488d45646b\\installed-data",
   "database_survived_uninstall": true,
-  "bundle_bytes": 580731261,
-  "installer_bytes": 139883359
+  "bundle_bytes": 582741845,
+  "installer_bytes": 141523998
 }

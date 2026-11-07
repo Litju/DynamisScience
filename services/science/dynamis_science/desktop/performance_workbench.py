@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from .models import RecordTableModel
+from .performance_navigation import PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES
 
 
 def _record_view() -> tuple[QTableView, RecordTableModel]:
@@ -612,17 +613,8 @@ class PerformanceWorkbench(QWidget):
 
     open_research_study = Signal(str)
     athlete_inspected = Signal(object)
-    page_names = (
-        "Today",
-        "Athlete 360",
-        "Plan",
-        "Monitor",
-        "Test",
-        "Match & Pose",
-        "Research",
-        "Report",
-    )
-    page_keys = ("today", "athlete", "plan", "monitor", "test", "match", "research", "report")
+    page_names = PERFORMANCE_PAGE_NAMES
+    page_keys = PERFORMANCE_PAGE_KEYS
 
     def __init__(self, window: QWidget) -> None:
         super().__init__(window)

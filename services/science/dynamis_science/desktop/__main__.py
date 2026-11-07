@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from ..data_root import DataRootConfigurationError, data_root, ensure_layout
 from .main_window import MainWindow
+from .performance_navigation import PERFORMANCE_PAGE_KEYS
 from .services import DynamisAppService
 
 
@@ -67,6 +68,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-root", help="private research data directory")
     parser.add_argument("--benchmark-ready-file", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--benchmark-exit-after-ready", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--benchmark-performance-page",
+        choices=PERFORMANCE_PAGE_KEYS,
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args(argv)
     app = QApplication(sys.argv[:1])
     app.setApplicationName("DynamisScience")
@@ -112,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
     window = MainWindow(DynamisAppService())
     if args.benchmark_exit_after_ready and not args.benchmark_ready_file:
         parser.error("--benchmark-exit-after-ready requires --benchmark-ready-file")
+    if args.benchmark_performance_page and not args.benchmark_ready_file:
+        parser.error("--benchmark-performance-page requires --benchmark-ready-file")
     if args.benchmark_ready_file:
         ready_file = args.benchmark_ready_file.expanduser().resolve()
 
@@ -119,8 +127,29 @@ def main(argv: list[str] | None = None) -> int:
             ready_file.parent.mkdir(parents=True, exist_ok=True)
             ready_file.write_text(str(time.perf_counter_ns()), encoding="utf-8")
 
-        window.catalogue_loaded.connect(write_ready_file)
-        if args.benchmark_exit_after_ready:
+        if args.benchmark_performance_page:
+            def open_performance_page() -> None:
+                window.show_performance_page(args.benchmark_performance_page)
+
+                def wait_for_page() -> None:
+                    loaded = (
+                        window.performance is not None
+                        and args.benchmark_performance_page in window.performance.loaded_pages
+                        and not window.runner.active
+                    )
+                    if loaded:
+                        write_ready_file()
+                        if args.benchmark_exit_after_ready:
+                            QTimer.singleShot(250, app.quit)
+                    else:
+                        QTimer.singleShot(50, wait_for_page)
+
+                QTimer.singleShot(0, wait_for_page)
+
+            window.catalogue_loaded.connect(open_performance_page)
+        else:
+            window.catalogue_loaded.connect(write_ready_file)
+        if args.benchmark_exit_after_ready and not args.benchmark_performance_page:
             window.catalogue_loaded.connect(lambda: QTimer.singleShot(1000, app.quit))
     window.show()
     return app.exec()

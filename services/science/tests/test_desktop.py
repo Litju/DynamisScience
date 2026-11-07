@@ -37,6 +37,10 @@ from dynamis_science.desktop.performance_workbench import (
     ReportDialog,
     SessionDialog,
 )
+from dynamis_science.desktop.performance_navigation import (
+    PERFORMANCE_PAGE_KEYS,
+    PERFORMANCE_PAGE_NAMES,
+)
 from dynamis_science.desktop.services import DynamisAppService
 from dynamis_science.desktop.tasks import TaskRunner
 from dynamis_science.desktop.library_dialog import ScientificLibraryDialog
@@ -123,6 +127,8 @@ def test_native_entry_point_smokes_and_reopens_its_private_store(tmp_path):
             "--benchmark-ready-file",
             str(ready_file),
             "--benchmark-exit-after-ready",
+            "--benchmark-performance-page",
+            "today",
         ],
         cwd=Path(__file__).resolve().parents[1],
         env=environment,
@@ -930,8 +936,8 @@ def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, m
     window.show()
     qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
     performance_root = window.navigator.topLevelItem(3)
-    assert performance_root.childCount() == len(window.performance.page_names)
-    for index, page in enumerate(window.performance.page_keys):
+    assert performance_root.childCount() == len(PERFORMANCE_PAGE_NAMES)
+    for index, page in enumerate(PERFORMANCE_PAGE_KEYS):
         item = performance_root.child(index)
         window._navigation_activated(item, 0)
         qtbot.waitUntil(lambda page=page: page in window.performance.loaded_pages)

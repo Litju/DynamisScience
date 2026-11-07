@@ -15,6 +15,17 @@ def _execute(request: dict) -> Any:
         from ..qualification_real import run
 
         return run()
+    if request.get("operation") == "figure_export":
+        from .plots import export_figure, run_figure
+
+        output_dir = Path(request["output_dir"])
+        output_dir.mkdir(parents=True, exist_ok=True)
+        figure = run_figure(request["run"])
+        exports = {}
+        for extension in ("png", "pdf", "svg"):
+            path = export_figure(figure, output_dir / f"packaged-analysis.{extension}")
+            exports[extension] = {"path": str(path), "bytes": path.stat().st_size}
+        return {"result_digest": request["run"].get("result_digest"), "exports": exports}
     if request.get("operation", "analysis") != "analysis":
         raise ValueError(f"Unknown isolated worker operation: {request['operation']}")
     from .services import DynamisAppService
