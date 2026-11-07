@@ -1,0 +1,46 @@
+{
+  "BENCH-01-COLD-START": {
+    "median_ms": 1297.091,
+    "p95_ms": 1370.67,
+    "samples": [
+      1297.091,
+      1371.398,
+      1367.758,
+      1259.087,
+      1294.868
+    ]
+  },
+  "benchmarks": {
+    "BENCH-02-IDLE-RAM": {
+      "delay_after_study_open_s": 5,
+      "working_set_mb": 200.22
+    },
+    "BENCH-03-PARQUET-PAGE": {
+      "latency_ms": 31.442,
+      "rows": 500,
+      "table": "force_signals",
+      "working_set_delta_mb": 2.24
+    },
+    "BENCH-04-WAVEFORM-LOAD": {
+      "latency_ms": 55.386
+    },
+    "BENCH-05-MIXEDLM-RUN": {
+      "max_gui_timer_gap_ms": 18.089,
+      "method_id": "METH-REAL-TREND",
+      "status": "COMPLETED",
+      "wall_ms": 4311.266,
+      "worker_duration_ms": 3342.563
+    },
+    "BENCH-06-PEAK-RSS": {
+      "peak_working_set_mb": 227.46,
+      "report_exported": true,
+      "working_set_mb": 223.95
+    }
+  },
+  "input_data": "checksum-verified snapshots and SQLite backup in a disposable temporary root",
+  "platform": "win32",
+  "python": "3.12.13",
+  "qt_platform": "offscreen",
+  "windows_release": "11",
+  "windows_version": "10.0.22631"
+}
