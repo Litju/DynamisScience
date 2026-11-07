@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +23,13 @@ SCHEMA_VERSION = "dynamis-science.schema@1.0.0"
 SNAPSHOT_ID = "DS-SYNTH-001"
 GENERATED_AT = "2026-09-24T00:00:00Z"
 ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = ROOT / "data"
+_fixture_root = os.environ.get("DYNAMISSCIENCE_FIXTURE_DIR")
+if _fixture_root:
+    DATA_DIR = Path(_fixture_root).expanduser().resolve()
+elif getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None):
+    DATA_DIR = Path(sys._MEIPASS) / "data"
+else:
+    DATA_DIR = ROOT / "data"
 PARQUET_DIR = DATA_DIR / "parquet"
 ARTIFACT_DIR = DATA_DIR / "artifacts"
 SYNTHETIC_DIR = DATA_DIR / "synthetic"

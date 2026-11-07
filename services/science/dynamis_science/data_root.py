@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+
+def _application_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[3]
+
+
+ROOT = _application_root()
 LAYOUT = (
     "sources",
     "extracted",
@@ -19,6 +27,7 @@ LAYOUT = (
     "artifacts",
     "reports",
     "performance",
+    "logs",
     "research",
     "tmp",
 )

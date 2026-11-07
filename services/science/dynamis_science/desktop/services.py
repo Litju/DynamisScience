@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import math
 import os
+import sqlite3
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +44,23 @@ class DynamisAppService:
             )
             self.synthetic_available = all(path.is_file() for path in required)
             researchstore.list_projects()  # initializes the versioned SQLite schema
+            database = self.root / "research" / "research.db"
+            connection = sqlite3.connect(
+                f"{database.as_uri()}?mode=ro", uri=True, timeout=5
+            )
+            try:
+                connection.execute("PRAGMA foreign_keys=ON")
+                integrity = connection.execute("PRAGMA quick_check").fetchone()[0]
+                foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
+                journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
+            finally:
+                connection.close()
+            if integrity != "ok" or foreign_keys or journal_mode.lower() != "wal":
+                raise DataRootConfigurationError(
+                    "Research database failed startup integrity checks "
+                    f"(integrity={integrity}, foreign_key_violations={len(foreign_keys)}, "
+                    f"journal_mode={journal_mode}). Use the Tools backup and restore workflow."
+                )
             self._initialized = True
         return self.verify_environment()
 
@@ -552,6 +571,35 @@ class DynamisAppService:
         request = json.dumps(
             {"data_root": str(self.root), "study_id": study_id, "payload": payload}
         )
+        if getattr(sys, "frozen", False):
+            self.ensure_initialized()
+            request_path = self.root / "tmp" / f"analysis-{uuid.uuid4().hex}-request.json"
+            response_path = self.root / "tmp" / f"analysis-{uuid.uuid4().hex}-response.json"
+            request_path.write_text(request, encoding="utf-8")
+            try:
+                process = subprocess.run(
+                    [sys.executable, "--worker", str(request_path), str(response_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=1800,
+                    cwd=self.root,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                )
+                output = response_path.read_text(encoding="utf-8") if response_path.is_file() else ""
+                if process.returncode:
+                    try:
+                        error = json.loads(output)
+                        message = f"{error['type']}: {error['message']}"
+                    except (KeyError, ValueError):
+                        message = process.stderr.strip() or "The isolated scientific worker failed"
+                    raise RuntimeError(message)
+                try:
+                    return json.loads(output)
+                except ValueError as error:
+                    raise RuntimeError("The isolated scientific worker returned invalid JSON") from error
+            finally:
+                request_path.unlink(missing_ok=True)
+                response_path.unlink(missing_ok=True)
         process = subprocess.run(
             [sys.executable, "-m", "dynamis_science.desktop.worker"],
             input=request,
@@ -858,6 +906,32 @@ class DynamisAppService:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(html, encoding="utf-8")
         return path
+
+    def verify_research_database(self) -> dict[str, Any]:
+        self.ensure_initialized()
+        from scripts.sqlite_recovery import inspect_database
+
+        return inspect_database(self.root / "research" / "research.db")
+
+    def backup_research_database(self) -> dict[str, Any]:
+        self.ensure_initialized()
+        from datetime import UTC, datetime
+
+        from scripts.sqlite_recovery import backup_database
+
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        target = self.root / "backups" / f"research-{stamp}-{uuid.uuid4().hex[:8]}.sqlite3"
+        result = backup_database(target)
+        return {"path": str(target), **result}
+
+    def rehearse_research_restore(
+        self, backup_path: str | os.PathLike[str]
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        from scripts.sqlite_recovery import restore_database
+
+        target = self.root / "tmp" / f"restore-{uuid.uuid4().hex}"
+        return restore_database(Path(backup_path).expanduser(), target)
 
 
 def _read_json(path: Path, default: Any) -> Any:

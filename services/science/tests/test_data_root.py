@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import pytest
 
+from dynamis_science import data_root as storage
 from dynamis_science.data_root import (
     DataRootConfigurationError,
     ROOT,
@@ -38,3 +40,16 @@ def test_path_resolution_uses_the_current_environment_or_explicit_root(monkeypat
     assert paths(explicit)["root"] == explicit.resolve()
     assert Path(paths()["research"]) == configured.resolve() / "research"
     assert Path(paths()["performance"]) == configured.resolve() / "performance"
+
+
+def test_frozen_data_root_is_external_to_the_installed_application(monkeypatch, tmp_path):
+    app_dir = tmp_path / "installed-app"
+    app_dir.mkdir()
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(app_dir / "DynamisScience.exe"))
+    monkeypatch.setattr(storage, "ROOT", storage._application_root())
+    data_dir = tmp_path / "private-data"
+
+    assert data_root(data_dir) == data_dir.resolve()
+    with pytest.raises(DataRootConfigurationError, match="outside the repository"):
+        data_root(app_dir / "private-data")

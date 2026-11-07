@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import sys
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
@@ -216,6 +218,19 @@ class MainWindow(QMainWindow):
         ):
             action = plan_menu.addAction(label)
             action.triggered.connect(callback)
+        tools_menu = self.menuBar().addMenu("Tools")
+        self.action_verify_database = QAction("Verify research database integrity", self)
+        self.action_verify_database.triggered.connect(self._verify_research_database)
+        self.action_backup_database = QAction("Create verified database backup", self)
+        self.action_backup_database.triggered.connect(self._backup_research_database)
+        self.action_restore_database = QAction("Rehearse restore from backup…", self)
+        self.action_restore_database.triggered.connect(self._rehearse_research_restore)
+        for action in (
+            self.action_verify_database,
+            self.action_backup_database,
+            self.action_restore_database,
+        ):
+            tools_menu.addAction(action)
         view_menu = self.menuBar().addMenu("View")
         view_menu.addAction(self.navigator_dock.toggleViewAction())
         view_menu.addAction(self.inspector_dock.toggleViewAction())
@@ -229,6 +244,9 @@ class MainWindow(QMainWindow):
             )
         )
         help_menu.addAction(about)
+        licenses_action = QAction("Open-source licenses…", self)
+        licenses_action.triggered.connect(self._open_third_party_licenses)
+        help_menu.addAction(licenses_action)
 
         self.research_toolbar = QToolBar("Research authoring", self)
         self.research_toolbar.setObjectName("ResearchToolbar")
@@ -237,6 +255,99 @@ class MainWindow(QMainWindow):
             self.research_toolbar.addAction(action)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.research_toolbar)
         self.performance_header.set_menu_actions(self.menuBar().actions())
+
+    def _open_third_party_licenses(self) -> None:
+        if getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None):
+            notice = Path(sys._MEIPASS) / "THIRD_PARTY_LICENSES.md"
+            distribution_notices = Path(sys._MEIPASS) / "THIRD_PARTY_NOTICES.txt"
+        else:
+            doc_root = Path(__file__).resolve().parents[4] / "docs" / "desktop"
+            notice = doc_root / "THIRD_PARTY_LICENSES.md"
+            distribution_notices = doc_root / "licenses" / "THIRD_PARTY_NOTICES.txt"
+        if not notice.is_file():
+            QMessageBox.warning(self, "Open-source licenses", "The bundled third-party notice is unavailable.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Open-source licenses")
+        layout = QVBoxLayout(dialog)
+        browser = QTextBrowser(dialog)
+        browser.setOpenExternalLinks(False)
+        content = notice.read_text(encoding="utf-8")
+        if distribution_notices.is_file():
+            content += "\n\n" + distribution_notices.read_text(encoding="utf-8")
+        browser.setMarkdown(content)
+        layout.addWidget(browser)
+        close = QPushButton("Close")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.resize(760, 600)
+        dialog.exec()
+
+    def _verify_research_database(self) -> None:
+        def show_report(report: dict[str, Any]) -> None:
+            QMessageBox.information(
+                self,
+                "Research database integrity",
+                f"Integrity: {', '.join(report['integrity_check'])}\n"
+                f"Foreign-key violations: {report['foreign_key_violations']}\n"
+                f"Projects: {report['record_counts']['projects']} · "
+                f"Studies: {report['record_counts']['studies']} · "
+                f"Runs: {report['record_counts']['runs']} · "
+                f"Evidence: {report['record_counts']['evidence']}\n"
+                f"SHA-256: {report['logical_sha256']}",
+            )
+
+        self.run_task(
+            self.service.verify_research_database,
+            show_report,
+            "Checking SQLite integrity and provenance records",
+        )
+
+    def _backup_research_database(self) -> None:
+        def show_backup(result: dict[str, Any]) -> None:
+            QMessageBox.information(
+                self,
+                "Research database backup",
+                f"Verified online backup created:\n{result['path']}\n\n"
+                f"Projects: {result['backup']['record_counts']['projects']} · "
+                f"Studies: {result['backup']['record_counts']['studies']} · "
+                f"Runs: {result['backup']['record_counts']['runs']} · "
+                f"Evidence: {result['backup']['record_counts']['evidence']}",
+            )
+
+        self.run_task(
+            self.service.backup_research_database,
+            show_backup,
+            "Creating and verifying an online SQLite backup",
+        )
+
+    def _rehearse_research_restore(self) -> None:
+        target, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose a verified database backup",
+            str(self.service.root / "backups"),
+            "SQLite backups (*.sqlite3 *.db)",
+        )
+        if not target:
+            return
+
+        def show_restore(result: dict[str, Any]) -> None:
+            counts = result["application_reopen"]["record_counts"]
+            QMessageBox.information(
+                self,
+                "Restore rehearsal completed",
+                "The backup was restored into an isolated private copy and reopened successfully. "
+                "The current data root was left untouched.\n\n"
+                f"Rehearsal copy:\n{result['restore_root']}\n\n"
+                f"Projects: {counts['projects']} · Studies: {counts['studies']} · "
+                f"Runs: {counts['runs']} · Evidence: {counts['evidence']}",
+            )
+
+        self.run_task(
+            lambda: self.service.rehearse_research_restore(target),
+            show_restore,
+            "Restoring the backup to a separate root and reopening it",
+        )
 
     def _show_performance_mode(self) -> None:
         self.menuBar().hide()
@@ -376,6 +487,9 @@ class MainWindow(QMainWindow):
         def failed(error: Exception) -> None:
             self.progress.setVisible(False)
             self.status_text.setText("Operation failed")
+            logging.getLogger("dynamis_science.desktop").error(
+                "Background task failed: %s (%s)", label, type(error).__name__
+            )
             if isinstance(error, ResearchConflict):
                 box = QMessageBox(self)
                 box.setWindowTitle("Record changed")

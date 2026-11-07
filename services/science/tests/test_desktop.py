@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -62,6 +63,68 @@ def test_task_results_are_delivered_on_gui_thread(qtbot):
     )
     qtbot.waitUntil(lambda: bool(received))
     assert received == [(17, main_thread)]
+
+
+def test_fixture_generator_build_override_preserves_repository_manifest(tmp_path):
+    repository_manifest = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "generator_manifest.json"
+
+    def checksum(path: Path) -> str:
+        with path.open("rb") as handle:
+            return hashlib.file_digest(handle, "sha256").hexdigest()
+
+    before = checksum(repository_manifest)
+    fixture_root = tmp_path / "packaged-synthetic-fixture"
+    environment = os.environ.copy()
+    environment["DYNAMISSCIENCE_FIXTURE_DIR"] = str(fixture_root)
+    process = subprocess.run(
+        [sys.executable, "-m", "dynamis_science.generate"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert process.returncode == 0, process.stderr
+    assert (fixture_root / "parquet" / "force_traces.parquet").is_file()
+    assert (fixture_root / "artifacts" / "dataset_snapshot.json").is_file()
+    after = checksum(repository_manifest)
+    assert after == before
+
+
+def test_native_entry_point_smokes_and_reopens_its_private_store(tmp_path):
+    root = tmp_path / "private"
+    ready_file = tmp_path / "startup-ready.txt"
+    settings_file = tmp_path / "settings.json"
+    environment = os.environ.copy()
+    environment.update(
+        QT_QPA_PLATFORM="offscreen",
+        DYNAMISSCIENCE_DATA_ROOT=str(root),
+        DYNAMISSCIENCE_SETTINGS_FILE=str(settings_file),
+    )
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dynamis_science.desktop",
+            "--data-root",
+            str(root),
+            "--benchmark-ready-file",
+            str(ready_file),
+            "--benchmark-exit-after-ready",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert process.returncode == 0, process.stderr
+    assert ready_file.is_file()
+    assert json.loads(settings_file.read_text(encoding="utf-8"))["data_root"] == str(root)
+    with sqlite3.connect(root / "research" / "research.db") as database:
+        assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
 def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monkeypatch):
@@ -821,4 +884,46 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     qtbot.waitUntil(lambda: not window.runner.active)
     assert "DS-SYNTH-001" in output.read_text(encoding="utf-8")
     assert not errors, errors
+    window.close()
+
+
+def test_native_database_tools_verify_backup_and_restore_safely(qtbot, tmp_path, monkeypatch):
+    messages = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *_args: messages.append(_args[-1]))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: pytest.fail(str(_args[-1])))
+    monkeypatch.setattr(QMessageBox, "question", lambda *_args: QMessageBox.StandardButton.Yes)
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    root = tmp_path / "private"
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(root))
+    service = DynamisAppService()
+    project = service.create_project({"title": "Backup rehearsal test"})
+    detail = service.create_study(
+        project["id"],
+        {
+            "title": "Restore verification study",
+            "research_question": "Does the temporary restore preserve the audit trail?",
+            "dataset_snapshot_id": "DS-SYNTH-001",
+            "primary_metric_id": "MET-CMJ-IMPULSE",
+        },
+    )
+    study_id = detail["study"]["id"]
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    original = service.verify_research_database()
+    window._backup_research_database()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    backups = list((root / "backups").glob("research-*.sqlite3"))
+    assert len(backups) == 1
+    assert any("Verified online backup created" in message for message in messages)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *_args: (str(backups[0]), "SQLite backups"))
+    window._rehearse_research_restore()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert any("restored into an isolated private copy" in message for message in messages)
+    assert service.verify_research_database()["logical_sha256"] == original["logical_sha256"]
+    restored = next((root / "tmp").glob("restore-*/research/research.db"))
+    assert restored.is_file()
+    assert service.get_study_detail(study_id)["study"]["id"] == study_id
     window.close()

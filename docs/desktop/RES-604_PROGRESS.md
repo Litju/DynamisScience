@@ -97,7 +97,7 @@ Performance measurements are in [G3 benchmark JSON](evidence/g3-performance-benc
 
 ## G4 — Packaging and web retirement
 
-**Implementation status:** In progress. The Performance OS domain module is now pure Python and its legacy HTTP route wrappers are isolated in `performance_http.py`; desktop calls the domain functions directly. PyInstaller 6.22.3 is in the build-tool dependency group, and Inno Setup 6.7.3 is installed for local installer work. No distribution has been claimed yet.
+**Implementation status:** In progress. The Windows one-directory bundle and per-user installer now build, install, launch offline, run a packaged scientific worker, and uninstall without changing the configured research database. Native feature parity and web retirement remain open.
 
 Completed in G4 so far:
 
@@ -105,14 +105,25 @@ Completed in G4 so far:
 - Added a fresh-process regression assertion that importing Performance OS domain logic leaves FastAPI, Uvicorn and QtWebEngine unloaded.
 - Installed the PyInstaller 6.22.3 build tool in the project environment and Inno Setup 6.7.3 for packaging validation. `uv lock --check` passed after the build-tool addition.
 - The legacy performance HTTP adapter still passes the existing TestClient Performance OS contract tests while native workflows use direct service calls.
+- Added a Windows-first PyInstaller `--onedir` spec and per-user Inno Setup installer. The build stages a disposable `DS-SYNTH-001` fixture under an ignored, unique build directory; no private Mendeley/MoveSmart data enters the bundle.
+- Fixed the first frozen-launch defects found by real installed runs: remove host Poppler ICU DLL contamination, explicitly collect pyqtgraph's dynamic `PySide6.QtOpenGL` and `QtOpenGLWidgets` imports, and resolve the private-root safety boundary from the installed executable directory when frozen.
+- Added native SQLite integrity inspection, online backup verification and isolated restore rehearsal. Application exceptions are logged to a rotating file under the configured private root; scientific execution uses the packaged `--worker` file-IPC entry point in a separate process.
+- Bundled third-party license notices and the LGPL-3.0 text, with an in-app Help menu viewer. The Qt redistribution notices remain included in the installer.
+
+Windows packaging verification (Windows 11 x64, Python 3.12.13, PyInstaller 6.22.3, Inno Setup 6.7.3):
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/build_windows.ps1` — passed. Bundle: `581,265,474` bytes; installer: `140,121,317` bytes.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/test_windows_installer.ps1` — passed. Unpacked and installed catalogue startup: `2,632 ms` / `3,827 ms`; peak working set: `207.07 MB` / `208.18 MB`; zero listening TCP ports; launch ran with HTTP proxy variables pinned to local port 9; silent install and uninstall passed; configured disposable SQLite database hash was unchanged after uninstall.
+- The installed `--worker` path ran the bundled `METH-U-DESC` analysis from a temporary authored study and matched the direct Python result digest; worker elapsed time was `1,257.52 ms`.
+- `uv run pytest -q` — full scientific and native regression suite passed, including verified Mendeley and MoveSmart workflows on isolated copies. `uv lock --check` passed. `uv run pytest tests/test_data_root.py tests/test_desktop.py::test_native_database_tools_verify_backup_and_restore_safely -q` passed; the backup/restore GUI test also passed on an isolated rerun.
+- Reproducible package measurements and isolated data-root path: [G4 packaging benchmarks](evidence/g4-packaging-benchmarks.json). The synthetic generator manifest's pre-existing worktree edit was not staged.
 
 Remaining G4 work:
 
-- Complete the endpoint-to-native workflow parity and scientific regression matrix. Keep the legacy HTTP adapter only until this passes.
-- Add the disposable generated fixture to the `--onedir` bundle without writing to the checked-out `data/` tree or including private Mendeley/MoveSmart records.
-- Build and smoke-test the standalone executable, compile and run the per-user Inno installer, verify uninstall leaves the configured private root untouched, and confirm offline launch/no HTTP listeners.
-- Add native database integrity/backup/restore actions, startup and failed-job recovery behavior, runtime-footprint and installer-size measurements, and Qt/Python licensing notices.
-- After parity, retire `apps/web`, TypeScript contracts and Node scripts, then remove `api.py`, `performance_http.py`, FastAPI/Uvicorn, and other unneeded HTTP dependencies. Re-run the scientific and native test suites after removal.
+- Complete the endpoint-to-native feature-parity review. The approved design still calls for a native investigation scratchpad and report-version comparison; add and verify those before retiring the old workbench.
+- Verify native replacements for every user-facing Research and Performance OS workflow and the associated scientific restrictions, warning states, and provenance navigation. Record any legacy-only test behavior that is intentionally superseded by the direct service and research-store contracts.
+- After parity, retire `apps/web`, TypeScript contracts and Node scripts, then remove `api.py`, `performance_http.py`, FastAPI/Uvicorn, multipart upload transport and other unneeded HTTP dependencies. Re-run the scientific and native suites after removal.
+- Finalize Windows offline/package qualification, startup and failed-job recovery review, Qt/Python licensing obligations, and the final footprint measurements after web retirement.
 
 G4 transport-decoupling verification: `uv run pytest tests/test_performance.py tests/test_desktop.py::test_performance_direct_service_preserves_records_and_science tests/test_desktop.py::test_performance_domain_imports_without_http_or_webengine -q` — passed (14 tests); the existing HTTP adapter tests emitted the known Starlette/httpx deprecation warning.
 
