@@ -1,0 +1,59 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.13",
+    "data": "DS-SYNTH-001 only; operational writes isolated in a temporary data root"
+  },
+  "measurements": {
+    "page_load_latency": [
+      {
+        "page": "today",
+        "loaded_ms": 886.87,
+        "maximum_gui_timer_gap_ms": 58.544
+      },
+      {
+        "page": "athlete",
+        "loaded_ms": 174.964,
+        "maximum_gui_timer_gap_ms": 40.066
+      },
+      {
+        "page": "plan",
+        "loaded_ms": 46.88,
+        "maximum_gui_timer_gap_ms": 12.819
+      },
+      {
+        "page": "monitor",
+        "loaded_ms": 95.067,
+        "maximum_gui_timer_gap_ms": 14.986
+      },
+      {
+        "page": "test",
+        "loaded_ms": 1448.674,
+        "maximum_gui_timer_gap_ms": 45.012
+      },
+      {
+        "page": "match",
+        "loaded_ms": 224.164,
+        "maximum_gui_timer_gap_ms": 59.746
+      },
+      {
+        "page": "research",
+        "loaded_ms": 42.653,
+        "maximum_gui_timer_gap_ms": 9.181
+      },
+      {
+        "page": "report",
+        "loaded_ms": 26.48,
+        "maximum_gui_timer_gap_ms": 19.921
+      }
+    ],
+    "working_set_mb": 388.67,
+    "peak_working_set_mb": 391.67,
+    "athlete_360_drawer_load_ms": 189.416,
+    "screenshots": [
+      "g3-performance-today.png",
+      "g3-performance-athlete.png",
+      "g3-performance-match.png"
+    ]
+  }
+}

@@ -71,7 +71,29 @@ G2 commits: `1c4d8c6` (`RES-604: integrate local admission and research authorin
 
 ## G3 — Performance OS
 
-Not started. Native Today, Plan, Monitor, Test, Research, Report and Athlete 360 workspaces remain.
+**Implementation status:** The operational workflows and the approved Direction F visual system are implemented in native Qt Widgets. Performance OS records stay under the configured private data root and remain isolated from admitted scientific records. G3 verification has passed; the two G1 scientific-worker timing targets remain open.
+
+Implemented:
+
+- Six-section Direction F shell: branded season/search header; Daily and Evidence rail; squad-availability footer; right-side daily context; five-cell squad pulse; attention queue; weekly load, CMJ force-time, research and next-action modules.
+- Native Athlete 360 dock with readiness, sleep, load ratio, descriptive baseline change and practitioner notes. The full Athlete 360 page remains available from the dock.
+- Native Plan microcycle editor and publish action; Monitor load/wellness/session-log view with a match-tracking and pose inspector; Test trial table and append-only reliability assessment; Research evidence/unit/metric link; audience-specific Reports with freeze and HTML export.
+- The approved `docs/design/res588-ux/prototypes/f/` design and `apps/web/app/performance.css` tokens are translated to `QPalette`, scoped QSS, Qt layouts, `QTableView`, `QDockWidget` and `pyqtgraph`; no browser rendering was introduced.
+- Performance OS calls the existing `performance.py` functions through `DynamisAppService`. The screens use actual fixture and persisted operational values, retain honest unavailable states, and show the `DS-SYNTH-001` provenance badge.
+
+Verification (Windows 11 x64, Python 3.12.13):
+
+- `$env:QT_QPA_PLATFORM='offscreen'; uv run pytest tests/test_desktop.py -q` — passed (11 tests), including navigation through all eight native pages, workflow buttons, Athlete 360 dock, reports, persistence and bounded match/pose rendering.
+- `$env:QT_QPA_PLATFORM='offscreen'; uv run pytest -q` — full science suite passed with one existing Starlette/httpx deprecation warning.
+- `uv run python -m compileall -q dynamis_science/desktop tests/test_desktop.py scripts/benchmark_performance_os.py` — passed.
+- `uv run python scripts/benchmark_performance_os.py --output ../../docs/desktop/evidence/g3-performance-benchmarks.json --evidence-dir ../../docs/desktop/evidence` — passed on Windows using a disposable data root and `DS-SYNTH-001` only.
+- The pre-existing `data/synthetic/generator_manifest.json` edit remained byte-identical through the full science suite: SHA-256 `835398DA594421BC9F04647992B0E9CEFD5DC844FD931D1964896B2E164A2587` before and after.
+
+GUI evidence: [Squad Command](evidence/g3-performance-today.png), [Athlete 360 dock](evidence/g3-performance-athlete.png), and [Match & Pose](evidence/g3-performance-match.png). All screenshots use the synthetic fixture and a temporary operational store.
+
+Performance measurements are in [G3 benchmark JSON](evidence/g3-performance-benchmarks.json). On the measured Windows 11 workstation, central page loads ranged from 26 ms to 1,449 ms; the Athlete 360 dock opened in 189 ms; resident working set was 389 MB and peak 392 MB. The largest observed GUI timer gap was 60 ms while opening Match & Pose. G3 has no separate timer-gap target; this measurement remains visible for later optimization. No scientific calculation was moved into presentation code.
+
+**G3 implementation commits:** `f27953d` (`RES-604: add direct Performance OS service operations`) and `df59eac` (`RES-604: port Performance OS design into Qt workspaces`). The G3 evidence commit is recorded below after it is created.
 
 ## G4 — Packaging and web retirement
 
@@ -79,4 +101,4 @@ Not started. Windows `--onedir` / Inno Setup packaging, install/uninstall and of
 
 ## Commits
 
-Every implementation commit uses a `RES-604` subject. The native service/UI implementation commit is `0377177` (`RES-604: implement native research workstation`). Evidence and benchmark artifacts are recorded in the following `RES-604` commit and in the Linear issue; the gate remains open while the two measured performance targets are reviewed.
+Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow implementation: `df59eac`. G3 screenshot and benchmark evidence is recorded in the next commit. The two G1 performance-target misses remain visible and unchanged; G4 still includes installation, recovery, offline and web-retirement verification.

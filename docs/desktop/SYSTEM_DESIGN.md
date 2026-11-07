@@ -293,13 +293,10 @@ QMainWindow (DynamisScience Workstation)
 │       ├── Lineage DAG Table/Tree (Upstream & Downstream Nodes)
 │       └── Selected Node Cryptographic & Parameter Metadata
 └── Mode 2: Performance OS Workbench (Squad Operations — Gate G3)
-    ├── Left Rail (QListWidget): Operational Cadence Navigation
-    │   ├── 1. Today (Daily Triage, Squad Pulse, Attention Queue, Readiness/Load Brief)
-    │   ├── 2. Plan (16-Week Mesocycle Load Targets, Draft vs Published Comparison)
-    │   ├── 3. Monitor (Longitudinal Load & Wellness, Session Logger, 2D Match Tracking/Pose)
-    │   ├── 4. Test (CMJ Force-Time Phase Inspector, Squad Reliability ICC/TE/CV Runner)
-    │   └── 5. Reports (Coach, Athlete, Medical, Board Briefs & HTML Export)
-    └── Right Dock (QDockWidget): Athlete 360 Inspector (Selected Athlete Profile, Individual Baseline Change, Notes)
+    ├── Direction F top bar (club/squad, season context, local search, practitioner role)
+    ├── Left Rail (QWidget): Daily (Today, Plan, Monitor, Test) and Evidence (Research, Reports)
+    ├── Central native workspaces: Squad Command, periodization, monitoring/match pose, testing, research link, reports
+    └── Right Dock (QDockWidget): Daily Context; switches to the selected Athlete 360 inspector on demand
 ```
 
 ### 4.3 Reviewable Native Wireframes (Central Research Workflow)
@@ -387,11 +384,12 @@ QMainWindow (DynamisScience Workstation)
   - `Ctrl+E`: Export current Report as self-contained HTML.
   - `Esc`: Cancel active modal dialog or clear table filter.
 - **Visual Palette & Typography (`QPalette` + Minimal Scoped QSS):**
-  - Follows the established dark scientific workstation tokens from `docs/design/res588-ux/SPORTS_SCIENCE_DESIGN_PATTERN.md` without heavy custom paint overrides:
-    - Canvas background `#0E1116`, elevated panel `#151A21`, table header `#1B222C`, border `#26303D`.
-    - Primary text `#ECEFF4`, secondary `#9AA5B4`, muted `#6E7887`.
-    - Semantic accents: Primary/Info `#4C9AFF`, Valid/Qualified `#2EA043`, Warning/Caution `#D29922`, Error/Rejected `#F85149`, Synthetic Fixture Accent `#C67D3B`.
-  - All numerical cells in `QTableView` enforce `Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter` and a tabular monospace font (`Cascadia Mono`, `Consolas`, or `IBM Plex Mono`) so decimal points and negative signs align vertically.
+  - The approved [Direction F Performance OS prototype](../design/res588-ux/prototypes/f/command.html) is the visual authority. The Qt `QPalette` and scoped QSS carry its `performance.css` tokens into the native shell:
+    - Canvas `#0A1016`, panels `#101922` / `#15212B`, borders `#23333E` / `#304552`.
+    - Primary text `#E3EDF2`, secondary `#B2C0C9`, muted `#7F919D`, faint `#566873`.
+    - Accents: lime `#C8F36B`, cyan `#5FD4E8`, amber `#E0A458`, red `#EF6B63`, violet `#A78BFA`.
+  - Typography uses IBM Plex Sans/Mono when installed, with Segoe UI and Consolas fallbacks. Numeric `QTableView` cells are right aligned and tabular; headers use compact uppercase labels.
+  - Performance layout uses the approved top bar, grouped left rail, five-cell squad pulse, paired analytical modules, dockable context/athlete inspector, and dense unit-bearing plots. The same palette carries across research surfaces without browser rendering or web runtime.
 - **High-DPI & Accessibility:**
   - Qt 6 enables high-DPI scaling automatically (`Qt.HighDpiScaleFactorRoundingPolicy.PassThrough`); all icons use vector `QIcon` SVG paths; minimum interactive row height is `28 px`; full `QWidget.setTabOrder` and `setAccessibleName` coverage across all forms and action buttons.
 
