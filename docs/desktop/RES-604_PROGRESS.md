@@ -93,7 +93,7 @@ GUI evidence: [Squad Command](evidence/g3-performance-today.png), [Athlete 360 d
 
 Performance measurements are in [G3 benchmark JSON](evidence/g3-performance-benchmarks.json). On the measured Windows 11 workstation, central page loads ranged from 26 ms to 1,449 ms; the Athlete 360 dock opened in 189 ms; resident working set was 389 MB and peak 392 MB. The largest observed GUI timer gap was 60 ms while opening Match & Pose. G3 has no separate timer-gap target; this measurement remains visible for later optimization. No scientific calculation was moved into presentation code.
 
-**G3 implementation commits:** `f27953d` (`RES-604: add direct Performance OS service operations`) and `df59eac` (`RES-604: port Performance OS design into Qt workspaces`). The G3 evidence commit is recorded below after it is created.
+**G3 commits:** `f27953d` (`RES-604: add direct Performance OS service operations`), `df59eac` (`RES-604: port Performance OS design into Qt workspaces`), and `7a25fdb` (`RES-604: capture Direction F G3 verification evidence`).
 
 ## G4 — Packaging and web retirement
 
@@ -101,4 +101,4 @@ Not started. Windows `--onedir` / Inno Setup packaging, install/uninstall and of
 
 ## Commits
 
-Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow implementation: `df59eac`. G3 screenshot and benchmark evidence is recorded in the next commit. The two G1 performance-target misses remain visible and unchanged; G4 still includes installation, recovery, offline and web-retirement verification.
+Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow: `df59eac`; G3 screenshots and benchmarks: `7a25fdb`. The two G1 performance-target misses remain visible and unchanged; G4 still includes installation, recovery, offline and web-retirement verification.
