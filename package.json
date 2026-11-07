@@ -6,7 +6,7 @@
   "packageManager": "pnpm@11.24.0",
   "scripts": {
     "data:generate": "uv run --directory services/science python -m dynamis_science.generate",
-    "science:dev": "uv run --directory services/science uvicorn dynamis_science.api:app --reload --port 8000",
+    "science:dev": "uv run --directory services/science uvicorn dynamis_science.api:app --reload --host 127.0.0.1 --port 8000",
     "web:dev": "pnpm --filter @dynamis/web dev",
     "dev": "pnpm data:generate && concurrently -k \"pnpm science:dev\" \"pnpm web:dev\"",
     "build": "pnpm --filter @dynamis/web build",
