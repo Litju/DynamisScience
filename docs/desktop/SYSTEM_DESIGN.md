@@ -550,3 +550,255 @@ To eliminate `fastapi.HTTPException` from domain and service code, `dynamis_scie
 - `ResearchValidation` (`422` equivalent): Invalid method parameter, unsupported method (`METH-REAL-BODYWEIGHT`), empty cohort resolution, or schema check failure.
 
 Background workers catch all exceptions, package them into a typed `TaskFailure(kind, message, details, traceback_str)` object, and emit `signals.failed(TaskFailure)` back to the GUI thread.
+
+---
+
+## 6. Heavy Scientific Computation, Concurrency & Performance
+
+### 6.1 GUI Thread Isolation Policy
+
+The main Qt GUI thread (`QApplication.instance().thread()`) is **strictly reserved for**:
+- Painting widgets, handling input events, updating `QAbstractTableModel` row slices already materialized in memory, and dispatching tasks to workers.
+- **Forbidden on the GUI thread:**
+  - Any `statsmodels` `MixedLM` fitting or NumPy ANOVA optimization.
+  - Any full-table Parquet scan (`force_signals.parquet`, `imu_signals.parquet`, `force_traces.parquet`).
+  - Any SQLite write transaction (`BEGIN IMMEDIATE`) or multi-join read query.
+  - Any file hashing (`SHA-256` / `MD5`) or archive extraction.
+
+### 6.2 Two-Tier Concurrency Architecture (`QThreadPool` vs `QProcess`)
+
+Based on the actual runtime characteristics of the DynamisScience codebase, workloads are routed to one of two execution tiers:
+
+| Tier | Mechanism | Target Workloads | Rationale |
+|---|---|---|---|
+| **Tier 1: In-Process Background Threads** | `QThreadPool.globalInstance()` (`maxThreadCount = min(4, os.cpu_count())`) executing `TaskRunnable(QRunnable)` with `TaskSignals(QObject)` (`started`, `progress`, `completed`, `failed`, `cancelled`) | - SQLite study/catalog loads (`researchstore`)<br>- DuckDB/Polars cohort resolution & longitudinal aggregation<br>- Paged Parquet slice reads (`read_table_page`)<br>- Single-trial 1000 Hz waveform extraction<br>- `METH-REAL-TREND` (`MixedLM` over 82–884 rows), `METH-REAL-RELIABILITY` (`ICC(3,1)` over 398 trials), `METH-REAL-SIGNAL-QA`, `METH-U-CHANGE` | `DuckDB`, `Polars` (Rust), `PyArrow` (C++), `NumPy`/`SciPy` (C/Fortran BLAS), and `sqlite3` (C) release the Python GIL during heavy I/O and numerical kernels. Typical latency is `< 5 ms` to `800 ms`, avoiding subprocess IPC serialization overhead. |
+| **Tier 2: Isolated Worker Subprocess** | `QProcess` invoking `sys.executable -m dynamis_science.<module>` with line-buffered JSON/progress stdout | - `extract_movesmart` + `ingest_real --source movesmart` (676 MB ZIP verification, 398-trial CSV parsing, writing `5.89M` force rows + `453k` IMU rows)<br>- `qualification_real` (`Rscript` `lme4` reference qualification)<br>- Large new candidate dataset admission (`> 50 MB`) | Parsing hundreds of raw CSVs in Python holds the GIL for several seconds and allocates transient buffers; running in `QProcess` guarantees zero GIL contention with the UI, clean OS-level memory reclamation on completion, and hard cancellation (`QProcess.terminate()` / `kill()`) without corrupting in-process state. |
+
+### 6.3 Memory-Bounded Dataset Access & Lazy Table Virtualization
+
+`DS-REAL-MOVESMART-805259588272` contains `5,896,294` rows in `force_signals.parquet` (`103.59 MB` compressed on disk, `> 650 MB` if eagerly materialized as Python dicts). To keep desktop RAM bounded:
+
+1. **Zero Full-Table Dict Materialization:**
+   - `ParquetPreviewTableModel(QAbstractTableModel)` never calls `.to_dicts()` on an entire Parquet file.
+   - Instead, it inspects metadata (`pyarrow.parquet.ParquetFile(path).metadata.num_rows` and schema) in `< 2 ms`, and requests **500-row pages** via DuckDB/Polars (`SELECT * FROM read_parquet(?) OFFSET ? LIMIT 500` or predicate-pushed `WHERE trial_id = ?`).
+2. **Predicate Pushdown for Signal Waveforms:**
+   - When the scientist selects trial `P01-walk0001` in the Signal Inspector, `get_signal_waveform()` executes a predicate-pushed Polars lazy scan:
+     `pl.scan_parquet(path).filter(pl.col("trial_id") == trial_id).collect()`
+   - This reads only the ~14,000 samples for that single trial (`< 1.2 MB`) rather than scanning all 5.89M rows.
+3. **Viewport-Bounded Waveform Rendering (`Peak-Preserving Min/Max Decimation`):**
+   - **Analytical calculations** (peak `Fz`, baseline median, support impulse `np.trapezoid`) **always run on the full-resolution 1000 Hz NumPy array**.
+   - **Screen rendering** in `pyqtgraph.PlotWidget` enables `setDownsampling(ds=True, auto=True, mode="peak")`, which draws a min/max envelope matching the horizontal pixel width of the plot canvas (`~1,200–2,400 px`), maintaining 60 FPS pan/zoom even on 30-second 1000 Hz multi-plate traces.
+
+### 6.4 Progress Reporting, Cooperative Cancellation & Safe Persistence
+
+1. **Progress Protocol:**
+   - Every `TaskRunnable` accepts a `CancellationToken` (`threading.Event`) and a `progress_callback(step: int, total: int, message: str)`.
+   - `QStatusBar` displays an inline `TaskProgressWidget` showing active task name, determinate/indeterminate progress bar, elapsed seconds, and a `Cancel` button.
+2. **Cooperative Cancellation Semantics:**
+   - Clicking `Cancel` sets `token.cancel()`.
+   - Multi-step operations (`METH-REAL-TREND` multi-optimizer loop `lbfgs → bfgs → powell → nm`, `METH-REAL-SIGNAL-QA` trial batches, cohort resolution) check `if token.is_cancelled(): raise TaskCancelledError()` between steps.
+   - For Tier 2 `QProcess` jobs, clicking `Cancel` terminates the child process and cleans up any uncommitted staging files under `$DYNAMISSCIENCE_DATA_ROOT/tmp/`.
+3. **Atomic Persistence Guarantee:**
+   - Background analysis workers compute all estimates, diagnostics, and figures **in memory first**.
+   - If cancelled or failed before completion, **nothing is written** to `research.db` or `artifacts/`.
+   - Only after `token.is_cancelled()` is verified `False` does the service open a single `BEGIN IMMEDIATE` SQLite transaction to insert the `runs` row, update `entities.state`, and append the `audit` log entry.
+
+### 6.5 Reproducible Benchmark Protocol (Zero Invented Metrics)
+
+No synthetic or unmeasured performance numbers are claimed in this specification. Instead, `RES-604` (Gate `G1`) will implement an automated benchmark script `services/science/scripts/benchmark_desktop.py` executing against the real private data root (`D:\datasets\DynamisScience`) on the target Windows workstation and recording machine-verifiable JSON artifacts to `$DYNAMISSCIENCE_DATA_ROOT/artifacts/desktop_benchmarks.json`:
+
+| Benchmark ID | Measured Operation | Measurement Method | Target Acceptance Gate (`RES-604`) |
+|---|---|---|---|
+| `BENCH-01-COLD-START` | Process launch (`python -m dynamis_science.desktop --benchmark-startup`) to `QMainWindow.isVisible()` + initial catalog tree populated (`QTimer.singleShot(0, ...)`). | `time.perf_counter()` across 5 consecutive runs; report median and p95 ms. | Median `< 1,500 ms` on Windows 11 NVMe SSD. |
+| `BENCH-02-IDLE-RAM` | Resident Working Set (`psutil.Process().memory_info().rss`) 5 seconds after startup with `STD-REAL-101` loaded in Overview tab. | `psutil` RSS & USS snapshot before any heavy run. | RSS `< 250 MB` (compared to multi-process Node.js + Next.js + Uvicorn baseline). |
+| `BENCH-03-PARQUET-PAGE` | Latency to open and render Page 1 (500 rows) of `force_signals.parquet` (`5,896,294` rows, `103.59 MB`) in `ParquetPreviewTableModel`. | `time.perf_counter()` from model request to `modelReset` completion. | Median `< 80 ms`; RAM delta `< 25 MB`. |
+| `BENCH-04-WAVEFORM-LOAD` | Latency to filter, extract, and plot a single trial (`P01-walk0001`, ~14.8k samples @ 1000 Hz) in `pyqtgraph`. | `time.perf_counter()` from selection signal to plot update. | Median `< 120 ms`. |
+| `BENCH-05-MIXEDLM-RUN` | End-to-end execution + SQLite WAL persistence of `METH-REAL-TREND` (`MixedLM` across 4 optimizers on `DS-REAL-MENDELEY`, `n = 82` rows) on background worker. | Worker `duration_ms` + main-thread event-loop jitter monitor (`max_gui_frame_gap_ms`). | Run `< 2,500 ms`; GUI thread max frame block `< 16 ms` (zero UI freeze). |
+| `BENCH-06-PEAK-RSS` | Peak process working set (`memory_info().peak_wset` on Windows) across a full session: browse catalog → preview `force_signals.parquet` → plot 5 waveforms → run MixedLM & ICC → export HTML report. | Windows process peak working set counter at session close. | Peak Working Set `< 500 MB`. |
+
+---
+
+## 7. Persistence, Packaging, Licensing & Security
+
+### 7.1 SQLite Transactions, WAL & Migration Boundaries
+
+1. **Connection Discipline (`researchstore.connect()`):**
+   - Every connection to `$DYNAMISSCIENCE_DATA_ROOT/research/research.db` configures:
+     - `PRAGMA foreign_keys = ON;`
+     - `PRAGMA journal_mode = WAL;`
+     - `PRAGMA synchronous = FULL;`
+     - `PRAGMA busy_timeout = 5000;`
+   - **Write Serialization:** All mutating operations use `with write_tx() as conn:` (`BEGIN IMMEDIATE`), ensuring SQLite serializes concurrent thread writes safely without mid-transaction `SQLITE_BUSY` deadlocks.
+   - **Short-Lived Connections:** Neither UI widgets nor long-running statistical workers hold open SQLite connections while computing models. Connections are opened, queried/written, and closed within milliseconds.
+2. **Schema Versioning & Automatic Pre-Migration Backup:**
+   - Current schema version is `PRAGMA user_version = 1` (`SCHEMA_VERSION = 1` in `researchstore.py`).
+   - Whenever a future desktop release increments `SCHEMA_VERSION` (`N -> N+1`):
+     1. Before executing any DDL migration, the startup sequence invokes `sqlite_recovery.create_online_backup()` to write a verified snapshot `research-pre-v{N+1}-{timestamp}.db` under `$DYNAMISSCIENCE_DATA_ROOT/backups/sqlite/`.
+     2. Executes the migration script inside a single exclusive transaction and updates `PRAGMA user_version = {N+1}`.
+     3. Runs `PRAGMA integrity_check` and `PRAGMA foreign_key_check`; if either fails, restores the pre-migration backup automatically and halts with a diagnostic dialog.
+
+### 7.2 Backup, Verified Restoration & Immutable Artifacts
+
+1. **Online SQLite Backup & Recovery (`services/science/scripts/sqlite_recovery.py`):**
+   - The desktop **Tools → Backup & Integrity Check…** menu action wraps the existing M0-qualified `sqlite_recovery.py` utilities (`sqlite3.Connection.backup`), allowing the user to trigger a hot backup and full restore rehearsal at any time without stopping the app.
+2. **Immutable Dataset Snapshots:**
+   - Admitted snapshots under `$DYNAMISSCIENCE_DATA_ROOT/snapshots/<snapshot_id>/` contain `snapshot.json`, `provenance_manifest.json`, `*.parquet`, and `immutable.json` (marked read-only on the Windows filesystem via `os.chmod(..., stat.S_IREAD)`).
+   - Before executing any `AnalysisRun`, `researchanalysis.py` / `realstore.py` verifies that the snapshot manifest and Parquet tables exist; `Tools → Verify Dataset Checksums` re-computes full SHA-256 digests against `snapshot.json["checksums"]`.
+3. **Historical Research State Preservation:**
+   - `project_versions`, `entity_versions`, `cohort_versions`, `plan_versions`, `investigation_versions`, `report_versions`, `runs`, `evidence`, and `audit` are **strictly append-only**.
+   - Freezing a cohort, plan, or report records a cryptographic SHA-256 hash of its canonical JSON payload; historical runs and frozen report exports (`export_html(entity_id, version=k)`) always reconstruct from the frozen record, never from mutable draft state.
+
+### 7.3 Windows Filesystem, Configuration, Logging & Optional R Runtime
+
+1. **Application Configuration (`QSettings`):**
+   - Non-scientific UI preferences (window geometry, `QSplitter` proportions, last opened study ID, `Show Synthetic Fixtures` toggle, configured `DYNAMISSCIENCE_DATA_ROOT` path, and optional `DYNAMISSCIENCE_RSCRIPT` path) are stored via `QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope, "Dynamis", "DynamisScience")` (`%APPDATA%\Dynamis\DynamisScience.ini`).
+2. **Rotating Scientific & Crash Logs:**
+   - Runtime logs are written to `$DYNAMISSCIENCE_DATA_ROOT/logs/dynamis_desktop.log` using Python's `RotatingFileHandler` (`maxBytes = 5 * 1024 * 1024`, `backupCount = 5`, UTF-8 encoding).
+   - Log entries record timestamps, thread names, task IDs, snapshot/study IDs, execution durations, and tracebacks, **never logging participant row values**.
+3. **Optional R Runtime Discovery (`qualification_real.py`):**
+   - Core desktop runtime requires **zero R installation** (`statsmodels` MixedLM and NumPy ANOVA run natively in Python).
+   - For independent method qualification (`Tools → Run Independent Method Qualification`), `_rscript()` checks `DYNAMISSCIENCE_RSCRIPT`, `QSettings`, `shutil.which("Rscript")`, and standard Windows paths (`C:\Program Files\R\R-*\bin\x64\Rscript.exe`). If absent, `QUAL-REAL-MIXEDLM` reports `BLOCKED (Rscript not configured)` cleanly without crashing while `QUAL-REAL-RELIABILITY` and `QUAL-REAL-SIGNALS` execute in pure Python/NumPy.
+
+### 7.4 Windows Packaging, Installer & Update Strategy
+
+1. **Packaging Tooling (`PyInstaller` One-Folder Bundle + `Inno Setup` Installer):**
+   - **Why One-Folder (`--onedir`) over One-File (`--onefile`):** A single-file self-extracting executable unpacks ~250 MB of `PySide6`, `DuckDB`, `Polars`, `PyArrow`, `SciPy`, and `statsmodels` DLLs into `%TEMP%` on every cold start, adding 3–6 seconds of launch latency and triggering antivirus heuristics. A `--onedir` distribution (`dist/DynamisScience/DynamisScience.exe` + `_internal/*.dll`) starts instantaneously (`< 1.5 s`) and allows clean dynamic linking of Qt DLLs.
+   - **Installer:** Packaged into a standard per-user Windows installer (`DynamisScience-Setup-x64.exe`) via **Inno Setup** (`DefaultDirName={localappdata}\Programs\DynamisScience`, `PrivilegesRequired=lowest` so scientists on locked-down university/club laptops can install without Administrator elevation).
+2. **Update & Uninstall Behavior:**
+   - **In-Place Upgrade:** Installing a newer `DynamisScience-Setup-x64.exe` replaces binaries under `%LOCALAPPDATA%\Programs\DynamisScience` while leaving `DYNAMISSCIENCE_DATA_ROOT` (`D:\datasets\DynamisScience` or `%LOCALAPPDATA%\DynamisScience`) completely untouched.
+   - **Clean Uninstall:** Uninstalling removes the application binaries, Start Menu shortcuts, and optionally `%APPDATA%\Dynamis\DynamisScience.ini`, **never deleting `$DYNAMISSCIENCE_DATA_ROOT`** (protecting irreplaceable research databases and admitted snapshots).
+
+### 7.5 Qt Licensing & Dataset Rights Compliance
+
+1. **`PySide6` / Qt 6 LGPLv3 Compliance (Proprietary Distribution Ready):**
+   - `PySide6` is licensed under **LGPLv3** (unlike `PyQt6`, which is GPLv3-only unless a commercial Riverbank license is purchased).
+   - To distribute DynamisScience as a proprietary application under LGPLv3 without purchasing a commercial Qt license, the desktop build enforces four mandatory technical conditions:
+     1. **Dynamic Linking Only:** Qt libraries (`Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Widgets.dll`, etc.) remain separate shared DLLs in the `--onedir` bundle (`_internal/PySide6/`) so an end user can technically replace them with compatible LGPLv3 Qt DLLs. Static compilation (`Nuitka --standalone` linking Qt statically) is prohibited unless a commercial Qt license is acquired.
+     2. **No Modification of Qt / PySide6 Source:** Uses unmodified upstream wheels.
+     3. **License Attribution Dialog:** `Help → About & Open-Source Licenses` displays the complete LGPLv3 text, copyright notices for Qt / PySide6 / Polars / DuckDB / SciPy / statsmodels, and bundles `THIRD_PARTY_LICENSES.txt` alongside `DynamisScience.exe`.
+2. **Dataset License & Non-Commercial Enforcement:**
+   - `DS-REAL-MOVESMART-805259588272` carries `CC BY-NC-SA 4.0` (`commercial_use_allowed: false`). The desktop application displays a persistent `NON-COMMERCIAL RESEARCH ONLY (CC BY-NC-SA 4.0)` badge on all MoveSmart views and embeds the exact license notice in every exported report manifest.
+   - Raw datasets in `D:\datasets\DynamisScience` are **never bundled inside the Windows installer**; they reside strictly in the external `DYNAMISSCIENCE_DATA_ROOT`.
+
+### 7.6 Proportional Local-First Security Model
+
+- **Threat Model:** Single-scientist or performance-practitioner local Windows workstation operating on de-identified sports science measurements.
+- **Controls:**
+  1. **OS User Account Boundary & Windows ACLs:** `DYNAMISSCIENCE_DATA_ROOT` and `%APPDATA%\Dynamis` inherit the logged-in Windows user's NTFS ACLs (`%LOCALAPPDATA%` is private to the Windows user profile). A startup check warns if `DYNAMISSCIENCE_DATA_ROOT` is located on a world-writable public share or inside a Git repository.
+  2. **Zero Outbound Network Calls at Runtime:** The desktop application opens zero listening TCP ports (`0.0.0.0` or `127.0.0.1`) and makes zero outbound HTTP requests during operation.
+  3. **HTML Export Sanitization:** All user-entered strings in `researchstore.export_html()` and `performance.export_report()` pass through `html.escape()` with zero external `<script>` or remote stylesheet dependencies.
+  4. **Explicitly Rejected Security Bloat:** Local multi-user login screens, JWT tokens, password hashing databases, OAuth2 flows, and role-based access control gates are explicitly excluded as unnecessary ceremony for a single-user native desktop tool.
+
+---
+
+## 8. Capability Migration Matrix & Staged Delivery Roadmap
+
+### 8.1 Complete Module & Capability Migration Matrix
+
+| Existing Component / File | Current Role | Migration Classification | Desktop Action & Target Location |
+|---|---|---|---|
+| `services/science/dynamis_science/data_root.py` | External `DYNAMISSCIENCE_DATA_ROOT` validation & layout | **Reuse unchanged** | Called directly by `desktop/app.py` and `desktop/services.py`. |
+| `services/science/dynamis_science/contracts.py` | Pydantic v2 domain schemas | **Reuse unchanged** | Used directly across `desktop/services.py` and models. |
+| `services/science/dynamis_science/researchstore.py` | SQLite WAL store, cohorts, plans, runs, evidence, lineage, HTML export | **Reuse unchanged** | Called directly by `DynamisAppService`. |
+| `services/science/dynamis_science/researchanalysis.py` | Qualified real/synthetic study execution (`MixedLM`, `ICC`, Signal QA) | **Reuse unchanged** | Invoked via `researchstore.execute_study_run()` on `QThreadPool`. |
+| `services/science/dynamis_science/realstore.py` | Immutable real-data snapshots & seeded `STUDY-REAL-001/002` | **Reuse unchanged** | Called directly by `DynamisAppService`. |
+| `services/science/dynamis_science/realanalysis.py` | Reference real-data analyses & provenance | **Reuse unchanged** | Called directly by `DynamisAppService`. |
+| `services/science/dynamis_science/admission.py` | Candidate dataset registration, QC, quarantine & admission | **Reuse unchanged** | Called by `DynamisAppService` and `DatasetAdmissionDialog`. |
+| `services/science/dynamis_science/analysis.py` | Synthetic `STUDY-001` CMJ & fitness-fatigue analysis | **Reuse unchanged** | Called by `DynamisAppService` for synthetic reference parity. |
+| `services/science/dynamis_science/lineage.py` | Computed provenance graph builder | **Reuse unchanged** | Called by `DynamisAppService.get_lineage_graph()`. |
+| `services/science/dynamis_science/qualification*.py` | Synthetic & real-data (`Rscript lme4`) qualification suites | **Reuse unchanged** | Invoked via `Tools → Qualification` (`QProcess` / worker). |
+| `services/science/dynamis_science/ingest_real.py` & `extract_movesmart.py` | Real dataset extraction & idempotent snapshot ingestion | **Reuse unchanged** | Invoked via `QProcess` worker when admitting raw archives. |
+| `services/science/scripts/sqlite_recovery.py` | Online SQLite backup & restore verification | **Reuse unchanged** | Invoked by `Tools → Backup & Integrity Check` and pre-migration hook. |
+| `services/science/dynamis_science/performance.py` | Performance OS logic + FastAPI `@router` & `HTTPException` | **Adapt Python interface** | Replace `HTTPException` with domain exceptions (`ResearchNotFound`, `ResearchValidation`); keep thin FastAPI router wrapper for legacy web compatibility. |
+| `services/science/dynamis_science/api.py` | FastAPI app + inline cross-store study/exploration/dataset dispatch | **Adapt Python interface** | Extract unified dispatch into `dynamis_science/desktop/services.py` (`DynamisAppService`); have `api.py` delegate to `DynamisAppService`. |
+| `apps/web/src/components/ResearchWorkbench.tsx` | Next.js / React Scientific Research UI (1,420 lines) | **Replace web UI with Qt** | Replaced by `dynamis_science/desktop/views/research_workbench.py` & tabs (`G1`–`G2`). |
+| `apps/web/src/components/PerformanceOS.tsx` | Next.js / React Performance OS UI (1,890 lines) | **Replace web UI with Qt** | Replaced by `dynamis_science/desktop/views/performance_workbench.py` (`G3`). |
+| `apps/web/src/components/Workbench.tsx` | Legacy synthetic workbench UI | **Replace web UI with Qt** | Superseded by unified `research_workbench.py` (`G1`). |
+| `packages/contracts/` | TypeScript contract mirrors | **Retire only after explicit approval** | Retained untouched during `G1`–`G3`; retired with `apps/web` in `G4` only after owner sign-off. |
+| `apps/web/` (Next.js 15 app) | Historical web frontend | **Retire only after explicit approval** | Preserved during `G1`–`G3` as regression reference; decommissioned in `G4` after full native verification. |
+
+### 8.2 Staged Implementation Gates (Beginning with `RES-604`)
+
+#### Gate `G1` — `RES-604`: Native Desktop Vertical Slice (Core Research & Real-Data Execution)
+- **Objective:** Deliver the working, end-to-end native `PySide6` desktop application executing the primary real-data scientific workflow without FastAPI or Node.js.
+- **Concrete Deliverables:**
+  1. `dynamis_science/desktop/services.py` (`DynamisAppService`) decoupled from FastAPI, with unit tests verifying parity against existing `api.py` responses.
+  2. `PySide6` + `pyqtgraph` added to `services/science/pyproject.toml`; entry point `python -m dynamis_science.desktop`.
+  3. `QMainWindow` workstation shell with validated `DYNAMISSCIENCE_DATA_ROOT` gate, mode/context bar, status bar task runner (`QThreadPool`), and provenance badges (`REAL DATA` vs `SYNTHETIC FIXTURE`).
+  4. Left **Project, Study & Dataset Tree Navigator** loading `PRJ-REAL-001` (`STD-REAL-101`, `MON-REAL-101`), `STUDY-REAL-001`, `STUDY-REAL-002`, `STUDY-001`, and all 3 admitted snapshots.
+  5. **5-Tab Research Workbench** supporting:
+     - Overview & question/hypothesis/audit inspection.
+     - Snapshot metadata, lazily paged `ParquetPreviewTableModel` (`force_signals.parquet` 5.89M rows), and cohort resolution table.
+     - Exploration plot & 1000 Hz `pyqtgraph` Force/IMU Signal Waveform Inspector.
+     - Analysis Plan selection & background execution (`METH-REAL-TREND`, `METH-REAL-RELIABILITY`, `METH-REAL-SIGNAL-QA`, `METH-U-CHANGE`, `METH-REAL-DESC`) with full estimates, diagnostics, and mandatory limitations display.
+     - Idempotent Evidence Promotion (`Promote to Evidence`), right-hand **Provenance Lineage Dock**, and **Export Self-Contained HTML Report**.
+  6. Automated `pytest-qt` / headless UI + service test suite and reproducible benchmark execution (`scripts/benchmark_desktop.py`).
+- **Technical Dependencies:** Owner approval of `RES-605` (this document).
+- **Scientific Regression Requirements:** All existing 50+ pytest tests in `services/science/tests/` must pass 100%; desktop `METH-REAL-TREND` and `METH-REAL-RELIABILITY` runs must produce identical numerical estimates and `result_digest` hashes to the qualified CLI/API runs.
+- **UI Acceptance Criteria & Completion Conditions:** Application launches natively on Windows 11 against `D:\datasets\DynamisScience` with zero HTTP servers running; user can browse `STD-REAL-101` and `STUDY-REAL-002`, inspect 5.89M-row Parquet tables without UI freeze, view 1000 Hz force traces, execute a MixedLM/ICC run on a background thread, promote evidence, inspect lineage, and export an HTML report; all 6 benchmarks in Section 6.5 recorded.
+- **Explicit Non-Goals for `G1`:** Full interactive authoring dialogs for *new* projects/cohorts/plans (read + execute + promote + export comes first in `G1`; full CRUD authoring forms are completed in `G2`), Performance OS operational screens (`G3`), and Windows installer packaging (`G4`).
+
+#### Gate `G2` — Full Research Authoring, Versioning & Dataset Admission Parity
+- **Concrete Deliverables:** Native dialogs and forms for creating/editing Projects, Studies, Monitoring Workspaces, and Investigations; interactive Cohort criteria builder with Save/Freeze/Fork and `ResearchConflict` resolution dialog; Analysis Plan parameter editor with Save/Freeze/Fork; local dataset source registration, structural QC inspection, quarantine viewer, and snapshot admission dialog (`DatasetAdmissionDialog`); report curation and Freeze Version workflow.
+- **Completion Conditions:** A scientist can create a brand-new project and study from scratch in the Qt UI, admit a local dataset file, define and freeze a cohort and analysis plan, fork a frozen cohort, execute runs, freeze a report version, and verify audit trail completeness in `research.db`.
+
+#### Gate `G3` — Performance OS Native Workspaces Parity
+- **Concrete Deliverables:** Decouple `performance.py` from `HTTPException`; build native `PerformanceWorkbench` views (`Today` daily brief & triage queue, `Plan` 16-week mesocycle editor & publish flow, `Monitor` longitudinal load/wellness & 2D pitch/pose viewer, `Test` CMJ phase inspector & reliability runner, `Reports` coach/athlete/medical/board generator, and dockable `Athlete 360` inspector).
+- **Completion Conditions:** All operational workflows in `performance.py` are usable natively in Qt with persistent `SYNTHETIC FIXTURE · DS-SYNTH-001` provenance labelling and full `pytest` coverage.
+
+#### Gate `G4` — Windows Packaging, Qualification Runner & Legacy Web Decommission
+- **Concrete Deliverables:** `Tools → Backup & Integrity Check` and `Tools → Independent Method Qualification` (`QProcess` R `lme4` runner) UI dialogs; `PyInstaller --onedir` build specification + `Inno Setup` installer script + bundled `THIRD_PARTY_LICENSES.txt`; after explicit owner verification and approval, archive/remove `apps/web/` and `packages/contracts/` and strip legacy FastAPI routes.
+- **Completion Conditions:** Standalone packaged `DynamisScience.exe` installs and passes smoke, qualification, and benchmark suites on Windows 11 without a development Python/Node environment.
+
+---
+
+## 9. Design Verification, Consistency Audit & Owner Approval Gate
+
+### 9.1 Twelve-Point Blueprint Verification Against Codebase
+
+| # | Audit Check | Verification Against `D:\projects\DynamisScience` & Design Resolution | Status |
+|---|---|---|---|
+| 1 | **Missing user workflows** | All 9 scientific stages (`Question → Snapshot → Cohort → Exploration → Spec → Run → Diagnostics → Evidence → Report`), Monitoring workspaces, Dataset Admission/Quarantine, and all 6 Performance OS surfaces (`Today`, `Plan`, `Monitor`, `Test`, `Report`, `Athlete 360`) are accounted for and mapped to native views and gates (`G1`–`G3`). | **VERIFIED** |
+| 2 | **Contradictory architecture decisions** | Single uniform call path: `Qt Widgets → QThreadPool/QRunnable → DynamisAppService → Domain Modules → SQLite/Parquet`. No dual ORM or competing state stores introduced. | **VERIFIED** |
+| 3 | **Duplicated responsibilities** | Unified study/dataset/exploration dispatch currently inside `api.py` is extracted into `DynamisAppService` (`desktop/services.py`) and called by both Qt and (temporarily) `api.py`. Zero duplicated query or model logic. | **VERIFIED** |
+| 4 | **Unnecessary runtime dependencies** | Only two new Python packages required: `PySide6>=6.8` and `pyqtgraph>=0.13`. Zero web engines (`QtWebEngine` excluded), zero message brokers, zero external database servers. | **VERIFIED** |
+| 5 | **Hidden HTTP or Node requirements** | Desktop entry point (`python -m dynamis_science.desktop`) imports neither `fastapi` nor `uvicorn`, spawns no localhost server, and requires no Node.js runtime. | **VERIFIED** |
+| 6 | **GUI-thread blocking** | All SQLite writes, DuckDB/Polars queries, Parquet slice reads, and `statsmodels`/NumPy runs execute in `QThreadPool` (`Tier 1`) or `QProcess` (`Tier 2`). Main thread only renders materialized models/arrays. | **VERIFIED** |
+| 7 | **Unbounded data loading** | `5.89M`-row `force_signals.parquet` is accessed exclusively via 500-row paged `ParquetPreviewTableModel` and single-trial predicate pushdown (`~14k` rows), with peak-preserving viewport decimation in `pyqtgraph`. | **VERIFIED** |
+| 8 | **Scientific method duplication** | `researchanalysis.py`, `realanalysis.py`, and `analysis.py` are called in-place without modification to any mathematical formula or optimizer tolerance. | **VERIFIED** |
+| 9 | **Unsafe SQLite access** | Preserves `researchstore.py` `WAL` mode, `synchronous = FULL`, `foreign_keys = ON`, `busy_timeout = 5000`, short-lived connections, and `BEGIN IMMEDIATE` write serialization, plus pre-migration `sqlite_recovery.py` online backup. | **VERIFIED** |
+| 10 | **Missing evidence/provenance behavior** | Idempotent evidence promotion (`promote_run_evidence`), computed DAG lineage (`lineage_graph` / `build_lineage_graph`), SHA-256 snapshot checksums, and embedded JSON manifests in HTML exports are preserved 1:1. | **VERIFIED** |
+| 11 | **Unspecified error and recovery states** | Domain exceptions (`DataRootConfigurationError`, `ResearchNotFound`, `ResearchConflict`, `ResearchValidation`, `TaskCancelledError`) map deterministically to native recovery dialogs and status banners (Section 3.4 & 5.4). | **VERIFIED** |
+| 12 | **Unjustified architectural complexity** | Rejects multi-tenant auth, cloud sync, microservices, embedded Chromium, and custom plugin engines in favor of a single Python package (`dynamis_science.desktop`) over existing SQLite/Parquet storage. | **VERIFIED** |
+
+### 9.2 Classification: Established Facts vs Proposed Decisions vs Open Questions
+
+#### Established Facts (Verified from Repository & Private Data Root)
+1. Local repository `HEAD` is `554b7048d3d6ed19a199e5dbb1eef666fd69eba2` on `main`; private data root `D:\datasets\DynamisScience` (`0.961 GiB`) is intact and passes all M0 integrity checks.
+2. Ten of the twelve Python backend modules (`data_root`, `contracts`, `researchstore`, `researchanalysis`, `realstore`, `realanalysis`, `admission`, `analysis`, `lineage`, `qualification*`) already have **zero FastAPI imports**.
+3. Only `api.py` and `performance.py` couple domain dispatch to FastAPI decorators/exceptions.
+4. `statsmodels` MixedLM (`METH-REAL-TREND`) and NumPy ANOVA (`METH-REAL-RELIABILITY`) are already mathematically qualified against R 4.6.2 (`lme4 2.1-0`) and independent two-way ANOVA references.
+
+#### Proposed Binding Architecture Decisions (Locked by `RES-605`)
+1. **UI Toolkit & Plotting:** Native `PySide6` (`QtWidgets`) + `pyqtgraph` for 1000 Hz waveform and scientific plotting; **no `QtWebEngineWidgets`** (reports export as self-contained HTML+SVG and preview natively).
+2. **Service Boundary:** Introduce `dynamis_science/desktop/services.py` (`DynamisAppService`) as the single in-process Python facade shared by the Qt desktop app and (until retirement) the legacy FastAPI wrapper.
+3. **Concurrency Model:** Two-tier execution — `QThreadPool` + `QRunnable` for sub-second to multi-second in-process queries and statistical models; `QProcess` for multi-minute 676 MB archive extraction/ingestion and optional external `Rscript` qualification.
+4. **Packaging & Licensing:** `PyInstaller --onedir` + per-user `Inno Setup` installer with dynamically linked `PySide6` DLLs to maintain full **LGPLv3** compliance without requiring a commercial Qt license.
+5. **Migration Sequence:** 4 incremental gates (`G1` `RES-604` vertical slice → `G2` authoring & admission CRUD → `G3` Performance OS native parity → `G4` packaging & legacy web retirement).
+
+#### Open Decisions Requiring Explicit Owner Confirmation Before or During `RES-604`
+1. **OD-1 — Plotting Library Confirmation (`pyqtgraph` vs `matplotlib` `FigureCanvasQTAgg`):**
+   - *Recommendation:* Use `pyqtgraph` as the primary interactive plot canvas (superior 60 FPS pan/zoom on 1000 Hz biomechanical force traces and native Qt `QGraphicsView` integration), while retaining the existing dependency-free inline SVG generator in `researchstore.py` for frozen HTML exports. Confirm if `matplotlib` static publication figure export (`.png`/`.pdf`/`.svg` via `FigureCanvasAgg`) is also desired in Gate `G1` or deferred to `G2`.
+2. **OD-2 — Gate `G1` (`RES-604`) Authoring Scope Boundary:**
+   - *Recommendation:* Keep `RES-604` (`G1`) sharply focused on catalog browsing, lazy Parquet & 1000 Hz signal inspection, cohort resolution preview, background execution of qualified methods (`METH-REAL-TREND`, `METH-REAL-RELIABILITY`, `METH-REAL-SIGNAL-QA`, `METH-U-CHANGE`, `METH-REAL-DESC`), evidence promotion, lineage DAG inspection, and HTML report export — placing interactive creation/forking forms (`New Project/Study`, `Fork Cohort/Plan`, `Admit New Local Dataset`) in Gate `G2`. Confirm if any creation form should be pulled into `RES-604`.
+3. **OD-3 — Legacy Web Application (`apps/web`) Retention Window:**
+   - *Recommendation:* Keep `apps/web` untouched in the repository until Gate `G3` (Performance OS native parity) is verified, then retire `apps/web` and `packages/contracts` in Gate `G4`.
+
+### 9.3 Owner-Review Sign-Off Checklist
+
+- [ ] **Architecture Topology Approved:** `PySide6 (QtWidgets + pyqtgraph) → QThreadPool/QProcess → DynamisAppService → Existing Scientific Domain → SQLite WAL / Parquet / External Data Root` (no FastAPI/Node.js/QtWebEngine at runtime).
+- [ ] **Product & Epistemic Separation Approved:** Real-data studies (`DS-REAL-MENDELEY`, `DS-REAL-MOVESMART`) and Synthetic fixtures (`DS-SYNTH-001` / Performance OS) are visually and cryptographically separated across all native views and exports.
+- [ ] **UI/UX & Wireframes Approved:** `QMainWindow` 3-pane layout (`QTreeView` navigator, 5-tab `QTabWidget` research workspace, dockable `QDockWidget` lineage/Athlete 360 inspector) approved for implementation.
+- [ ] **Concurrency & Memory Bounds Approved:** 500-row lazy paged `ParquetPreviewTableModel` for 5.89M-row tables, single-trial predicate pushdown, and `BENCH-01..06` verification protocol approved.
+- [ ] **LGPLv3 & Packaging Strategy Approved:** Dynamic-linked `--onedir` bundle + per-user installer preserving external `DYNAMISSCIENCE_DATA_ROOT`.
+- [ ] **Gate `G1` (`RES-604`) Authorized to Proceed:** Owner authorizes transitioning `RES-605` to `Done` and beginning implementation of `RES-604`.
