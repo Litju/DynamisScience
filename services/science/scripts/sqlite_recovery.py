@@ -121,7 +121,14 @@ def backup_database(destination: Path) -> dict[str, Any]:
     source_connection = _readonly(source)
     target_connection = sqlite3.connect(str(destination), timeout=30)
     try:
+        target_connection.execute("PRAGMA synchronous=FULL")
         source_connection.backup(target_connection)
+        checkpoint = target_connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        if checkpoint is None or checkpoint[0] != 0:
+            raise RecoveryError("Backup WAL could not be checkpointed")
+        journal_mode = target_connection.execute("PRAGMA journal_mode=DELETE").fetchone()[0]
+        if str(journal_mode).lower() != "delete":
+            raise RecoveryError("Backup database could not be closed out as a standalone file")
     finally:
         target_connection.close()
         source_connection.close()

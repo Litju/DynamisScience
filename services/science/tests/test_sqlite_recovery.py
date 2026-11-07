@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from dynamis_science import researchstore
 from scripts.sqlite_recovery import backup_database, inspect_database, restore_database
 
@@ -12,6 +14,9 @@ def test_wal_online_backup_restores_and_reopens_separately(monkeypatch, tmp_path
 
     backup_path = root / "backups" / "research-test.sqlite3"
     backup = backup_database(backup_path)
+    assert backup["backup"]["journal_mode"].lower() == "delete"
+    assert not Path(f"{backup_path}-wal").exists()
+    assert not Path(f"{backup_path}-shm").exists()
     restored = restore_database(backup_path, root / "tmp" / "restore-test")
     restored_path = root / "tmp" / "restore-test" / "research" / "research.db"
     verified = inspect_database(restored_path)
