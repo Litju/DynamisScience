@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -248,15 +250,47 @@ def get_protocol(protocol_id: str) -> dict[str, Any] | None:
 
 
 def ingest_source_artifact(source_id: str, original_filename: str, content: bytes, acquisition_method: str = "upload") -> dict[str, Any]:
+    return _ingest_source_stream(
+        source_id, original_filename, io.BytesIO(content), acquisition_method
+    )
+
+
+def ingest_source_file(
+    source_id: str, file_path: str | os.PathLike[str], acquisition_method: str = "local_file"
+) -> dict[str, Any]:
+    path = Path(file_path).expanduser().resolve(strict=True)
+    if not path.is_file():
+        raise ValueError("Source artifact must be a regular file")
+    with path.open("rb") as content:
+        return _ingest_source_stream(source_id, path.name, content, acquisition_method)
+
+
+def _ingest_source_stream(source_id: str, original_filename: str, content, acquisition_method: str) -> dict[str, Any]:
     source = get_source(source_id)
     if source is None:
         raise ValueError(f"Unknown source: {source_id}")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", source_id):
+        raise ValueError("Invalid source id")
     source_dir = _admitted_dir() / source_id
     source_dir.mkdir(parents=True, exist_ok=True)
-    artifact_id = "SA-" + hashlib.sha256(content + original_filename.encode()).hexdigest()[:12].upper()
     suffix = Path(original_filename).suffix.lower() or ".bin"
-    stored_path = source_dir / f"{artifact_id}{suffix}"
-    stored_path.write_bytes(content)
+    temporary_path = source_dir / f".{uuid.uuid4().hex}.upload"
+    content_hash = hashlib.sha256()
+    artifact_hash = hashlib.sha256()
+    size_bytes = 0
+    try:
+        with temporary_path.open("wb") as stored:
+            while chunk := content.read(1024 * 1024):
+                stored.write(chunk)
+                content_hash.update(chunk)
+                artifact_hash.update(chunk)
+                size_bytes += len(chunk)
+        artifact_hash.update(original_filename.encode())
+        artifact_id = "SA-" + artifact_hash.hexdigest()[:12].upper()
+        stored_path = source_dir / f"{artifact_id}{suffix}"
+        os.replace(temporary_path, stored_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     fmt = "CSV" if suffix == ".csv" else "PARQUET" if suffix in {".parquet", ".pq"} else "JSON" if suffix == ".json" else "OTHER"
     artifact = {
         "id": artifact_id,
@@ -264,8 +298,8 @@ def ingest_source_artifact(source_id: str, original_filename: str, content: byte
         "format": fmt,
         "original_filename": original_filename,
         "stored_path": str(stored_path),
-        "content_hash_sha256": hashlib.sha256(content).hexdigest(),
-        "size_bytes": len(content),
+        "content_hash_sha256": content_hash.hexdigest(),
+        "size_bytes": size_bytes,
         "acquired_at": _now(),
         "acquisition_method": acquisition_method,
         "rights_record_id": source_id,
@@ -691,5 +725,72 @@ def list_admitted_snapshots() -> list[dict[str, Any]]:
             if path.is_dir():
                 snapshot_file = path / "snapshot.json"
                 if snapshot_file.exists():
-                    snapshots.append(json.loads(snapshot_file.read_text(encoding="utf-8")))
+                    snapshot = json.loads(snapshot_file.read_text(encoding="utf-8"))
+                    if snapshot.get("id") == path.name:
+                        snapshots.append(snapshot)
     return snapshots
+
+
+def get_admitted_snapshot(snapshot_id: str) -> dict[str, Any] | None:
+    snapshot = next(
+        (item for item in list_admitted_snapshots() if item.get("id") == snapshot_id),
+        None,
+    )
+    if snapshot is None:
+        return None
+    if not isinstance(snapshot.get("id"), str) or not re.fullmatch(
+        r"DS-ADMITTED-[A-F0-9]{12}", snapshot["id"]
+    ):
+        return None
+    directory = _admitted_dir() / snapshot["id"]
+    table = snapshot.get("table", "")
+    if table not in {"cmj_trials", "sprint_trials"}:
+        return None
+    if not (directory / f"{table}.parquet").is_file():
+        return None
+    artifact = get_source_artifact(snapshot.get("source_artifact_id", ""))
+    source = get_source(artifact.get("source_id", "")) if artifact else None
+    if source is None:
+        return None
+    family = snapshot.get("measurement_family", "")
+    provenance = _json(directory / "provenance_manifest.json", {})
+    admission_record = next(
+        (
+            item
+            for item in list_admission_records()
+            if item.get("dataset_snapshot_id") == snapshot_id
+        ),
+        {},
+    )
+    license_text = source.get("license_or_agreement", "")
+    privacy = {
+        "classification": source.get("privacy_status", "NOT_APPLICABLE"),
+        "restrictions": source.get("redistribution_restrictions", ""),
+        "retention_limitations": source.get("retention_limitations", ""),
+    }
+    return {
+        **snapshot,
+        "path": str(directory),
+        "real_data": snapshot.get("rights_status") != "FIXTURE_ONLY",
+        "synthetic": snapshot.get("rights_status") == "FIXTURE_ONLY",
+        "admitted_source": True,
+        "tables": {table: {"file": f"{table}.parquet", "rows": snapshot.get("row_count", 0)}},
+        "row_counts": {table: snapshot.get("row_count", 0)},
+        "checksums": provenance.get("content_hashes", {}),
+        "admission": admission_record,
+        "provenance": provenance,
+        "source": {
+            "id": source["id"],
+            "name": source["name"],
+            "publisher": source["publisher"],
+            "doi": None,
+            "dataset_identity": source.get("dataset_identity"),
+            "version": source.get("version"),
+            "license": {"id": license_text, "name": license_text},
+            "privacy": privacy,
+            "permitted_uses": source.get("permitted_uses", []),
+            "redistribution_restrictions": source.get("redistribution_restrictions", ""),
+            "attribution": f"{source['publisher']}. {source['dataset_identity']}. {license_text}.",
+            "rights_status": source.get("rights_status", "UNVERIFIED"),
+        },
+    }

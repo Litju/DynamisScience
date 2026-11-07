@@ -453,13 +453,22 @@ def _synthetic_snapshot() -> dict[str, Any] | None:
 
 
 def _real_snapshot(snapshot_id: str) -> dict[str, Any] | None:
-    return realstore.get_snapshot(snapshot_id)
+    snapshot = realstore.get_snapshot(snapshot_id)
+    if snapshot is not None:
+        return snapshot
+    from .admission import get_admitted_snapshot
+
+    return get_admitted_snapshot(snapshot_id)
 
 
 def get_snapshot(snapshot_id: str) -> dict[str, Any] | None:
     real = _real_snapshot(snapshot_id)
     if real is not None:
-        return {**real, "real_data": True, "synthetic": False}
+        return {
+            **real,
+            "real_data": bool(real.get("real_data", True)),
+            "synthetic": bool(real.get("synthetic", False)),
+        }
     synthetic = _synthetic_snapshot()
     if synthetic is not None and synthetic.get("id") == snapshot_id:
         return synthetic
@@ -472,12 +481,54 @@ def list_snapshots() -> list[dict[str, Any]]:
     if synthetic is not None:
         result.append(synthetic)
     result.extend({**item, "real_data": True, "synthetic": False} for item in realstore.list_snapshots())
+    from .admission import list_admitted_snapshots
+
+    result.extend(
+        snapshot
+        for item in list_admitted_snapshots()
+        if (snapshot := get_snapshot(item["id"])) is not None
+    )
     return result
 
 
 def read_snapshot_table(snapshot_id: str, table: str) -> pl.DataFrame:
     real = _real_snapshot(snapshot_id)
     if real is not None:
+        if real.get("admitted_source"):
+            if table == "subjects" and table not in _table_names(real):
+                observation_table = next(
+                    (name for name in ("cmj_trials", "sprint_trials") if name in _table_names(real)),
+                    None,
+                )
+                if observation_table is None:
+                    raise ResearchNotFound(f"Snapshot {snapshot_id} has no participant identifiers")
+                path = paths()["admitted"] / snapshot_id / f"{observation_table}.parquet"
+                schema = pl.read_parquet_schema(path)
+                if "subject_id" not in schema:
+                    raise ResearchValidation(f"Snapshot {snapshot_id} has no subject_id column")
+                fields = [pl.col("subject_id")]
+                fields.extend(
+                    pl.col(name)
+                    for name in ("display_id", "position")
+                    if name in schema
+                )
+                frame = (
+                    pl.scan_parquet(path)
+                    .select(fields)
+                    .unique(subset=["subject_id"], maintain_order=True)
+                    .collect(engine="streaming")
+                )
+                if "display_id" not in frame.columns:
+                    frame = frame.with_columns(pl.col("subject_id").alias("display_id"))
+                if "position" not in frame.columns:
+                    frame = frame.with_columns(pl.lit("Participant").alias("position"))
+                return frame
+            if table not in _table_names(real):
+                raise ResearchNotFound(f"Table {table} is not in snapshot {snapshot_id}")
+            path = paths()["admitted"] / snapshot_id / f"{table}.parquet"
+            if not path.is_file():
+                raise ResearchNotFound(f"Table {table} is unavailable in snapshot {snapshot_id}")
+            return pl.read_parquet(path)
         return realstore.read_table(snapshot_id, table)
     synthetic = _synthetic_snapshot()
     if synthetic is not None and synthetic.get("id") == snapshot_id:
@@ -496,7 +547,7 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
     snapshot = get_snapshot(snapshot_id)
     if snapshot is None:
         raise ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
-    if snapshot.get("real_data"):
+    if snapshot.get("real_data") and not snapshot.get("admitted_source"):
         from .realanalysis import METRICS
 
         tables = set(_table_names(snapshot))
@@ -521,6 +572,8 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
         return result
     # Synthetic fixture: keep the same metric identities used by the accepted UI.
     tables = set(_table_names(snapshot))
+    if snapshot.get("admitted_source") and not (tables & {"cmj_trials"}):
+        return []
     candidates = [
         ("MET-CMJ-IMPULSE", "Concentric impulse", "N·s·kg⁻¹", "concentric_impulse_n_s_kg", "cmj_trials", "PRIMARY"),
         ("MET-CMJ-HEIGHT", "Jump height (flight time)", "cm", "jump_height_cm", "cmj_trials", "SECONDARY"),
@@ -529,11 +582,18 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
         ("MET-CMJ-DEPTH", "Countermovement depth", "cm", "countermovement_depth_cm", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-RSI-MOD", "RSI-mod", "cm·s⁻¹", "rsi_mod", "cmj_trials", "CONTEXT"),
     ]
-    return [
+    result = [
         {"id": metric_id, "metric_id": metric_id, "label": label, "unit": unit, "column": column, "table": table, "definition_id": metric_id, "status": "ACTIVE", "role": role}
         for metric_id, label, unit, column, table, role in candidates
         if table in tables
     ]
+    if snapshot.get("admitted_source"):
+        import pyarrow.parquet as pq
+
+        path = paths()["admitted"] / snapshot_id / "cmj_trials.parquet"
+        columns = set(pq.ParquetFile(path).schema_arrow.names)
+        result = [item for item in result if item["column"] in columns]
+    return result
 
 
 def dataset_catalogue() -> list[dict[str, Any]]:
@@ -1178,7 +1238,7 @@ def update_entity(entity_id: str, patch: dict[str, Any], base_version: int | Non
         if base_version is not None and int(base_version) != int(document["version"]):
             raise ResearchConflict(f"{entity_id} is at version {document['version']}, not {base_version}")
         allowed = {
-            "title", "short_title", "research_question", "question", "design", "population", "eligibility", "exclusions",
+            "title", "short_title", "research_question", "design", "population", "eligibility", "exclusions",
             "intervention", "arms", "outcomes", "protocols", "schedule", "hypotheses", "cohort_id", "analysis_plan_id",
             "dataset_snapshot_id",
         }
@@ -1724,8 +1784,8 @@ def update_plan(plan_id: str, patch: dict[str, Any], base_version: int | None = 
         plan["version"] = int(plan["version"]) + 1
         plan["updated_at"] = _now()
         connection.execute(
-            "UPDATE plans SET version = ?, method_id = ?, document = ?, updated_at = ? WHERE id = ?",
-            (plan["version"], plan["method_id"], _canonical(plan), plan["updated_at"], plan_id),
+            "UPDATE plans SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+            (plan["version"], _canonical(plan), plan["updated_at"], plan_id),
         )
         connection.execute(
             "INSERT INTO plan_versions (plan_id, version, change_type, document, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -2331,6 +2391,10 @@ def _default_report(entity: dict[str, Any], project: dict[str, Any] | None) -> d
         "evidence_ids": [],
         "figure_ids": [],
         "citations": [],
+        "summary": "",
+        "conclusion": "",
+        "recommendations": "",
+        "narrative_note": "",
         "created_at": _now(),
         "updated_at": _now(),
         "schema_version": SCHEMA_VERSION,
@@ -2356,6 +2420,32 @@ def get_report_document(entity_id: str) -> dict[str, Any]:
         raise ResearchNotFound(f"Research object {entity_id} not found")
     with _connect() as connection:
         report = _ensure_report_row(connection, entity)
+    return report
+
+
+def update_report(entity_id: str, patch: dict[str, Any], base_version: int | None = None) -> dict[str, Any]:
+    entity = get_entity(entity_id)
+    if entity is None:
+        raise ResearchNotFound(f"Research object {entity_id} not found")
+    with _tx() as connection:
+        report = _ensure_report_row(connection, entity)
+        if base_version is not None and int(base_version) != int(report["version"]):
+            raise ResearchConflict(f"Report is at version {report['version']}, not {base_version}")
+        for key in ("title", "summary", "conclusion", "recommendations", "narrative_note"):
+            if key in patch:
+                report[key] = str(patch[key])
+        if not report.get("title", "").strip():
+            raise ResearchValidation("A report title is required")
+        report["version"] = int(report["version"]) + 1
+        report["status"] = "DRAFT"
+        report.pop("frozen_at", None)
+        report.pop("content_hash", None)
+        report["updated_at"] = _now()
+        connection.execute(
+            "UPDATE reports SET version = ?, status = 'DRAFT', document = ?, updated_at = ? WHERE entity_id = ?",
+            (report["version"], _canonical(report), report["updated_at"], entity_id),
+        )
+        _audit(connection, "report.updated", "report", report["id"], patch)
     return report
 
 
@@ -2482,6 +2572,10 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
         report = _ensure_report_row(connection, entity)
         content = {
             "title": payload["title"],
+            "summary": payload.get("summary", ""),
+            "conclusion": payload.get("conclusion", ""),
+            "recommendations": payload.get("recommendations", ""),
+            "narrative_note": payload.get("narrative_note", ""),
             "study_id": entity_id,
             "project_id": entity["project_id"],
             "evidence_ids": payload["evidence_ids"],
@@ -2715,6 +2809,16 @@ def export_html(entity_id: str, version: int | None = None) -> str:
     limitation_html = "".join(f"<li>{html.escape(item)}</li>" for item in limitations)
     source = snapshot.get("source", {})
     title = html.escape(payload.get("title", "Research report"))
+    narrative = "".join(
+        f"<h2>{html.escape(label)}</h2><p>{html.escape(str(payload.get(key) or ''))}</p>"
+        for key, label in (
+            ("summary", "Summary"),
+            ("conclusion", "Conclusion"),
+            ("recommendations", "Recommendations"),
+            ("narrative_note", "Researcher notes"),
+        )
+        if payload.get(key)
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
@@ -2751,6 +2855,7 @@ pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid 
 <h2>4. Results</h2>
 {'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>95% interval</th><th>Run</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
 {figure_html}
+{narrative}
 <h2>5. Limitations</h2><ul>{limitation_html}</ul>
 <h2>6. Provenance and reproducibility</h2>
 <p>Every cited value resolves to an immutable run, a frozen analysis plan, a resolved cohort, the admitted snapshot and its source. The manifest below is embedded in this file.</p>

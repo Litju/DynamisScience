@@ -13,8 +13,8 @@ from typing import Any
 import polars as pl
 import pyarrow.parquet as pq
 
-from .. import realanalysis, realstore, researchanalysis, researchstore
-from ..data_root import DataRootConfigurationError, data_root, ensure_layout
+from .. import admission, realanalysis, realstore, researchanalysis, researchstore
+from ..data_root import DataRootConfigurationError, data_root, ensure_layout, paths
 from ..generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
 
@@ -58,6 +58,272 @@ class DynamisAppService:
     def list_projects(self) -> list[dict[str, Any]]:
         self.ensure_initialized()
         return researchstore.list_projects(include_archived=True)
+
+    def get_project(self, project_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        project = researchstore.get_project(project_id)
+        if project is None:
+            raise researchstore.ResearchNotFound(f"Project {project_id} not found")
+        return project
+
+    def create_project(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.create_project(
+            payload["title"],
+            payload.get("description", ""),
+            payload.get("objectives", []),
+            payload.get("dataset_snapshot_ids", []),
+        )
+
+    def update_project(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        patch = {key: value for key, value in payload.items() if key != "base_version"}
+        return researchstore.update_project(project_id, patch, payload.get("base_version"))
+
+    def archive_project(self, project_id: str, archived: bool = True) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.set_project_archived(project_id, archived)
+
+    def project_history(self, project_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.project_history(project_id)
+
+    def create_study(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.create_study(project_id, payload)
+
+    def create_monitoring_program(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.create_monitoring_program(project_id, payload)
+
+    def update_study(
+        self, study_id: str, payload: dict[str, Any], base_version: int | None = None
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        entity = researchstore.get_entity(study_id)
+        if entity is None:
+            raise researchstore.ResearchNotFound(f"Research object {study_id} not found")
+        if entity.get("kind") == "MONITORING":
+            return self.update_monitoring_program(study_id, payload, base_version)
+        patch = {key: value for key, value in payload.items() if key != "base_version"}
+        question = dict(patch.get("question", {}))
+        if "research_question" in patch:
+            question["statement"] = patch["research_question"]
+        for key in ("estimand", "population"):
+            if key in patch:
+                question[key] = patch[key]
+        if question:
+            patch["question"] = question
+        if isinstance(patch.get("hypotheses"), list) and patch["hypotheses"]:
+            patch["hypotheses"] = researchstore._normalise_hypotheses(
+                patch["hypotheses"], entity["question"]["id"],
+                patch.get("research_question", entity.get("research_question", "")),
+            )
+        return researchstore.update_entity(study_id, patch, base_version)
+
+    def update_monitoring_program(
+        self, program_id: str, payload: dict[str, Any], base_version: int | None = None
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        entity = researchstore.get_entity(program_id)
+        if entity is None or entity.get("kind") != "MONITORING":
+            raise researchstore.ResearchNotFound(f"Monitoring program {program_id} not found")
+        schedule = dict(entity.get("schedule", {}))
+        start_week = int(payload.get("start_week", schedule.get("start_week", 1)))
+        weeks = int(payload.get("weeks", schedule.get("weeks", 1)))
+        if start_week < 1 or weeks < 1 or weeks > 104:
+            raise researchstore.ResearchValidation("start_week must be ≥ 1 and weeks between 1 and 104")
+        points = [
+            {"index": index + 1, "week": start_week + index, "label": f"Week {start_week + index}", "planned": True}
+            for index in range(weeks)
+        ]
+        schedule.update(start_week=start_week, weeks=weeks, points=points, future_measurements=points)
+        patch = {
+            key: payload[key]
+            for key in ("title", "short_title", "research_question", "population", "eligibility", "exclusions")
+            if key in payload
+        }
+        question = dict(entity.get("question", {}))
+        if "research_question" in payload:
+            question["statement"] = str(payload["research_question"]).strip()
+            question["time_horizon"] = f"{weeks} planned weekly measurements starting at week {start_week}."
+        if "population" in payload:
+            question["population"] = payload["population"]
+        patch.update(question=question, schedule=schedule)
+        return researchstore.update_entity(program_id, patch, base_version)
+
+    def transition_study(self, study_id: str, state: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.transition_entity(study_id, state)
+
+    def study_history(self, study_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.entity_history(study_id)
+
+    def create_cohort(self, study_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        definition = {
+            key: payload[key]
+            for key in (
+                "include_subject_ids", "exclude_subject_ids", "rules",
+                "min_metric_observations", "activity", "snapshot_id",
+            )
+            if key in payload
+        }
+        return researchstore.create_cohort(
+            study_id,
+            payload["name"],
+            definition,
+            bool(payload.get("freeze", False)),
+            payload.get("base_version"),
+            payload.get("parent_id"),
+        )
+
+    def update_cohort(self, cohort_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        patch = {key: value for key, value in payload.items() if key != "base_version"}
+        return researchstore.update_cohort(cohort_id, patch, payload.get("base_version"))
+
+    def freeze_cohort(self, cohort_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.freeze_cohort(cohort_id)
+
+    def fork_cohort(self, cohort_id: str, name: str | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.fork_cohort(cohort_id, name)
+
+    def cohort_history(self, cohort_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.cohort_history(cohort_id)
+
+    def list_cohorts(self, study_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.list_cohorts(study_id)
+
+    def get_cohort(self, cohort_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        cohort = researchstore.get_cohort(cohort_id)
+        if cohort is None:
+            raise researchstore.ResearchNotFound(f"Cohort {cohort_id} not found")
+        return cohort
+
+    def create_plan(self, study_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.create_plan(study_id, payload)
+
+    def update_plan(self, plan_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        patch = {key: value for key, value in payload.items() if key != "base_version"}
+        return researchstore.update_plan(plan_id, patch, payload.get("base_version"))
+
+    def freeze_plan(self, plan_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.freeze_plan(plan_id)
+
+    def fork_plan(self, plan_id: str, name: str | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.fork_plan(plan_id, name)
+
+    def plan_history(self, plan_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.plan_history(plan_id)
+
+    def list_plans(self, study_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.list_plans(study_id)
+
+    def get_plan(self, plan_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        plan = researchstore.get_plan(plan_id)
+        if plan is None:
+            raise researchstore.ResearchNotFound(f"Analysis plan {plan_id} not found")
+        return plan
+
+    def list_admission_sources(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return admission.list_sources()
+
+    def get_admission_source(self, source_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        source = admission.get_source(source_id)
+        if source is None:
+            raise researchstore.ResearchNotFound(f"Source {source_id} not found")
+        return source
+
+    def register_admission_source(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return admission.register_source(payload)
+
+    def verify_source_rights(self, source_id: str, verifier: str = "desktop") -> dict[str, Any]:
+        self.ensure_initialized()
+        return admission.verify_rights(source_id, verifier)
+
+    def ingest_local_source_file(
+        self, source_id: str, file_path: str | os.PathLike[str]
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        return admission.ingest_source_file(source_id, file_path)
+
+    def list_source_artifacts(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return admission.list_source_artifacts()
+
+    def list_admission_instruments(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return admission.list_instruments()
+
+    def register_admission_instrument(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return admission.register_instrument(payload)
+
+    def list_admission_protocols(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return admission.list_protocols()
+
+    def register_admission_protocol(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return admission.register_protocol(payload)
+
+    def validate_source_artifact(
+        self, artifact_id: str, family: str, metadata: dict[str, Any]
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        artifact = admission.get_source_artifact(artifact_id)
+        if artifact is None:
+            raise researchstore.ResearchNotFound(f"Source artifact {artifact_id} not found")
+        if family == "CMJ_FORCE_PLATFORM":
+            return admission.validate_cmj(artifact, metadata)
+        if family == "SPRINT_TIMING":
+            return admission.validate_sprint(artifact, metadata)
+        raise researchstore.ResearchValidation(f"Unsupported measurement family: {family}")
+
+    def admit_source_artifact(
+        self, artifact_id: str, family: str, metadata: dict[str, Any]
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        return admission.admit_artifact(artifact_id, family, metadata)
+
+    def list_admission_records(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return admission.list_admission_records()
+
+    def get_admission_record(self, record_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        record = admission.get_admission_record(record_id)
+        if record is None:
+            raise researchstore.ResearchNotFound(f"Admission record {record_id} not found")
+        return record
+
+    def list_admission_quality(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return admission.list_quality()
+
+    def get_admission_quality(self, quality_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        quality = admission.get_quality(quality_id)
+        if quality is None:
+            raise researchstore.ResearchNotFound(f"Quality assessment {quality_id} not found")
+        return quality
 
     def list_all_studies(self) -> list[dict[str, Any]]:
         self.ensure_initialized()
@@ -190,7 +456,10 @@ class DynamisAppService:
         return researchstore.dataset_metrics(snapshot_id)
 
     def resolve_cohort(
-        self, study_id: str, excluded_subject_ids: list[str] | None = None
+        self,
+        study_id: str,
+        excluded_subject_ids: list[str] | None = None,
+        cohort_id: str | None = None,
     ) -> dict[str, Any]:
         self.ensure_initialized()
         if study_id in realstore.real_study_ids():
@@ -211,9 +480,11 @@ class DynamisAppService:
                 members = [item for item in cohort.get("subject_ids", []) if item not in excluded]
                 return {"cohort": {**cohort, "subject_ids": members}, "n": len(members), "snapshot_id": SNAPSHOT_ID}
             raise researchstore.ResearchNotFound(f"Study {study_id} not found")
-        cohort = researchstore.get_cohort(entity.get("cohort_id") or "")
+        cohort = researchstore.get_cohort(cohort_id or entity.get("cohort_id") or "")
         if cohort is None:
             raise researchstore.ResearchNotFound(f"Study {study_id} has no cohort")
+        if cohort.get("study_id") != study_id:
+            raise researchstore.ResearchValidation("The selected cohort belongs to a different study")
         return researchstore.resolve_cohort(
             cohort, entity["dataset_snapshot_id"], excluded_subject_ids
         )
@@ -328,15 +599,29 @@ class DynamisAppService:
             return _read_json(ARTIFACT_DIR / "report.json", {})
         raise researchstore.ResearchNotFound(f"Report for {study_id} not found")
 
+    def update_report(
+        self, study_id: str, payload: dict[str, Any], base_version: int | None = None
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.update_report(study_id, payload, base_version)
+
     def freeze_report(self, study_id: str) -> dict[str, Any]:
         self.ensure_initialized()
         return researchstore.freeze_report(study_id)
+
+    def report_versions(self, study_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return researchstore.report_versions(study_id)
 
     def cite_report_artifact(
         self, study_id: str, artifact_id: str, section: str | None = None
     ) -> dict[str, Any]:
         self.ensure_initialized()
         return researchstore.cite_artifact(study_id, artifact_id, section)
+
+    def uncite_report_artifact(self, study_id: str, artifact_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.uncite_artifact(study_id, artifact_id)
 
     def export_report_html(
         self, study_id: str, target_path: str | os.PathLike[str], version: int | None = None
@@ -449,6 +734,8 @@ def _table_names(snapshot: dict[str, Any]) -> list[str]:
 def _table_path(snapshot_id: str, table_name: str, snapshot: dict[str, Any]) -> Path:
     if snapshot.get("synthetic"):
         path = PARQUET_DIR / f"{table_name}.parquet"
+    elif snapshot.get("admitted_source"):
+        path = paths()["admitted"] / snapshot_id / f"{table_name}.parquet"
     else:
         path = realstore.snapshots_dir() / snapshot_id / f"{table_name}.parquet"
     if not path.is_file():
