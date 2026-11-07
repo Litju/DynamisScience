@@ -6,12 +6,23 @@ import json
 from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtGui import QColor, QFont
 
 from .services import DynamisAppService
 from .tasks import TaskRunner
 
 
 class RecordTableModel(QAbstractTableModel):
+    HEADER_LABELS = {
+        "athlete_id": "ATHLETE",
+        "subject_id": "SUBJECT",
+        "position": "POS",
+        "readiness": "READY",
+        "load_ratio": "LOAD",
+        "cmj_change": "CMJ Δ",
+        "cmj_delta_pct": "CMJ Δ",
+    }
+
     def __init__(self, rows: list[dict[str, Any]] | None = None) -> None:
         super().__init__()
         self.rows = rows or []
@@ -30,9 +41,22 @@ class RecordTableModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self.columns)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+        if not index.isValid():
             return None
-        value = self.rows[index.row()].get(self.columns[index.column()])
+        column = self.columns[index.column()]
+        value = self.rows[index.row()].get(column)
+        numeric = isinstance(value, (int, float)) or column in {
+            "readiness", "load_ratio", "cmj_change", "cmj_delta_pct", "sleep_hours", "age",
+        }
+        if role == Qt.ItemDataRole.TextAlignmentRole and numeric:
+            return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        if role == Qt.ItemDataRole.FontRole and numeric:
+            return QFont("Consolas", 9)
+        if role == Qt.ItemDataRole.ForegroundRole and column == "flag":
+            label = str(value or "").lower()
+            return QColor("#e0a458" if "load" in label else "#ef6b63")
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
         if isinstance(value, (dict, list)):
             return json.dumps(value, ensure_ascii=False, sort_keys=True)
         return "" if value is None else str(value)
@@ -40,7 +64,13 @@ class RecordTableModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if role != Qt.ItemDataRole.DisplayRole:
             return None
-        return self.columns[section] if orientation == Qt.Orientation.Horizontal and section < len(self.columns) else str(section + 1)
+        return (
+            self.HEADER_LABELS.get(
+                self.columns[section], self.columns[section].replace("_", " ").upper()
+            )
+            if orientation == Qt.Orientation.Horizontal and section < len(self.columns)
+            else str(section + 1)
+        )
 
 
 class ParquetPreviewTableModel(QAbstractTableModel):

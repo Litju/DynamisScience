@@ -8,6 +8,7 @@ from typing import Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDockWidget,
     QDialog,
@@ -43,9 +44,11 @@ from .dialogs import (
     ProjectDialog,
     StudyDialog,
 )
+from .performance_workbench import PerformanceHeader, PerformanceRail, PerformanceWorkbench
 from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .tasks import TaskRunner
+from .theme import apply_theme
 
 
 class MainWindow(QMainWindow):
@@ -53,6 +56,9 @@ class MainWindow(QMainWindow):
 
     def __init__(self, service: DynamisAppService) -> None:
         super().__init__()
+        application = QApplication.instance()
+        if application is not None:
+            apply_theme(application)
         self.service = service
         self.runner = TaskRunner(self)
         self._close_after_tasks = False
@@ -73,19 +79,25 @@ class MainWindow(QMainWindow):
         self.navigator.itemClicked.connect(self._navigation_activated)
         self.navigator_dock = QDockWidget("Research navigator", self)
         self.navigator_dock.setObjectName("ResearchNavigator")
-        self.navigator_dock.setWidget(self.navigator)
+        self.navigator_stack = QStackedWidget(self.navigator_dock)
+        self.navigator_stack.addWidget(self.navigator)
+        self.navigator_dock.setWidget(self.navigator_stack)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.navigator_dock)
 
         self.inspector = QTextBrowser()
         self.inspector_dock = QDockWidget("Inspector", self)
         self.inspector_dock.setObjectName("Inspector")
-        self.inspector_dock.setWidget(self.inspector)
+        self.inspector_stack = QStackedWidget(self.inspector_dock)
+        self.inspector_stack.addWidget(self.inspector)
+        self.inspector_dock.setWidget(self.inspector_stack)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
 
         central = QWidget()
         layout = QVBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         header = QHBoxLayout()
-        brand = QLabel("DYNAMISSCIENCE  /  RESEARCH WORKSTATION")
+        brand = QLabel("DYNAMISSCIENCE  /  SCIENTIFIC & PERFORMANCE WORKSTATION")
         brand.setStyleSheet("font-weight: 700; letter-spacing: 1px")
         self.context = QLabel("Select a project, study or dataset")
         self.provenance = QLabel("")
@@ -94,7 +106,12 @@ class MainWindow(QMainWindow):
         header.addStretch(1)
         header.addWidget(self.context)
         header.addWidget(self.provenance)
-        layout.addLayout(header)
+        self.research_header = QWidget()
+        self.research_header.setObjectName("ResearchHeader")
+        header_layout = QHBoxLayout(self.research_header)
+        header_layout.setContentsMargins(12, 0, 12, 0)
+        header_layout.addLayout(header)
+        layout.addWidget(self.research_header)
 
         self.workspace = QStackedWidget()
         self.welcome = QLabel("Loading the validated research catalogue…")
@@ -102,8 +119,28 @@ class MainWindow(QMainWindow):
         self.workspace.addWidget(self.welcome)
         self.research = ResearchWorkbench(self)
         self.workspace.addWidget(self.research)
+        self.performance = PerformanceWorkbench(self)
+        self.performance.open_research_study.connect(self._open_research_study)
+        self.performance.athlete_inspected.connect(self._show_athlete_inspector)
+        self.performance.context_panel.back_to_daily.connect(self._show_daily_context)
+        self.performance.context_panel.open_full_athlete.connect(self._open_full_athlete_profile)
+        self.inspector_stack.addWidget(self.performance.context_panel)
+        self.workspace.addWidget(self.performance)
         layout.addWidget(self.workspace, 1)
         self.setCentralWidget(central)
+
+        self.performance_header = PerformanceHeader(self)
+        self.performance_header.search_requested.connect(self._search_performance)
+        self.performance_rail = PerformanceRail(self)
+        self.performance_rail.page_selected.connect(self.show_performance_page)
+        self.navigator_stack.addWidget(self.performance_rail)
+        self.performance_toolbar = QToolBar("Performance OS", self)
+        self.performance_toolbar.setObjectName("PerformanceToolbar")
+        self.performance_toolbar.setMovable(False)
+        self.performance_toolbar.setFloatable(False)
+        self.performance_toolbar.addWidget(self.performance_header)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
+        self.performance_toolbar.hide()
 
         self.status_text = QLabel("Starting")
         self.progress = QProgressBar()
@@ -193,11 +230,115 @@ class MainWindow(QMainWindow):
         )
         help_menu.addAction(about)
 
-        toolbar = QToolBar("Research authoring", self)
-        toolbar.setMovable(False)
+        self.research_toolbar = QToolBar("Research authoring", self)
+        self.research_toolbar.setObjectName("ResearchToolbar")
+        self.research_toolbar.setMovable(False)
         for action in (self.action_new_project, self.action_new_study, self.action_admit):
-            toolbar.addAction(action)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+            self.research_toolbar.addAction(action)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.research_toolbar)
+        self.performance_header.set_menu_actions(self.menuBar().actions())
+
+    def _show_performance_mode(self) -> None:
+        self.menuBar().hide()
+        self.research_header.hide()
+        self.provenance.hide()
+        self.performance_toolbar.show()
+        self.research_toolbar.hide()
+        self.navigator_stack.setCurrentWidget(self.performance_rail)
+        self.navigator_dock.setTitleBarWidget(QWidget())
+        self.navigator_dock.setMinimumWidth(196)
+        self.navigator_dock.setMaximumWidth(232)
+        self.inspector_dock.setWindowTitle(
+            "ATHLETE 360"
+            if self.performance.context_panel.current_athlete
+            and self.performance.context_panel.views.currentWidget()
+            == self.performance.context_panel.athlete_view
+            else "DAILY CONTEXT"
+        )
+        self.inspector_stack.setCurrentWidget(self.performance.context_panel)
+        self.inspector_dock.setMinimumWidth(280)
+        self.inspector_dock.setMaximumWidth(340)
+        self.resizeDocks(
+            [self.navigator_dock, self.inspector_dock], [204, 300], Qt.Orientation.Horizontal
+        )
+        if not getattr(self, "_performance_context_loaded", False):
+            self._performance_context_loaded = True
+            self.run_task(
+                lambda: self.service.performance_page_data("context")["context"],
+                self._performance_context_loaded_from_service,
+                "Loading squad and season context",
+            )
+
+    def _performance_context_loaded_from_service(self, context: dict[str, Any]) -> None:
+        self.performance_header.set_context(context)
+        self.performance_rail.set_context(context)
+
+    def _show_research_mode(self) -> None:
+        self.menuBar().show()
+        self.performance_toolbar.hide()
+        self.research_toolbar.show()
+        self.research_header.show()
+        self.provenance.show()
+        self.navigator_stack.setCurrentWidget(self.navigator)
+        self.navigator_dock.setTitleBarWidget(None)
+        self.navigator_dock.setWindowTitle("Research navigator")
+        self.navigator_dock.setMinimumWidth(0)
+        self.navigator_dock.setMaximumWidth(16777215)
+        self.inspector_dock.setWindowTitle("Inspector")
+        self.inspector_stack.setCurrentWidget(self.inspector)
+        self.inspector_dock.setMinimumWidth(0)
+        self.inspector_dock.setMaximumWidth(16777215)
+
+    def show_performance_page(self, page: str) -> None:
+        self._show_performance_mode()
+        page_alias = {"athlete": "today", "match": "monitor"}
+        if page in page_alias:
+            self.performance_rail.set_current(page_alias[page])
+        else:
+            self.performance_rail.set_current(page)
+        self.current_target = {"type": "performance", "page": page}
+        title = {"athlete": "Athlete 360", "match": "Match & Pose"}.get(
+            page, self.performance.page_names[self.performance.page_keys.index(page)]
+        )
+        self.context.setText(title)
+        self.provenance.setText("SYNTHETIC FIXTURE · DS-SYNTH-001 · NO REAL DATA")
+        self.workspace.setCurrentWidget(self.performance)
+        self.performance.select_page(page)
+
+    def _search_performance(self, query: str) -> None:
+        if not query:
+            return
+        self.run_task(
+            lambda: self.service.performance_athlete(query),
+            self._show_performance_athlete,
+            f"Searching athlete records · {query}",
+        )
+
+    def _show_performance_athlete(self, detail: dict[str, Any]) -> None:
+        self.show_performance_page("athlete")
+        athlete_id = detail["subject"]["display_id"]
+        index = self.performance.athlete_picker.findText(athlete_id)
+        if index < 0:
+            self.performance.athlete_picker.addItem(athlete_id)
+            index = self.performance.athlete_picker.findText(athlete_id)
+        self.performance.athlete_picker.setCurrentIndex(index)
+        self.performance._athlete_loaded(detail)
+
+    def _show_athlete_inspector(self, detail: dict[str, Any]) -> None:
+        self.performance.context_panel.show_athlete(detail)
+        self.inspector_dock.setWindowTitle("ATHLETE 360")
+        self.inspector_dock.show()
+        self.inspector_dock.raise_()
+
+    def _show_daily_context(self) -> None:
+        self.performance.context_panel.show_daily()
+        self.inspector_dock.setWindowTitle("DAILY CONTEXT")
+
+    def _open_full_athlete_profile(self, athlete_id: str) -> None:
+        self.show_performance_page("athlete")
+        index = self.performance.athlete_picker.findText(athlete_id)
+        if index >= 0:
+            self.performance.athlete_picker.setCurrentIndex(index)
 
     def _load(self) -> None:
         self.run_task(self.service.ensure_initialized, self._load_catalogue, "Validating private data root")
@@ -289,6 +430,17 @@ class MainWindow(QMainWindow):
             item = QTreeWidgetItem([dataset.get("label") or dataset["id"]])
             item.setData(0, Qt.ItemDataRole.UserRole, {"type": "dataset", "id": dataset["id"]})
             data_root.addChild(item)
+        performance_root = QTreeWidgetItem(["Performance OS · synthetic fixture"])
+        performance_root.setData(0, Qt.ItemDataRole.UserRole, {"type": "performance_root"})
+        self.navigator.addTopLevelItem(performance_root)
+        for page, label in zip(self.performance.page_keys, self.performance.page_names):
+            item = QTreeWidgetItem([label])
+            item.setData(
+                0,
+                Qt.ItemDataRole.UserRole,
+                {"type": "performance", "page": page},
+            )
+            performance_root.addChild(item)
         self.navigator.expandAll()
         self.workspace.setCurrentWidget(self.welcome)
         self.welcome.setText(
@@ -318,6 +470,12 @@ class MainWindow(QMainWindow):
 
     def _navigation_activated(self, item: QTreeWidgetItem, _column: int) -> None:
         target = item.data(0, Qt.ItemDataRole.UserRole) or {}
+        if target.get("type") == "performance":
+            self.show_performance_page(target["page"])
+            return
+        if target.get("type") == "performance_root":
+            self.show_performance_page("today")
+            return
         if target.get("type") == "project":
             project_id = target["id"]
             self.run_task(
@@ -340,6 +498,7 @@ class MainWindow(QMainWindow):
                 "Opening dataset",
             )
         elif target.get("type") in {"projects", "datasets", "studies"}:
+            self._show_research_mode()
             self.current_target = None
             self.current_project = None
             self.current_study_id = None
@@ -347,7 +506,19 @@ class MainWindow(QMainWindow):
             self.workspace.setCurrentWidget(self.welcome)
             self.welcome.setText(item.text(0))
 
+    def _open_research_study(self, study_id: str) -> None:
+        study_parent = self.navigator.topLevelItem(1)
+        for index in range(study_parent.childCount()):
+            item = study_parent.child(index)
+            target = item.data(0, Qt.ItemDataRole.UserRole) or {}
+            if target.get("id") == study_id:
+                self.navigator.setCurrentItem(item)
+                self._navigation_activated(item, 0)
+                return
+        QMessageBox.information(self, "Research link", f"Linked study {study_id} is not in the current catalogue.")
+
     def _show_project(self, project_id: str, project: dict[str, Any]) -> None:
+        self._show_research_mode()
         self.current_target = {"type": "project", "id": project_id}
         self.current_project = project
         self.current_study_id = None
@@ -360,6 +531,7 @@ class MainWindow(QMainWindow):
         self.research.tabs.setCurrentIndex(0)
 
     def _show_study(self, study_id: str, detail: dict[str, Any]) -> None:
+        self._show_research_mode()
         self.current_target = {"type": "study", "id": study_id}
         self.current_project = detail.get("project")
         self.current_study_id = study_id
@@ -389,6 +561,7 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.research)
 
     def _show_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        self._show_research_mode()
         self.current_target = {"type": "dataset", "id": snapshot_id}
         self.current_study_id = None
         self.current_study = {}

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QApplication, QDialogButtonBox, QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QFileDialog, QInputDialog, QMessageBox
 
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.dialogs import (
@@ -20,6 +20,11 @@ from dynamis_science.desktop.dialogs import (
     StudyDialog,
 )
 from dynamis_science.desktop.plots import export_figure, run_figure
+from dynamis_science.desktop.performance_workbench import (
+    PlanDialog as PerformancePlanDialog,
+    ReportDialog,
+    SessionDialog,
+)
 from dynamis_science.desktop.services import DynamisAppService
 from dynamis_science.desktop.tasks import TaskRunner
 from dynamis_science import realstore, researchstore
@@ -63,7 +68,7 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     window = MainWindow(DynamisAppService())
     qtbot.addWidget(window)
     window.show()
-    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
 
     assert window.research.tabs.count() == 5
     study_parent = window.navigator.topLevelItem(1)
@@ -229,7 +234,7 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     window = MainWindow(service)
     qtbot.addWidget(window)
     window.show()
-    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
     study_parent = window.navigator.topLevelItem(1)
     item = next(
         study_parent.child(index)
@@ -371,7 +376,7 @@ def test_native_project_and_study_creation_forms(qtbot, tmp_path, monkeypatch):
     window = MainWindow(service)
     qtbot.addWidget(window)
     window.show()
-    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
 
     def create_project_form():
         dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, ProjectDialog))
@@ -481,7 +486,7 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     window = MainWindow(service)
     qtbot.addWidget(window)
     window.show()
-    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
     source_file = tmp_path / "local-cmj.csv"
     dialog = DatasetAdmissionDialog(service, window.run_task, window._admission_saved, window)
     qtbot.addWidget(dialog)
@@ -531,6 +536,7 @@ def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(
 ):
     errors = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *_args: errors.append(_args[-1]))
+    monkeypatch.setattr(QMessageBox, "information", lambda *_args: errors.append(_args[-1]))
     monkeypatch.setattr(
         QMessageBox,
         "question",
@@ -554,7 +560,7 @@ def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(
     window = MainWindow(service)
     qtbot.addWidget(window)
     window.show()
-    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
     item = next(
         window.navigator.topLevelItem(1).child(index)
         for index in range(window.navigator.topLevelItem(1).childCount())
@@ -578,9 +584,11 @@ def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(
 
     window._freeze_cohort()
     qtbot.waitUntil(lambda: service.get_cohort(created_cohort["id"])["status"] == "FROZEN")
+    qtbot.waitUntil(lambda: not window.runner.active)
     monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("Forked cohort", True))
     window._fork_cohort()
     qtbot.waitUntil(lambda: len(service.list_cohorts(study_id)) == len(cohorts) + 1)
+    qtbot.waitUntil(lambda: not window.runner.active)
     forked_cohort = service.list_cohorts(study_id)[-1]
     assert forked_cohort["parent_id"] == created_cohort["id"]
 
@@ -603,13 +611,193 @@ def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(
     assert plan["name"] == "Native frozen plan"
     window._freeze_plan()
     qtbot.waitUntil(lambda: service.get_plan(plan["id"])["status"] == "FROZEN")
+    qtbot.waitUntil(lambda: not window.runner.active)
     monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("Forked plan", True))
     window._fork_plan()
     qtbot.waitUntil(lambda: len(service.list_plans(study_id)) >= 3)
+    qtbot.waitUntil(lambda: not window.runner.active)
     forked_plan = service.list_plans(study_id)[-1]
     assert forked_plan["parent_id"] == plan["id"]
     assert service.cohort_history(created_cohort["id"])
     assert service.plan_history(plan["id"])
     assert not errors, errors
     qtbot.waitUntil(lambda: not window.runner.active)
+    window.close()
+
+
+def test_performance_direct_service_preserves_records_and_science(tmp_path, monkeypatch):
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    service = DynamisAppService()
+    overview = service.performance_page_data("today")
+    assert overview["today"]["pulse"]["readiness"] == pytest.approx(7.091, abs=0.001)
+    assert overview["today"]["data_quality"]["valid_trials"] == 883
+    assert len(overview["athletes"]) == 28
+
+    athlete = service.performance_athlete("ATH-003")
+    assert len(athlete["weeks"]) == 16
+    assert athlete["availability"]["status"] == "ROSTER_ONLY"
+    assert athlete["force_trial_id"] == "CMJ-003-16-1"
+
+    plan = service.performance_page_data("plan")["plan"]
+    next_week = plan["current_week"] + 1
+    next_microcycle = next(row for row in plan["microcycles"] if row["week"] == next_week)
+    updated = service.performance_update_plan(
+        {
+            "week": next_week,
+            "focus": "Native editor persistence check",
+            "testing_window": next_microcycle.get("testing_window", ""),
+            "sessions": next_microcycle["sessions"],
+        }
+    )
+    assert updated["microcycles"][1]["focus"] == "Native editor persistence check"
+    assert service.performance_log_session(
+        {
+            "date": "2026-11-07",
+            "session_type": "Field",
+            "duration_min": 60,
+            "session_rpe": 5,
+            "attendance": 27,
+        }
+    )["srpe_load_au"] == 300
+
+    assessment = service.performance_run_reliability()
+    assert assessment["status"] == "COMPUTED"
+    assert assessment["provenance"]["snapshot_id"] == "DS-SYNTH-001"
+    report = service.performance_create_report({"audience": "coach", "role": "Test coach"})
+    frozen = service.performance_freeze_report(report["id"])
+    assert frozen["status"] == "FROZEN"
+    exported = service.performance_export_report(report["id"], tmp_path / "coach-report.html")
+    assert "DS-SYNTH-001" in exported.read_text(encoding="utf-8")
+
+    match = service.performance_page_data("match")
+    assert match["movement"]["scope"] == "SEGMENT_ONLY"
+    frame = service.performance_match_frame(900, "PLAYER-14")
+    assert len(frame["tracking"]) >= 20
+    assert len(frame["pose"]) > 0
+    assert len(service.performance_tracking("PLAYER-14")["rows"]) == 1800
+    assert len(service.performance_page_data("research")["metrics"]) >= 1
+    with pytest.raises(ValueError, match="Unknown Performance OS workspace"):
+        service.performance_page_data("unknown")
+
+
+def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, monkeypatch):
+    errors = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: errors.append(_args[-1]))
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    window = MainWindow(DynamisAppService())
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
+    performance_root = window.navigator.topLevelItem(3)
+    assert performance_root.childCount() == len(window.performance.page_names)
+    for index, page in enumerate(window.performance.page_keys):
+        item = performance_root.child(index)
+        window._navigation_activated(item, 0)
+        qtbot.waitUntil(lambda page=page: page in window.performance.loaded_pages)
+        qtbot.waitUntil(lambda: not window.runner.active)
+        assert window.performance.current_page == page
+    qtbot.waitUntil(lambda: window.performance.test_model.rowCount() > 0)
+    qtbot.waitUntil(lambda: window.performance.event_model.rowCount() > 0)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert window.performance.tabs.count() == 8
+    assert window.performance.athlete_trend.plotItem.listDataItems()
+    assert window.performance.match_field.plotItem.listDataItems()
+    assert window.performance.pose_plot.plotItem.listDataItems()
+    window.show_performance_page("today")
+    qtbot.waitUntil(lambda: not window.runner.active)
+    window.performance._open_selected_athlete()
+    qtbot.waitUntil(
+        lambda: window.performance.context_panel.views.currentWidget()
+        is window.performance.context_panel.athlete_view
+    )
+    assert window.performance.current_page == "today"
+    assert window.inspector_dock.windowTitle() == "ATHLETE 360"
+    qtbot.waitUntil(lambda: not window.runner.active)
+    window._show_daily_context()
+    assert window.inspector_dock.windowTitle() == "DAILY CONTEXT"
+    assert not errors, errors
+    window.close()
+
+
+def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path, monkeypatch):
+    errors = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: errors.append(_args[-1]))
+    monkeypatch.setattr(QMessageBox, "question", lambda *_args: QMessageBox.StandardButton.Yes)
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    service = DynamisAppService()
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
+    performance_root = window.navigator.topLevelItem(3)
+
+    window._navigation_activated(performance_root.child(3), 0)
+    qtbot.waitUntil(lambda: "monitor" in window.performance.loaded_pages)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    def save_session(dialog):
+        dialog.notes.setText("Native session entry")
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(SessionDialog, "exec", save_session)
+    window.performance._log_session()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    monitor = service.performance_page_data("monitor")["load"]
+    assert monitor["session_logs"][-1]["notes"] == "Native session entry"
+
+    window._navigation_activated(performance_root.child(1), 0)
+    qtbot.waitUntil(lambda: bool(window.performance.athlete_trend.plotItem.listDataItems()))
+    qtbot.waitUntil(lambda: not window.runner.active)
+    athlete_index = window.performance.athlete_picker.findText("ATH-003")
+    window.performance.athlete_picker.setCurrentIndex(athlete_index)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    monkeypatch.setattr(
+        QInputDialog,
+        "getMultiLineText",
+        lambda *_args: ("Native practitioner note", True),
+    )
+    window.performance._add_athlete_note()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert service.performance_athlete("ATH-003")["notes"][-1]["text"] == "Native practitioner note"
+
+    window._navigation_activated(performance_root.child(2), 0)
+    qtbot.waitUntil(lambda: bool(window.performance.plan_chart.plotItem.listDataItems()))
+    qtbot.waitUntil(lambda: not window.runner.active)
+    def save_plan(dialog):
+        dialog.focus.setText("Native microcycle editor")
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(PerformancePlanDialog, "exec", save_plan)
+    window.performance._edit_plan()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    window.performance._publish_plan()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    plan = service.performance_page_data("plan")["plan"]
+    assert plan["status"] == "PUBLISHED"
+    assert plan["microcycles"][1]["focus"] == "Native microcycle editor"
+
+    window._navigation_activated(performance_root.child(7), 0)
+    qtbot.waitUntil(lambda: "report" in window.performance.loaded_pages)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    monkeypatch.setattr(
+        ReportDialog,
+        "exec",
+        lambda dialog: (dialog.role.setText("Native report author"), QDialog.DialogCode.Accepted)[1],
+    )
+    window.performance._create_report()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    reports = service.performance_page_data("report")["reports"]
+    assert reports
+    report_id = window.performance.selected_report_id
+    window.performance._freeze_report()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert next(item for item in service.performance_page_data("report")["reports"] if item["id"] == report_id)["status"] == "FROZEN"
+    output = tmp_path / "practitioner-report.html"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args: (str(output), "HTML report (*.html)"))
+    window.performance._export_report()
+    qtbot.waitUntil(output.is_file)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert "DS-SYNTH-001" in output.read_text(encoding="utf-8")
+    assert not errors, errors
     window.close()
