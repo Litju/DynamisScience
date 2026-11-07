@@ -47,7 +47,7 @@ Inno Setup 6.7.3 is used only to build the Windows installer and is not bundled
 into the installed application. Its license permits commercial use subject to
 the stated copyright and redistribution conditions; the installer build keeps
 the Inno Setup copyright and source attribution in this documentation. The
-The compiler is not shipped with the application. See the [official license](https://jrsoftware.org/files/is/license.txt) for the copyright and redistribution conditions.
+compiler is not shipped with the application. See the [official license](https://jrsoftware.org/files/is/license.txt) for the copyright and redistribution conditions.
 
 ## Dataset rights and private state
 

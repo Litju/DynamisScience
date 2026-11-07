@@ -10,6 +10,7 @@ import sys
 import threading
 from pathlib import Path
 
+import polars as pl
 import pytest
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -40,7 +41,7 @@ from dynamis_science.desktop.services import DynamisAppService
 from dynamis_science.desktop.tasks import TaskRunner
 from dynamis_science.desktop.library_dialog import ScientificLibraryDialog
 from dynamis_science.desktop.lineage_dialog import LineageDialog
-from dynamis_science import realstore, researchstore
+from dynamis_science import qualification_real, realstore, researchstore
 
 
 def test_parquet_preview_is_bounded_and_offset_correct(tmp_path, monkeypatch):
@@ -245,6 +246,59 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     )
     assert movesmart["status"] == "COMPLETED"
     assert movesmart["result_digest"]
+
+    rscript = os.environ.get("DYNAMISSCIENCE_RSCRIPT", "")
+    if not (rscript and Path(rscript).is_file()) and shutil.which("Rscript") is None:
+        pytest.skip("Independent R/lme4 MixedLM qualification is unavailable")
+    raw_source = Path(r"D:\datasets\DynamisScience\extracted\zenodo-17376717\Dataset")
+    if not raw_source.is_dir():
+        pytest.skip("Verified MoveSmart raw signal copies are unavailable")
+    raw_target = root / "extracted" / "zenodo-17376717" / "Dataset"
+    signal_rows = realstore.read_table(movesmart["snapshot_id"], "signal_trials")
+    prefixes = {"Walking": "walk", "Running": "run", "Heel drop": "heel", "Step drop": "drop"}
+    for activity, prefix in prefixes.items():
+        row = (
+            signal_rows.filter(pl.col("activity") == activity)
+            .sort(["subject_id", "trial_number"])
+            .row(0, named=True)
+        )
+        files = sorted(
+            raw_source.glob(
+                f"{row['participant_folder']}/{prefix}{int(row['trial_number']):04d}_f_*.csv"
+            )
+        )
+        if not files:
+            pytest.skip(f"MoveSmart raw force files for {activity} are unavailable")
+        destination = raw_target / row["participant_folder"]
+        destination.mkdir(parents=True, exist_ok=True)
+        for source_file in files:
+            shutil.copy2(source_file, destination / source_file.name)
+
+    signal_qa = service.execute_analysis_run(
+        realstore.STUDY_MOVESMART,
+        {
+            "method_id": "METH-REAL-SIGNAL-QA",
+            "outcome_metric_id": "MET-REAL-FZ-PEAK",
+            "parameters": {},
+        },
+    )
+    assert signal_qa["status"] == "COMPLETED"
+    qualifications = {
+        item["id"]: item for item in qualification_real.run()
+    }
+    for qualification_id in (
+        "QUAL-REAL-MIXEDLM",
+        "QUAL-REAL-RELIABILITY",
+        "QUAL-REAL-SIGNAL",
+    ):
+        qualification = qualifications[qualification_id]
+        assert qualification["status"] == "QUALIFIED", qualification
+        comparisons = qualification.get("comparisons", {})
+        checks = comparisons.values() if isinstance(comparisons, dict) else comparisons
+        assert all(
+            comparison["pass"]
+            for comparison in checks
+        )
     trial = service.list_signal_trials(movesmart["snapshot_id"], activity="Walking")[0]
     waveform = service.get_signal_waveform(movesmart["snapshot_id"], trial["trial_id"])
     assert waveform["source_rows"] > waveform["sample_count"]

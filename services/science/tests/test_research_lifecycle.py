@@ -256,7 +256,7 @@ def test_restart_and_regeneration_preserve_research_state(root):
     project = researchstore.create_project("Persistence project")
     detail = _study(project["id"])
     before = researchstore.get_project(project["id"])
-    # pnpm data:generate writes the synthetic fixture only; it must never touch research metadata.
+    # Synthetic regeneration changes data artifacts only, never authored research metadata.
     generate_data()
     after = researchstore.get_project(project["id"])
     assert after["id"] == before["id"]

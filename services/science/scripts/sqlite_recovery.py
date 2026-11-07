@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from dynamis_science.data_root import DataRootConfigurationError, data_root
+from dynamis_science.data_root import DataRootConfigurationError, ROOT, data_root
 
 
 class RecoveryError(RuntimeError):
@@ -30,7 +30,7 @@ def _private_path(value: str | Path, root: Path, label: str) -> Path:
     if path.is_symlink():
         raise RecoveryError(f"{label} cannot be a symbolic link")
     path = path.resolve()
-    if not _within(path, root) or path.is_relative_to(Path(__file__).resolve().parents[3]):
+    if not _within(path, root) or path.is_relative_to(ROOT):
         raise RecoveryError(f"{label} must remain inside the private data root")
     return path
 

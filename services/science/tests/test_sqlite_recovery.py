@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from dynamis_science import researchstore
+from scripts import sqlite_recovery
 from scripts.sqlite_recovery import backup_database, inspect_database, restore_database
 
 
@@ -26,3 +29,17 @@ def test_wal_online_backup_restores_and_reopens_separately(monkeypatch, tmp_path
     assert restored["application_reopen"]["record_counts"]["projects"] == 1
     assert verified["record_counts"]["projects"] == 1
     assert verified["journal_mode"].lower() == "wal"
+
+
+def test_recovery_paths_use_installed_application_boundary(monkeypatch, tmp_path):
+    install_dir = tmp_path / "installed-app"
+    private_root = tmp_path / "private-data"
+    install_dir.mkdir()
+    private_root.mkdir()
+    monkeypatch.setattr(sqlite_recovery, "ROOT", install_dir)
+    backup = private_root / "backups" / "research.sqlite3"
+    backup.parent.mkdir()
+
+    assert sqlite_recovery._private_path(backup, private_root, "Backup path") == backup
+    with pytest.raises(sqlite_recovery.RecoveryError, match="private data root"):
+        sqlite_recovery._private_path(install_dir / "research.sqlite3", private_root, "Backup path")

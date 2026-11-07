@@ -125,6 +125,31 @@ base = Path(os.environ["DYNAMISSCIENCE_DATA_ROOT"]) / "tmp"
 
     $database = Join-Path $installedDataRoot "research\research.db"
     if (-not (Test-Path -LiteralPath $database)) { throw "The installed application did not initialize the configured data root." }
+    $databaseHashBeforeMaintenance = (Get-FileHash -LiteralPath $database -Algorithm SHA256).Hash
+    $databaseSmokePath = Join-Path $installedDataRoot "tmp\packaged-database-smoke.json"
+    $databaseClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $databaseProcess = Start-Process -FilePath $installedExe `
+        -ArgumentList @("--database-smoke", $installedDataRoot, $databaseSmokePath) `
+        -PassThru -Wait -WindowStyle Hidden
+    $databaseClock.Stop()
+    if ($databaseProcess.ExitCode -ne 0) { throw "The packaged SQLite backup/restore rehearsal failed ($($databaseProcess.ExitCode))." }
+    $databaseSmoke = Get-Content -LiteralPath $databaseSmokePath -Raw | ConvertFrom-Json
+    if (($databaseSmoke.verification.integrity_check -join ",") -ne "ok") {
+        throw "The packaged database integrity check failed."
+    }
+    if ($databaseSmoke.restore.backup.logical_sha256 -ne $databaseSmoke.restore.restored.logical_sha256) {
+        throw "The packaged restore rehearsal changed the logical database state."
+    }
+    if ((Get-FileHash -LiteralPath $database -Algorithm SHA256).Hash -ne $databaseHashBeforeMaintenance) {
+        throw "The packaged backup/restore rehearsal changed the operational database."
+    }
+    $benchmarks.sqlite_recovery = @{
+        integrity_check = $databaseSmoke.verification.integrity_check -join ","
+        restore_reopened = $true
+        logical_hash_preserved = $true
+        operational_database_unchanged = $true
+        elapsed_ms = [Math]::Round($databaseClock.Elapsed.TotalMilliseconds, 2)
+    }
     $databaseHashBeforeUninstall = (Get-FileHash -LiteralPath $database -Algorithm SHA256).Hash
     $uninstaller = Join-Path $installRoot "unins000.exe"
     $uninstallProcess = Start-Process -FilePath $uninstaller `

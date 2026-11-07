@@ -8,7 +8,7 @@ Private data root: `D:\datasets\DynamisScience` (read-only source during verific
 
 ## G1 — Native scientific workstation
 
-**Implementation status:** The native research journey is implemented and verified on disposable copies. G1 remains open against two measured design targets listed below; work continues through G2–G4.
+**Implementation status:** The native research journey is implemented and verified on disposable copies. Three measured G1 timing targets remain above their design thresholds; the deviations are recorded below without changing qualified numerical methods.
 
 Implemented:
 
@@ -35,19 +35,19 @@ Performance results: [G1 benchmark JSON](evidence/g1-desktop-benchmarks.json). T
 
 | Benchmark | Measured | Design target | Result |
 |---|---:|---:|---|
-| Cold start to populated catalogue (5 samples) | median 1,297 ms; p95 1,371 ms | median <1,500 ms | Met |
-| Idle working set, 5 s after opening Mendeley | 200.22 MB | <250 MB | Met |
-| First `force_signals.parquet` page (500 rows) | 31.44 ms; +2.24 MB working set | <80 ms; <25 MB delta | Met |
-| MoveSmart waveform to plot update | 52.97 ms | <120 ms | Met |
-| Mendeley MixedLM worker runtime | 3,342.6 ms; 4,311.3 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
-| Maximum GUI timer gap during MixedLM | 18.09 ms | <16 ms | Missed by 2.09 ms |
-| Peak session working set including report export | 227.46 MB | <500 MB | Met |
+| Cold start to populated catalogue (5 samples) | median 2,240 ms; p95 2,263 ms | median <1,500 ms | Missed; 740 ms over target |
+| Idle working set, 5 s after opening Mendeley | 242.54 MB | <250 MB | Met |
+| First `force_signals.parquet` page (500 rows) | 24.24 ms; +2.52 MB working set | <80 ms; <25 MB delta | Met |
+| MoveSmart waveform to plot update | 61.19 ms | <120 ms | Met |
+| Mendeley MixedLM worker runtime | 3,535.6 ms; 4,881.8 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
+| Maximum GUI timer gap during MixedLM | 29.88 ms | <16 ms | Missed by 13.88 ms |
+| Peak session working set including report export | 269.80 MB | <500 MB | Met |
 
-The two missed performance targets remain tracked; no numerical method, optimizer or tolerance was changed to improve the benchmark.
+These three missed timing targets were remeasured on the completed native-only application; no numerical method, optimizer or tolerance was changed to improve them.
 
 ## G2 — Research authoring and data management
 
-**Implementation status:** Authoring and admission workflows are implemented and verified. The shared G1 performance targets remain open as recorded above.
+**Implementation status:** Authoring and admission workflows are implemented and verified. The three shared G1 timing deviations remain recorded above.
 
 Implemented:
 
@@ -71,7 +71,7 @@ G2 commits: `1c4d8c6` (`RES-604: integrate local admission and research authorin
 
 ## G3 — Performance OS
 
-**Implementation status:** The operational workflows and the approved Direction F visual system are implemented in native Qt Widgets. Performance OS records stay under the configured private data root and remain isolated from admitted scientific records. G3 verification has passed; the two G1 scientific-worker timing targets remain open.
+**Implementation status:** The operational workflows and the approved Direction F visual system are implemented in native Qt Widgets. Performance OS records stay under the configured private data root and remain isolated from admitted scientific records. G3 verification has passed; the three G1 timing deviations remain recorded above.
 
 Implemented:
 
@@ -97,14 +97,14 @@ Performance measurements are in [G3 benchmark JSON](evidence/g3-performance-benc
 
 ## G4 — Packaging and web retirement
 
-**Implementation status:** In progress. The Windows one-directory bundle and per-user installer now build, install, launch offline, run a packaged scientific worker, and uninstall without changing the configured research database. Native feature parity and web retirement remain open.
+**Implementation status:** Complete. The native parity review passed, the legacy web and HTTP application code has been retired, and the final Windows installer passed its installed-app, analysis-worker, recovery, offline and uninstall checks. G1's three recorded timing-target misses remain visible under G1 with current measurements.
 
 Completed in G4 so far:
 
-- Split FastAPI route decorators, HTTP status mapping and HTML response wrapping from `performance.py` into the temporary `performance_http.py` adapter. The desktop imports the Python-only domain module.
-- Added a fresh-process regression assertion that importing Performance OS domain logic leaves FastAPI, Uvicorn and QtWebEngine unloaded.
-- Installed the PyInstaller 6.22.3 build tool in the project environment and Inno Setup 6.7.3 for packaging validation. `uv lock --check` passed after the build-tool addition.
-- The legacy performance HTTP adapter still passes the existing TestClient Performance OS contract tests while native workflows use direct service calls.
+- Split the Performance OS domain from its HTTP routes, then retired both `performance_http.py` and `api.py` after native parity verification. Qt calls `DynamisAppService` and existing Python scientific/domain modules directly.
+- Removed `apps/web`, TypeScript contract/UI packages, pnpm scripts and lockfiles, web-only Playwright automation, FastAPI/Uvicorn, multipart upload, httpx and Playwright dependencies.
+- The fresh-process regression check confirms the native import path loads no FastAPI, Uvicorn or QtWebEngine; a post-retirement environment check also confirms FastAPI, Uvicorn, httpx and Playwright are not installed.
+- PyInstaller 6.22.3 remains a build-only dependency. Inno Setup 6.7.3 builds the per-user installer. `uv lock --check` and `uv sync --locked` passed after retiring the web dependency graph.
 - Added a Windows-first PyInstaller `--onedir` spec and per-user Inno Setup installer. The build stages a disposable `DS-SYNTH-001` fixture under an ignored, unique build directory; no private Mendeley/MoveSmart data enters the bundle.
 - Fixed the first frozen-launch defects found by real installed runs: remove host Poppler ICU DLL contamination, explicitly collect pyqtgraph's dynamic `PySide6.QtOpenGL` and `QtOpenGLWidgets` imports, and resolve the private-root safety boundary from the installed executable directory when frozen.
 - Added native SQLite integrity inspection, online backup verification and isolated restore rehearsal. Application exceptions are logged to a rotating file under the configured private root; scientific execution uses the packaged `--worker` file-IPC entry point in a separate process.
@@ -115,12 +115,11 @@ Completed in G4 so far:
 
 Windows packaging verification (Windows 11 x64, Python 3.12.13, PyInstaller 6.22.3, Inno Setup 6.7.3):
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/build_windows.ps1` — passed. Bundle: `581,265,474` bytes; installer: `140,121,317` bytes.
-- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/test_windows_installer.ps1` — passed. Unpacked and installed catalogue startup: `2,632 ms` / `3,827 ms`; peak working set: `207.07 MB` / `208.18 MB`; zero listening TCP ports; launch ran with HTTP proxy variables pinned to local port 9; silent install and uninstall passed; configured disposable SQLite database hash was unchanged after uninstall.
-- The installed `--worker` path ran the bundled `METH-U-DESC` analysis from a temporary authored study and matched the direct Python result digest; worker elapsed time was `1,257.52 ms`.
-- `uv run pytest -q` — full scientific and native regression suite passed, including verified Mendeley and MoveSmart workflows on isolated copies. `uv lock --check` passed. `uv run pytest tests/test_data_root.py tests/test_desktop.py::test_native_database_tools_verify_backup_and_restore_safely -q` passed; the backup/restore GUI test also passed on an isolated rerun.
-- `uv run pytest tests/test_admission.py tests/test_performance.py -q` — passed after converting these suites to direct service calls. The native desktop suite also covers admission, performance operations, report export, investigation save/fork, report comparison and lineage-node inspection.
-- Reproducible package measurements and isolated data-root path: [G4 packaging benchmarks](evidence/g4-packaging-benchmarks.json). The synthetic generator manifest's pre-existing worktree edit was not staged.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/build_windows.ps1` — passed after web retirement. Final bundle: `580,698,065` bytes; installer: `139,847,227` bytes. The generated notice contains 35 runtime distributions plus the PyInstaller bootloader license text.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/test_windows_installer.ps1` — passed on Windows 11 x64. Unpacked and installed catalogue startup: `5,380 ms` / `4,480 ms`; peak working set: `212.00 MB` / `202.62 MB`; zero listening TCP ports; HTTP proxy variables were pinned to local port 9; install and uninstall passed.
+- The installed `--worker` path completed bundled `METH-U-DESC` and matched the direct Python result digest in `2,350 ms`. The packaged `--database-smoke` mode verified SQLite integrity, made an online backup, restored and reopened it, and preserved the logical hash and operational database bytes in `2,320 ms`; the database also remained byte-identical after uninstall.
+- `uv run pytest -q` — all 92 scientific and native tests passed after retirement, including isolated Mendeley/MoveSmart runs and their independent R/lme4 MixedLM, ICC and raw-signal qualifications. `uv run pytest --collect-only -q` confirmed 92 collected tests. `uv lock --check`, `uv sync --locked`, Python `compileall`, and the installer PowerShell parser check passed.
+- Reproducible package and recovery measurements with a disposable data-root path: [G4 packaging benchmarks](evidence/g4-packaging-benchmarks.json). The pre-existing line-ending-only edit to `data/synthetic/generator_manifest.json` was preserved and not staged.
 
 Native parity map:
 
@@ -133,14 +132,8 @@ Native parity map:
 | Investigation blocks, run history, evidence and report workflow | Versioned Qt investigation editor; direct analysis tab; explicit evidence promotion; frozen report diff; clickable lineage DAG | `test_native_investigation_editor_and_report_version_comparison`, `test_native_research_journey_executes_promotes_freezes_and_exports` |
 | Unsupported model simulations | Read-only `PROTOTYPE`/`UNAVAILABLE` registry state; no athlete prediction or injury-risk execution | Catalog status and limitation display; no model execution control is exposed in the native UI |
 
-Remaining G4 work:
-
-- Retire `apps/web`, TypeScript contracts, Node scripts and obsolete browser automation. Remove `api.py`, `performance_http.py`, FastAPI/Uvicorn, multipart upload transport and unneeded HTTP/browser dependencies.
-- Update the root README and implementation status docs for the native-only architecture. Re-run the full scientific/native suite and rebuild/test the final offline Windows installer after retirement.
-- Finalize Windows offline/package qualification, startup and failed-job recovery review, Qt/Python licensing obligations, and the final footprint measurements after web retirement.
-
-G4 transport-decoupling verification: `uv run pytest tests/test_performance.py tests/test_desktop.py::test_performance_direct_service_preserves_records_and_science tests/test_desktop.py::test_performance_domain_imports_without_http_or_webengine -q` — passed (14 tests); the existing HTTP adapter tests emitted the known Starlette/httpx deprecation warning.
+G4 has no remaining implementation work. The three G1 timing deviations remain recorded; their numerical methods and optimizer sequence are unchanged.
 
 ## Commits
 
-Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow: `df59eac`; G3 screenshots and benchmarks: `7a25fdb`. The two G1 performance-target misses remain visible and unchanged; G4 still includes installation, recovery, offline and web-retirement verification.
+Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow: `df59eac`; G3 screenshots and benchmarks: `7a25fdb`. G4 includes transport decoupling `4b318ef`, Windows build tooling `9e98590`, package/recovery evidence `813bdc3`, and research parity `e3cc02b`; the final web-retirement commit SHA will be recorded after commit. Three G1 timing deviations remain visible with the numerical methods unchanged.

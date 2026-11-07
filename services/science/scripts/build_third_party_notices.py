@@ -77,6 +77,26 @@ def build_notices(project_file: Path, output_file: Path) -> int:
                 sections.extend([f"### {relative}", "", content, ""])
         elif len(license_id) > 300:
             sections.extend(["### Distribution license text", "", license_id, ""])
+    try:
+        bootloader = metadata.distribution("pyinstaller")
+    except metadata.PackageNotFoundError as error:
+        raise RuntimeError("PyInstaller must be installed to package the desktop app") from error
+    bootloader_licenses = [
+        (relative, content)
+        for relative, content in _license_files(bootloader)
+        if Path(relative).name.lower() == "copying.txt"
+    ]
+    if not bootloader_licenses:
+        raise RuntimeError("PyInstaller bootloader license text is unavailable")
+    sections.extend(
+        [
+            "## PyInstaller bootloader",
+            "The desktop executable includes the PyInstaller bootloader; its license follows.",
+            "",
+        ]
+    )
+    for relative, content in bootloader_licenses:
+        sections.extend([f"### {relative}", "", content, ""])
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text("\n".join(sections), encoding="utf-8")
     return len(distributions)

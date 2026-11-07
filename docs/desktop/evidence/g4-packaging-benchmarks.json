@@ -4,15 +4,15 @@
     {
       "label": "onedir",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 2631.9950000000003,
-      "peak_working_set_mb": 207.07,
+      "startup_to_catalogue_ms": 5379.9894,
+      "peak_working_set_mb": 212,
       "process_exit_code": 0
     },
     {
       "label": "installed",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 3827.1110000000003,
-      "peak_working_set_mb": 208.18,
+      "startup_to_catalogue_ms": 4479.906,
+      "peak_working_set_mb": 202.62,
       "process_exit_code": 0
     }
   ],
@@ -21,10 +21,17 @@
     "method_id": "METH-U-DESC",
     "status": "COMPLETED",
     "result_digest_matches_direct": true,
-    "elapsed_ms": 1257.52
+    "elapsed_ms": 2350.49
   },
-  "data_root": "D:\\SWE_HOME\\tmp\\dynamis-g4-installer-c1534ad58abd465c91ed8425c3af82a6\\installed-data",
+  "sqlite_recovery": {
+    "elapsed_ms": 2320.16,
+    "logical_hash_preserved": true,
+    "operational_database_unchanged": true,
+    "restore_reopened": true,
+    "integrity_check": "ok"
+  },
+  "data_root": "D:\\SWE_HOME\\tmp\\dynamis-g4-installer-feedbe66ab284ed8abc8cb00c794f980\\installed-data",
   "database_survived_uninstall": true,
-  "bundle_bytes": 581265474,
-  "installer_bytes": 140121317
+  "bundle_bytes": 580698065,
+  "installer_bytes": 139847227
 }
