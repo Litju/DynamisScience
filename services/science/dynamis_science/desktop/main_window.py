@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import difflib
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
@@ -46,6 +47,9 @@ from .dialogs import (
     ProjectDialog,
     StudyDialog,
 )
+from .investigation_editor import InvestigationEditor
+from .library_dialog import ScientificLibraryDialog
+from .lineage_dialog import LineageDialog
 from .performance_workbench import PerformanceHeader, PerformanceRail, PerformanceWorkbench
 from ..researchstore import ResearchConflict
 from .services import DynamisAppService
@@ -184,6 +188,10 @@ class MainWindow(QMainWindow):
         self.action_study_history.triggered.connect(self._object_history)
         self.action_report_history = QAction("Report version history…", self)
         self.action_report_history.triggered.connect(self._report_history)
+        self.action_compare_report_versions = QAction("Compare frozen report versions…", self)
+        self.action_compare_report_versions.triggered.connect(self._compare_report_versions)
+        self.action_scientific_library = QAction("Scientific definition library…", self)
+        self.action_scientific_library.triggered.connect(self._open_scientific_library)
         for action in (
             self.action_new_project,
             self.action_new_study,
@@ -196,6 +204,8 @@ class MainWindow(QMainWindow):
             self.action_transition,
             self.action_study_history,
             self.action_report_history,
+            self.action_compare_report_versions,
+            self.action_scientific_library,
         ):
             research_menu.addAction(action)
         cohort_menu = research_menu.addMenu("Cohort")
@@ -1049,6 +1059,96 @@ class MainWindow(QMainWindow):
                 "Loading report versions",
             )
 
+    def _compare_report_versions(self) -> None:
+        study_id = self._authored_study_id()
+        if not study_id:
+            QMessageBox.information(
+                self, "Report comparison", "Open an authored research study first."
+            )
+            return
+
+        def load_versions() -> list[dict[str, Any]]:
+            versions = self.service.report_versions(study_id)
+            return [
+                self.service.get_report_version(study_id, int(item["version"]))
+                for item in reversed(versions)
+            ]
+
+        self.run_task(
+            load_versions,
+            self._show_report_version_comparison,
+            "Loading frozen report versions",
+        )
+
+    def _open_scientific_library(self) -> None:
+        self.run_task(
+            self.service.scientific_library,
+            lambda library: ScientificLibraryDialog(library, self).exec(),
+            "Loading scientific metric, protocol and method definitions",
+        )
+
+    def _show_report_version_comparison(self, versions: list[dict[str, Any]]) -> None:
+        if len(versions) < 2:
+            QMessageBox.information(
+                self, "Report comparison", "Freeze at least two report versions to compare them."
+            )
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Compare frozen report versions")
+        layout = QVBoxLayout(dialog)
+        selectors = QHBoxLayout()
+        left_version = QComboBox()
+        right_version = QComboBox()
+        for report in versions:
+            label = f"v{report['version']} · {report.get('frozen_at', report.get('updated_at', ''))}"
+            left_version.addItem(label, report["version"])
+            right_version.addItem(label, report["version"])
+        right_version.setCurrentIndex(right_version.count() - 1)
+        selectors.addWidget(left_version)
+        selectors.addWidget(QLabel("compared with"))
+        selectors.addWidget(right_version)
+        layout.addLayout(selectors)
+        comparison = QTextBrowser()
+        comparison.setOpenExternalLinks(False)
+        layout.addWidget(comparison, 1)
+        documents = {
+            int(report["version"]): json.dumps(
+                {
+                    key: report.get(key)
+                    for key in (
+                        "title",
+                        "summary",
+                        "conclusion",
+                        "recommendations",
+                        "narrative_note",
+                        "frozen_content",
+                    )
+                },
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            ).splitlines()
+            for report in versions
+        }
+
+        def render_diff() -> None:
+            first = int(left_version.currentData())
+            second = int(right_version.currentData())
+            html = difflib.HtmlDiff(wrapcolumn=100).make_file(
+                documents[first],
+                documents[second],
+                fromdesc=f"Version {first}",
+                todesc=f"Version {second}",
+            )
+            comparison.setHtml(html)
+
+        left_version.currentIndexChanged.connect(render_diff)
+        right_version.currentIndexChanged.connect(render_diff)
+        render_diff()
+        dialog.resize(1100, 720)
+        dialog.exec()
+
     def _open_admission_history(self) -> None:
         self.run_task(
             lambda: (self.service.list_admission_records(), self.service.list_admission_quality()),
@@ -1187,6 +1287,9 @@ class ResearchWorkbench(QWidget):
     def _build_analysis(self) -> None:
         page = self.tabs.widget(3)
         layout = QVBoxLayout(page)
+        self.analysis_tabs = QTabWidget()
+        run_page = QWidget()
+        run_layout = QVBoxLayout(run_page)
         controls = QHBoxLayout()
         self.method_picker = QComboBox()
         self.analysis_metric_picker = QComboBox()
@@ -1207,7 +1310,7 @@ class ResearchWorkbench(QWidget):
         controls.addWidget(execute_button)
         controls.addWidget(self.show_figure_button)
         controls.addWidget(export_run)
-        layout.addLayout(controls)
+        run_layout.addLayout(controls)
         results = QSplitter(Qt.Orientation.Horizontal)
         self.run_output = QTextBrowser()
         self.run_plot_holder = QWidget()
@@ -1215,7 +1318,13 @@ class ResearchWorkbench(QWidget):
         holder_layout.addWidget(QLabel("Run an analysis to create a scientific figure."))
         results.addWidget(self.run_output)
         results.addWidget(self.run_plot_holder)
-        layout.addWidget(results, 1)
+        run_layout.addWidget(results, 1)
+        self.analysis_tabs.addTab(run_page, "Analysis run")
+        self.investigation_editor = InvestigationEditor(
+            self.service, self.window.run_task, self
+        )
+        self.analysis_tabs.addTab(self.investigation_editor, "Investigation")
+        layout.addWidget(self.analysis_tabs)
 
     def _build_evidence(self) -> None:
         page = self.tabs.widget(4)
@@ -1298,6 +1407,7 @@ class ResearchWorkbench(QWidget):
         self.report_version = None
         self.report_document_version = None
         self.exploration_result = None
+        self.investigation_editor.set_study(study_id)
         self.method_picker.clear()
         self.metric_picker.clear()
         self.analysis_metric_picker.clear()
@@ -1695,13 +1805,7 @@ class ResearchWorkbench(QWidget):
             return
         self.evidence_output.setPlainText(json.dumps(value, indent=2, ensure_ascii=False, default=str))
         artifact = value.get("evidence_artifact") or {}
-        artifact_id = artifact.get("id") or self.latest_run.get("id")
         self.latest_evidence_id = artifact.get("id")
-        self.window.run_task(
-            lambda: self.service.get_lineage_graph(artifact_id),
-            lambda graph: self._show_lineage(graph) if study_id == self.study_id else None,
-            "Loading evidence provenance",
-        )
         self._load_runs_and_report()
 
     def _cite_latest(self) -> None:
@@ -1777,12 +1881,8 @@ class ResearchWorkbench(QWidget):
         )
 
     def _show_lineage(self, graph: dict[str, Any]) -> None:
-        nodes = graph.get("nodes", [])
-        edges = graph.get("edges", [])
-        self.evidence_output.setPlainText(
-            f"Lineage graph · {len(nodes)} nodes · {len(edges)} edges\n\n"
-            + "\n".join(f"{item.get('kind', '')}  {item.get('id', '')}  {item.get('label', '')}" for item in nodes)
-        )
+        self.lineage_dialog = LineageDialog(graph, self.window)
+        self.lineage_dialog.exec()
 
     def _load_runs_and_report(self) -> None:
         if not getattr(self, "study_id", None):

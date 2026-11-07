@@ -12,7 +12,15 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QApplication, QDialog, QDialogButtonBox, QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QInputDialog,
+    QMessageBox,
+    QTextBrowser,
+)
 
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.dialogs import (
@@ -30,6 +38,8 @@ from dynamis_science.desktop.performance_workbench import (
 )
 from dynamis_science.desktop.services import DynamisAppService
 from dynamis_science.desktop.tasks import TaskRunner
+from dynamis_science.desktop.library_dialog import ScientificLibraryDialog
+from dynamis_science.desktop.lineage_dialog import LineageDialog
 from dynamis_science import realstore, researchstore
 
 
@@ -314,6 +324,7 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     )
     assert not errors, errors
 
+
     movesmart = next(
         study
         for study in service.list_all_studies()
@@ -425,6 +436,97 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     with sqlite3.connect(root / "research" / "research.db") as database:
         assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     assert service.get_report(study_id)["status"] == "FROZEN"
+
+
+def test_native_investigation_editor_and_report_version_comparison(
+    qtbot, tmp_path, monkeypatch
+):
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    service = DynamisAppService()
+    library = service.scientific_library()
+    assert any(item["id"] == "MET-CMJ-IMPULSE" for item in library["metrics"])
+    assert any(item["id"] == "METH-LONG" for item in library["methods"])
+    assert any(item["status"] in {"PROTOTYPE", "UNAVAILABLE"} for item in library["models"])
+    library_dialog = ScientificLibraryDialog(library)
+    qtbot.addWidget(library_dialog)
+    assert library_dialog.tabs.count() == 4
+    model_records = library_dialog.sections["models"]["records"]
+    model_dialog = library_dialog.sections["models"]["detail"]
+    assert any(item["status"] == "UNAVAILABLE" for item in model_records)
+    assert "known_limitations" in model_dialog.toPlainText()
+
+    project = service.create_project(
+        {"title": "Scratchpad UI test", "dataset_snapshot_ids": ["DS-SYNTH-001"]}
+    )
+    study = service.create_study(
+        project["id"],
+        {
+            "title": "Investigation UI study",
+            "research_question": "How does the measured outcome vary?",
+            "dataset_snapshot_id": "DS-SYNTH-001",
+            "primary_metric_id": "MET-CMJ-IMPULSE",
+        },
+    )["study"]
+    lineage_graph = service.get_lineage_graph(study["id"])
+    lineage_dialog = LineageDialog(lineage_graph)
+    qtbot.addWidget(lineage_dialog)
+    assert len(lineage_dialog.node_items) == len(lineage_graph["nodes"])
+    assert lineage_graph["edges"]
+    selected_node = lineage_graph["nodes"][-1]
+    lineage_dialog.scene.clearSelection()
+    lineage_dialog.node_items[selected_node["id"]].setSelected(True)
+    assert selected_node["id"] in lineage_dialog.detail.toPlainText()
+
+    report = service.update_report(study["id"], {"summary": "Initial draft"}, 1)
+    first_version = service.freeze_report(study["id"])["version"]
+    service.update_report(
+        study["id"], {"summary": "Revised draft"}, base_version=report["version"]
+    )
+    second_version = service.freeze_report(study["id"])["version"]
+
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    window.show()
+    window.research.set_study(study["id"], service.get_study_detail(study["id"]))
+    qtbot.waitUntil(
+        lambda: window.research.investigation_editor.current is not None
+        and not window.runner.active
+    )
+    editor = window.research.investigation_editor
+    assert editor.investigations.count() == 1
+    editor.block_type.setCurrentText("interpretation")
+    editor._add_block()
+    editor.state.setPlainText('{"note":"Review with the observed cohort only."}')
+    editor._save()
+    qtbot.waitUntil(
+        lambda: editor.current is not None
+        and editor.current["version"] == 2
+        and not window.runner.active
+    )
+    assert editor.blocks[-1]["type"] == "interpretation"
+
+    editor._fork_investigation()
+    qtbot.waitUntil(
+        lambda: editor.current is not None
+        and editor.current.get("parent_id") is not None
+        and not window.runner.active
+    )
+    assert len(service.list_investigations(study["id"])) == 2
+
+    opened = []
+    monkeypatch.setattr(QDialog, "exec", lambda dialog: opened.append(dialog) or 0)
+    window._show_report_version_comparison(
+        [
+            service.get_report_version(study["id"], first_version),
+            service.get_report_version(study["id"], second_version),
+        ]
+    )
+    comparison = opened[0].findChild(QTextBrowser)
+    assert comparison is not None
+    assert "Initial draft" in comparison.toPlainText()
+    assert "Revised draft" in comparison.toPlainText()
+    window.close()
 
 
 def test_native_project_and_study_creation_forms(qtbot, tmp_path, monkeypatch):

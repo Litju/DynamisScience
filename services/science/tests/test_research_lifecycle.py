@@ -5,10 +5,8 @@ import json
 import numpy as np
 import polars as pl
 import pytest
-from fastapi.testclient import TestClient
 
 from dynamis_science import realstore, researchanalysis, researchstore
-from dynamis_science.api import app
 from dynamis_science.generate import generate_data
 
 SNAPSHOT_ID = "DS-REAL-TEST588"
@@ -271,47 +269,6 @@ def test_restart_and_regeneration_preserve_research_state(root):
     assert reloaded.get_project(project["id"])["title"] == "Persistence project"
 
 
-def test_api_lifecycle_and_html_export(root):
-    with TestClient(app) as client:
-        project = client.post("/research/projects", json={"title": "API project", "description": "API-created"}).json()
-        study = client.post(
-            f"/research/projects/{project['id']}/studies",
-            json={
-                "title": "API study",
-                "research_question": "Does CMJ height change?",
-                "dataset_snapshot_id": SNAPSHOT_ID,
-                "primary_metric_id": "MET-REAL-CMJ-HEIGHT",
-            },
-        ).json()
-        study_id = study["study"]["id"]
-        cohort_id = study["cohort"]["id"]
-        plan_id = study["plan"]["id"]
-        assert client.post(f"/research/cohorts/{cohort_id}/freeze").status_code == 200
-        assert client.post(f"/research/plans/{plan_id}/freeze").status_code == 200
-        assert client.post(f"/research/studies/{study_id}/state", json={"state": "READY"}).status_code == 200
-        run = client.post(
-            "/analyses/execute",
-            json={"study_id": study_id, "method_id": "METH-REAL-TREND", "outcome_metric_id": "MET-REAL-CMJ-HEIGHT", "parameters": {}, "excluded_subject_ids": []},
-        )
-        assert run.status_code == 200, run.text
-        run_id = run.json()["id"]
-        promoted = client.post("/evidence", json={"run_id": run_id, "study_id": study_id})
-        assert promoted.status_code == 200, promoted.text
-        evidence_id = promoted.json()["evidence_artifact"]["id"]
-        assert client.post("/report/citations", json={"study_id": study_id, "artifact_id": evidence_id}).status_code == 200
-        report = client.get(f"/report?study_id={study_id}")
-        assert report.status_code == 200 and report.json()["research"]
-        exported = client.get(f"/research/studies/{study_id}/report/export")
-        assert exported.status_code == 200
-        assert "attachment" in exported.headers["content-disposition"]
-        assert "data:image" not in exported.text
-        lineage = client.get(f"/lineage/{evidence_id}?scope=path&depth=3")
-        assert lineage.status_code == 200
-        assert any(node["id"] == SNAPSHOT_ID for node in lineage.json()["nodes"])
-        freeze = client.post(f"/research/studies/{study_id}/report/freeze")
-        assert freeze.status_code == 200
-        versions = client.get(f"/research/studies/{study_id}/report/versions").json()
-        assert versions and versions[0]["status"] == "FROZEN"
 
 
 def test_reruns_are_append_only_and_promotion_is_idempotent(root):

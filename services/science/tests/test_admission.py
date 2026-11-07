@@ -1,65 +1,67 @@
-import base64
-import io
+from __future__ import annotations
+
 from pathlib import Path
 
-import polars as pl
 import pytest
-from fastapi.testclient import TestClient
 
+from dynamis_science import qualification
 from dynamis_science.data_root import data_root, paths
-from dynamis_science.api import app
+from dynamis_science.desktop.services import DynamisAppService
 
 
 @pytest.fixture
-def private_root(monkeypatch, tmp_path):
-    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path))
-    return tmp_path
+def service(monkeypatch, tmp_path):
+    root = tmp_path / "private"
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(root))
+    app = DynamisAppService()
+    app.ensure_initialized()
+    return app
 
 
-@pytest.fixture
-def client(private_root):
-    with TestClient(app) as c:
-        yield c
+def _register_fixture_source(service: DynamisAppService) -> None:
+    service.register_admission_source(
+        {
+            "id": "SRC-FIXTURE",
+            "name": "Fixture source",
+            "publisher": "DynamisScience tests",
+            "dataset_identity": "fixture-cmj",
+            "version": "1.0",
+            "acquisition_method": "synthetic fixture",
+            "license_or_agreement": "Internal fixture only; not real data",
+            "redistribution_restrictions": "Fixture only; do not treat as real measurements",
+            "permitted_uses": ["testing"],
+            "rights_status": "FIXTURE_ONLY",
+            "derived_data_publishable": False,
+        }
+    )
+    service.verify_source_rights("SRC-FIXTURE", "test")
 
 
-def _register_fixture_source(client: TestClient) -> None:
-    client.post("/admission/sources", json={
-        "id": "SRC-FIXTURE",
-        "name": "Fixture source",
-        "publisher": "DynamisScience tests",
-        "dataset_identity": "fixture-cmj",
-        "version": "1.0",
-        "acquisition_method": "synthetic fixture",
-        "license_or_agreement": "Internal fixture only; not real data",
-        "redistribution_restrictions": "Fixture only; do not treat as real measurements",
-        "permitted_uses": ["testing"],
-        "rights_status": "FIXTURE_ONLY",
-        "derived_data_publishable": False,
-    })
-    client.post("/admission/sources/SRC-FIXTURE/verify-rights", json={"verifier": "test"})
-
-
-def _register_instrument_protocol(client: TestClient) -> None:
-    client.post("/admission/instruments", json={
-        "id": "INST-FP-1",
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "manufacturer": "Fixture",
-        "model": "FP",
-        "serial_number": "1",
-        "calibration_status": "CALIBRATED",
-        "calibration_date": "2026-01-01",
-        "sampling_capabilities_hz": [1000.0],
-    })
-    client.post("/admission/protocols", json={
-        "id": "PROT-FP-1",
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "name": "Fixture CMJ",
-        "version": "1.0",
-        "sampling_hz": 1000.0,
-        "units": {"body_mass": "kg", "time": "s", "distance": "cm"},
-        "coordinate_convention": "vertical z up",
-        "processing_method": "trapezoidal",
-    })
+def _register_instrument_protocol(service: DynamisAppService) -> None:
+    service.register_admission_instrument(
+        {
+            "id": "INST-FP-1",
+            "measurement_family": "CMJ_FORCE_PLATFORM",
+            "manufacturer": "Fixture",
+            "model": "FP",
+            "serial_number": "1",
+            "calibration_status": "CALIBRATED",
+            "calibration_date": "2026-01-01",
+            "sampling_capabilities_hz": [1000.0],
+        }
+    )
+    service.register_admission_protocol(
+        {
+            "id": "PROT-FP-1",
+            "measurement_family": "CMJ_FORCE_PLATFORM",
+            "name": "Fixture CMJ",
+            "version": "1.0",
+            "sampling_hz": 1000.0,
+            "units": {"body_mass": "kg", "time": "s", "distance": "cm"},
+            "coordinate_convention": "vertical z up",
+            "processing_method": "trapezoidal",
+        }
+    )
 
 
 def _cmj_csv() -> str:
@@ -70,230 +72,171 @@ def _cmj_csv() -> str:
     )
 
 
-def test_admission_rejects_source_ids_that_could_escape_storage(client, private_root):
-    response = client.post("/admission/sources", json={
-        "id": "../outside",
-        "name": "Fixture source",
-        "publisher": "DynamisScience tests",
-        "dataset_identity": "fixture-cmj",
-        "version": "1.0",
-        "acquisition_method": "synthetic fixture",
-        "license_or_agreement": "Internal fixture only",
-        "redistribution_restrictions": "Fixture only",
-    })
-    assert response.status_code == 422
-    assert not (private_root / "artifacts" / "admission_sources.json").exists()
+def _ingest(service: DynamisAppService, tmp_path: Path, filename: str, content: bytes):
+    source_file = tmp_path / filename
+    source_file.write_bytes(content)
+    return service.ingest_local_source_file("SRC-FIXTURE", source_file)
 
 
-def test_admission_valid_csv(client: TestClient, private_root):
-    _register_fixture_source(client)
-    _register_instrument_protocol(client)
-    content = _cmj_csv().encode()
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "cmj.csv",
-        "content_base64": base64.b64encode(content).decode(),
-    }).json()
-    validation = client.post("/admission/validate", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}},
-    }).json()
+def test_admission_rejects_source_ids_that_could_escape_storage(service, tmp_path):
+    with pytest.raises(ValueError, match="Source id"):
+        service.register_admission_source(
+            {
+                "id": "../outside",
+                "name": "Fixture source",
+                "publisher": "DynamisScience tests",
+                "dataset_identity": "fixture-cmj",
+                "version": "1.0",
+                "acquisition_method": "synthetic fixture",
+                "license_or_agreement": "Internal fixture only",
+                "redistribution_restrictions": "Fixture only",
+            }
+        )
+    assert not (data_root() / "artifacts" / "admission_sources.json").exists()
+
+
+def test_admission_valid_csv(service, tmp_path):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    artifact = _ingest(service, tmp_path, "cmj.csv", _cmj_csv().encode())
+    metadata = {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}}
+    validation = service.validate_source_artifact(
+        artifact["id"], "CMJ_FORCE_PLATFORM", metadata
+    )
     assert validation["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
-    admitted = client.post("/admission/admit", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}},
-    }).json()
+    admitted = service.admit_source_artifact(
+        artifact["id"], "CMJ_FORCE_PLATFORM", metadata
+    )
     assert admitted["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
     assert admitted["dataset_snapshot_id"] is not None
-    snapshots = client.get("/admission/snapshots").json()
-    assert any(s["id"] == admitted["dataset_snapshot_id"] for s in snapshots)
-    assert data_root() == private_root.resolve()
-    assert Path(artifact["stored_path"]).is_relative_to(private_root.resolve())
-    assert (paths()["admitted"] / admitted["dataset_snapshot_id"] / "cmj_trials.parquet").exists()
+    assert any(
+        item["id"] == admitted["dataset_snapshot_id"] for item in service.list_datasets()
+    )
+    assert data_root() == service.root
+    assert Path(artifact["stored_path"]).is_relative_to(service.root)
+    assert (
+        paths()["admitted"]
+        / admitted["dataset_snapshot_id"]
+        / "cmj_trials.parquet"
+    ).exists()
     assert (paths()["artifacts"] / "admission_records.json").exists()
 
 
-def test_admission_missing_required_fields(client: TestClient):
-    _register_fixture_source(client)
-    _register_instrument_protocol(client)
-    content = b"subject_id,trial_id\nSUB-1,T-1\n"
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "bad.csv",
-        "content_base64": base64.b64encode(content).decode(),
-    }).json()
-    validation = client.post("/admission/validate", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg"}},
-    }).json()
+@pytest.mark.parametrize(
+    "filename,content,metadata",
+    [
+        (
+            "missing.csv",
+            b"subject_id,trial_id\nSUB-1,T-1\n",
+            {"units": {"body_mass": "kg"}},
+        ),
+        (
+            "units.csv",
+            _cmj_csv().encode(),
+            {"units": {"body_mass": "stones"}},
+        ),
+        (
+            "duplicate.csv",
+            (
+                "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week,body_mass_kg,jump_height_cm\n"
+                "SUB-1,S-1,T-1,INST-FP-1,PROT-FP-1,1000,1,80,40\n"
+                "SUB-2,S-2,T-1,INST-FP-1,PROT-FP-1,1000,1,75,38\n"
+            ).encode(),
+            {"units": {"body_mass": "kg"}},
+        ),
+        (
+            "sampling.csv",
+            (
+                "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week,body_mass_kg,jump_height_cm\n"
+                "SUB-1,S-1,T-1,INST-FP-1,PROT-FP-1,0,1,80,40\n"
+            ).encode(),
+            {"units": {"body_mass": "kg"}},
+        ),
+        ("corrupt.csv", b"\x00\xff\xfe not csv", {"units": {"body_mass": "kg"}}),
+    ],
+)
+def test_invalid_admission_data_is_rejected(
+    service, tmp_path, filename, content, metadata
+):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    artifact = _ingest(service, tmp_path, filename, content)
+    validation = service.validate_source_artifact(
+        artifact["id"], "CMJ_FORCE_PLATFORM", metadata
+    )
     assert validation["status"] == "REJECTED"
     assert validation["errors"]
 
 
-def test_admission_incorrect_units(client: TestClient):
-    _register_fixture_source(client)
-    _register_instrument_protocol(client)
-    content = _cmj_csv().encode()
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "units.csv",
-        "content_base64": base64.b64encode(content).decode(),
-    }).json()
-    validation = client.post("/admission/validate", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "stones"}},
-    }).json()
-    assert validation["status"] == "REJECTED"
-
-
-def test_admission_duplicate_trials(client: TestClient):
-    _register_fixture_source(client)
-    _register_instrument_protocol(client)
-    csv = (
-        "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week,body_mass_kg,jump_height_cm\n"
-        "SUB-1,S-1,T-1,INST-FP-1,PROT-FP-1,1000,1,80,40\n"
-        "SUB-2,S-2,T-1,INST-FP-1,PROT-FP-1,1000,1,75,38\n"
+def test_admission_is_idempotent_and_rejected_inputs_never_create_snapshots(
+    service, tmp_path
+):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    artifact = _ingest(service, tmp_path, "idem.csv", _cmj_csv().encode())
+    repeated = service.ingest_local_source_file(
+        "SRC-FIXTURE", tmp_path / "idem.csv"
     )
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "dup.csv",
-        "content_base64": base64.b64encode(csv.encode()).decode(),
-    }).json()
-    validation = client.post("/admission/validate", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg"}},
-    }).json()
-    assert validation["status"] == "REJECTED"
-
-
-def test_admission_invalid_sampling(client: TestClient):
-    _register_fixture_source(client)
-    _register_instrument_protocol(client)
-    csv = (
-        "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week,body_mass_kg,jump_height_cm\n"
-        "SUB-1,S-1,T-1,INST-FP-1,PROT-FP-1,0,1,80,40\n"
+    assert artifact["id"] == repeated["id"]
+    metadata = {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}}
+    first = service.admit_source_artifact(
+        artifact["id"], "CMJ_FORCE_PLATFORM", metadata
     )
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "samp.csv",
-        "content_base64": base64.b64encode(csv.encode()).decode(),
-    }).json()
-    validation = client.post("/admission/validate", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg"}},
-    }).json()
-    assert validation["status"] == "REJECTED"
+    before = len(service.list_admission_records())
+    second = service.admit_source_artifact(
+        artifact["id"], "CMJ_FORCE_PLATFORM", metadata
+    )
+    assert second["dataset_snapshot_id"] == first["dataset_snapshot_id"]
+    assert len(service.list_admission_records()) == before
+
+    rejected = _ingest(service, tmp_path, "reject.csv", b"foo,bar\n1,2\n")
+    result = service.admit_source_artifact(
+        rejected["id"], "CMJ_FORCE_PLATFORM", {"units": {"body_mass": "kg"}}
+    )
+    assert result["status"] == "REJECTED"
+    assert result["dataset_snapshot_id"] is None
 
 
-def test_admission_corrupted_file(client: TestClient):
-    _register_fixture_source(client)
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "corrupt.csv",
-        "content_base64": base64.b64encode(b"\x00\xff\xfe not csv").decode(),
-    }).json()
-    validation = client.post("/admission/validate", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg"}},
-    }).json()
-    assert validation["status"] == "REJECTED"
-
-
-def test_admission_idempotency(client: TestClient):
-    _register_fixture_source(client)
-    _register_instrument_protocol(client)
-    content = _cmj_csv().encode()
-    a1 = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "idem.csv",
-        "content_base64": base64.b64encode(content).decode(),
-    }).json()
-    a2 = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "idem.csv",
-        "content_base64": base64.b64encode(content).decode(),
-    }).json()
-    assert a1["id"] == a2["id"]
-    client.post("/admission/admit", json={
-        "artifact_id": a1["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}},
-    })
-    rec1 = client.get("/admission/records").json()
-    before = len(rec1)
-    client.post("/admission/admit", json={
-        "artifact_id": a1["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}},
-    })
-    after = client.get("/admission/records").json()
-    assert len(after) == before
-
-
-def test_admission_rejected_no_snapshot(client: TestClient):
-    _register_fixture_source(client)
-    content = b"foo,bar\n1,2\n"
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "reject.csv",
-        "content_base64": base64.b64encode(content).decode(),
-    }).json()
-    admitted = client.post("/admission/admit", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "CMJ_FORCE_PLATFORM",
-        "metadata": {"units": {"body_mass": "kg"}},
-    }).json()
-    assert admitted["status"] == "REJECTED"
-    assert admitted["dataset_snapshot_id"] is None
-
-
-def test_sprint_modality(client: TestClient):
-    _register_fixture_source(client)
-    client.post("/admission/instruments", json={
-        "id": "INST-TIME-1",
-        "measurement_family": "SPRINT_TIMING",
-        "manufacturer": "Fixture",
-        "model": "Gates",
-        "serial_number": "2",
-        "calibration_status": "CALIBRATED",
-    })
-    client.post("/admission/protocols", json={
-        "id": "PROT-SPRINT-1",
-        "measurement_family": "SPRINT_TIMING",
-        "name": "Sprint",
-        "version": "1.0",
-        "sampling_hz": 1000.0,
-        "units": {"distance": "m", "time": "s"},
-        "coordinate_convention": "track lane",
-    })
+def test_sprint_modality_is_admitted_with_its_own_contract(service, tmp_path):
+    _register_fixture_source(service)
+    service.register_admission_instrument(
+        {
+            "id": "INST-TIME-1",
+            "measurement_family": "SPRINT_TIMING",
+            "manufacturer": "Fixture",
+            "model": "Gates",
+            "serial_number": "2",
+            "calibration_status": "CALIBRATED",
+        }
+    )
+    service.register_admission_protocol(
+        {
+            "id": "PROT-SPRINT-1",
+            "measurement_family": "SPRINT_TIMING",
+            "name": "Sprint",
+            "version": "1.0",
+            "sampling_hz": 1000.0,
+            "units": {"distance": "m", "time": "s"},
+            "coordinate_convention": "track lane",
+        }
+    )
     csv = (
         "subject_id,session_id,trial_id,instrument_id,protocol_id,distance_m,time_s\n"
         "SUB-1,S-1,T-1,INST-TIME-1,PROT-SPRINT-1,30,4.2\n"
+    ).encode()
+    artifact = _ingest(service, tmp_path, "sprint.csv", csv)
+    result = service.admit_source_artifact(
+        artifact["id"],
+        "SPRINT_TIMING",
+        {"units": {"distance": "m", "time": "s"}, "coordinate_system": "track"},
     )
-    artifact = client.post("/admission/artifacts", json={
-        "source_id": "SRC-FIXTURE",
-        "original_filename": "sprint.csv",
-        "content_base64": base64.b64encode(csv.encode()).decode(),
-    }).json()
-    admitted = client.post("/admission/admit", json={
-        "artifact_id": artifact["id"],
-        "measurement_family": "SPRINT_TIMING",
-        "metadata": {"units": {"distance": "m", "time": "s"}, "coordinate_system": "track"},
-    }).json()
-    assert admitted["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
+    assert result["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
 
 
-def test_qualification_endpoint(client: TestClient):
-    records = client.post("/qualification/run").json()
+def test_qualification_records_are_native_python_calls(service):
+    records = qualification.run_qualification()
     assert len(records) == 3
-    statuses = {r["id"]: r["status"] for r in records}
+    statuses = {record["id"]: record["status"] for record in records}
     assert statuses["QUAL-CMJ-METRICS"] == "QUALIFIED"
     assert statuses["QUAL-RELIABILITY"] == "QUALIFIED"
     assert statuses["QUAL-LONGITUDINAL"] == "PARTIALLY_QUALIFIED"

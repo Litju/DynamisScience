@@ -109,6 +109,9 @@ Completed in G4 so far:
 - Fixed the first frozen-launch defects found by real installed runs: remove host Poppler ICU DLL contamination, explicitly collect pyqtgraph's dynamic `PySide6.QtOpenGL` and `QtOpenGLWidgets` imports, and resolve the private-root safety boundary from the installed executable directory when frozen.
 - Added native SQLite integrity inspection, online backup verification and isolated restore rehearsal. Application exceptions are logged to a rotating file under the configured private root; scientific execution uses the packaged `--worker` file-IPC entry point in a separate process.
 - Bundled third-party license notices and the LGPL-3.0 text, with an in-app Help menu viewer. The Qt redistribution notices remain included in the installer.
+- Added a read-only native scientific library for metric, protocol, method and model definitions. Prototype and unavailable entries display their stored status and limitations; the dialog does not execute unsupported methods.
+- Added a native versioned investigation editor with typed blocks, JSON state editing, add/remove/reorder, dependency-order validation, optimistic saves and fork lineage. Added a side-by-side HTML diff for frozen report versions and a clickable Qt provenance DAG with stored-node details.
+- The admission, Performance OS and scientific regression tests now call the direct Python facade/domain. The legacy HTTP client tests have been replaced by the native workflows and direct storage/science assertions.
 
 Windows packaging verification (Windows 11 x64, Python 3.12.13, PyInstaller 6.22.3, Inno Setup 6.7.3):
 
@@ -116,13 +119,24 @@ Windows packaging verification (Windows 11 x64, Python 3.12.13, PyInstaller 6.22
 - `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/test_windows_installer.ps1` — passed. Unpacked and installed catalogue startup: `2,632 ms` / `3,827 ms`; peak working set: `207.07 MB` / `208.18 MB`; zero listening TCP ports; launch ran with HTTP proxy variables pinned to local port 9; silent install and uninstall passed; configured disposable SQLite database hash was unchanged after uninstall.
 - The installed `--worker` path ran the bundled `METH-U-DESC` analysis from a temporary authored study and matched the direct Python result digest; worker elapsed time was `1,257.52 ms`.
 - `uv run pytest -q` — full scientific and native regression suite passed, including verified Mendeley and MoveSmart workflows on isolated copies. `uv lock --check` passed. `uv run pytest tests/test_data_root.py tests/test_desktop.py::test_native_database_tools_verify_backup_and_restore_safely -q` passed; the backup/restore GUI test also passed on an isolated rerun.
+- `uv run pytest tests/test_admission.py tests/test_performance.py -q` — passed after converting these suites to direct service calls. The native desktop suite also covers admission, performance operations, report export, investigation save/fork, report comparison and lineage-node inspection.
 - Reproducible package measurements and isolated data-root path: [G4 packaging benchmarks](evidence/g4-packaging-benchmarks.json). The synthetic generator manifest's pre-existing worktree edit was not staged.
+
+Native parity map:
+
+| Former web surface | Native replacement | Verification |
+|---|---|---|
+| Today, Athlete 360, Plan, Monitor, Test, Match/pose, Research and Reports | Direction F Qt Performance OS pages, docked Athlete 360, pyqtgraph viewers and direct `DynamisAppService` persistence | `tests/test_desktop.py::test_native_performance_os_workspaces_load_without_errors`, `test_native_performance_operations_edit_monitor_and_reports`; G3 native screenshots and benchmark |
+| Research home, project/study authoring, cohort, plan, runs, evidence and report | Qt catalogue, native dialogs and five research workspaces | `test_native_project_and_study_creation_forms`, `test_native_cohort_and_plan_forms_support_freeze_fork_and_history`, `test_native_research_journey_executes_promotes_freezes_and_exports`, `test_authored_project_study_cohort_plan_and_report_versions` |
+| Dataset pages and admission | Bounded `QAbstractTableModel` preview, provenance/rights inspector, native local-file admission, QC and quarantine history | `test_parquet_preview_is_bounded_and_offset_correct`, `test_native_admission_form_verifies_rights_runs_qc_and_admits`, direct `test_admission.py` checks |
+| Scientific library | Qt catalog for metrics, protocols, methods and models, preserving prototype/unavailable status and limitations | `test_native_investigation_editor_and_report_version_comparison` checks the bundled catalog; the scientific test suite verifies the direct method contracts |
+| Investigation blocks, run history, evidence and report workflow | Versioned Qt investigation editor; direct analysis tab; explicit evidence promotion; frozen report diff; clickable lineage DAG | `test_native_investigation_editor_and_report_version_comparison`, `test_native_research_journey_executes_promotes_freezes_and_exports` |
+| Unsupported model simulations | Read-only `PROTOTYPE`/`UNAVAILABLE` registry state; no athlete prediction or injury-risk execution | Catalog status and limitation display; no model execution control is exposed in the native UI |
 
 Remaining G4 work:
 
-- Complete the endpoint-to-native feature-parity review. The approved design still calls for a native investigation scratchpad and report-version comparison; add and verify those before retiring the old workbench.
-- Verify native replacements for every user-facing Research and Performance OS workflow and the associated scientific restrictions, warning states, and provenance navigation. Record any legacy-only test behavior that is intentionally superseded by the direct service and research-store contracts.
-- After parity, retire `apps/web`, TypeScript contracts and Node scripts, then remove `api.py`, `performance_http.py`, FastAPI/Uvicorn, multipart upload transport and other unneeded HTTP dependencies. Re-run the scientific and native suites after removal.
+- Retire `apps/web`, TypeScript contracts, Node scripts and obsolete browser automation. Remove `api.py`, `performance_http.py`, FastAPI/Uvicorn, multipart upload transport and unneeded HTTP/browser dependencies.
+- Update the root README and implementation status docs for the native-only architecture. Re-run the full scientific/native suite and rebuild/test the final offline Windows installer after retirement.
 - Finalize Windows offline/package qualification, startup and failed-job recovery review, Qt/Python licensing obligations, and the final footprint measurements after web retirement.
 
 G4 transport-decoupling verification: `uv run pytest tests/test_performance.py tests/test_desktop.py::test_performance_direct_service_preserves_records_and_science tests/test_desktop.py::test_performance_domain_imports_without_http_or_webengine -q` — passed (14 tests); the existing HTTP adapter tests emitted the known Starlette/httpx deprecation warning.

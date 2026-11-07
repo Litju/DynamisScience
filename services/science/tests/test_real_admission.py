@@ -5,11 +5,10 @@ import base64
 import openpyxl
 import polars as pl
 import pytest
-from fastapi.testclient import TestClient
 
-from dynamis_science import real_mendeley, real_movesmart, realstore
-from dynamis_science.api import app
+from dynamis_science import qualification_real, real_mendeley, real_movesmart, realstore
 from dynamis_science.data_root import data_root, paths
+from dynamis_science.desktop.services import DynamisAppService
 from dynamis_science.real_sources import SOURCES
 
 
@@ -138,19 +137,16 @@ def test_snapshot_is_immutable_and_idempotent(temp_root):
 
 def test_real_endpoints_are_separate_from_synthetic(monkeypatch, tmp_path):
     monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path))
-    with TestClient(app) as client:
-        studies = client.get("/studies").json()
-        assert [study["id"] for study in studies] == ["STUDY-001"]
-        sources = client.get("/real/sources").json()
-        assert len(sources) == 2
-        assert all(source["admitted"] is False for source in sources)
-        datasets = client.get("/datasets").json()
-        assert len(datasets) == 1
-        assert datasets[0]["synthetic"] is True
+    service = DynamisAppService()
+    studies = service.list_all_studies()
+    datasets = service.list_datasets()
+    assert [study["id"] for study in studies] == ["STUDY-001"]
+    assert len(datasets) == 1
+    assert datasets[0]["synthetic"] is True
+    assert not realstore.list_snapshots()
 
 
 def test_qualification_records_are_real_data_only_when_present(monkeypatch, tmp_path):
     monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path))
     assert data_root() == tmp_path
-    with TestClient(app) as client:
-        assert client.get("/real/qualification").json() == []
+    assert qualification_real.run() == []

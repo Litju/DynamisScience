@@ -63,6 +63,15 @@ DESIGN_ALLOWED_TABLES = {
     "DESCRIPTIVE": {"cmj_occasions", "signal_trials", "cmj_trials"},
 }
 
+INVESTIGATION_BLOCK_TYPES = frozenset(
+    {
+        "question", "dataset", "cohort", "schedule", "table", "explore",
+        "force_trial", "match_event", "analysis", "diagnostics", "evidence",
+        "model", "figure", "interpretation", "report_section",
+    }
+)
+BLOCK_DEPENDENCY_KEYS = ("cohort_block_id", "analysis_block_id", "evidence_block_id")
+
 METHODS: dict[str, dict[str, Any]] = {
     "METH-REAL-TREND": {
         "id": "METH-REAL-TREND",
@@ -185,6 +194,33 @@ class ResearchConflict(RuntimeError):
 
 class ResearchValidation(ValueError):
     pass
+
+
+def validate_investigation_blocks(blocks: list[dict[str, Any]]) -> None:
+    seen: set[str] = set()
+    for block in blocks:
+        if not isinstance(block, dict):
+            raise ResearchValidation("Investigation blocks must be JSON objects")
+        block_id = block.get("id")
+        block_type = block.get("type")
+        state = block.get("state", {})
+        if not isinstance(block_id, str) or not block_id.strip():
+            raise ResearchValidation("Investigation blocks require a non-empty ID")
+        if not isinstance(block_type, str) or block_type not in INVESTIGATION_BLOCK_TYPES:
+            raise ResearchValidation(f"Unknown block type: {block_type}")
+        if not isinstance(block.get("title"), str) or not block["title"].strip():
+            raise ResearchValidation(f"{block_id} requires a title")
+        if not isinstance(state, dict):
+            raise ResearchValidation(f"{block_id} state must be a JSON object")
+        if block_id in seen:
+            raise ResearchValidation(f"Duplicate block ID: {block_id}")
+        for key in BLOCK_DEPENDENCY_KEYS:
+            reference = state.get(key)
+            if reference and (not isinstance(reference, str) or reference not in seen):
+                raise ResearchValidation(
+                    f"{block_id} depends on {reference}, which must appear earlier in the investigation"
+                )
+        seen.add(block_id)
 
 
 def _now() -> str:
@@ -1931,6 +1967,8 @@ def _create_default_investigation(entity: dict[str, Any]) -> dict[str, Any]:
 
 
 def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]] | None = None, parent_id: str | None = None) -> dict[str, Any]:
+    blocks = blocks or []
+    validate_investigation_blocks(blocks)
     entity = get_entity(entity_id)
     if entity is None:
         raise ResearchNotFound(f"Research object {entity_id} not found")
@@ -1944,7 +1982,7 @@ def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]
         "status": "DRAFT",
         "version": 1,
         "parent_id": parent_id,
-        "blocks": blocks or [],
+        "blocks": blocks,
         "created_at": now,
         "updated_at": now,
         "schema_version": SCHEMA_VERSION,
@@ -1975,6 +2013,7 @@ def list_investigations(entity_id: str) -> list[dict[str, Any]]:
 
 
 def update_investigation_research(investigation_id: str, blocks: list[dict[str, Any]], base_version: int | None = None, title: str | None = None) -> dict[str, Any]:
+    validate_investigation_blocks(blocks)
     with _tx() as connection:
         row = connection.execute("SELECT * FROM investigations WHERE id = ?", (investigation_id,)).fetchone()
         if row is None:

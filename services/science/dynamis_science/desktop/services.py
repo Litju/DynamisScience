@@ -474,6 +474,12 @@ class DynamisAppService:
         self.ensure_initialized()
         return researchstore.dataset_metrics(snapshot_id)
 
+    def scientific_library(self) -> dict[str, Any]:
+        self.ensure_initialized()
+        from ..scientific_library import get_scientific_library
+
+        return get_scientific_library()
+
     def resolve_cohort(
         self,
         study_id: str,
@@ -660,6 +666,67 @@ class DynamisAppService:
     def report_versions(self, study_id: str) -> list[dict[str, Any]]:
         self.ensure_initialized()
         return researchstore.report_versions(study_id)
+
+    def get_report_version(self, study_id: str, version: int) -> dict[str, Any]:
+        self.ensure_initialized()
+        report = researchstore.get_report_version(study_id, version)
+        if report is None:
+            raise researchstore.ResearchNotFound(
+                f"Frozen report version {version} not found for {study_id}"
+            )
+        return report
+
+    def list_investigations(self, study_id: str) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        if study_id == "STUDY-001":
+            records = _read_json(ARTIFACT_DIR / "investigations.json", [])
+            return [record for record in records if record.get("study_id") == study_id]
+        if study_id in realstore.real_study_ids():
+            return [
+                record
+                for record in realanalysis.list_investigations()
+                if record.get("study_id") == study_id
+            ]
+        return researchstore.list_investigations(study_id)
+
+    def create_investigation(
+        self, study_id: str, title: str, blocks: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        researchstore.validate_investigation_blocks(blocks or [])
+        return researchstore.create_investigation(study_id, title, blocks)
+
+    def update_investigation(
+        self,
+        investigation_id: str,
+        blocks: list[dict[str, Any]],
+        base_version: int,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        researchstore.validate_investigation_blocks(blocks)
+        if investigation_id.startswith("INV-U-"):
+            return researchstore.update_investigation_research(
+                investigation_id, blocks, base_version, title
+            )
+        if investigation_id.startswith("INV-REAL-"):
+            try:
+                return realanalysis.update_investigation(
+                    investigation_id, blocks, base_version
+                )
+            except ValueError as error:
+                raise researchstore.ResearchConflict(str(error)) from error
+        raise researchstore.ResearchValidation(
+            "The bundled synthetic investigation is read-only"
+        )
+
+    def fork_investigation(self, investigation_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        if not investigation_id.startswith("INV-U-"):
+            raise researchstore.ResearchValidation(
+                "Only authored research investigations can be forked"
+            )
+        return researchstore.fork_investigation(investigation_id)
 
     def cite_report_artifact(
         self, study_id: str, artifact_id: str, section: str | None = None

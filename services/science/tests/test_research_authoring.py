@@ -77,8 +77,76 @@ def test_authored_project_study_cohort_plan_and_report_versions(tmp_path, monkey
     report = service.export_report_html(study_id, tmp_path / "report-v1.html", version)
     assert run["id"] in report.read_text(encoding="utf-8")
     assert researchstore.report_versions(study_id)[0]["status"] == "FROZEN"
+    first_report = service.get_report_version(study_id, version)
+    draft_report = service.update_report(
+        study_id,
+        {"summary": "Second frozen version for native comparison."},
+        base_version=version,
+    )
+    second_version = service.freeze_report(study_id)["version"]
+    second_report = service.get_report_version(study_id, second_version)
+    assert draft_report["version"] == second_version == version + 1
+    assert first_report["frozen_content"] != second_report["frozen_content"]
     assert any(record["change_type"] == "CREATED" for record in service.project_history(project["id"]))
     assert any(record["change_type"] == "UPDATED" for record in service.study_history(study_id))
+
+
+def test_investigation_scratchpad_versions_validate_order_and_fork(tmp_path, monkeypatch):
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    service = DynamisAppService()
+    project = service.create_project(
+        {"title": "Investigation test", "dataset_snapshot_ids": ["DS-SYNTH-001"]}
+    )
+    study = service.create_study(
+        project["id"],
+        {
+            "title": "Investigation study",
+            "research_question": "How does the registered outcome vary?",
+            "dataset_snapshot_id": "DS-SYNTH-001",
+            "primary_metric_id": "MET-CMJ-IMPULSE",
+        },
+    )["study"]
+
+    investigation = service.create_investigation(
+        study["id"],
+        "Signal review",
+        [
+            {"id": "B-COHORT", "type": "cohort", "title": "Cohort", "state": {}},
+            {
+                "id": "B-EXPLORE",
+                "type": "explore",
+                "title": "Explore impulse",
+                "state": {"cohort_block_id": "B-COHORT"},
+            },
+        ],
+    )
+    with pytest.raises(researchstore.ResearchValidation, match="must appear earlier"):
+        service.update_investigation(
+            investigation["id"],
+            [
+                {
+                    "id": "B-EXPLORE",
+                    "type": "explore",
+                    "title": "Explore impulse",
+                    "state": {"cohort_block_id": "B-COHORT"},
+                },
+                {"id": "B-COHORT", "type": "cohort", "title": "Cohort", "state": {}},
+            ],
+            base_version=1,
+        )
+
+    updated = service.update_investigation(
+        investigation["id"], investigation["blocks"], base_version=1, title="Saved version"
+    )
+    assert updated["version"] == 2
+    with pytest.raises(researchstore.ResearchConflict, match="at version 2"):
+        service.update_investigation(
+            investigation["id"], investigation["blocks"], base_version=1
+        )
+    fork = service.fork_investigation(investigation["id"])
+    assert fork["parent_id"] == investigation["id"]
+    assert fork["blocks"] == updated["blocks"]
+    assert len(service.list_investigations(study["id"])) == 3
 
 
 def test_local_source_admission_streams_checks_rights_and_enters_research_catalogue(
