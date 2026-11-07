@@ -47,7 +47,27 @@ The two missed performance targets remain tracked; no numerical method, optimize
 
 ## G2 — Research authoring and data management
 
-Not started. Project/study CRUD, cohort and plan authoring/versioning, admission/QC/quarantine and complete report composition remain.
+**Implementation status:** Authoring and admission workflows are implemented and verified. The shared G1 performance targets remain open as recorded above.
+
+Implemented:
+
+- Native project create/edit/archive/restore; study and monitoring-program create/edit, version history and state transitions.
+- Cohort include/exclude IDs, JSON rules, minimum-observation/activity filters, resolution table, draft edits, freeze, fork and history.
+- Analysis plan method/metric/cohort selection, JSON parameters, estimand/design fields, optimistic update, freeze, fork and history.
+- Native local-source admission uses streamed file copies, source-rights review/verification, instrument/protocol manifests, QC results, admitted snapshots and rejected/quarantined history.
+- Admitted CMJ snapshots are available to the research catalogue and can be used to create studies without copying data into the real snapshot store. Only registered metrics and methods are offered.
+- Report narrative fields, evidence citation removal, optimistic versioning, freeze history and frozen HTML export.
+
+Verification:
+
+- `uv run pytest tests/test_research_authoring.py -q` — passed (2 backend authoring/admission tests).
+- `QT_QPA_PLATFORM=offscreen uv run pytest tests/test_desktop.py -q` — passed, including native project/study/monitoring dialogs, cohort and plan freeze/fork, report composition, source QC/admission and quarantine viewing.
+- `QT_QPA_PLATFORM=offscreen uv run pytest -q` — full science suite passed with the existing Starlette/httpx deprecation warning.
+- Private snapshots and the research database were copied to disposable roots for integration tests; the private source root and pre-existing manifest edit remain unchanged.
+
+GUI evidence: [native study authoring dialog using the synthetic fixture](evidence/g2-study-authoring.png).
+
+G2 commits: `1c4d8c6` (`RES-604: integrate local admission and research authoring`) and `fd29072` (`RES-604: author research and admissions in Qt`).
 
 ## G3 — Performance OS
 
