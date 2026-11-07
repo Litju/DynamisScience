@@ -35,13 +35,13 @@ Performance results: [G1 benchmark JSON](evidence/g1-desktop-benchmarks.json). T
 
 | Benchmark | Measured | Design target | Result |
 |---|---:|---:|---|
-| Cold start to populated catalogue (5 samples) | median 2,029 ms; p95 2,293 ms | median <1,500 ms | Missed; 529 ms over target |
-| Idle working set, 5 s after opening Mendeley | 243.67 MB | <250 MB | Met |
-| First `force_signals.parquet` page (500 rows) | 20.01 ms; +2.18 MB working set | <80 ms; <25 MB delta | Met |
-| MoveSmart waveform to plot update | 60.45 ms | <120 ms | Met |
-| Mendeley MixedLM worker runtime | 3,277.1 ms; 4,425.4 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
-| Maximum GUI timer gap during MixedLM | 9.37 ms | <16 ms | Met |
-| Peak session working set including report export | 269.73 MB | <500 MB | Met |
+| Cold start to populated catalogue (5 samples) | median 2,006 ms; p95 2,032 ms | median <1,500 ms | Missed; 506 ms over target |
+| Idle working set, 5 s after opening Mendeley | 243.27 MB | <250 MB | Met |
+| First `force_signals.parquet` page (500 rows) | 20.10 ms; +1.72 MB working set | <80 ms; <25 MB delta | Met |
+| MoveSmart waveform to plot update | 44.64 ms | <120 ms | Met |
+| Mendeley MixedLM worker runtime | 3,216.2 ms; 4,368.7 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
+| Maximum GUI timer gap during MixedLM | 10.34 ms | <16 ms | Met |
+| Peak session working set including report export | 269.34 MB | <500 MB | Met |
 
 The two missed timing targets were remeasured on the completed native-only application; no numerical method, optimizer or tolerance was changed to improve them.
 
