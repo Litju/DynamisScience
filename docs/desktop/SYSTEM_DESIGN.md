@@ -6,6 +6,8 @@
 **Target Platform:** Windows 11 x64 Native Desktop (`PySide6` / Qt 6 Widgets, Python ≥ 3.12)  
 **Primary Authoritative Deliverable:** `docs/desktop/SYSTEM_DESIGN.md`
 
+**Implementation note (RES-604 G4, 2026-11-07):** This remains the frozen RES-605 architecture record. After native parity verification, the temporary compatibility implementation was retired: `apps/web`, the TypeScript packages, Node scripts, `api.py`, `performance_http.py`, and the FastAPI/Uvicorn/browser-test dependency path are no longer part of the delivered application. The as-built application uses the direct Qt-to-Python service path described here. Gate results, commands, measurements and remaining performance deviations are recorded in [RES-604_PROGRESS.md](RES-604_PROGRESS.md).
+
 ---
 
 ## 1. Source-of-Truth Audit & Executive Summary
