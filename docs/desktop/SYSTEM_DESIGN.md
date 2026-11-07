@@ -46,8 +46,9 @@ A line-by-line inspection of `services/science/dynamis_science/` confirms that *
 | `lineage.py` | 399 | **None** | Computed artifact lineage graph builder for synthetic/reference studies. **Reuse unchanged.** |
 | `qualification.py` & `qualification_real.py` | 685 | **None** | Independent qualification against analytical fixtures and optional local `Rscript` (`R 4.6.2`, `lme4 2.1-0`). **Reuse unchanged.** |
 | `ingest_real.py` & `extract_movesmart.py` | 217 | **None** | Idempotent CLI/module ingestion and filtered archive extraction for Mendeley and MoveSmart datasets. **Reuse unchanged (expose progress callbacks to Qt workers).** |
-| `performance.py` | 1,981 | **Coupled (`APIRouter`, `HTTPException`, `Query`, `HTMLResponse`)** | Contains all Performance OS domain calculations (`today`, `athletes`, `squad_weeks`, `athlete_detail`, `load_overview`, `log_session`, `add_athlete_note`, `get_plan`, `update_plan`, `publish_plan`, `tests`, `run_reliability`, `movement`, `units`, `research_link`, `create_report`, `freeze_report`, `export_report`) decorated directly as FastAPI route handlers. **Decouple HTTP decorators/exceptions from pure Python functions.** |
-| `api.py` | 2,568 | **Coupled (`FastAPI`, `HTTPException`, route handlers)** | Mixes FastAPI HTTP wiring with **unified cross-store domain dispatch** (`overview`, unified `studies` list, unified `study_detail`, `resolve_cohort`, `explore_longitudinal` DuckDB queries, `force_trials`, `force_trial`, `match_detail`, `datasets`, `dataset_detail`, unified `execute_analysis`, unified `promote_evidence`, unified `report`, unified `lineage`). **Extract unified dispatch into pure Python `ApplicationFacade`; keep `api.py` as a thin HTTP adapter until web retirement.** |
+| `performance.py` | ~1,980 | **None** | Pure Python Performance OS domain functions and Pydantic payload validation. Called directly by `DynamisAppService`; no FastAPI decorators, HTTP exceptions or responses. |
+| `performance_http.py` | ~140 | **Coupled (`APIRouter`, `HTTPException`, `HTMLResponse`)** | Temporary route adapter preserving the legacy web contract during G4 parity verification. Not imported by the desktop entry point; retire with `api.py` after the web runtime is removed. |
+| `api.py` | ~2,570 | **Coupled (`FastAPI`, `HTTPException`, route handlers)** | Legacy HTTP application for the retiring web frontend. The native application uses `DynamisAppService`; remove `api.py` only after G4 endpoint-to-workspace parity and regression review. |
 
 ---
 
@@ -419,8 +420,9 @@ services/science/
     ├── qualification_real.py              # [Existing — Unchanged] Real-data + R lme4 qualification suite
     ├── ingest_real.py                     # [Existing — Unchanged] Mendeley & MoveSmart CLI ingestion
     ├── extract_movesmart.py               # [Existing — Unchanged] Filtered MoveSmart ZIP extractor
-    ├── performance.py                     # [Adapt Interface] Extract HTTPExceptions into domain exceptions
-    ├── api.py                             # [Retained Legacy Adapter] Calls services.py; not imported by desktop
+    ├── performance.py                     # Python-only Performance OS domain operations
+    ├── performance_http.py                # Temporary legacy router adapter; desktop does not import
+    ├── api.py                             # Temporary legacy HTTP application; retire after parity
     └── desktop/                           # [New Package in RES-604] Native Qt Desktop Application
         ├── __init__.py
         ├── __main__.py                    # CLI & GUI entry point (`python -m dynamis_science.desktop`)
@@ -707,7 +709,8 @@ No synthetic or unmeasured performance numbers are claimed in this specification
 | `services/science/dynamis_science/qualification*.py` | Synthetic & real-data (`Rscript lme4`) qualification suites | **Reuse unchanged** | Invoked via `Tools → Qualification` (`QProcess` / worker). |
 | `services/science/dynamis_science/ingest_real.py` & `extract_movesmart.py` | Real dataset extraction & idempotent snapshot ingestion | **Reuse unchanged** | Invoked via `QProcess` worker when admitting raw archives. |
 | `services/science/scripts/sqlite_recovery.py` | Online SQLite backup & restore verification | **Reuse unchanged** | Invoked by `Tools → Backup & Integrity Check` and pre-migration hook. |
-| `services/science/dynamis_science/performance.py` | Performance OS logic + FastAPI `@router` & `HTTPException` | **Adapt Python interface** | Replace `HTTPException` with domain exceptions (`ResearchNotFound`, `ResearchValidation`); keep thin FastAPI router wrapper for legacy web compatibility. |
+| `services/science/dynamis_science/performance.py` | Performance OS Python domain operations | **Reuse as native domain** | Called directly by `DynamisAppService`; no FastAPI dependency. |
+| `services/science/dynamis_science/performance_http.py` | Legacy Performance OS HTTP routes | **Retire after G4 parity** | Thin FastAPI adapter for `apps/web`; desktop never imports it. |
 | `services/science/dynamis_science/api.py` | FastAPI app + inline cross-store study/exploration/dataset dispatch | **Adapt Python interface** | Extract unified dispatch into `dynamis_science/desktop/services.py` (`DynamisAppService`); have `api.py` delegate to `DynamisAppService`. |
 | `apps/web/src/components/ResearchWorkbench.tsx` | Next.js / React Scientific Research UI (1,420 lines) | **Replace web UI with Qt** | Replaced by `dynamis_science/desktop/views/research_workbench.py` & tabs (`G1`–`G2`). |
 | `apps/web/src/components/PerformanceOS.tsx` | Next.js / React Performance OS UI (1,890 lines) | **Replace web UI with Qt** | Replaced by `dynamis_science/desktop/views/performance_workbench.py` (`G3`). |
@@ -775,7 +778,7 @@ No synthetic or unmeasured performance numbers are claimed in this specification
 #### Established Facts (Verified from Repository & Private Data Root)
 1. Local repository `HEAD` is `554b7048d3d6ed19a199e5dbb1eef666fd69eba2` on `main`; private data root `D:\datasets\DynamisScience` (`0.961 GiB`) is intact and passes all M0 integrity checks.
 2. Ten of the twelve Python backend modules (`data_root`, `contracts`, `researchstore`, `researchanalysis`, `realstore`, `realanalysis`, `admission`, `analysis`, `lineage`, `qualification*`) already have **zero FastAPI imports**.
-3. Only `api.py` and `performance.py` couple domain dispatch to FastAPI decorators/exceptions.
+3. `performance.py` is now a Python-only domain module. The remaining FastAPI entry points are confined to `api.py` and the temporary `performance_http.py` adapter and are scheduled for G4 retirement after native parity verification.
 4. `statsmodels` MixedLM (`METH-REAL-TREND`) and NumPy ANOVA (`METH-REAL-RELIABILITY`) are already mathematically qualified against R 4.6.2 (`lme4 2.1-0`) and independent two-way ANOVA references.
 
 #### Proposed Binding Architecture Decisions (Locked by `RES-605`)

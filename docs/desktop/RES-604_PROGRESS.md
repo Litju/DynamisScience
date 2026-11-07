@@ -97,7 +97,24 @@ Performance measurements are in [G3 benchmark JSON](evidence/g3-performance-benc
 
 ## G4 — Packaging and web retirement
 
-Not started. Windows `--onedir` / Inno Setup packaging, install/uninstall and offline verification, recovery UI, licensing bundle, parity audit and web-runtime retirement remain.
+**Implementation status:** In progress. The Performance OS domain module is now pure Python and its legacy HTTP route wrappers are isolated in `performance_http.py`; desktop calls the domain functions directly. PyInstaller 6.22.3 is in the build-tool dependency group, and Inno Setup 6.7.3 is installed for local installer work. No distribution has been claimed yet.
+
+Completed in G4 so far:
+
+- Split FastAPI route decorators, HTTP status mapping and HTML response wrapping from `performance.py` into the temporary `performance_http.py` adapter. The desktop imports the Python-only domain module.
+- Added a fresh-process regression assertion that importing Performance OS domain logic leaves FastAPI, Uvicorn and QtWebEngine unloaded.
+- Installed the PyInstaller 6.22.3 build tool in the project environment and Inno Setup 6.7.3 for packaging validation. `uv lock --check` passed after the build-tool addition.
+- The legacy performance HTTP adapter still passes the existing TestClient Performance OS contract tests while native workflows use direct service calls.
+
+Remaining G4 work:
+
+- Complete the endpoint-to-native workflow parity and scientific regression matrix. Keep the legacy HTTP adapter only until this passes.
+- Add the disposable generated fixture to the `--onedir` bundle without writing to the checked-out `data/` tree or including private Mendeley/MoveSmart records.
+- Build and smoke-test the standalone executable, compile and run the per-user Inno installer, verify uninstall leaves the configured private root untouched, and confirm offline launch/no HTTP listeners.
+- Add native database integrity/backup/restore actions, startup and failed-job recovery behavior, runtime-footprint and installer-size measurements, and Qt/Python licensing notices.
+- After parity, retire `apps/web`, TypeScript contracts and Node scripts, then remove `api.py`, `performance_http.py`, FastAPI/Uvicorn, and other unneeded HTTP dependencies. Re-run the scientific and native test suites after removal.
+
+G4 transport-decoupling verification: `uv run pytest tests/test_performance.py tests/test_desktop.py::test_performance_direct_service_preserves_records_and_science tests/test_desktop.py::test_performance_domain_imports_without_http_or_webengine -q` — passed (14 tests); the existing HTTP adapter tests emitted the known Starlette/httpx deprecation warning.
 
 ## Commits
 

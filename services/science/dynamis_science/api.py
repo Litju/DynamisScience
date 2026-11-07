@@ -51,7 +51,7 @@ from .analysis import (
 from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID, generate_data
 from .lineage import build_lineage_graph, scope_lineage_graph
 from .qualification import list_qualification_records, run_qualification
-from . import performance, qualification_real, realanalysis, realstore, researchanalysis, researchstore
+from . import performance, performance_http, qualification_real, realanalysis, realstore, researchanalysis, researchstore
 
 
 @asynccontextmanager
@@ -79,7 +79,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(performance.router)
+app.include_router(performance_http.router)
 
 BLOCK_TYPES = {
     "question",

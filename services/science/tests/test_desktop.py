@@ -4,6 +4,8 @@ import hashlib
 import json
 import shutil
 import sqlite3
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -678,6 +680,25 @@ def test_performance_direct_service_preserves_records_and_science(tmp_path, monk
     assert len(service.performance_page_data("research")["metrics"]) >= 1
     with pytest.raises(ValueError, match="Unknown Performance OS workspace"):
         service.performance_page_data("unknown")
+
+
+def test_performance_domain_imports_without_http_or_webengine():
+    service_root = Path(__file__).resolve().parents[1]
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from dynamis_science import performance; "
+            "assert 'fastapi' not in sys.modules; "
+            "assert 'uvicorn' not in sys.modules; "
+            "assert not any(name.startswith('PySide6.QtWebEngine') for name in sys.modules)",
+        ],
+        cwd=service_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert process.returncode == 0, process.stderr
 
 
 def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, monkeypatch):

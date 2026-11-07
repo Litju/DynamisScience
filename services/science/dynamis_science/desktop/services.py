@@ -853,10 +853,10 @@ class DynamisAppService:
         self.ensure_initialized()
         from .. import performance
 
-        response = performance.export_report(report_id)
+        html = performance.export_report(report_id)
         path = Path(target_path).expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(response.body)
+        path.write_text(html, encoding="utf-8")
         return path
 
 

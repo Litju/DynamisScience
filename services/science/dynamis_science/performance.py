@@ -24,15 +24,11 @@ from typing import Any, Literal
 
 import numpy as np
 import polars as pl
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .analysis import _reliability
 from .data_root import paths
 from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
-
-router = APIRouter(prefix="/performance", tags=["performance"])
 
 CURRENT_WEEK = 16
 BASELINE_WEEKS = (1, 2, 3, 4)
@@ -40,6 +36,10 @@ ROLLING_WEEKS = 4
 PLAN_SCHEMA = "dynamis-performance.plan@1.0.0"
 REPORT_SCHEMA = "dynamis-performance.report@1.0.0"
 ASSESSMENT_SCHEMA = "dynamis-performance.test-assessment@1.0.0"
+
+
+class PerformanceInputError(ValueError):
+    """Raised when an operational command is missing a required input."""
 
 CLUB = {
     "id": "NORTHSIDE-FC",
@@ -925,7 +925,6 @@ class ReportRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/context")
 def context() -> dict[str, Any]:
     snapshot = _snapshot()
     return {
@@ -955,7 +954,6 @@ def context() -> dict[str, Any]:
     }
 
 
-@router.get("/today")
 def today() -> dict[str, Any]:
     weekly = _weekly_rows()
     current = weekly[-1]
@@ -1072,7 +1070,6 @@ def today() -> dict[str, Any]:
     }
 
 
-@router.get("/athletes")
 def athletes() -> list[dict[str, Any]]:
     base = _athlete_base_rows()
     output = []
@@ -1089,7 +1086,6 @@ def athletes() -> list[dict[str, Any]]:
     return output
 
 
-@router.get("/squad-weeks")
 def squad_weeks() -> dict[str, Any]:
     subjects = _tables()["subjects"].to_dicts()
     summaries = _athlete_base_rows()
@@ -1130,7 +1126,6 @@ def squad_weeks() -> dict[str, Any]:
     }
 
 
-@router.get("/athletes/{athlete_id}")
 def athlete_detail(athlete_id: str) -> dict[str, Any]:
     subjects = _tables()["subjects"].to_dicts()
     subject = next(
@@ -1138,7 +1133,7 @@ def athlete_detail(athlete_id: str) -> dict[str, Any]:
         None,
     )
     if subject is None:
-        raise HTTPException(status_code=404, detail=f"Athlete {athlete_id} is not in the admitted roster")
+        raise researchstore.ResearchNotFound(f"Athlete {athlete_id} is not in the admitted roster")
     rows = _athlete_rows(subject["subject_id"])
     base = _athlete_base_rows()[subject["subject_id"]]
     current = rows[-1]
@@ -1208,7 +1203,6 @@ def athlete_detail(athlete_id: str) -> dict[str, Any]:
     }
 
 
-@router.get("/load")
 def load_overview() -> dict[str, Any]:
     weekly = _weekly_rows()
     plan = _plan()
@@ -1243,7 +1237,6 @@ def load_overview() -> dict[str, Any]:
     }
 
 
-@router.post("/sessions")
 def log_session(payload: SessionLog) -> dict[str, Any]:
     store = _read_store("sessions.json", {"sessions": []})
     record = {
@@ -1265,7 +1258,6 @@ def log_session(payload: SessionLog) -> dict[str, Any]:
     return record
 
 
-@router.post("/athletes/{athlete_id}/notes")
 def add_athlete_note(athlete_id: str, payload: AthleteNote) -> dict[str, Any]:
     athlete = next(
         (
@@ -1276,7 +1268,7 @@ def add_athlete_note(athlete_id: str, payload: AthleteNote) -> dict[str, Any]:
         None,
     )
     if athlete is None:
-        raise HTTPException(status_code=404, detail="Athlete not found")
+        raise researchstore.ResearchNotFound("Athlete not found")
     store = _read_store("notes.json", {"notes": []})
     note = {
         "id": f"NOTE-{len(store['notes']) + 1:04d}",
@@ -1292,7 +1284,6 @@ def add_athlete_note(athlete_id: str, payload: AthleteNote) -> dict[str, Any]:
     return note
 
 
-@router.get("/plan")
 def get_plan() -> dict[str, Any]:
     plan = _plan()
     weekly = _weekly_rows()
@@ -1336,7 +1327,6 @@ def get_plan() -> dict[str, Any]:
     }
 
 
-@router.put("/plan")
 def update_plan(payload: PlanUpdate) -> dict[str, Any]:
     plan = _plan()
     microcycle = next(
@@ -1376,7 +1366,6 @@ def update_plan(payload: PlanUpdate) -> dict[str, Any]:
     return get_plan()
 
 
-@router.post("/plan/publish")
 def publish_plan() -> dict[str, Any]:
     plan = _plan()
     plan["status"] = "PUBLISHED"
@@ -1403,7 +1392,6 @@ def _trial_rows_for_week(week: int) -> list[dict[str, Any]]:
     return _tables()["cmj"].filter(pl.col("week") == week).to_dicts()
 
 
-@router.get("/tests")
 def tests() -> dict[str, Any]:
     week = CURRENT_WEEK
     trials = _trial_rows_for_week(week)
@@ -1522,7 +1510,6 @@ def tests() -> dict[str, Any]:
     }
 
 
-@router.post("/tests/reliability")
 def run_reliability() -> dict[str, Any]:
     current = tests()
     payload = {
@@ -1551,12 +1538,10 @@ def run_reliability() -> dict[str, Any]:
     return payload
 
 
-@router.get("/movement")
 def movement() -> dict[str, Any]:
     return _movement()
 
 
-@router.get("/units")
 def units() -> dict[str, Any]:
     return {
         "units": UNITS,
@@ -1582,7 +1567,6 @@ def units() -> dict[str, Any]:
     }
 
 
-@router.get("/research")
 def research_link() -> dict[str, Any]:
     return {
         "study": _study_summary(),
@@ -1706,7 +1690,7 @@ def _report_content(audience: str, athlete_id: str | None, role: str) -> dict[st
             None,
         )
         if subject is None:
-            raise HTTPException(status_code=400, detail="An athlete_id is required for an athlete report")
+            raise PerformanceInputError("An athlete_id is required for an athlete report")
         detail = athlete_detail(subject["display_id"])
         sections = [
             {
@@ -1860,7 +1844,6 @@ def _report_content(audience: str, athlete_id: str | None, role: str) -> dict[st
     }
 
 
-@router.get("/reports")
 def list_reports(audience: str | None = None) -> list[dict[str, Any]]:
     reports = _read_store("reports.json", {"reports": []})["reports"]
     if audience:
@@ -1868,7 +1851,6 @@ def list_reports(audience: str | None = None) -> list[dict[str, Any]]:
     return sorted(reports, key=lambda item: item["version"], reverse=True)
 
 
-@router.post("/reports")
 def create_report(payload: ReportRequest) -> dict[str, Any]:
     content = _report_content(payload.audience, payload.athlete_id, payload.role)
     store = _read_store("reports.json", {"reports": []})
@@ -1898,12 +1880,11 @@ def create_report(payload: ReportRequest) -> dict[str, Any]:
     return report
 
 
-@router.post("/reports/{report_id}/freeze")
 def freeze_report(report_id: str) -> dict[str, Any]:
     store = _read_store("reports.json", {"reports": []})
     report = next((item for item in store["reports"] if item["id"] == report_id), None)
     if report is None:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise researchstore.ResearchNotFound("Report not found")
     if report["status"] == "FROZEN":
         return report
     report["status"] = "FROZEN"
@@ -1920,21 +1901,19 @@ def freeze_report(report_id: str) -> dict[str, Any]:
     return report
 
 
-@router.get("/reports/{report_id}")
 def get_report(report_id: str) -> dict[str, Any]:
     store = _read_store("reports.json", {"reports": []})
     report = next((item for item in store["reports"] if item["id"] == report_id), None)
     if report is None:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise researchstore.ResearchNotFound("Report not found")
     return report
 
 
-@router.get("/reports/{report_id}/export", response_class=HTMLResponse)
-def export_report(report_id: str) -> HTMLResponse:
+def export_report(report_id: str) -> str:
     store = _read_store("reports.json", {"reports": []})
     report = next((item for item in store["reports"] if item["id"] == report_id), None)
     if report is None:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise researchstore.ResearchNotFound("Report not found")
     escape = html.escape
     section_html = []
     for section in report["sections"]:
@@ -1978,4 +1957,4 @@ footer{{margin-top:30px;border-top:1px solid #d5dde2;padding-top:10px;font-famil
 <section><h2>Limitations</h2>{''.join(f'<p>— {escape(item)}</p>' for item in report['limitations'])}</section>
 <footer>{escape(str(report['provenance']))}<br>{escape(' · '.join(report['limitations']))}</footer>
 </body></html>"""
-    return HTMLResponse(document)
+    return document
