@@ -8,10 +8,17 @@ import threading
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QApplication, QDialogButtonBox, QFileDialog, QInputDialog, QMessageBox
 
 from dynamis_science.desktop.main_window import MainWindow
+from dynamis_science.desktop.dialogs import (
+    CohortDialog,
+    DatasetAdmissionDialog,
+    PlanDialog,
+    ProjectDialog,
+    StudyDialog,
+)
 from dynamis_science.desktop.plots import export_figure, run_figure
 from dynamis_science.desktop.services import DynamisAppService
 from dynamis_science.desktop.tasks import TaskRunner
@@ -292,13 +299,34 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
 
     window.research._promote()
     qtbot.waitUntil(lambda: window.research.latest_evidence_id is not None)
+    citation_version = window.research.report_document_version or 0
     window.research._cite_latest()
     qtbot.waitUntil(
-        lambda: any(
-            citation["artifact_id"] == window.research.latest_evidence_id
-            for citation in service.get_report(study_id).get("citations", [])
-        )
+        lambda: (
+            window.research.report_document_version is not None
+            and window.research.report_document_version > citation_version
+        ) or bool(errors)
     )
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert not errors, errors
+    assert any(
+        citation["artifact_id"] == window.research.latest_evidence_id
+        for citation in service.get_report(study_id).get("citations", [])
+    )
+    window.research.report_title.setText("Native authored results")
+    window.research.report_summary.setPlainText("The observed within-subject estimate is reported with its stored interval.")
+    window.research.report_conclusion.setPlainText("Interpret the estimate within the single-arm observational design.")
+    document_version = window.research.report_document_version
+    window.research._save_report_draft()
+    qtbot.waitUntil(
+        lambda: (
+            window.research.report_document_version is not None
+            and window.research.report_document_version > document_version
+        ) or bool(errors)
+    )
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert not errors, errors
+    assert service.get_report(study_id).get("summary") == "The observed within-subject estimate is reported with its stored interval."
     expected_report_version = service.get_report(study_id)["version"]
     window.research._freeze_report()
     qtbot.waitUntil(
@@ -315,6 +343,8 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     qtbot.waitUntil(lambda: output.is_file())
     html = output.read_text(encoding="utf-8")
     assert window.research.latest_run["id"] in html
+    assert "Native authored results" in html
+    assert "single-arm observational design" in html
     assert "doi" in html.lower()
     qtbot.waitUntil(lambda: not window.runner.active)
     window.close()
@@ -325,3 +355,261 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     with sqlite3.connect(root / "research" / "research.db") as database:
         assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     assert service.get_report(study_id)["status"] == "FROZEN"
+
+
+def test_native_project_and_study_creation_forms(qtbot, tmp_path, monkeypatch):
+    errors = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: errors.append(_args[-1]))
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args: QMessageBox.StandardButton.No,
+    )
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    service = DynamisAppService()
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+
+    def create_project_form():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, ProjectDialog))
+        dialog.title.setText("Native-created project")
+        dialog.description.setPlainText("Created through Qt Widgets")
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, create_project_form)
+    window._new_project()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert not errors, errors
+    assert window.current_target and window.current_target["type"] == "project"
+    project_id = window.current_target["id"]
+
+    def edit_project_form():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, ProjectDialog))
+        dialog.title.setText("Edited native project")
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, edit_project_form)
+    window._edit_current()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert service.get_project(project_id)["title"] == "Edited native project"
+
+    def create_study_form():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, StudyDialog))
+        dialog.title.setText("Native-created study")
+        dialog.question.setPlainText("Does the admitted metric change over the observed weeks?")
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, create_study_form)
+    window._new_research_object(False)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert not errors, errors
+    qtbot.waitUntil(lambda: bool(window.current_study_id and window.current_study_id.startswith("STUDY-U-")))
+    detail = service.get_study_detail(window.current_study_id)
+    assert detail["study"]["project_id"] == project_id
+    assert detail["question"]["statement"] == "Does the admitted metric change over the observed weeks?"
+
+    def edit_study_form():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, StudyDialog))
+        dialog.title.setText("Edited native study")
+        dialog.question.setPlainText("How does the metric change across the observed weeks?")
+        dialog.population.setText("Participants in the local admitted snapshot")
+        dialog.estimand.setText("Descriptive change across observed weeks")
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, edit_study_form)
+    window._edit_current()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    detail = service.get_study_detail(window.current_study_id)
+    assert detail["study"]["title"] == "Edited native study"
+    assert detail["question"]["statement"] == "How does the metric change across the observed weeks?"
+    assert detail["question"]["estimand"] == "Descriptive change across observed weeks"
+    assert detail["question"]["population"] == "Participants in the local admitted snapshot"
+
+    def create_monitoring_form():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, StudyDialog))
+        dialog.title.setText("Native monitoring program")
+        dialog.question.setPlainText("How does the monitoring metric vary during the period?")
+        dialog.start_week.setValue(8)
+        dialog.weeks.setValue(4)
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, create_monitoring_form)
+    window._new_research_object(True)
+    qtbot.waitUntil(lambda: not window.runner.active)
+    assert window.current_study_id and window.current_study_id.startswith("PROG-U-")
+    monitoring_id = window.current_study_id
+    monitoring = service.get_study_detail(monitoring_id)
+    assert monitoring["kind"] == "MONITORING"
+    assert monitoring["program"]["schedule"]["start_week"] == 8
+    assert monitoring["program"]["schedule"]["weeks"] == 4
+
+    def edit_monitoring_form():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, StudyDialog))
+        dialog.title.setText("Edited monitoring program")
+        dialog.start_week.setValue(10)
+        dialog.weeks.setValue(3)
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, edit_monitoring_form)
+    window._edit_current()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    updated = service.get_study_detail(monitoring_id)
+    assert updated["study"]["title"] == "Edited monitoring program"
+    assert updated["program"]["schedule"]["start_week"] == 10
+    assert updated["program"]["schedule"]["weeks"] == 3
+    assert not errors, errors
+    window.close()
+
+
+def test_native_admission_form_verifies_rights_runs_qc_and_admits(
+    qtbot, tmp_path, monkeypatch
+):
+    errors = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: errors.append(_args[-1]))
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args: QMessageBox.StandardButton.No,
+    )
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    root = tmp_path / "private"
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(root))
+    service = DynamisAppService()
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    source_file = tmp_path / "local-cmj.csv"
+    dialog = DatasetAdmissionDialog(service, window.run_task, window._admission_saved, window)
+    qtbot.addWidget(dialog)
+    source_file.write_text(
+        "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week,body_mass_kg,jump_height_cm,concentric_impulse_n_s_kg\n"
+        f"P01,S01,T01,{dialog.instrument_id},{dialog.protocol_id},1000,1,80,38,1.7\n"
+        f"P01,S02,T02,{dialog.instrument_id},{dialog.protocol_id},1000,2,80,39,1.8\n"
+        f"P02,S01,T03,{dialog.instrument_id},{dialog.protocol_id},1000,1,75,35,1.6\n"
+        f"P02,S02,T04,{dialog.instrument_id},{dialog.protocol_id},1000,2,75,36,1.7\n",
+        encoding="utf-8",
+    )
+    dialog.source_name.setText("Native admission test")
+    dialog.publisher.setText("Local test manifest")
+    dialog.dataset_identity.setText("local-cmj-test-v1")
+    dialog.license.setText("Test-only license terms")
+    dialog.permitted_uses.setText("research testing")
+    dialog.restrictions.setPlainText("Local test data; do not redistribute")
+    dialog.rights_reviewed.setChecked(True)
+    dialog.manufacturer.setText("Test")
+    dialog.instrument_model.setText("Force plate")
+    dialog.serial.setText("LOCAL-1")
+    dialog.calibration.setText("CALIBRATED")
+    dialog.protocol_name.setText("CMJ protocol")
+    dialog.file_path.setText(str(source_file))
+    dialog.show()
+    dialog.review_button.click()
+    qtbot.waitUntil(lambda: dialog.quality is not None or bool(errors), timeout=30000)
+    assert not errors, errors
+    assert dialog.quality["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
+    dialog.admit_button.click()
+    qtbot.waitUntil(
+        lambda: any(item.get("dataset_snapshot_id") for item in service.list_admission_records()),
+        timeout=30000,
+    )
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    record = service.list_admission_records()[-1]
+    assert record["dataset_snapshot_id"]
+    admitted = service.get_dataset_detail(record["dataset_snapshot_id"])
+    assert admitted["source"]["rights_status"] == "VERIFIED"
+    assert any(item["id"] == record["dataset_snapshot_id"] for item in service.list_datasets())
+    dialog.close()
+    window.close()
+
+
+def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(
+    qtbot, tmp_path, monkeypatch
+):
+    errors = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *_args: errors.append(_args[-1]))
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args: QMessageBox.StandardButton.No,
+    )
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    service = DynamisAppService()
+    service.ensure_initialized()
+    project = service.create_project({"title": "Cohort and plan UI test"})
+    detail = service.create_study(
+        project["id"],
+        {
+            "title": "Authored cohort study",
+            "research_question": "How does impulse vary across observed weeks?",
+            "dataset_snapshot_id": "DS-SYNTH-001",
+            "primary_metric_id": "MET-CMJ-IMPULSE",
+        },
+    )
+    study_id = detail["study"]["id"]
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 3)
+    item = next(
+        window.navigator.topLevelItem(1).child(index)
+        for index in range(window.navigator.topLevelItem(1).childCount())
+        if window.navigator.topLevelItem(1).child(index).data(0, Qt.ItemDataRole.UserRole)["id"] == study_id
+    )
+    window._navigation_activated(item, 0)
+    qtbot.waitUntil(lambda: window.current_study_id == study_id)
+
+    def save_cohort_dialog():
+        dialog = next(item for item in QApplication.topLevelWidgets() if isinstance(item, CohortDialog))
+        dialog.name.setText("Saved native cohort")
+        dialog.description.setText("Cohort authored in Qt")
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, save_cohort_dialog)
+    window._new_cohort()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    cohorts = service.list_cohorts(study_id)
+    created_cohort = cohorts[-1]
+    assert created_cohort["name"] == "Saved native cohort"
+
+    window._freeze_cohort()
+    qtbot.waitUntil(lambda: service.get_cohort(created_cohort["id"])["status"] == "FROZEN")
+    monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("Forked cohort", True))
+    window._fork_cohort()
+    qtbot.waitUntil(lambda: len(service.list_cohorts(study_id)) == len(cohorts) + 1)
+    forked_cohort = service.list_cohorts(study_id)[-1]
+    assert forked_cohort["parent_id"] == created_cohort["id"]
+
+    def save_plan_dialog():
+        dialog = next(
+            (item for item in QApplication.topLevelWidgets() if isinstance(item, PlanDialog)),
+            None,
+        )
+        if dialog is None:
+            QTimer.singleShot(25, save_plan_dialog)
+            return
+        dialog.name.setText("Native frozen plan")
+        dialog.cohort.setCurrentIndex(dialog.cohort.findData(created_cohort["id"]))
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Save).click()
+
+    QTimer.singleShot(0, save_plan_dialog)
+    window._new_plan()
+    qtbot.waitUntil(lambda: not window.runner.active)
+    plan = service.list_plans(study_id)[-1]
+    assert plan["name"] == "Native frozen plan"
+    window._freeze_plan()
+    qtbot.waitUntil(lambda: service.get_plan(plan["id"])["status"] == "FROZEN")
+    monkeypatch.setattr(QInputDialog, "getText", lambda *_args, **_kwargs: ("Forked plan", True))
+    window._fork_plan()
+    qtbot.waitUntil(lambda: len(service.list_plans(study_id)) >= 3)
+    forked_plan = service.list_plans(study_id)[-1]
+    assert forked_plan["parent_id"] == plan["id"]
+    assert service.cohort_history(created_cohort["id"])
+    assert service.plan_history(plan["id"])
+    assert not errors, errors
+    qtbot.waitUntil(lambda: not window.runner.active)
+    window.close()

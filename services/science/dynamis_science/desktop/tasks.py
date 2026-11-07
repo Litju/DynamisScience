@@ -11,7 +11,6 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 class _Signals(QObject):
     result = Signal(object)
     failed = Signal(object)
-    finished = Signal()
 
 
 class _Task(QRunnable):
@@ -25,8 +24,6 @@ class _Task(QRunnable):
             self.signals.result.emit(self.operation())
         except Exception as error:
             self.signals.failed.emit(error)
-        finally:
-            self.signals.finished.emit()
 
 
 class TaskRunner(QObject):
@@ -34,7 +31,6 @@ class TaskRunner(QObject):
 
     _result = Signal(object, object)
     _failed = Signal(object, object)
-    _finished = Signal(object)
     idle = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -44,18 +40,25 @@ class TaskRunner(QObject):
         self.callbacks: dict[_Task, tuple[Callable[[Any], None], Callable[[Exception], None]]] = {}
         self._result.connect(self._deliver_result)
         self._failed.connect(self._deliver_error)
-        self._finished.connect(self._forget)
 
     def _deliver_result(self, task: _Task, value: Any) -> None:
         callback, on_error = self.callbacks[task]
         try:
             callback(value)
         except Exception as error:
-            on_error(error)
+            try:
+                on_error(error)
+            finally:
+                self._forget(task)
+        else:
+            self._forget(task)
 
     def _deliver_error(self, task: _Task, error: Exception) -> None:
         _, callback = self.callbacks[task]
-        callback(error)
+        try:
+            callback(error)
+        finally:
+            self._forget(task)
 
     def _forget(self, task: _Task) -> None:
         self.callbacks.pop(task, None)
@@ -74,5 +77,4 @@ class TaskRunner(QObject):
         self.callbacks[task] = (on_result, on_error)
         task.signals.result.connect(lambda value: self._result.emit(task, value))
         task.signals.failed.connect(lambda error: self._failed.emit(task, error))
-        task.signals.finished.connect(lambda: self._finished.emit(task))
         self.pool.start(task)

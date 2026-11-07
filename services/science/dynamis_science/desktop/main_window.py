@@ -10,15 +10,19 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QComboBox,
     QDockWidget,
+    QDialog,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QToolBar,
     QSplitter,
     QStackedWidget,
     QTabWidget,
@@ -30,7 +34,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .models import ParquetPreviewTableModel
+from .models import ParquetPreviewTableModel, RecordTableModel
+from .dialogs import (
+    AdmissionHistoryDialog,
+    CohortDialog,
+    DatasetAdmissionDialog,
+    PlanDialog,
+    ProjectDialog,
+    StudyDialog,
+)
+from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .tasks import TaskRunner
 
@@ -47,6 +60,8 @@ class MainWindow(QMainWindow):
         self.current_study_id: str | None = None
         self.current_study: dict[str, Any] = {}
         self.current_snapshot_id: str | None = None
+        self.current_target: dict[str, str] | None = None
+        self.current_project: dict[str, Any] | None = None
         self.setWindowTitle("DynamisScience")
         self.resize(1420, 900)
         self._build_shell()
@@ -107,6 +122,63 @@ class MainWindow(QMainWindow):
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
+        research_menu = self.menuBar().addMenu("Research")
+        self.action_new_project = QAction("New project…", self)
+        self.action_new_project.triggered.connect(self._new_project)
+        self.action_new_study = QAction("New study…", self)
+        self.action_new_study.triggered.connect(lambda: self._new_research_object(False))
+        self.action_new_monitoring = QAction("New monitoring program…", self)
+        self.action_new_monitoring.triggered.connect(lambda: self._new_research_object(True))
+        self.action_edit = QAction("Edit selected project / study…", self)
+        self.action_edit.triggered.connect(self._edit_current)
+        self.action_admit = QAction("Admit local dataset…", self)
+        self.action_admit.triggered.connect(self._open_admission)
+        self.action_admission_history = QAction("Admission and quarantine history…", self)
+        self.action_admission_history.triggered.connect(self._open_admission_history)
+        self.action_archive = QAction("Archive selected project / study", self)
+        self.action_archive.triggered.connect(self._archive_current)
+        self.action_restore = QAction("Restore selected project / study", self)
+        self.action_restore.triggered.connect(self._restore_current)
+        self.action_transition = QAction("Transition selected study state…", self)
+        self.action_transition.triggered.connect(self._transition_current_study)
+        self.action_study_history = QAction("Study / project history…", self)
+        self.action_study_history.triggered.connect(self._object_history)
+        self.action_report_history = QAction("Report version history…", self)
+        self.action_report_history.triggered.connect(self._report_history)
+        for action in (
+            self.action_new_project,
+            self.action_new_study,
+            self.action_new_monitoring,
+            self.action_edit,
+            self.action_admit,
+            self.action_admission_history,
+            self.action_archive,
+            self.action_restore,
+            self.action_transition,
+            self.action_study_history,
+            self.action_report_history,
+        ):
+            research_menu.addAction(action)
+        cohort_menu = research_menu.addMenu("Cohort")
+        for label, callback in (
+            ("New cohort…", self._new_cohort),
+            ("Edit current cohort…", self._edit_cohort),
+            ("Freeze current cohort", self._freeze_cohort),
+            ("Fork current cohort…", self._fork_cohort),
+            ("Cohort history…", self._cohort_history),
+        ):
+            action = cohort_menu.addAction(label)
+            action.triggered.connect(callback)
+        plan_menu = research_menu.addMenu("Analysis plan")
+        for label, callback in (
+            ("New plan…", self._new_plan),
+            ("Edit current plan…", self._edit_plan),
+            ("Freeze current plan", self._freeze_plan),
+            ("Fork current plan…", self._fork_plan),
+            ("Plan history…", self._plan_history),
+        ):
+            action = plan_menu.addAction(label)
+            action.triggered.connect(callback)
         view_menu = self.menuBar().addMenu("View")
         view_menu.addAction(self.navigator_dock.toggleViewAction())
         view_menu.addAction(self.inspector_dock.toggleViewAction())
@@ -120,6 +192,12 @@ class MainWindow(QMainWindow):
             )
         )
         help_menu.addAction(about)
+
+        toolbar = QToolBar("Research authoring", self)
+        toolbar.setMovable(False)
+        for action in (self.action_new_project, self.action_new_study, self.action_admit):
+            toolbar.addAction(action)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
     def _load(self) -> None:
         self.run_task(self.service.ensure_initialized, self._load_catalogue, "Validating private data root")
@@ -157,6 +235,17 @@ class MainWindow(QMainWindow):
         def failed(error: Exception) -> None:
             self.progress.setVisible(False)
             self.status_text.setText("Operation failed")
+            if isinstance(error, ResearchConflict):
+                box = QMessageBox(self)
+                box.setWindowTitle("Record changed")
+                box.setIcon(QMessageBox.Icon.Warning)
+                box.setText(str(error))
+                reload = box.addButton("Reload latest record", QMessageBox.ButtonRole.AcceptRole)
+                box.addButton("Dismiss", QMessageBox.ButtonRole.RejectRole)
+                box.exec()
+                if box.clickedButton() is reload and self.current_target:
+                    self.refresh_catalogue(self.current_target)
+                return
             QMessageBox.warning(self, "DynamisScience", f"{type(error).__name__}: {error}")
 
         self.runner.submit(operation, succeeded, failed)
@@ -172,8 +261,12 @@ class MainWindow(QMainWindow):
     def _catalogue(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
         return self.service.list_projects(), self.service.list_all_studies(), self.service.list_datasets()
 
-    def _populate_navigation(self, values) -> None:
+    def _populate_navigation(self, values, select: dict[str, str] | None = None) -> None:
         projects, studies, datasets = values
+        self.projects, self.studies, self.datasets = projects, studies, datasets
+        self.projects = projects
+        self.studies = studies
+        self.datasets = datasets
         self.navigator.clear()
         project_root = QTreeWidgetItem(["Projects"])
         project_root.setData(0, Qt.ItemDataRole.UserRole, {"type": "projects"})
@@ -203,9 +296,35 @@ class MainWindow(QMainWindow):
         )
         self.status_text.setText("Ready")
         self.catalogue_loaded.emit()
+        if select:
+            self._select_catalogue_target(select)
+
+    def refresh_catalogue(self, select: dict[str, str] | None = None) -> None:
+        self.run_task(
+            self._catalogue,
+            lambda values: self._populate_navigation(values, select),
+            "Refreshing research catalogue",
+        )
+
+    def _select_catalogue_target(self, target: dict[str, str]) -> None:
+        for root_index in range(self.navigator.topLevelItemCount()):
+            root = self.navigator.topLevelItem(root_index)
+            for child_index in range(root.childCount()):
+                child = root.child(child_index)
+                if child.data(0, Qt.ItemDataRole.UserRole) == target:
+                    self.navigator.setCurrentItem(child)
+                    self._navigation_activated(child, 0)
+                    return
 
     def _navigation_activated(self, item: QTreeWidgetItem, _column: int) -> None:
         target = item.data(0, Qt.ItemDataRole.UserRole) or {}
+        if target.get("type") == "project":
+            project_id = target["id"]
+            self.run_task(
+                lambda: self.service.get_project(project_id),
+                lambda project: self._show_project(project_id, project),
+                "Opening project",
+            )
         if target.get("type") == "study":
             study_id = target["id"]
             self.run_task(
@@ -221,10 +340,28 @@ class MainWindow(QMainWindow):
                 "Opening dataset",
             )
         elif target.get("type") in {"projects", "datasets", "studies"}:
+            self.current_target = None
+            self.current_project = None
+            self.current_study_id = None
+            self.current_study = {}
             self.workspace.setCurrentWidget(self.welcome)
             self.welcome.setText(item.text(0))
 
+    def _show_project(self, project_id: str, project: dict[str, Any]) -> None:
+        self.current_target = {"type": "project", "id": project_id}
+        self.current_project = project
+        self.current_study_id = None
+        self.current_study = {}
+        self.current_snapshot_id = None
+        self.context.setText(project.get("title", project_id))
+        self.provenance.setText("RESEARCH PROJECT")
+        self.research.select_project(project)
+        self.workspace.setCurrentWidget(self.research)
+        self.research.tabs.setCurrentIndex(0)
+
     def _show_study(self, study_id: str, detail: dict[str, Any]) -> None:
+        self.current_target = {"type": "study", "id": study_id}
+        self.current_project = detail.get("project")
         self.current_study_id = study_id
         self.current_study = detail
         snapshot = detail.get("snapshot", {})
@@ -238,30 +375,399 @@ class MainWindow(QMainWindow):
             if classification:
                 parts.append(str(classification))
             badge = "  ·  ".join(parts)
-        else:
+        elif snapshot.get("synthetic") and snapshot.get("id") == "DS-SYNTH-001":
             badge = "SYNTHETIC FIXTURE · DS-SYNTH-001 · NO EMPIRICAL CLAIMS"
+        elif snapshot.get("admitted_source"):
+            badge = "FIXTURE-ONLY ADMISSION · " + "  ·  ".join(
+                str(value) for value in (snapshot.get("id"), license_id, classification) if value
+            )
+        else:
+            badge = f"SYNTHETIC FIXTURE · {snapshot.get('id', 'unknown snapshot')}"
         self.context.setText(detail.get("study", {}).get("title") or study_id)
         self.provenance.setText(badge)
         self.research.set_study(study_id, detail)
         self.workspace.setCurrentWidget(self.research)
 
     def _show_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        self.current_target = {"type": "dataset", "id": snapshot_id}
         self.current_study_id = None
         self.current_study = {}
+        self.current_project = None
         self.current_snapshot_id = snapshot_id
         self.context.setText(detail.get("label") or snapshot_id)
         source = detail.get("source", {})
         license_info = source.get("license", {})
         license_id = license_info.get("id") if isinstance(license_info, dict) else license_info
-        self.provenance.setText(
-            "REAL DATA" if detail.get("real_data") else "SYNTHETIC FIXTURE · DS-SYNTH-001"
-        )
+        if detail.get("real_data"):
+            badge = "REAL DATA"
+        elif detail.get("admitted_source"):
+            badge = f"FIXTURE-ONLY ADMISSION · {snapshot_id}"
+        else:
+            badge = f"SYNTHETIC FIXTURE · {snapshot_id}"
+        self.provenance.setText(badge)
         if license_id:
             self.provenance.setText(f"{self.provenance.text()}  ·  {license_id}")
         self.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
         self.research.select_dataset(snapshot_id, detail)
         self.workspace.setCurrentWidget(self.research)
         self.research.tabs.setCurrentIndex(1)
+        self.research.dataset_tabs.setCurrentIndex(0)
+
+    def _new_project(self) -> None:
+        datasets = getattr(self, "datasets", [])
+        dialog = ProjectDialog(datasets, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dialog.payload()
+        self.run_task(
+            lambda: self.service.create_project(payload),
+            lambda project: self.refresh_catalogue({"type": "project", "id": project["id"]}),
+            "Creating research project",
+        )
+
+    def _new_research_object(self, monitoring: bool) -> None:
+        projects = [item for item in getattr(self, "projects", []) if item.get("status") != "ARCHIVED"]
+        if not projects:
+            QMessageBox.information(self, "Research object", "Create an active project first.")
+            return
+        project_id = None
+        if self.current_target and self.current_target.get("type") == "project":
+            project_id = self.current_target["id"]
+        elif self.current_target and self.current_target.get("type") == "study":
+            project_id = (self.current_study.get("study") or {}).get("project_id")
+        dialog = StudyDialog(projects, getattr(self, "datasets", []), project_id, monitoring=monitoring, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dialog.payload()
+        project_id = payload.pop("project_id")
+        operation = (
+            (lambda: self.service.create_monitoring_program(project_id, payload))
+            if monitoring
+            else (lambda: self.service.create_study(project_id, payload))
+        )
+
+        def opened(detail: dict[str, Any]) -> None:
+            entity = detail.get("study", {})
+            self.refresh_catalogue({"type": "study", "id": entity["id"]})
+
+        self.run_task(operation, opened, "Creating monitoring program" if monitoring else "Creating study")
+
+    def _edit_current(self) -> None:
+        if not self.current_target:
+            QMessageBox.information(self, "Edit", "Select a project or authored study first.")
+            return
+        if self.current_target["type"] == "project" and self.current_project:
+            dialog = ProjectDialog(getattr(self, "datasets", []), self.current_project, self)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            project_id = self.current_project["id"]
+            payload = dialog.payload()
+            self.run_task(
+                lambda: self.service.update_project(project_id, payload),
+                lambda _project: self.refresh_catalogue({"type": "project", "id": project_id}),
+                "Saving project changes",
+            )
+            return
+        if self.current_target["type"] != "study" or not self.current_study_id:
+            QMessageBox.information(self, "Edit", "Datasets are immutable; edit project or study metadata instead.")
+            return
+        if not self.current_study_id.startswith(("STUDY-U-", "PROG-U-")):
+            QMessageBox.information(self, "Edit", "Admitted reference studies are read-only. Create an authored study to work with this dataset.")
+            return
+        detail = self.current_study
+        study = detail.get("study", {})
+        monitoring = detail.get("kind") == "MONITORING" or study.get("kind") == "MONITORING"
+        dialog = StudyDialog(
+            [item for item in self.projects if item.get("status") != "ARCHIVED"],
+            self.datasets,
+            detail=detail,
+            monitoring=monitoring,
+            parent=self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dialog.payload()
+        study_id = self.current_study_id
+        self.run_task(
+            lambda: self.service.update_study(study_id, payload, payload.get("base_version")),
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            "Saving research object changes",
+        )
+
+    def _authored_study_id(self) -> str | None:
+        study_id = self.current_study_id
+        if study_id and study_id.startswith(("STUDY-U-", "PROG-U-")):
+            return study_id
+        QMessageBox.information(self, "Research authoring", "Open an authored research study or monitoring program first.")
+        return None
+
+    def _create_cohort(self, study_id: str, cohort: dict[str, Any] | None = None) -> None:
+        dialog = CohortDialog(cohort, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dialog.payload()
+        if cohort:
+            cohort_id = cohort["id"]
+            operation = lambda: self.service.update_cohort(cohort_id, payload)
+            label = "Saving cohort version"
+        else:
+            operation = lambda: self.service.create_cohort(study_id, payload)
+            label = "Creating cohort"
+        self.run_task(
+            operation,
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            label,
+        )
+
+    def _new_cohort(self) -> None:
+        study_id = self._authored_study_id()
+        if study_id:
+            self._create_cohort(study_id)
+
+    def _edit_cohort(self) -> None:
+        study_id = self._authored_study_id()
+        if not study_id:
+            return
+        self.run_task(
+            lambda: self.service.list_cohorts(study_id),
+            lambda cohorts: self._choose_cohort_to_edit(study_id, cohorts),
+            "Loading cohort versions",
+        )
+
+    def _choose_cohort_to_edit(self, study_id: str, cohorts: list[dict[str, Any]]) -> None:
+        cohort = next((item for item in reversed(cohorts) if item.get("status") == "DRAFT"), None)
+        if cohort is None and cohorts:
+            QMessageBox.information(self, "Cohort", "The current cohort is frozen. Fork it to make changes.")
+            return
+        if cohort is None:
+            QMessageBox.information(self, "Cohort", "This study has no saved cohort.")
+            return
+        self._create_cohort(study_id, cohort)
+
+    def _freeze_cohort(self) -> None:
+        study_id = self._authored_study_id()
+        cohort_id = (self.current_study.get("cohort") or {}).get("id")
+        if not study_id or not cohort_id:
+            return
+        self.run_task(
+            lambda: self.service.freeze_cohort(cohort_id),
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            "Freezing cohort membership",
+        )
+
+    def _fork_cohort(self) -> None:
+        study_id = self._authored_study_id()
+        cohort_id = (self.current_study.get("cohort") or {}).get("id")
+        if not study_id or not cohort_id:
+            return
+        name, accepted = QInputDialog.getText(self, "Fork cohort", "Name for the new draft cohort")
+        if not accepted:
+            return
+        self.run_task(
+            lambda: self.service.fork_cohort(cohort_id, name.strip() or None),
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            "Forking cohort version",
+        )
+
+    def _open_plan_dialog(self, study_id: str, plan: dict[str, Any] | None, values) -> None:
+        methods, metrics, cohorts = values
+        dialog = PlanDialog(methods, metrics, cohorts, plan, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dialog.payload()
+        if plan:
+            operation = lambda: self.service.update_plan(plan["id"], payload)
+            label = "Saving analysis plan version"
+        else:
+            operation = lambda: self.service.create_plan(study_id, payload)
+            label = "Creating analysis plan"
+        self.run_task(
+            operation,
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            label,
+        )
+
+    def _plan_options(self, study_id: str, plan: dict[str, Any] | None = None) -> None:
+        snapshot_id = self.current_study.get("snapshot", {}).get("id")
+        self.run_task(
+            lambda: (
+                self.service.list_methods(snapshot_id),
+                self.service.list_metrics(snapshot_id),
+                self.service.list_cohorts(study_id),
+            ),
+            lambda values: self._open_plan_dialog(study_id, plan, values),
+            "Loading registered analysis methods",
+        )
+
+    def _new_plan(self) -> None:
+        study_id = self._authored_study_id()
+        if study_id:
+            self._plan_options(study_id)
+
+    def _edit_plan(self) -> None:
+        study_id = self._authored_study_id()
+        if not study_id:
+            return
+        plans = self.service.list_plans(study_id)
+        plan = next((item for item in reversed(plans) if item.get("status") == "DRAFT"), None)
+        if plan is None:
+            QMessageBox.information(self, "Analysis plan", "The current plan is frozen. Fork it to make changes.")
+            return
+        self._plan_options(study_id, plan)
+
+    def _freeze_plan(self) -> None:
+        study_id = self._authored_study_id()
+        plan_id = (self.current_study.get("plan") or {}).get("id")
+        if not study_id or not plan_id:
+            return
+        self.run_task(
+            lambda: self.service.freeze_plan(plan_id),
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            "Freezing analysis plan",
+        )
+
+    def _fork_plan(self) -> None:
+        study_id = self._authored_study_id()
+        plan_id = (self.current_study.get("plan") or {}).get("id")
+        if not study_id or not plan_id:
+            return
+        name, accepted = QInputDialog.getText(self, "Fork analysis plan", "Name for the new draft plan")
+        if not accepted:
+            return
+        self.run_task(
+            lambda: self.service.fork_plan(plan_id, name.strip() or None),
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            "Forking analysis plan version",
+        )
+
+    def _history_dialog(self, title: str, records: list[dict[str, Any]]) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        layout = QVBoxLayout(dialog)
+        browser = QTextBrowser()
+        browser.setPlainText(json.dumps(records, indent=2, ensure_ascii=False, default=str))
+        layout.addWidget(browser)
+        close = QPushButton("Close")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.resize(850, 600)
+        dialog.exec()
+
+    def _cohort_history(self) -> None:
+        cohort_id = (self.current_study.get("cohort") or {}).get("id")
+        if cohort_id:
+            self.run_task(
+                lambda: self.service.cohort_history(cohort_id),
+                lambda records: self._history_dialog("Cohort version history", records),
+                "Loading cohort history",
+            )
+
+    def _plan_history(self) -> None:
+        plan_id = (self.current_study.get("plan") or {}).get("id")
+        if plan_id:
+            self.run_task(
+                lambda: self.service.plan_history(plan_id),
+                lambda records: self._history_dialog("Analysis plan history", records),
+                "Loading plan history",
+            )
+
+    def _open_admission(self) -> None:
+        dialog = DatasetAdmissionDialog(
+            self.service,
+            self.run_task,
+            self._admission_saved,
+            self,
+        )
+        dialog.exec()
+
+    def _admission_saved(self, record: dict[str, Any]) -> None:
+        snapshot_id = record.get("dataset_snapshot_id")
+        self.statusBar().showMessage(
+            f"Admission recorded: {snapshot_id or record.get('status', 'QC result')}", 8000
+        )
+        target = {"type": "dataset", "id": snapshot_id} if snapshot_id else None
+        self.refresh_catalogue(target)
+
+    def _archive_current(self) -> None:
+        if not self.current_target:
+            return
+        target = self.current_target.copy()
+        if target["type"] == "project":
+            operation = lambda: self.service.archive_project(target["id"], True)
+        elif target["type"] == "study" and target["id"].startswith(("STUDY-U-", "PROG-U-")):
+            operation = lambda: self.service.transition_study(target["id"], "ARCHIVED")
+        else:
+            QMessageBox.information(self, "Archive", "Only authored projects and studies can be archived.")
+            return
+        self.run_task(operation, lambda _value: self.refresh_catalogue(), "Archiving research record")
+
+    def _restore_current(self) -> None:
+        if not self.current_target:
+            return
+        target = self.current_target.copy()
+        if target["type"] == "project":
+            operation = lambda: self.service.archive_project(target["id"], False)
+        elif target["type"] == "study" and target["id"].startswith(("STUDY-U-", "PROG-U-")):
+            prior = self.current_study.get("study", {}).get("state_before_archive", "DRAFT")
+            operation = lambda: self.service.transition_study(target["id"], prior)
+        else:
+            QMessageBox.information(self, "Restore", "Only archived authored records can be restored.")
+            return
+        self.run_task(
+            operation,
+            lambda _value: self.refresh_catalogue(target),
+            "Restoring research record",
+        )
+
+    def _transition_current_study(self) -> None:
+        study_id = self._authored_study_id()
+        if not study_id:
+            return
+        allowed = self.current_study.get("allowed_transitions", [])
+        if not allowed:
+            QMessageBox.information(self, "Study state", "No state transition is available from the current state.")
+            return
+        target, accepted = QInputDialog.getItem(
+            self, "Study state", "Transition to", allowed, 0, False
+        )
+        if not accepted:
+            return
+        self.run_task(
+            lambda: self.service.transition_study(study_id, target),
+            lambda _result: self.refresh_catalogue({"type": "study", "id": study_id}),
+            "Recording study state transition",
+        )
+
+    def _object_history(self) -> None:
+        if not self.current_target:
+            return
+        target = self.current_target.copy()
+        if target["type"] == "project":
+            operation = lambda: self.service.project_history(target["id"])
+            title = "Project version history"
+        elif target["type"] == "study" and target["id"].startswith(("STUDY-U-", "PROG-U-")):
+            operation = lambda: self.service.study_history(target["id"])
+            title = "Study version history"
+        else:
+            QMessageBox.information(self, "History", "Version history is available for authored projects and studies.")
+            return
+        self.run_task(operation, lambda records: self._history_dialog(title, records), "Loading version history")
+
+    def _report_history(self) -> None:
+        study_id = self._authored_study_id()
+        if study_id:
+            self.run_task(
+                lambda: self.service.report_versions(study_id),
+                lambda records: self._history_dialog("Frozen report versions", records),
+                "Loading report versions",
+            )
+
+    def _open_admission_history(self) -> None:
+        self.run_task(
+            lambda: (self.service.list_admission_records(), self.service.list_admission_quality()),
+            lambda values: AdmissionHistoryDialog(values[0], values[1], self).exec(),
+            "Loading admission and QC history",
+        )
 
 
 class ResearchWorkbench(QWidget):
@@ -272,6 +778,7 @@ class ResearchWorkbench(QWidget):
         self.latest_run: dict[str, Any] | None = None
         self.latest_evidence_id: str | None = None
         self.report_version: int | None = None
+        self.report_document_version: int | None = None
         self.report_generation = 0
         self.exploration_result: dict[str, Any] | None = None
         self.tabs = QTabWidget()
@@ -311,21 +818,45 @@ class ResearchWorkbench(QWidget):
     def _build_dataset(self) -> None:
         page = self.tabs.widget(1)
         layout = QVBoxLayout(page)
+        self.dataset_tabs = QTabWidget()
+        preview_page = QWidget()
+        preview_layout = QVBoxLayout(preview_page)
         controls = QHBoxLayout()
         self.table_picker = QComboBox()
         self.table_picker.currentIndexChanged.connect(self._table_changed)
         controls.addWidget(QLabel("Snapshot table"))
         controls.addWidget(self.table_picker, 1)
-        layout.addLayout(controls)
+        preview_layout.addLayout(controls)
         self.table = QTableView()
         self.table.setAlternatingRowColors(True)
         self.table.setSortingEnabled(False)
         self.table_model = ParquetPreviewTableModel(self.service, self.window.runner)
         self.table.setModel(self.table_model)
         self.table.verticalHeader().setDefaultSectionSize(23)
-        layout.addWidget(self.table, 1)
+        preview_layout.addWidget(self.table, 1)
         self.table_status = QLabel("Select a study or dataset to inspect bounded Parquet pages.")
-        layout.addWidget(self.table_status)
+        preview_layout.addWidget(self.table_status)
+        self.dataset_tabs.addTab(preview_page, "Parquet preview")
+
+        cohort_page = QWidget()
+        cohort_layout = QVBoxLayout(cohort_page)
+        cohort_controls = QHBoxLayout()
+        self.cohort_picker = QComboBox()
+        resolve_button = QPushButton("Resolve cohort")
+        resolve_button.clicked.connect(self._resolve_selected_cohort)
+        cohort_controls.addWidget(QLabel("Saved cohort"))
+        cohort_controls.addWidget(self.cohort_picker, 1)
+        cohort_controls.addWidget(resolve_button)
+        cohort_layout.addLayout(cohort_controls)
+        self.cohort_summary = QLabel("Open a study to resolve its cohort.")
+        cohort_layout.addWidget(self.cohort_summary)
+        self.cohort_table = QTableView()
+        self.cohort_table_model = RecordTableModel()
+        self.cohort_table.setModel(self.cohort_table_model)
+        self.cohort_table.setAlternatingRowColors(True)
+        cohort_layout.addWidget(self.cohort_table, 1)
+        self.dataset_tabs.addTab(cohort_page, "Cohort resolution")
+        layout.addWidget(self.dataset_tabs)
 
     def _build_exploration(self) -> None:
         import pyqtgraph as pg
@@ -407,6 +938,8 @@ class ResearchWorkbench(QWidget):
         promote_button.clicked.connect(self._promote)
         cite_button = QPushButton("Cite promoted evidence")
         cite_button.clicked.connect(self._cite_latest)
+        uncite_button = QPushButton("Remove current citation")
+        uncite_button.clicked.connect(self._uncite_latest)
         freeze_button = QPushButton("Freeze report version")
         freeze_button.clicked.connect(self._freeze_report)
         lineage_button = QPushButton("Show provenance lineage")
@@ -415,6 +948,7 @@ class ResearchWorkbench(QWidget):
         export_button.clicked.connect(self.export_report)
         buttons.addWidget(promote_button)
         buttons.addWidget(cite_button)
+        buttons.addWidget(uncite_button)
         buttons.addWidget(lineage_button)
         buttons.addWidget(freeze_button)
         buttons.addWidget(export_button)
@@ -422,6 +956,22 @@ class ResearchWorkbench(QWidget):
         self.evidence_output = QTextBrowser()
         self.evidence_output.setMinimumHeight(130)
         layout.addWidget(self.evidence_output, 1)
+        narrative = QFormLayout()
+        self.report_title = QLineEdit()
+        self.report_summary = QPlainTextEdit()
+        self.report_summary.setMaximumHeight(55)
+        self.report_conclusion = QPlainTextEdit()
+        self.report_conclusion.setMaximumHeight(55)
+        self.report_recommendations = QPlainTextEdit()
+        self.report_recommendations.setMaximumHeight(55)
+        narrative.addRow("Report title", self.report_title)
+        narrative.addRow("Summary", self.report_summary)
+        narrative.addRow("Conclusion", self.report_conclusion)
+        narrative.addRow("Recommendations", self.report_recommendations)
+        layout.addLayout(narrative)
+        self.save_report_button = QPushButton("Save report draft")
+        self.save_report_button.clicked.connect(self._save_report_draft)
+        layout.addWidget(self.save_report_button)
         self.report_preview = QTextBrowser()
         layout.addWidget(self.report_preview, 2)
 
@@ -459,19 +1009,38 @@ class ResearchWorkbench(QWidget):
         self.latest_run = None
         self.latest_evidence_id = None
         self.report_version = None
+        self.report_document_version = None
         self.exploration_result = None
         self.method_picker.clear()
         self.metric_picker.clear()
         self.analysis_metric_picker.clear()
         self.execute_button.setEnabled(study_id != "STUDY-001")
+        self.save_report_button.setEnabled(False)
         if study_id == "STUDY-001":
             self.run_output.setPlainText(
                 "The synthetic regression fixture is available for inspection and signal QA. "
                 "Persisted research runs are created from an authored project and study."
             )
         self._load_dataset(self.snapshot_id)
+        self._load_cohorts(study_id)
         self._load_controls()
         self._load_runs_and_report()
+
+    def select_project(self, project: dict[str, Any]) -> None:
+        self._ensure_tab(0)
+        self.study_id = None
+        self.detail = {}
+        self.snapshot_id = None
+        self.latest_run = None
+        self.latest_evidence_id = None
+        self.report_version = None
+        self.report_document_version = None
+        self.exploration_result = None
+        if hasattr(self, "execute_button"):
+            self.execute_button.setEnabled(False)
+        if hasattr(self, "save_report_button"):
+            self.save_report_button.setEnabled(False)
+        self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
         self._ensure_tab(1)
@@ -481,12 +1050,17 @@ class ResearchWorkbench(QWidget):
         self.latest_run = None
         self.latest_evidence_id = None
         self.report_version = None
+        self.report_document_version = None
         self.exploration_result = None
         self.method_picker.clear()
         self.metric_picker.clear()
         self.analysis_metric_picker.clear()
-        self.execute_button.setEnabled(False)
+        if hasattr(self, "execute_button"):
+            self.execute_button.setEnabled(False)
+        if hasattr(self, "save_report_button"):
+            self.save_report_button.setEnabled(False)
         self._load_dataset(snapshot_id, detail)
+        self.dataset_tabs.setCurrentIndex(0)
         self.window.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
 
     def _load_dataset(self, snapshot_id: str | None, detail: dict[str, Any] | None = None) -> None:
@@ -496,6 +1070,64 @@ class ResearchWorkbench(QWidget):
             lambda: detail or self.service.get_dataset_detail(snapshot_id),
             lambda value: self._dataset_loaded(snapshot_id, value),
             "Reading Parquet metadata",
+        )
+
+    def _load_cohorts(self, study_id: str) -> None:
+        self.window.run_task(
+            lambda: self.service.list_cohorts(study_id),
+            lambda cohorts: self._cohorts_loaded(study_id, cohorts),
+            "Loading cohort versions",
+        )
+
+    def _cohorts_loaded(self, study_id: str, cohorts: list[dict[str, Any]]) -> None:
+        if study_id != getattr(self, "study_id", None):
+            return
+        self.cohort_picker.clear()
+        for cohort in cohorts:
+            self.cohort_picker.addItem(
+                f"{cohort.get('name', cohort['id'])} · {cohort.get('status', 'DRAFT')} · v{cohort.get('version', 1)}",
+                cohort["id"],
+            )
+        if not cohorts and study_id in {"STUDY-REAL-001", "STUDY-REAL-002", "STUDY-001"}:
+            self.cohort_picker.addItem("Admitted study cohort", None)
+        if not self.cohort_picker.count():
+            self.cohort_summary.setText("No cohort is saved for this study.")
+
+    def _resolve_selected_cohort(self) -> None:
+        if not getattr(self, "study_id", None):
+            self.cohort_summary.setText("Open a study to resolve a cohort.")
+            return
+        study_id = self.study_id
+        cohort_id = self.cohort_picker.currentData()
+        self.window.run_task(
+            lambda: self.service.resolve_cohort(study_id, cohort_id=cohort_id),
+            lambda result: self._cohort_resolved(study_id, result),
+            "Resolving cohort membership and quality",
+        )
+
+    def _cohort_resolved(self, study_id: str, result: dict[str, Any]) -> None:
+        if study_id != self.study_id:
+            return
+        cohort = result.get("cohort", {})
+        self.cohort_summary.setText(
+            f"{cohort.get('name', cohort.get('id', 'Cohort'))} · {cohort.get('status', 'DRAFT')} · "
+            f"{result.get('n', 0):,} included · "
+            f"{len(result.get('excluded_subjects', [])):,} excluded · "
+            f"{result.get('snapshot_id', self.snapshot_id)}"
+        )
+        self.cohort_table_model.set_rows(result.get("athletes", []))
+        self.window.inspector.setPlainText(
+            json.dumps(
+                {
+                    "cohort": cohort,
+                    "trial_quality": result.get("trial_quality"),
+                    "exclusion_criteria": result.get("exclusion_criteria"),
+                    "snapshot_id": result.get("snapshot_id"),
+                },
+                indent=2,
+                ensure_ascii=False,
+                default=str,
+            )
         )
 
     def _dataset_loaded(self, snapshot_id: str, detail: dict[str, Any]) -> None:
@@ -801,8 +1433,22 @@ class ResearchWorkbench(QWidget):
         if study_id != self.study_id:
             return
         self.evidence_output.setPlainText(json.dumps(result, indent=2, ensure_ascii=False))
+        if result.get("version") is not None:
+            self.report_document_version = result["version"]
         self.report_version = None
         self._load_runs_and_report()
+
+    def _uncite_latest(self) -> None:
+        if not self.latest_evidence_id or not getattr(self, "study_id", None):
+            QMessageBox.information(self, "Report citation", "Promote a completed run to evidence first.")
+            return
+        study_id = self.study_id
+        artifact_id = self.latest_evidence_id
+        self.window.run_task(
+            lambda: self.service.uncite_report_artifact(study_id, artifact_id),
+            lambda result: self._report_cited(study_id, result),
+            "Removing report citation",
+        )
 
     def _freeze_report(self) -> None:
         if not getattr(self, "study_id", None) or not self.study_id.startswith(("STUDY-U-", "PROG-U-")):
@@ -867,7 +1513,13 @@ class ResearchWorkbench(QWidget):
         if study_id != self.study_id or generation != self.report_generation:
             return
         report, detail = values
+        self.report_document_version = int(report.get("version", 1))
         self.report_version = report.get("version") if report.get("status") == "FROZEN" else None
+        self.report_title.setText(report.get("title", ""))
+        self.report_summary.setPlainText(report.get("summary", ""))
+        self.report_conclusion.setPlainText(report.get("conclusion", ""))
+        self.report_recommendations.setPlainText(report.get("recommendations", ""))
+        self.save_report_button.setEnabled(study_id.startswith(("STUDY-U-", "PROG-U-")))
         self.evidence_output.setPlainText(
             json.dumps(
                 {"evidence": detail.get("evidence", []), "report": report},
@@ -884,6 +1536,31 @@ class ResearchWorkbench(QWidget):
                 else None,
                 "Rendering versioned report preview",
             )
+
+    def _save_report_draft(self) -> None:
+        study_id = getattr(self, "study_id", None)
+        if not study_id or not study_id.startswith(("STUDY-U-", "PROG-U-")):
+            return
+        payload = {
+            "title": self.report_title.text().strip(),
+            "summary": self.report_summary.toPlainText(),
+            "conclusion": self.report_conclusion.toPlainText(),
+            "recommendations": self.report_recommendations.toPlainText(),
+        }
+        base_version = self.report_document_version
+
+        def saved(report: dict[str, Any]) -> None:
+            if study_id != self.study_id:
+                return
+            self.report_document_version = report["version"]
+            self.report_version = None
+            self._load_runs_and_report()
+
+        self.window.run_task(
+            lambda: self.service.update_report(study_id, payload, base_version),
+            saved,
+            "Saving report draft",
+        )
 
     def export_report(self) -> None:
         if not getattr(self, "study_id", None) or not self.study_id.startswith(("STUDY-U-", "PROG-U-")):
