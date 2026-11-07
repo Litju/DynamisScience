@@ -11,19 +11,15 @@ from typing import Any
 import polars as pl
 
 from .contracts import utc_now
+from .data_root import paths
 
-ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = ROOT / "data"
-ADMITTED_DIR = DATA_DIR / "admitted"
-ARTIFACT_DIR = DATA_DIR / "artifacts"
 
-SOURCES_PATH = ARTIFACT_DIR / "admission_sources.json"
-SOURCE_ARTIFACTS_PATH = ARTIFACT_DIR / "admission_source_artifacts.json"
-INSTRUMENTS_PATH = ARTIFACT_DIR / "admission_instruments.json"
-PROTOCOLS_PATH = ARTIFACT_DIR / "admission_protocols.json"
-ADMISSION_RECORDS_PATH = ARTIFACT_DIR / "admission_records.json"
-QUALITY_PATH = ARTIFACT_DIR / "admission_quality.json"
-QUALIFICATION_PATH = ARTIFACT_DIR / "qualification_records.json"
+def _artifact_path(name: str) -> Path:
+    return paths()["artifacts"] / name
+
+
+def _admitted_dir() -> Path:
+    return paths()["admitted"]
 
 PARSER_VERSION = "dynamis-admission@0.1.0"
 SCHEMA_VERSION = "dynamis-science.admission.schema@1.0.0"
@@ -120,11 +116,16 @@ def register_source(payload: dict[str, Any]) -> dict[str, Any]:
     missing = [field for field in required if not str(payload.get(field, "")).strip()]
     if missing:
         raise ValueError(f"Missing source fields: {', '.join(missing)}")
-    sources = _load_list(SOURCES_PATH)
-    if any(item.get("id") == payload["id"] for item in sources):
-        raise ValueError(f"Source already registered: {payload['id']}")
+    source_id = payload.get("id")
+    if not isinstance(source_id, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", source_id
+    ):
+        raise ValueError("Source id must contain only letters, numbers, dot, underscore or hyphen")
+    sources = _load_list(_artifact_path("admission_sources.json"))
+    if any(item.get("id") == source_id for item in sources):
+        raise ValueError(f"Source already registered: {source_id}")
     source = {
-        "id": payload["id"],
+        "id": source_id,
         "name": payload["name"],
         "publisher": payload["publisher"],
         "dataset_identity": payload["dataset_identity"],
@@ -142,16 +143,16 @@ def register_source(payload: dict[str, Any]) -> dict[str, Any]:
         "notes": payload.get("notes", ""),
     }
     sources.append(source)
-    _save_list(SOURCES_PATH, sources)
+    _save_list(_artifact_path("admission_sources.json"), sources)
     return source
 
 
 def list_sources() -> list[dict[str, Any]]:
-    return _load_list(SOURCES_PATH)
+    return _load_list(_artifact_path("admission_sources.json"))
 
 
 def get_source(source_id: str) -> dict[str, Any] | None:
-    return next((item for item in _load_list(SOURCES_PATH) if item.get("id") == source_id), None)
+    return next((item for item in _load_list(_artifact_path("admission_sources.json")) if item.get("id") == source_id), None)
 
 
 def verify_rights(source_id: str, verifier: str = "system") -> dict[str, Any]:
@@ -175,8 +176,8 @@ def verify_rights(source_id: str, verifier: str = "system") -> dict[str, Any]:
     if source["rights_status"] == "VERIFIED":
         source["rights_verified_at"] = _now()
         source["rights_verified_by"] = verifier
-    sources = [item if item.get("id") != source_id else source for item in _load_list(SOURCES_PATH)]
-    _save_list(SOURCES_PATH, sources)
+    sources = [item if item.get("id") != source_id else source for item in _load_list(_artifact_path("admission_sources.json"))]
+    _save_list(_artifact_path("admission_sources.json"), sources)
     return {"source_id": source_id, "rights_status": source["rights_status"], "problems": problems, "verified_at": source.get("rights_verified_at")}
 
 
@@ -185,7 +186,7 @@ def register_instrument(payload: dict[str, Any]) -> dict[str, Any]:
     missing = [field for field in required if not str(payload.get(field, "")).strip()]
     if missing:
         raise ValueError(f"Missing instrument fields: {', '.join(missing)}")
-    instruments = _load_list(INSTRUMENTS_PATH)
+    instruments = _load_list(_artifact_path("admission_instruments.json"))
     if any(item.get("id") == payload["id"] for item in instruments):
         raise ValueError(f"Instrument already registered: {payload['id']}")
     instrument = {
@@ -201,16 +202,16 @@ def register_instrument(payload: dict[str, Any]) -> dict[str, Any]:
         "notes": payload.get("notes", ""),
     }
     instruments.append(instrument)
-    _save_list(INSTRUMENTS_PATH, instruments)
+    _save_list(_artifact_path("admission_instruments.json"), instruments)
     return instrument
 
 
 def list_instruments() -> list[dict[str, Any]]:
-    return _load_list(INSTRUMENTS_PATH)
+    return _load_list(_artifact_path("admission_instruments.json"))
 
 
 def get_instrument(instrument_id: str) -> dict[str, Any] | None:
-    return next((item for item in _load_list(INSTRUMENTS_PATH) if item.get("id") == instrument_id), None)
+    return next((item for item in _load_list(_artifact_path("admission_instruments.json")) if item.get("id") == instrument_id), None)
 
 
 def register_protocol(payload: dict[str, Any]) -> dict[str, Any]:
@@ -218,7 +219,7 @@ def register_protocol(payload: dict[str, Any]) -> dict[str, Any]:
     missing = [field for field in required if payload.get(field) in (None, "")]
     if missing:
         raise ValueError(f"Missing protocol fields: {', '.join(missing)}")
-    protocols = _load_list(PROTOCOLS_PATH)
+    protocols = _load_list(_artifact_path("admission_protocols.json"))
     if any(item.get("id") == payload["id"] for item in protocols):
         raise ValueError(f"Protocol already registered: {payload['id']}")
     protocol = {
@@ -234,23 +235,23 @@ def register_protocol(payload: dict[str, Any]) -> dict[str, Any]:
         "known_limitations": payload.get("known_limitations", []),
     }
     protocols.append(protocol)
-    _save_list(PROTOCOLS_PATH, protocols)
+    _save_list(_artifact_path("admission_protocols.json"), protocols)
     return protocol
 
 
 def list_protocols() -> list[dict[str, Any]]:
-    return _load_list(PROTOCOLS_PATH)
+    return _load_list(_artifact_path("admission_protocols.json"))
 
 
 def get_protocol(protocol_id: str) -> dict[str, Any] | None:
-    return next((item for item in _load_list(PROTOCOLS_PATH) if item.get("id") == protocol_id), None)
+    return next((item for item in _load_list(_artifact_path("admission_protocols.json")) if item.get("id") == protocol_id), None)
 
 
 def ingest_source_artifact(source_id: str, original_filename: str, content: bytes, acquisition_method: str = "upload") -> dict[str, Any]:
     source = get_source(source_id)
     if source is None:
         raise ValueError(f"Unknown source: {source_id}")
-    source_dir = ADMITTED_DIR / source_id
+    source_dir = _admitted_dir() / source_id
     source_dir.mkdir(parents=True, exist_ok=True)
     artifact_id = "SA-" + hashlib.sha256(content + original_filename.encode()).hexdigest()[:12].upper()
     suffix = Path(original_filename).suffix.lower() or ".bin"
@@ -269,19 +270,19 @@ def ingest_source_artifact(source_id: str, original_filename: str, content: byte
         "acquisition_method": acquisition_method,
         "rights_record_id": source_id,
     }
-    artifacts = _load_list(SOURCE_ARTIFACTS_PATH)
+    artifacts = _load_list(_artifact_path("admission_source_artifacts.json"))
     if not any(item.get("id") == artifact_id for item in artifacts):
         artifacts.append(artifact)
-        _save_list(SOURCE_ARTIFACTS_PATH, artifacts)
+        _save_list(_artifact_path("admission_source_artifacts.json"), artifacts)
     return artifact
 
 
 def list_source_artifacts() -> list[dict[str, Any]]:
-    return _load_list(SOURCE_ARTIFACTS_PATH)
+    return _load_list(_artifact_path("admission_source_artifacts.json"))
 
 
 def get_source_artifact(artifact_id: str) -> dict[str, Any] | None:
-    return next((item for item in _load_list(SOURCE_ARTIFACTS_PATH) if item.get("id") == artifact_id), None)
+    return next((item for item in _load_list(_artifact_path("admission_source_artifacts.json")) if item.get("id") == artifact_id), None)
 
 
 def _read_frame(artifact: dict[str, Any]) -> pl.DataFrame:
@@ -501,15 +502,15 @@ def _quality_result(artifact, family, status, errors, warnings, rejected, quaran
         "counts": counts,
         "checked_at": _now(),
     }
-    records = _load_list(QUALITY_PATH)
+    records = _load_list(_artifact_path("admission_quality.json"))
     records = [r for r in records if r.get("id") != assessment["id"]]
     records.append(assessment)
-    _save_list(QUALITY_PATH, records)
+    _save_list(_artifact_path("admission_quality.json"), records)
     return assessment
 
 
 def get_quality(assessment_id: str) -> dict[str, Any] | None:
-    return next((r for r in _load_list(QUALITY_PATH) if r.get("id") == assessment_id), None)
+    return next((r for r in _load_list(_artifact_path("admission_quality.json")) if r.get("id") == assessment_id), None)
 
 
 def harmonize_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> pl.DataFrame:
@@ -582,10 +583,10 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "provenance_manifest_id": None,
             "blocked_reason": "source rights are not verified",
         }
-        records = _load_list(ADMISSION_RECORDS_PATH)
+        records = _load_list(_artifact_path("admission_records.json"))
         records = [r for r in records if r.get("source_artifact_id") != artifact_id or r.get("measurement_family") != family]
         records.append(record)
-        _save_list(ADMISSION_RECORDS_PATH, records)
+        _save_list(_artifact_path("admission_records.json"), records)
         return record
 
     if family == "CMJ_FORCE_PLATFORM":
@@ -611,7 +612,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             frame = harmonize_sprint(artifact, metadata)
             table_name = "sprint_trials"
         snapshot_id = _snapshot_id(artifact, family)
-        snapshot_dir = ADMITTED_DIR / snapshot_id
+        snapshot_dir = _admitted_dir() / snapshot_id
         snapshot_dir.mkdir(parents=True, exist_ok=True)
         out_path = snapshot_dir / f"{table_name}.parquet"
         frame.write_parquet(out_path, compression="zstd")
@@ -667,25 +668,26 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
         "admitted_at": _now(),
         "provenance_manifest_id": manifest_id,
     }
-    records = _load_list(ADMISSION_RECORDS_PATH)
+    records = _load_list(_artifact_path("admission_records.json"))
     records = [r for r in records if r.get("source_artifact_id") != artifact_id or r.get("measurement_family") != family]
     records.append(record)
-    _save_list(ADMISSION_RECORDS_PATH, records)
+    _save_list(_artifact_path("admission_records.json"), records)
     return record
 
 
 def list_admission_records() -> list[dict[str, Any]]:
-    return _load_list(ADMISSION_RECORDS_PATH)
+    return _load_list(_artifact_path("admission_records.json"))
 
 
 def get_admission_record(record_id: str) -> dict[str, Any] | None:
-    return next((r for r in _load_list(ADMISSION_RECORDS_PATH) if r.get("id") == record_id), None)
+    return next((r for r in _load_list(_artifact_path("admission_records.json")) if r.get("id") == record_id), None)
 
 
 def list_admitted_snapshots() -> list[dict[str, Any]]:
     snapshots = []
-    if ADMITTED_DIR.exists():
-        for path in ADMITTED_DIR.iterdir():
+    admitted_dir = _admitted_dir()
+    if admitted_dir.exists():
+        for path in admitted_dir.iterdir():
             if path.is_dir():
                 snapshot_file = path / "snapshot.json"
                 if snapshot_file.exists():

@@ -7,9 +7,9 @@ import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 
-from dynamis_science import real_mendeley, realstore
+from dynamis_science import real_mendeley, real_movesmart, realstore
 from dynamis_science.api import app
-from dynamis_science.data_root import data_root
+from dynamis_science.data_root import data_root, paths
 from dynamis_science.real_sources import SOURCES
 
 
@@ -81,6 +81,32 @@ def test_mendeley_adapter_preserves_native_and_canonical_values(temp_root):
     assessment = real_mendeley.assess(tables, path)
     assert assessment["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
     assert assessment["counts"]["subjects"] == 21
+    snapshot = real_mendeley.write_snapshot(tables, assessment)
+    snapshot_dir = paths()["snapshots"] / snapshot["id"]
+    assert (snapshot_dir / "provenance_manifest.json").exists()
+    assert (snapshot_dir / "measurements_long.parquet").exists()
+    assert snapshot_dir.is_relative_to(temp_root.resolve())
+
+
+def test_movesmart_snapshot_writer_uses_private_root(temp_root):
+    tables = {
+        "subjects": pl.DataFrame({"subject_id": ["SYNTHETIC-01"]}),
+        "signal_trials": pl.DataFrame({"trial_id": ["SYNTHETIC-TRIAL"], "fz_peak_n": [1200.0]}),
+    }
+    assessment = {
+        "status": "ADMITTED_WITH_WARNINGS",
+        "source_path": "synthetic-movesmart-fixture.zip",
+        "source_sha256": "a" * 64,
+        "source_size_bytes": 1,
+        "checks": [{"check": "fixture", "status": "PASS"}],
+        "warnings": [],
+    }
+
+    snapshot = real_movesmart.write_snapshot(tables, assessment)
+    snapshot_dir = paths()["snapshots"] / snapshot["id"]
+    assert (snapshot_dir / "provenance_manifest.json").exists()
+    assert (snapshot_dir / "signal_trials.parquet").exists()
+    assert snapshot_dir.is_relative_to(temp_root.resolve())
 
 
 def test_snapshot_is_immutable_and_idempotent(temp_root):

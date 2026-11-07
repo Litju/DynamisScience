@@ -1,16 +1,23 @@
 import base64
 import io
+from pathlib import Path
 
 import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 
-from dynamis_science.admission import ADMITTED_DIR, ADMISSION_RECORDS_PATH
+from dynamis_science.data_root import data_root, paths
 from dynamis_science.api import app
 
 
 @pytest.fixture
-def client():
+def private_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
+def client(private_root):
     with TestClient(app) as c:
         yield c
 
@@ -63,7 +70,22 @@ def _cmj_csv() -> str:
     )
 
 
-def test_admission_valid_csv(client: TestClient):
+def test_admission_rejects_source_ids_that_could_escape_storage(client, private_root):
+    response = client.post("/admission/sources", json={
+        "id": "../outside",
+        "name": "Fixture source",
+        "publisher": "DynamisScience tests",
+        "dataset_identity": "fixture-cmj",
+        "version": "1.0",
+        "acquisition_method": "synthetic fixture",
+        "license_or_agreement": "Internal fixture only",
+        "redistribution_restrictions": "Fixture only",
+    })
+    assert response.status_code == 422
+    assert not (private_root / "artifacts" / "admission_sources.json").exists()
+
+
+def test_admission_valid_csv(client: TestClient, private_root):
     _register_fixture_source(client)
     _register_instrument_protocol(client)
     content = _cmj_csv().encode()
@@ -87,6 +109,10 @@ def test_admission_valid_csv(client: TestClient):
     assert admitted["dataset_snapshot_id"] is not None
     snapshots = client.get("/admission/snapshots").json()
     assert any(s["id"] == admitted["dataset_snapshot_id"] for s in snapshots)
+    assert data_root() == private_root.resolve()
+    assert Path(artifact["stored_path"]).is_relative_to(private_root.resolve())
+    assert (paths()["admitted"] / admitted["dataset_snapshot_id"] / "cmj_trials.parquet").exists()
+    assert (paths()["artifacts"] / "admission_records.json").exists()
 
 
 def test_admission_missing_required_fields(client: TestClient):
