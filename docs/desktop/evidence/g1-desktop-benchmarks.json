@@ -1,40 +1,40 @@
 {
   "BENCH-01-COLD-START": {
-    "median_ms": 2239.937,
-    "p95_ms": 2263.219,
+    "median_ms": 2028.741,
+    "p95_ms": 2293.088,
     "samples": [
-      2239.937,
-      2246.114,
-      2144.402,
-      2267.495,
-      2186.228
+      2051.005,
+      2028.741,
+      2353.609,
+      1994.416,
+      2020.563
     ]
   },
   "benchmarks": {
     "BENCH-02-IDLE-RAM": {
       "delay_after_study_open_s": 5,
-      "working_set_mb": 242.54
+      "working_set_mb": 243.67
     },
     "BENCH-03-PARQUET-PAGE": {
-      "latency_ms": 24.238,
+      "latency_ms": 20.008,
       "rows": 500,
       "table": "force_signals",
-      "working_set_delta_mb": 2.52
+      "working_set_delta_mb": 2.18
     },
     "BENCH-04-WAVEFORM-LOAD": {
-      "latency_ms": 61.191
+      "latency_ms": 60.454
     },
     "BENCH-05-MIXEDLM-RUN": {
-      "max_gui_timer_gap_ms": 29.884,
+      "max_gui_timer_gap_ms": 9.374,
       "method_id": "METH-REAL-TREND",
       "status": "COMPLETED",
-      "wall_ms": 4881.763,
-      "worker_duration_ms": 3535.584
+      "wall_ms": 4425.402,
+      "worker_duration_ms": 3277.137
     },
     "BENCH-06-PEAK-RSS": {
-      "peak_working_set_mb": 269.8,
+      "peak_working_set_mb": 269.73,
       "report_exported": true,
-      "working_set_mb": 269.47
+      "working_set_mb": 269.69
     }
   },
   "input_data": "checksum-verified snapshots and SQLite backup in a disposable temporary root",

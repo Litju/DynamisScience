@@ -6,10 +6,17 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 
-def _execute(request: dict) -> dict:
+def _execute(request: dict) -> Any:
     os.environ["DYNAMISSCIENCE_DATA_ROOT"] = request["data_root"]
+    if request.get("operation", "analysis") == "real_qualification":
+        from ..qualification_real import run
+
+        return run()
+    if request.get("operation", "analysis") != "analysis":
+        raise ValueError(f"Unknown isolated worker operation: {request['operation']}")
     from .services import DynamisAppService
 
     return DynamisAppService().execute_analysis_run(

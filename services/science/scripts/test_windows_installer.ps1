@@ -98,6 +98,7 @@ run = s.execute_analysis_run(study["id"], payload)
 base = Path(os.environ["DYNAMISSCIENCE_DATA_ROOT"]) / "tmp"
 (base / "packaged-worker-request.json").write_text(json.dumps(request), encoding="utf-8")
 (base / "packaged-worker-expected.json").write_text(json.dumps({"result_digest": run["result_digest"]}), encoding="utf-8")
+(base / "qualification-worker-request.json").write_text(json.dumps({"operation": "real_qualification", "data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"]}), encoding="utf-8")
 '@
     Push-Location $serviceRoot
     try {
@@ -122,6 +123,23 @@ base = Path(os.environ["DYNAMISSCIENCE_DATA_ROOT"]) / "tmp"
         result_digest_matches_direct = $true
         elapsed_ms = [Math]::Round($workerClock.Elapsed.TotalMilliseconds, 2)
     }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $installRoot "_internal\scripts\real_mixedlm.R"))) {
+        throw "The installer omitted the independent MixedLM reference script."
+    }
+    $qualificationRequestPath = Join-Path $installedDataRoot "tmp\qualification-worker-request.json"
+    $qualificationResponsePath = Join-Path $installedDataRoot "tmp\qualification-worker-response.json"
+    $qualificationProcess = Start-Process -FilePath $installedExe `
+        -ArgumentList @("--worker", $qualificationRequestPath, $qualificationResponsePath) `
+        -PassThru -Wait -WindowStyle Hidden
+    if ($qualificationProcess.ExitCode -ne 0) {
+        throw "The packaged qualification worker failed ($($qualificationProcess.ExitCode))."
+    }
+    $qualificationResult = Get-Content -LiteralPath $qualificationResponsePath -Raw | ConvertFrom-Json
+    if (@($qualificationResult).Count -ne 0) {
+        throw "The packaged qualification worker should report an honest empty state for the synthetic-only test root."
+    }
+    $benchmarks.qualification_worker = @{ status = "NO_REAL_SNAPSHOTS"; empty_state = $true }
 
     $database = Join-Path $installedDataRoot "research\research.db"
     if (-not (Test-Path -LiteralPath $database)) { throw "The installed application did not initialize the configured data root." }

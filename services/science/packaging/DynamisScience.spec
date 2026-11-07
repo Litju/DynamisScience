@@ -19,6 +19,9 @@ if third_party_notices.is_file():
 lgpl_notice = repo_root / "docs" / "desktop" / "licenses" / "LGPL-3.0.txt"
 if lgpl_notice.is_file():
     datas.append((str(lgpl_notice), "licenses"))
+r_reference = service_root / "scripts" / "real_mixedlm.R"
+if r_reference.is_file():
+    datas.append((str(r_reference), "scripts"))
 
 a = Analysis(
     [str(service_root / "scripts" / "desktop_entry.py")],
@@ -27,6 +30,7 @@ a = Analysis(
     datas=datas,
     hiddenimports=[
         "dynamis_science.desktop.worker",
+        "dynamis_science.qualification_real",
         "dynamis_science.performance",
         "scripts.sqlite_recovery",
         "PySide6.QtOpenGL",

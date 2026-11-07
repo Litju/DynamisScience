@@ -49,7 +49,7 @@ The installer includes a deterministic synthetic fixture only. It does not inclu
 - Synthetic `DS-SYNTH-001` data are labeled as demonstration data and are never empirical evidence.
 - Unsupported models remain marked as prototypes or unavailable. The app does not produce athlete predictions or injury-risk estimates from unsupported methods.
 - Studies, cohorts, plans, runs, evidence, figures, reports and audit history persist in SQLite. Scientific tables and artifacts use Parquet and the configured private filesystem.
-- Database integrity checks, verified online backups and isolated restore rehearsals are available from the native **Tools** menu.
+- Database integrity checks, verified online backups, isolated restore rehearsals and independent real-data qualification are available from the native **Tools** menu. Qualification uses the qualified Python methods and an optional local R/lme4 reference; without R, the application records an honest blocked state.
 
 The current packaging measurements are recorded in [G4 evidence](docs/desktop/evidence/g4-packaging-benchmarks.json). The migration status and remaining verification are tracked in [RES-604 progress](docs/desktop/RES-604_PROGRESS.md).
 

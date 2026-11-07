@@ -574,14 +574,28 @@ class DynamisAppService:
             "METH-REAL-SIGNAL-QA",
         }:
             return self.execute_analysis_run(study_id, payload)
-        request = json.dumps(
-            {"data_root": str(self.root), "study_id": study_id, "payload": payload}
+        return self._run_isolated_worker(
+            {
+                "operation": "analysis",
+                "data_root": str(self.root),
+                "study_id": study_id,
+                "payload": payload,
+            }
         )
+
+    def run_independent_qualification(self) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return self._run_isolated_worker(
+            {"operation": "real_qualification", "data_root": str(self.root)}
+        )
+
+    def _run_isolated_worker(self, request: dict[str, Any]) -> Any:
+        encoded_request = json.dumps(request)
         if getattr(sys, "frozen", False):
             self.ensure_initialized()
-            request_path = self.root / "tmp" / f"analysis-{uuid.uuid4().hex}-request.json"
-            response_path = self.root / "tmp" / f"analysis-{uuid.uuid4().hex}-response.json"
-            request_path.write_text(request, encoding="utf-8")
+            request_path = self.root / "tmp" / f"worker-{uuid.uuid4().hex}-request.json"
+            response_path = self.root / "tmp" / f"worker-{uuid.uuid4().hex}-response.json"
+            request_path.write_text(encoded_request, encoding="utf-8")
             try:
                 process = subprocess.run(
                     [sys.executable, "--worker", str(request_path), str(response_path)],
@@ -608,7 +622,7 @@ class DynamisAppService:
                 response_path.unlink(missing_ok=True)
         process = subprocess.run(
             [sys.executable, "-m", "dynamis_science.desktop.worker"],
-            input=request,
+            input=encoded_request,
             text=True,
             capture_output=True,
             timeout=1800,

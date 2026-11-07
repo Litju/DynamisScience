@@ -1083,3 +1083,18 @@ def test_native_database_tools_verify_backup_and_restore_safely(qtbot, tmp_path,
     assert restored.is_file()
     assert service.get_study_detail(study_id)["study"]["id"] == study_id
     window.close()
+
+
+def test_native_qualification_action_reports_an_honest_empty_state(qtbot, tmp_path, monkeypatch):
+    messages = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *_args: messages.append(_args[-1]))
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
+    window = MainWindow(DynamisAppService())
+    qtbot.addWidget(window)
+    window.show()
+    qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
+    window.action_run_qualification.trigger()
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    assert any("No admitted real-data snapshots" in message for message in messages)
+    window.close()

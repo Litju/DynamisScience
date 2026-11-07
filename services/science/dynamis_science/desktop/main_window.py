@@ -235,10 +235,13 @@ class MainWindow(QMainWindow):
         self.action_backup_database.triggered.connect(self._backup_research_database)
         self.action_restore_database = QAction("Rehearse restore from backup…", self)
         self.action_restore_database.triggered.connect(self._rehearse_research_restore)
+        self.action_run_qualification = QAction("Run independent real-data qualification", self)
+        self.action_run_qualification.triggered.connect(self._run_independent_qualification)
         for action in (
             self.action_verify_database,
             self.action_backup_database,
             self.action_restore_database,
+            self.action_run_qualification,
         ):
             tools_menu.addAction(action)
         view_menu = self.menuBar().addMenu("View")
@@ -357,6 +360,36 @@ class MainWindow(QMainWindow):
             lambda: self.service.rehearse_research_restore(target),
             show_restore,
             "Restoring the backup to a separate root and reopening it",
+        )
+
+    def _run_independent_qualification(self) -> None:
+        self.run_task(
+            self.service.run_independent_qualification,
+            self._show_qualification_results,
+            "Running independent real-data method qualification",
+        )
+
+    def _show_qualification_results(self, records: list[dict[str, Any]]) -> None:
+        if not records:
+            QMessageBox.information(
+                self,
+                "Independent method qualification",
+                "No admitted real-data snapshots are available to qualify.",
+            )
+            return
+        lines = []
+        for record in records:
+            outcome = record.get("pass_fail") or record.get("status", "UNKNOWN")
+            reason = record.get("reason")
+            lines.append(
+                f"{record['id']} · {record.get('status', 'UNKNOWN')} · {outcome}"
+                + (f"\n  {reason}" if reason else "")
+            )
+        QMessageBox.information(
+            self,
+            "Independent method qualification",
+            "\n\n".join(lines)
+            + f"\n\nRecords were saved under:\n{self.service.root / 'qualification'}",
         )
 
     def _show_performance_mode(self) -> None:

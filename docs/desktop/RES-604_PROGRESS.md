@@ -8,7 +8,7 @@ Private data root: `D:\datasets\DynamisScience` (read-only source during verific
 
 ## G1 — Native scientific workstation
 
-**Implementation status:** The native research journey is implemented and verified on disposable copies. Three measured G1 timing targets remain above their design thresholds; the deviations are recorded below without changing qualified numerical methods.
+**Implementation status:** The native research journey is implemented and verified on disposable copies. Two measured G1 timing targets remain above their design thresholds; the deviations are recorded below without changing qualified numerical methods.
 
 Implemented:
 
@@ -35,19 +35,19 @@ Performance results: [G1 benchmark JSON](evidence/g1-desktop-benchmarks.json). T
 
 | Benchmark | Measured | Design target | Result |
 |---|---:|---:|---|
-| Cold start to populated catalogue (5 samples) | median 2,240 ms; p95 2,263 ms | median <1,500 ms | Missed; 740 ms over target |
-| Idle working set, 5 s after opening Mendeley | 242.54 MB | <250 MB | Met |
-| First `force_signals.parquet` page (500 rows) | 24.24 ms; +2.52 MB working set | <80 ms; <25 MB delta | Met |
-| MoveSmart waveform to plot update | 61.19 ms | <120 ms | Met |
-| Mendeley MixedLM worker runtime | 3,535.6 ms; 4,881.8 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
-| Maximum GUI timer gap during MixedLM | 29.88 ms | <16 ms | Missed by 13.88 ms |
-| Peak session working set including report export | 269.80 MB | <500 MB | Met |
+| Cold start to populated catalogue (5 samples) | median 2,029 ms; p95 2,293 ms | median <1,500 ms | Missed; 529 ms over target |
+| Idle working set, 5 s after opening Mendeley | 243.67 MB | <250 MB | Met |
+| First `force_signals.parquet` page (500 rows) | 20.01 ms; +2.18 MB working set | <80 ms; <25 MB delta | Met |
+| MoveSmart waveform to plot update | 60.45 ms | <120 ms | Met |
+| Mendeley MixedLM worker runtime | 3,277.1 ms; 4,425.4 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
+| Maximum GUI timer gap during MixedLM | 9.37 ms | <16 ms | Met |
+| Peak session working set including report export | 269.73 MB | <500 MB | Met |
 
-These three missed timing targets were remeasured on the completed native-only application; no numerical method, optimizer or tolerance was changed to improve them.
+The two missed timing targets were remeasured on the completed native-only application; no numerical method, optimizer or tolerance was changed to improve them.
 
 ## G2 — Research authoring and data management
 
-**Implementation status:** Authoring and admission workflows are implemented and verified. The three shared G1 timing deviations remain recorded above.
+**Implementation status:** Authoring and admission workflows are implemented and verified. The two shared G1 timing deviations remain recorded above.
 
 Implemented:
 
@@ -71,7 +71,7 @@ G2 commits: `1c4d8c6` (`RES-604: integrate local admission and research authorin
 
 ## G3 — Performance OS
 
-**Implementation status:** The operational workflows and the approved Direction F visual system are implemented in native Qt Widgets. Performance OS records stay under the configured private data root and remain isolated from admitted scientific records. G3 verification has passed; the three G1 timing deviations remain recorded above.
+**Implementation status:** The operational workflows and the approved Direction F visual system are implemented in native Qt Widgets. Performance OS records stay under the configured private data root and remain isolated from admitted scientific records. G3 verification has passed; the two G1 timing deviations remain recorded above.
 
 Implemented:
 
@@ -97,7 +97,7 @@ Performance measurements are in [G3 benchmark JSON](evidence/g3-performance-benc
 
 ## G4 — Packaging and web retirement
 
-**Implementation status:** Complete. The native parity review passed, the legacy web and HTTP application code has been retired, and the final Windows installer passed its installed-app, analysis-worker, recovery, offline and uninstall checks. G1's three recorded timing-target misses remain visible under G1 with current measurements.
+**Implementation status:** Complete. The native parity review passed, the legacy web and HTTP application code has been retired, and the final Windows installer passed its installed-app, analysis-worker, recovery, offline and uninstall checks. G1's two recorded timing-target misses remain visible under G1 with current measurements.
 
 Completed in G4 so far:
 
@@ -107,7 +107,7 @@ Completed in G4 so far:
 - PyInstaller 6.22.3 remains a build-only dependency. Inno Setup 6.7.3 builds the per-user installer. `uv lock --check` and `uv sync --locked` passed after retiring the web dependency graph.
 - Added a Windows-first PyInstaller `--onedir` spec and per-user Inno Setup installer. The build stages a disposable `DS-SYNTH-001` fixture under an ignored, unique build directory; no private Mendeley/MoveSmart data enters the bundle.
 - Fixed the first frozen-launch defects found by real installed runs: remove host Poppler ICU DLL contamination, explicitly collect pyqtgraph's dynamic `PySide6.QtOpenGL` and `QtOpenGLWidgets` imports, and resolve the private-root safety boundary from the installed executable directory when frozen.
-- Added native SQLite integrity inspection, online backup verification and isolated restore rehearsal. Application exceptions are logged to a rotating file under the configured private root; scientific execution uses the packaged `--worker` file-IPC entry point in a separate process.
+- Added native SQLite integrity inspection, online backup verification and isolated restore rehearsal, plus a native independent real-data qualification action running through the isolated worker and an optional external R/lme4 reference. Application exceptions are logged to a rotating file under the configured private root; scientific execution uses the packaged `--worker` file-IPC entry point in a separate process.
 - Bundled third-party license notices and the LGPL-3.0 text, with an in-app Help menu viewer. The Qt redistribution notices remain included in the installer.
 - Added a read-only native scientific library for metric, protocol, method and model definitions. Prototype and unavailable entries display their stored status and limitations; the dialog does not execute unsupported methods.
 - Added a native versioned investigation editor with typed blocks, JSON state editing, add/remove/reorder, dependency-order validation, optimistic saves and fork lineage. Added a side-by-side HTML diff for frozen report versions and a clickable Qt provenance DAG with stored-node details.
@@ -115,10 +115,10 @@ Completed in G4 so far:
 
 Windows packaging verification (Windows 11 x64, Python 3.12.13, PyInstaller 6.22.3, Inno Setup 6.7.3):
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/build_windows.ps1` — passed after web retirement. Final bundle: `580,698,065` bytes; installer: `139,847,227` bytes. The generated notice contains 35 runtime distributions plus the PyInstaller bootloader license text.
-- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/test_windows_installer.ps1` — passed on Windows 11 x64. Unpacked and installed catalogue startup: `5,380 ms` / `4,480 ms`; peak working set: `212.00 MB` / `202.62 MB`; zero listening TCP ports; HTTP proxy variables were pinned to local port 9; install and uninstall passed.
-- The installed `--worker` path completed bundled `METH-U-DESC` and matched the direct Python result digest in `2,350 ms`. The packaged `--database-smoke` mode verified SQLite integrity, made an online backup, restored and reopened it, and preserved the logical hash and operational database bytes in `2,320 ms`; the database also remained byte-identical after uninstall.
-- `uv run pytest -q` — all 92 scientific and native tests passed after retirement, including isolated Mendeley/MoveSmart runs and their independent R/lme4 MixedLM, ICC and raw-signal qualifications. `uv run pytest --collect-only -q` confirmed 92 collected tests. `uv lock --check`, `uv sync --locked`, Python `compileall`, and the installer PowerShell parser check passed.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/build_windows.ps1` — passed after web retirement. Final bundle: `580,731,261` bytes; installer: `139,883,359` bytes. The generated notice contains 35 runtime distributions plus the PyInstaller bootloader license text.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File services/science/scripts/test_windows_installer.ps1` — passed on Windows 11 x64. Unpacked and installed catalogue startup: `2,421 ms` / `3,578 ms`; peak working set: `219.30 MB` / `211.93 MB`; zero listening TCP ports; HTTP proxy variables were pinned to local port 9; install and uninstall passed.
+- The installed `--worker` path completed bundled `METH-U-DESC` and matched the direct Python result digest in `1,219 ms`. The installed independent-qualification worker returned the correct empty state for a synthetic-only root. The packaged `--database-smoke` mode verified SQLite integrity, made an online backup, restored and reopened it, and preserved the logical hash and operational database bytes in `1,224 ms`; the database also remained byte-identical after uninstall.
+- `uv run pytest -q` — all 93 scientific and native tests passed after retirement, including isolated Mendeley/MoveSmart runs and their independent R/lme4 MixedLM, ICC and raw-signal qualifications. `uv run pytest --collect-only -q` confirmed 93 collected tests. `uv lock --check`, `uv sync --locked`, Python `compileall`, and the installer PowerShell parser check passed.
 - Reproducible package and recovery measurements with a disposable data-root path: [G4 packaging benchmarks](evidence/g4-packaging-benchmarks.json). The pre-existing line-ending-only edit to `data/synthetic/generator_manifest.json` was preserved and not staged.
 
 Native parity map:
@@ -132,8 +132,8 @@ Native parity map:
 | Investigation blocks, run history, evidence and report workflow | Versioned Qt investigation editor; direct analysis tab; explicit evidence promotion; frozen report diff; clickable lineage DAG | `test_native_investigation_editor_and_report_version_comparison`, `test_native_research_journey_executes_promotes_freezes_and_exports` |
 | Unsupported model simulations | Read-only `PROTOTYPE`/`UNAVAILABLE` registry state; no athlete prediction or injury-risk execution | Catalog status and limitation display; no model execution control is exposed in the native UI |
 
-G4 has no remaining implementation work. The three G1 timing deviations remain recorded; their numerical methods and optimizer sequence are unchanged.
+G4 has no remaining implementation work. The two G1 timing deviations remain recorded; their numerical methods and optimizer sequence are unchanged.
 
 ## Commits
 
-Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow: `df59eac`; G3 screenshots and benchmarks: `7a25fdb`. G4 includes transport decoupling `4b318ef`, Windows build tooling `9e98590`, package/recovery evidence `813bdc3`, research parity `e3cc02b`, and final web retirement/installer verification `139e45f`. Three G1 timing deviations remain visible with the numerical methods unchanged.
+Every implementation commit uses a `RES-604` subject. G1 base: `0377177` (`RES-604: implement native research workstation`); G1 evidence: `a02a108` (`RES-604: record native benchmark and G1 evidence`). G2 service: `1c4d8c6`; G2 UI: `fd29072`; G2 evidence: `92ca8e8`. G3 service: `f27953d`; G3 native visual/workflow: `df59eac`; G3 screenshots and benchmarks: `7a25fdb`. G4 includes transport decoupling `4b318ef`, Windows build tooling `9e98590`, package/recovery evidence `813bdc3`, research parity `e3cc02b`, and final web retirement/installer verification `139e45f`. Two G1 timing deviations remain visible with the numerical methods unchanged.
