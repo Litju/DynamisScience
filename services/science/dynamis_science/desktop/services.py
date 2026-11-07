@@ -722,6 +722,143 @@ class DynamisAppService:
             "source_rows_bounded": True,
         }
 
+    def performance_page_data(self, page: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        if page == "context":
+            return {"context": performance.context()}
+        if page == "today":
+            return {"today": performance.today(), "athletes": performance.athletes()}
+        if page == "athlete":
+            return {"athletes": performance.athletes()}
+        if page == "plan":
+            return {"plan": performance.get_plan()}
+        if page == "monitor":
+            return {"load": performance.load_overview(), "movement": performance.movement()}
+        if page == "test":
+            return {"tests": performance.tests()}
+        if page == "research":
+            return {
+                "research": performance.research_link(),
+                "units": performance.units(),
+                "metrics": self.list_metrics("DS-SYNTH-001"),
+            }
+        if page == "report":
+            return {"reports": performance.list_reports(), "athletes": performance.athletes()}
+        if page == "match":
+            return {"movement": performance.movement(), "roster": self.performance_match_roster()}
+        raise ValueError(f"Unknown Performance OS workspace: {page}")
+
+    def performance_athlete(self, athlete_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.athlete_detail(athlete_id)
+
+    def performance_tracking(self, player_id: str, limit: int = 2500) -> dict[str, Any]:
+        self.ensure_initialized()
+        if not 2 <= limit <= 10000:
+            raise ValueError("limit must be between 2 and 10000")
+        path = PARQUET_DIR / "match_tracking.parquet"
+        frame = (
+            pl.scan_parquet(path)
+            .filter(pl.col("player_id") == player_id)
+            .sort("time_s")
+            .limit(limit)
+            .collect()
+        )
+        if frame.is_empty():
+            raise researchstore.ResearchNotFound(f"Tracking data for {player_id} is unavailable")
+        return {"player_id": player_id, "rows": frame.to_dicts(), "source": "DS-SYNTH-001 / match_tracking.parquet"}
+
+    def performance_match_roster(self) -> dict[str, Any]:
+        self.ensure_initialized()
+        tracking = pl.scan_parquet(PARQUET_DIR / "match_tracking.parquet")
+        pose = pl.scan_parquet(PARQUET_DIR / "match_pose.parquet")
+        return {
+            "players": tracking.select("player_id", "team").unique().sort("player_id").collect().to_dicts(),
+            "pose_players": pose.select("athlete_id").unique().sort("athlete_id").collect()["athlete_id"].to_list(),
+            "events": pl.scan_parquet(PARQUET_DIR / "match_events.parquet").limit(100).collect().to_dicts(),
+            "source": "DS-SYNTH-001 / 10 Hz synthetic match segment",
+        }
+
+    def performance_match_frame(self, frame_number: int, athlete_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        if not 0 <= frame_number < 1800:
+            raise ValueError("frame_number must be between 0 and 1799")
+        tracking = (
+            pl.scan_parquet(PARQUET_DIR / "match_tracking.parquet")
+            .filter(pl.col("frame") == frame_number)
+            .limit(24)
+            .collect()
+            .to_dicts()
+        )
+        pose = (
+            pl.scan_parquet(PARQUET_DIR / "match_pose.parquet")
+            .filter((pl.col("frame") == frame_number) & (pl.col("athlete_id") == athlete_id))
+            .limit(32)
+            .collect()
+            .to_dicts()
+        )
+        return {"frame": frame_number, "time_s": frame_number / 10, "tracking": tracking, "pose": pose}
+
+    def performance_log_session(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.log_session(performance.SessionLog.model_validate(payload))
+
+    def performance_add_athlete_note(
+        self, athlete_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.add_athlete_note(
+            athlete_id, performance.AthleteNote.model_validate(payload)
+        )
+
+    def performance_update_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.update_plan(performance.PlanUpdate.model_validate(payload))
+
+    def performance_publish_plan(self) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.publish_plan()
+
+    def performance_run_reliability(self) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.run_reliability()
+
+    def performance_create_report(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.create_report(performance.ReportRequest.model_validate(payload))
+
+    def performance_freeze_report(self, report_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        from .. import performance
+
+        return performance.freeze_report(report_id)
+
+    def performance_export_report(self, report_id: str, target_path: str | os.PathLike[str]) -> Path:
+        self.ensure_initialized()
+        from .. import performance
+
+        response = performance.export_report(report_id)
+        path = Path(target_path).expanduser().resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(response.body)
+        return path
+
 
 def _read_json(path: Path, default: Any) -> Any:
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else default
