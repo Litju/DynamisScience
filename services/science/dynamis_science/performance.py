@@ -17,7 +17,6 @@ import hashlib
 import html
 import json
 import math
-import os
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -30,7 +29,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .analysis import _reliability
-from .data_root import data_root
+from .data_root import paths
 from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
 router = APIRouter(prefix="/performance", tags=["performance"])
@@ -219,10 +218,7 @@ def _normalise_unit(unit: str | None) -> str:
 
 
 def _store_dir() -> Path:
-    configured = os.environ.get("DYNAMISSCIENCE_PERFORMANCE_STORE", "").strip()
-    base = Path(configured).expanduser().resolve() if configured else data_root() / "performance"
-    base.mkdir(parents=True, exist_ok=True)
-    return base
+    return paths()["performance"]
 
 
 def _read_store(name: str, default: Any) -> Any:

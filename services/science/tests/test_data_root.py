@@ -37,3 +37,4 @@ def test_path_resolution_uses_the_current_environment_or_explicit_root(monkeypat
     assert data_root() == configured.resolve()
     assert paths(explicit)["root"] == explicit.resolve()
     assert Path(paths()["research"]) == configured.resolve() / "research"
+    assert Path(paths()["performance"]) == configured.resolve() / "performance"

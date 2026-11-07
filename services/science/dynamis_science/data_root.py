@@ -18,6 +18,7 @@ LAYOUT = (
     "manifests",
     "artifacts",
     "reports",
+    "performance",
     "research",
     "tmp",
 )

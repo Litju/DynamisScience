@@ -6,12 +6,14 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from dynamis_science import performance
 from dynamis_science.api import app
+from dynamis_science.data_root import data_root
 
 
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("DYNAMISSCIENCE_PERFORMANCE_STORE", str(tmp_path / "performance"))
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path))
     with TestClient(app) as test_client:
         yield test_client
 
@@ -33,9 +35,18 @@ def test_today_is_composed_from_the_admitted_snapshot(client: TestClient):
         assert row["flag"]["unit"]
         assert row["flag"]["threshold"] is not None
     assert payload["study"]["snapshot_id"] == "DS-SYNTH-001"
+    assert (data_root() / "performance").is_dir()
     assert payload["movement"]["player"]["distance_m"] == pytest.approx(215.9, abs=0.1)
     assert payload["movement"]["player"]["hsr_m"] == pytest.approx(81.3, abs=0.1)
     assert payload["movement"]["quality"]["position_resets_total"] >= 2
+
+
+def test_performance_store_ignores_legacy_path_override(client: TestClient, monkeypatch, tmp_path):
+    override = tmp_path.parent / "legacy-performance-store"
+    monkeypatch.setenv("DYNAMISSCIENCE_PERFORMANCE_STORE", str(override))
+
+    assert performance._store_dir() == data_root() / "performance"
+    assert not override.exists()
 
 
 def test_availability_is_explicitly_roster_only(client: TestClient):
