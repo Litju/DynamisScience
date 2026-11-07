@@ -162,14 +162,12 @@ ZENODO_SOURCE: dict[str, Any] = {
     "privacy": {
         "classification": "PSEUDONYMOUS",
         "rationale": (
-            "Participant directories are named P<n>-<birth year>-<height cm>-<body mass kg> "
-            "(for example P1-1990-186.5-95.8). This is quasi-identifying anthropometric "
-            "and demographic data even though names are absent."
+            "Participant directory names encode a participant number, birth year, height and "
+            "body mass; these are quasi-identifying fields even though names are absent."
         ),
         "incidents": [
-            "The archive contains '~$rvin_Ghaffarzadeh_IT_Internship_Application.docx', "
-            "an unrelated personal document. It is excluded from extraction and "
-            "recorded as a privacy incident; it is not research data.",
+            "The archive contains one unrelated personal document. It is excluded "
+            "from extraction and recorded as a privacy incident; it is not research data.",
         ],
         "additional_obligations": [
             "Do not republish participant folder names or the personal document.",
@@ -194,7 +192,7 @@ ZENODO_SOURCE: dict[str, Any] = {
         "excluded_entries": [
             "__MACOSX metadata (1783 entries)",
             ".DS_Store files (7 entries)",
-            "~$rvin_Ghaffarzadeh_IT_Internship_Application.docx (1 personal document)",
+            "one unrelated personal DOCX (not extracted)",
         ],
     },
     "data_classification": "RAW_MULTIMODAL_SIGNAL",

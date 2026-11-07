@@ -4,8 +4,8 @@ Run while the science service (port 8000) and the production Next.js build
 (port 3001) are running:
 
     $env:DYNAMISSCIENCE_DATA_ROOT = '$DYNAMISSCIENCE_DATA_ROOT'
-    $env:DYNAMISSCIENCE_BROWSER_BASE = 'http://localhost:3001'
-    python scripts/res588_validation.py
+    $env:DYNAMISSCIENCE_BROWSER_BASE = 'http://127.0.0.1:3001'
+    uv run --directory services/science python -m scripts.res588_validation
 
 The script reads the two demonstration studies and the monitoring program from
 the local science service, exercises them at 1440x900, 1280x800 and 1024x800,
@@ -19,15 +19,13 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import httpx
 from playwright.sync_api import sync_playwright
+from dynamis_science.data_root import data_root
 
-DATA_ROOT = Path(os.environ.get("DYNAMISSCIENCE_DATA_ROOT", Path(__file__).resolve().parents[1] / "data" / "real"))
-REPORT_DIR = DATA_ROOT / "reports" / "browser-res588"
 API = os.environ.get("DYNAMISSCIENCE_SCIENCE_API", "http://127.0.0.1:8000")
-BASE = os.environ.get("DYNAMISSCIENCE_BROWSER_BASE", "http://localhost:3001")
+BASE = os.environ.get("DYNAMISSCIENCE_BROWSER_BASE", "http://127.0.0.1:3001")
 VIEWPORTS = [
     {"name": "desktop-1440", "width": 1440, "height": 900},
     {"name": "desktop-1280", "width": 1280, "height": 800},
@@ -63,7 +61,8 @@ def overflow(page) -> dict:
 
 
 def run() -> dict:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    report_dir = data_root() / "reports" / "browser-res588"
+    report_dir.mkdir(parents=True, exist_ok=True)
     manifest = discover()
     results = {
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -99,7 +98,7 @@ def run() -> dict:
                         page.wait_for_timeout(2500)
                     if action:
                         action()
-                    screenshot = REPORT_DIR / f"{viewport['name']}-{name.strip('/').replace('/', '-').replace('?', '-')}.png"
+                    screenshot = report_dir / f"{viewport['name']}-{name.strip('/').replace('/', '-').replace('?', '-')}.png"
                     page.screenshot(path=str(screenshot), full_page=True)
                     entries.append(
                         {
@@ -126,12 +125,12 @@ def run() -> dict:
                     page.goto(f"{BASE}/research/studies/{study}", wait_until="domcontentloaded", timeout=60000)
                     page.get_by_role("group", name="Study mode").get_by_role("button", name="Report").click()
                     page.get_by_role("link", name="Export HTML").wait_for(timeout=30000)
-                    screenshot = REPORT_DIR / f"{viewport['name']}-{label}.png"
+                    screenshot = report_dir / f"{viewport['name']}-{label}.png"
                     page.screenshot(path=str(screenshot), full_page=True)
                     with page.expect_download(timeout=30000) as download_info:
                         page.get_by_role("link", name="Export HTML").click()
                     download = download_info.value
-                    export_path = REPORT_DIR / f"{viewport['name']}-{label}.html"
+                    export_path = report_dir / f"{viewport['name']}-{label}.html"
                     download.save_as(str(export_path))
                     html = export_path.read_text(encoding="utf-8")
                     entries.append(
@@ -190,7 +189,7 @@ def run() -> dict:
         and item["keyboard"]["ctrl_k_palette_open"]
         for item in results["viewports"]
     ) else "ATTENTION"
-    (REPORT_DIR / "res588_validation.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    (report_dir / "res588_validation.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     return results
 
 

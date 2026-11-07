@@ -1,9 +1,9 @@
 """Rendered-product validation at the viewports required by RES-587.
 
-Run while the local science service (port 8000) and Next.js app (port 3000)
+Run while the local science service (port 8000) and Next.js app (port 3001)
 are running:
 
-    python scripts/browser_validation.py
+    uv run --directory services/science python -m scripts.browser_validation
 
 The script uses the installed Microsoft Edge through Playwright, so it does
 not download a browser.  Screenshots and a machine-readable report are written
@@ -16,16 +16,11 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+from dynamis_science.data_root import data_root
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA_ROOT = Path(
-    os.environ.get("DYNAMISSCIENCE_DATA_ROOT", ROOT / "data" / "real")
-).expanduser()
-REPORT_DIR = DATA_ROOT / "reports" / "browser"
-BASE = os.environ.get("DYNAMISSCIENCE_BROWSER_BASE", "http://localhost:3000")
+BASE = os.environ.get("DYNAMISSCIENCE_BROWSER_BASE", "http://127.0.0.1:3001")
 
 VIEWPORTS = [
     {"name": "desktop-1440", "width": 1440, "height": 900},
@@ -53,7 +48,8 @@ def _overflow(page) -> dict:
 
 
 def run() -> dict:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    report_dir = data_root() / "reports" / "browser"
+    report_dir.mkdir(parents=True, exist_ok=True)
     results = {"started_at": datetime.now(timezone.utc).isoformat(), "base": BASE, "viewports": []}
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True, args=["--disable-gpu"])
@@ -85,7 +81,7 @@ def run() -> dict:
                     except Exception:
                         page.wait_for_timeout(3000)
                     overflow = _overflow(page)
-                    screenshot = REPORT_DIR / f"{viewport['name']}-{name}.png"
+                    screenshot = report_dir / f"{viewport['name']}-{name}.png"
                     page.screenshot(path=str(screenshot), full_page=True)
                     entries.append(
                         {
@@ -111,7 +107,7 @@ def run() -> dict:
                         page.get_by_text("REPORT-REAL-001", exact=False).first.wait_for(timeout=30000)
                     except Exception:
                         page.wait_for_timeout(2000)
-                    filename = REPORT_DIR / f"{viewport['name']}-report.png"
+                    filename = report_dir / f"{viewport['name']}-report.png"
                     page.screenshot(path=str(filename), full_page=True)
                     entries.append(
                         {
@@ -145,7 +141,7 @@ def run() -> dict:
         and all(page["marker_visible"] for page in item["pages"])
         for item in results["viewports"]
     ) else "ATTENTION"
-    (REPORT_DIR / "browser_validation.json").write_text(
+    (report_dir / "browser_validation.json").write_text(
         json.dumps(results, indent=2), encoding="utf-8"
     )
     return results

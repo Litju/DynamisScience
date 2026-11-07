@@ -320,24 +320,17 @@ Local, unpushed implementation commits:
 
 ```powershell
 $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
-$env:DYNAMISSCIENCE_PERFORMANCE_STORE = Join-Path $env:DYNAMISSCIENCE_DATA_ROOT 'performance'
-
-# Terminal 1 — science service
-uv run --directory services/science uvicorn dynamis_science.api:app --port 8000
-
-# Terminal 2 — web
-cd apps/web
-node node_modules/next/dist/bin/next dev -p 3000
+$env:NEXT_PUBLIC_SCIENCE_API_URL = 'http://127.0.0.1:8000'
+pnpm dev
 ```
 
-Open `http://localhost:3000/today`.
+Open `http://127.0.0.1:3001/today`. Performance state is stored under the same private data root as research and admission data.
 
 Production:
 
 ```powershell
-cd apps/web
-node node_modules/next/dist/bin/next build
-node node_modules/next/dist/bin/next start -p 3000
+pnpm build
+pnpm --filter @dynamis/web start
 ```
 
 Validation:

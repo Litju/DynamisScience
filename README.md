@@ -146,24 +146,51 @@ git clone https://github.com/Litju/DynamisScience.git
 Set-Location .\DynamisScience
 ```
 
-Requirements: Node.js 22+, the repository-pinned pnpm 11.24.0, Python 3.12+ and [`uv`](https://docs.astral.sh/uv/). pnpm 11 requires Node.js 22 or newer ([pnpm compatibility](https://pnpm.io/installation)).
+Requirements: Node.js 22+, the repository-pinned pnpm 11.24.0, Python 3.12+ and [`uv`](https://docs.astral.sh/uv/). pnpm 11 requires Node.js 22 or newer ([pnpm compatibility](https://pnpm.io/installation)). Local R is needed only for the independent MixedLM qualification; Playwright Chromium is needed only for browser validation.
 
 ```bash
 npm install --global pnpm@11.24.0
 uv sync --locked --directory services/science
 pnpm install --frozen-lockfile
-pnpm dev   # regenerates the deterministic synthetic fixture, then starts the service and web app
 ```
 
-Open <http://localhost:3000>. The science service's OpenAPI documentation is at <http://localhost:8000/docs>.
+Set an absolute private data directory outside the repository before starting the full research workflow. On Windows:
 
-Private real datasets, admitted Parquet snapshots, reports and local research state are not in GitHub. Keep them in a separate private data root and set `DYNAMISSCIENCE_DATA_ROOT` before starting the app. The SQLite database is `research/research.db` under that root. For another machine, transfer the complete data root through a secure channel while the science service is stopped, then verify dataset manifests and file hashes; never put that root in the repository.
+```powershell
+$env:DYNAMISSCIENCE_DATA_ROOT = 'D:\datasets\DynamisScience'
+$env:NEXT_PUBLIC_SCIENCE_API_URL = 'http://127.0.0.1:8000'
+$env:DYNAMISSCIENCE_SCIENCE_API = 'http://127.0.0.1:8000'
+$env:DYNAMISSCIENCE_BROWSER_BASE = 'http://127.0.0.1:3001'
+pnpm dev
+```
+
+The root `dev` command regenerates only the deterministic synthetic portfolio and starts the API and frontend. It binds the API to `127.0.0.1:8000` and Next.js to `127.0.0.1:3001`. Open <http://127.0.0.1:3001>; the API's OpenAPI documentation is at <http://127.0.0.1:8000/docs>. The committed development commands have fixed loopback bindings; do not expose the unauthenticated local service to a LAN. A future authenticated pilot requires a separate deployment topology and security review.
+
+Private real datasets, admitted snapshots, manifests, evidence, reports and local research state stay outside GitHub. `DYNAMISSCIENCE_DATA_ROOT` must be an absolute directory outside the checkout. Real-data storage fails closed when it is missing, points inside the repository, or names a file. The resolver reads the environment when called, so tests and tools can supply an isolated root without import-time environment capture.
+
+The private root contains `sources/` (archives), `extracted/`, `admitted/` (legacy upload path), `snapshots/` (immutable real-data tables), `manifests/`, `artifacts/`, `qualification/`, `reports/`, `performance/`, `research/research.db`, and `tmp/`. Synthetic demo fixtures remain in the ignored repository `data/` tree. Existing local fixture artifacts are not migrated automatically.
+
+### SQLite backup and recovery
+
+Use the SQLite Online Backup API so committed WAL records are included. Backups stay under the private root and the recovery command refuses to overwrite an existing file or restore directory:
+
+```powershell
+$root = $env:DYNAMISSCIENCE_DATA_ROOT
+$backup = Join-Path $root 'backups\research-manual.sqlite3'
+$restore = Join-Path $root 'tmp\restore-manual'
+uv run --directory services/science python -m scripts.sqlite_recovery backup --destination $backup
+uv run --directory services/science python -m scripts.sqlite_recovery verify --database (Join-Path $root 'research\research.db')
+uv run --directory services/science python -m scripts.sqlite_recovery restore --backup $backup --destination-root $restore
+uv run --directory services/science python -m scripts.sqlite_recovery verify --database (Join-Path $restore 'research\research.db')
+```
+
+`restore` writes to a new `tmp/` root, checks the schema, all table counts and logical record hash, checks integrity and foreign keys, reopens through the application persistence layer, and verifies evidence lineage. It copies the existing snapshots, manifests and qualification receipt needed by that check. This procedure verifies SQLite recovery; a full private-root disaster recovery also needs a private backup of archives and other root files. Do not replace the operational database with the verification restore.
 
 ## Testing and validation
 
 ```bash
 pnpm data:generate
-pnpm test        # Vitest (web) + pytest (science)
+pnpm test        # Vitest (web) + pytest (science; isolated private root)
 pnpm lint
 pnpm typecheck
 pnpm build
@@ -175,8 +202,10 @@ For rendered browser validation, install Playwright's managed Chromium once:
 uv run --directory services/science playwright install chromium
 ```
 
-- **119 automated tests** (84 Python, 35 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, investigation ordering rules, scenario simulation, report citations, the typed block model, lineage layout, display rules, the complete research lifecycle, frozen-plan and report-version immutability, monitoring schedules and restart/regeneration safety.
+- **136 automated tests** (101 Python, 35 web) covering byte-deterministic regeneration, dataset structure, force-metric correctness, reliability maths, the difference-in-change estimand, computed diagnostics, planned-versus-exploratory resolution, run immutability, idempotent evidence promotion, reproduction detection, cohort resolution, exploration aggregates, path-scoped lineage, research lifecycle and report immutability, monitoring schedules, private-root isolation, archive safety, and SQLite recovery.
 - **Rendered end-to-end validation**: scripted headless-browser walkthroughs of the synthetic and real workflows, and of both RES-588 demonstrations, at 1440×900, 1280×800 and 1024×800 against the production build, with zero console/page/network errors and no horizontal overflow.
+
+Python's `tests/conftest.py` replaces any inherited operational root before test modules load, blocks that inherited path, and constrains storage to temporary directories. The regression suite verifies a disposable simulated operational root, including sentinel and SQLite/WAL file hashes. `pnpm test` needs no manual environment cleanup. For rendered checks, install Chromium with `uv run --directory services/science playwright install chromium`, then run `uv run --directory services/science python -m scripts.browser_validation` and `uv run --directory services/science python -m scripts.performance_os_smoke` while `pnpm dev` is running.
 
 ## Real-data admission (RES-587)
 

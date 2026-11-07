@@ -224,20 +224,20 @@ $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
 .\.venv\Scripts\python.exe -m uvicorn dynamis_science.api:app --host 127.0.0.1 --port 8000
 
 # Frontend tests / typecheck / lint / production build
-Set-Location (Join-Path (git rev-parse --show-toplevel) 'apps\web')
-.\node_modules\.bin\vitest.cmd run
-.\node_modules\.bin\tsc.cmd --noEmit
-.\node_modules\.bin\eslint.cmd .
+Set-Location (git rev-parse --show-toplevel)
+pnpm test:web
+pnpm typecheck
+pnpm lint
 $env:NEXT_PUBLIC_SCIENCE_API_URL = 'http://127.0.0.1:8000'
-.\node_modules\.bin\next.cmd build
-.\node_modules\.bin\next.cmd start -p 3001
+pnpm build
+pnpm --filter @dynamis/web start
 
 # Rendered-product validation
 Set-Location (Join-Path (git rev-parse --show-toplevel) 'services\science')
 $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
-$env:DYNAMISSCIENCE_BROWSER_BASE = 'http://localhost:3001'
-.\.venv\Scripts\python.exe scripts\res588_validation.py
-.\.venv\Scripts\python.exe scripts\browser_validation.py
+$env:DYNAMISSCIENCE_BROWSER_BASE = 'http://127.0.0.1:3001'
+.\.venv\Scripts\python.exe -m scripts.res588_validation
+.\.venv\Scripts\python.exe -m scripts.browser_validation
 ```
 
 The two demonstrations can be replayed through the UI at `/research`: create a

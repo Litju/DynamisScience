@@ -81,11 +81,10 @@ working-capacity target was never approached.
 - Licence: **CC0 1.0** — this differs from the CC BY 4.0 reported in the earlier
   RES-587 notes; the Zenodo record metadata was checked directly
 - Commercial use: permitted; redistribution: permitted
-- Privacy: **PSEUDONYMOUS** — participant directories encode birth year, height
-  and body mass (for example `P1-1990-186.5-95.8`)
-- Privacy incident: the ZIP contains
-  `~$rvin_Ghaffarzadeh_IT_Internship_Application.docx`, an unrelated personal
-  document. It was excluded from extraction and is never analysed.
+- Privacy: **PSEUDONYMOUS** — participant directory names encode participant
+  number, birth year, height and body mass; these are quasi-identifying fields
+- Privacy incident: the ZIP contains one unrelated personal DOCX. It was
+  excluded from extraction and is never analysed.
 - Archive inventory: 3,564 entries, 1,769 CSV files, 676,083,934 uncompressed
   bytes, 0 path-traversal candidates; `__MACOSX`, `.DS_Store` and the personal
   DOCX were excluded.
@@ -231,7 +230,6 @@ Set-Location .\services\science
 .\.venv\Scripts\python.exe -m dynamis_science.qualification_real
 
 # 3. Python tests
-Remove-Item Env:DYNAMISSCIENCE_DATA_ROOT
 .\.venv\Scripts\python.exe -m pytest -q
 
 # 4. Backend
@@ -239,20 +237,23 @@ $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
 .\.venv\Scripts\python.exe -m uvicorn dynamis_science.api:app --host 127.0.0.1 --port 8000
 
 # 5. Frontend (new PowerShell)
-Set-Location (Join-Path (git rev-parse --show-toplevel) 'apps\web')
+Set-Location (git rev-parse --show-toplevel)
 $env:NEXT_PUBLIC_SCIENCE_API_URL = 'http://127.0.0.1:8000'
-.\node_modules\.bin\next.cmd dev -p 3000
+pnpm web:dev
 
 # 6. Production build and rendered validation
-.\node_modules\.bin\next.cmd build
-.\node_modules\.bin\next.cmd start -p 3001
+Set-Location (git rev-parse --show-toplevel)
+pnpm build
+pnpm --filter @dynamis/web start
 
 # 7. Browser validation against production
 Set-Location (Join-Path (git rev-parse --show-toplevel) 'services\science')
 $env:DYNAMISSCIENCE_DATA_ROOT = Join-Path $env:LOCALAPPDATA 'DynamisScience'
-$env:DYNAMISSCIENCE_BROWSER_BASE = 'http://localhost:3001'
-.\.venv\Scripts\python.exe scripts\browser_validation.py
+$env:DYNAMISSCIENCE_BROWSER_BASE = 'http://127.0.0.1:3001'
+.\.venv\Scripts\python.exe -m scripts.browser_validation
 ```
+
+The pytest session now isolates `DYNAMISSCIENCE_DATA_ROOT` automatically; no manual environment-variable cleanup is required.
 
 `pnpm` and `npm` corepack shims were broken on this machine; the equivalent
 direct Node binaries under `apps/web/node_modules/.bin` were used. The recorded
