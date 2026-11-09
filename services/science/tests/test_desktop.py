@@ -220,7 +220,7 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert mendeley["status"] == "COMPLETED"
     assert mendeley["method_id"] == "METH-REAL-TREND"
     assert mendeley["result_digest"]
-    isolated_mendeley = service.execute_analysis_isolated(
+    background_mendeley = service.execute_analysis_isolated(
         realstore.STUDY_MENDELEY,
         {
             "method_id": "METH-REAL-TREND",
@@ -228,8 +228,8 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
             "parameters": {"reference_occasion": 1, "contrast_occasion": 4},
         },
     )
-    assert isolated_mendeley["result_digest"] == mendeley["result_digest"]
-    assert isolated_mendeley["result"] == mendeley["result"]
+    assert background_mendeley["result_digest"] == mendeley["result_digest"]
+    assert background_mendeley["result"] == mendeley["result"]
     promoted = service.promote_run_to_evidence(mendeley["id"])
     assert promoted["evidence_artifact"]["analysis_run_id"] == mendeley["id"]
     graph = service.get_lineage_graph(promoted["evidence_artifact"]["id"])
@@ -252,6 +252,16 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     )
     assert movesmart["status"] == "COMPLETED"
     assert movesmart["result_digest"]
+    isolated_movesmart = service.execute_analysis_isolated(
+        realstore.STUDY_MOVESMART,
+        {
+            "method_id": "METH-REAL-RELIABILITY",
+            "outcome_metric_id": "MET-REAL-FZ-PEAK",
+            "parameters": {"activity": "Walking", "max_trials": 8},
+        },
+    )
+    assert isolated_movesmart["result_digest"] == movesmart["result_digest"]
+    assert isolated_movesmart["result"] == movesmart["result"]
 
     rscript = os.environ.get("DYNAMISSCIENCE_RSCRIPT", "")
     if not (rscript and Path(rscript).is_file()) and shutil.which("Rscript") is None:
@@ -289,6 +299,15 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
         },
     )
     assert signal_qa["status"] == "COMPLETED"
+    isolated_signal_qa = service.execute_analysis_isolated(
+        realstore.STUDY_MOVESMART,
+        {
+            "method_id": "METH-REAL-SIGNAL-QA",
+            "outcome_metric_id": "MET-REAL-FZ-PEAK",
+            "parameters": {},
+        },
+    )
+    assert isolated_signal_qa["result_digest"] == signal_qa["result_digest"]
     qualifications = {
         item["id"]: item for item in qualification_real.run()
     }

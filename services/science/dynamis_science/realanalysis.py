@@ -665,7 +665,7 @@ def _reliability_matrix(values: np.ndarray) -> dict[str, Any]:
 
 
 def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contrast: int, unit: str = "cm") -> dict[str, Any]:
-    import statsmodels.api as sm
+    from statsmodels.regression.mixed_linear_model import MixedLM
 
     rows = [
         row
@@ -697,7 +697,7 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
         candidates: list[tuple[float, str, Any]] = []
         for method in ("lbfgs", "bfgs", "powell", "nm"):
             try:
-                model = sm.MixedLM(
+                model = MixedLM(
                     endog=outcomes,
                     exog=design,
                     groups=np.array(subjects),

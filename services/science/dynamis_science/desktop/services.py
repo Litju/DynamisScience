@@ -568,6 +568,7 @@ class DynamisAppService:
     def execute_analysis_isolated(
         self, study_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
+        """Isolate the real-data MixedLM and signal analyses from the GUI process."""
         if payload.get("method_id") not in {
             "METH-REAL-TREND",
             "METH-REAL-RELIABILITY",

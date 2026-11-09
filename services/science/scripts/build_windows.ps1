@@ -66,7 +66,23 @@ try {
 
     $bundleBytes = (Get-ChildItem -LiteralPath $bundleRoot -File -Recurse | Measure-Object -Property Length -Sum).Sum
     $installer = Get-Item -LiteralPath (Join-Path $installerRoot "DynamisScience-Setup-x64.exe")
+    $sourceCommit = (& git -C $repoRoot rev-parse HEAD | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "Could not record the source Git commit." }
+    $sourceStatus = @(& git -C $repoRoot status --porcelain --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) { throw "Could not record the source working-tree state." }
+    $sourceDiffPath = Join-Path $buildRoot ".source-diff.tmp"
+    try {
+        & git -C $repoRoot diff --binary HEAD "--output=$sourceDiffPath"
+        if ($LASTEXITCODE -ne 0) { throw "Could not fingerprint the source diff." }
+        $sourceDiffSha256 = (Get-FileHash -LiteralPath $sourceDiffPath -Algorithm SHA256).Hash
+    }
+    finally {
+        Remove-Item -LiteralPath $sourceDiffPath -Force -ErrorAction SilentlyContinue
+    }
     $report = [ordered]@{
+        source_commit = $sourceCommit
+        source_status = $sourceStatus
+        source_diff_sha256 = $sourceDiffSha256
         app_version = $AppVersion
         python_version = (uv run python --version 2>&1 | Out-String).Trim()
         pyinstaller_version = (uv run python -m PyInstaller --version 2>&1 | Out-String).Trim()
