@@ -66,18 +66,20 @@ try {
 
     $bundleBytes = (Get-ChildItem -LiteralPath $bundleRoot -File -Recurse | Measure-Object -Property Length -Sum).Sum
     $installer = Get-Item -LiteralPath (Join-Path $installerRoot "DynamisScience-Setup-x64.exe")
-    $sourceCommit = (& git -C $repoRoot rev-parse HEAD | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) { throw "Could not record the source Git commit." }
-    $sourceStatus = @(& git -C $repoRoot status --porcelain --untracked-files=all)
-    if ($LASTEXITCODE -ne 0) { throw "Could not record the source working-tree state." }
     $sourceDiffPath = Join-Path $buildRoot ".source-diff.tmp"
+    Push-Location $repoRoot
     try {
-        & git -C $repoRoot diff --binary HEAD "--output=$sourceDiffPath"
+        $sourceCommit = (& git rev-parse HEAD | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) { throw "Could not record the source Git commit." }
+        $sourceStatus = @(& git status --porcelain --untracked-files=all)
+        if ($LASTEXITCODE -ne 0) { throw "Could not record the source working-tree state." }
+        & git diff --binary HEAD "--output=$sourceDiffPath"
         if ($LASTEXITCODE -ne 0) { throw "Could not fingerprint the source diff." }
         $sourceDiffSha256 = (Get-FileHash -LiteralPath $sourceDiffPath -Algorithm SHA256).Hash
     }
     finally {
         Remove-Item -LiteralPath $sourceDiffPath -Force -ErrorAction SilentlyContinue
+        Pop-Location
     }
     $report = [ordered]@{
         source_commit = $sourceCommit
