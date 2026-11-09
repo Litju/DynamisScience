@@ -266,7 +266,7 @@ for activity, prefix in {"Walking": "walk", "Running": "run", "Heel drop": "heel
     if ($realQualificationProcess.ExitCode -ne 0) {
         throw "The packaged real-data qualification worker failed ($($realQualificationProcess.ExitCode))."
     }
-    $realQualifications = @(Get-Content -LiteralPath $realQualificationResponsePath -Raw | ConvertFrom-Json)
+    $realQualifications = Get-Content -LiteralPath $realQualificationResponsePath -Raw | ConvertFrom-Json
     $qualificationStatuses = @{}
     $qualificationSummary = @()
     foreach ($qualification in $realQualifications) {
