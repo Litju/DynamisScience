@@ -75,7 +75,12 @@ class MainWindow(QMainWindow):
         self.current_target: dict[str, str] | None = None
         self.current_project: dict[str, Any] | None = None
         self.setWindowTitle("DynamisScience")
-        self.resize(1420, 900)
+        screen = self.screen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            self.resize(min(1420, available.width() - 32), min(900, available.height() - 64))
+        else:
+            self.resize(1420, 900)
         self._build_shell()
         self._load()
 
@@ -107,6 +112,8 @@ class MainWindow(QMainWindow):
         brand.setStyleSheet("font-weight: 700; letter-spacing: 1px")
         self.context = QLabel("Select a project, study or dataset")
         self.provenance = QLabel("")
+        for label in (brand, self.context, self.provenance):
+            label.setWordWrap(True)
         self.provenance.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         header.addWidget(brand)
         header.addStretch(1)

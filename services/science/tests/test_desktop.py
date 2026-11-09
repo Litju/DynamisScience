@@ -152,6 +152,10 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     window.show()
     qtbot.waitUntil(lambda: window.navigator.topLevelItemCount() == 4)
 
+    available = window.screen().availableGeometry()
+    assert window.frameGeometry().width() <= available.width()
+    assert window.frameGeometry().height() <= available.height()
+
     assert window.research.tabs.count() == 5
     study_parent = window.navigator.topLevelItem(1)
     synthetic = next(
