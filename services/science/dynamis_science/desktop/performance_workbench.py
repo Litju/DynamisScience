@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import html
 from typing import Any
 
 import numpy as np
@@ -1026,6 +1025,7 @@ class PerformanceWorkbench(QWidget):
         self.report_view, self.report_model = _record_view()
         split.addWidget(self.report_view)
         self.report_preview = QTextBrowser()
+        self.report_preview.setStyleSheet("background: white; color: #17212b;")
         split.addWidget(self.report_preview)
         self.report_view.clicked.connect(self._select_report)
         layout.addWidget(split, 1)
@@ -1560,11 +1560,7 @@ class PerformanceWorkbench(QWidget):
 
     def _show_report(self, report: dict[str, Any]) -> None:
         self.selected_report_id = report["id"]
-        self.report_preview.setHtml(
-            f"<h2>{html.escape(str(report['title']))}</h2><p><b>{html.escape(str(report['status']))}</b> · "
-            f"{html.escape(str(report['audience']))} · version {int(report['version'])}</p>"
-            f"<pre>{html.escape(_pretty(report))}</pre>"
-        )
+        self.report_preview.setHtml(self.service.performance_render_report(report))
 
     def _freeze_report(self) -> None:
         report_id = getattr(self, "selected_report_id", None)

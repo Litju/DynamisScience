@@ -1910,21 +1910,21 @@ def get_report(report_id: str) -> dict[str, Any]:
 
 
 def export_report(report_id: str) -> str:
-    store = _read_store("reports.json", {"reports": []})
-    report = next((item for item in store["reports"] if item["id"] == report_id), None)
-    if report is None:
-        raise researchstore.ResearchNotFound("Report not found")
+    return render_report(get_report(report_id))
+
+
+def render_report(report: dict[str, Any]) -> str:
     escape = html.escape
     section_html = []
     for section in report["sections"]:
         body = "".join(f"<p>{escape(str(paragraph))}</p>" for paragraph in section.get("body", []))
         metrics = ""
         if section.get("metrics"):
-            metrics = "<div class='metrics'>" + "".join(
-                f"<div class='metric'><span>{escape(str(item['label']))}</span><strong>{escape(str(item['value']))} "
-                f"<em>{escape(str(item['unit']))}</em></strong><small>{escape(str(item['detail']))}</small></div>"
+            metrics = "<table class='metrics'>" + "".join(
+                f"<tr><th>{escape(str(item['label']))}</th><td>{escape(str(item['value']))} "
+                f"{escape(str(item['unit']))}</td><td>{escape(str(item['detail']))}</td></tr>"
                 for item in section["metrics"]
-            ) + "</div>"
+            ) + "</table>"
         table = ""
         if section.get("table"):
             headers = list(section["table"][0].keys()) if section["table"] else []
@@ -1943,10 +1943,6 @@ def export_report(report_id: str) -> str:
 body{{font-family:'IBM Plex Sans',Segoe UI,sans-serif;max-width:860px;margin:40px auto;padding:0 32px;color:#17212b;font-size:13px;line-height:1.55}}
 h1{{font-size:24px;margin:0 0 4px}} .meta{{font-family:monospace;font-size:10px;color:#5b6c78;border-bottom:1px solid #d5dde2;padding-bottom:12px;margin-bottom:22px}}
 h2{{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#5b6c78;margin:24px 0 8px}}
-.metrics{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}}
-.metric{{border:1px solid #d5dde2;padding:8px}} .metric span{{display:block;font-size:9px;text-transform:uppercase;color:#5b6c78}}
-.metric strong{{display:block;font-family:monospace;font-size:17px;margin-top:2px}} .metric em{{font-style:normal;font-size:11px;color:#5b6c78}}
-.metric small{{display:block;font-size:10px;color:#6b7a85;margin-top:2px}}
 table{{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0}} th,td{{text-align:left;border-bottom:1px solid #d5dde2;padding:4px 6px}} th{{color:#5b6c78}}
 footer{{margin-top:30px;border-top:1px solid #d5dde2;padding-top:10px;font-family:monospace;font-size:9px;color:#6b7a85}}
 @media print{{body{{margin:0;padding:24px}}}}

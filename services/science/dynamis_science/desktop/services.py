@@ -979,6 +979,11 @@ class DynamisAppService:
 
         return performance.freeze_report(report_id)
 
+    def performance_render_report(self, report: dict[str, Any]) -> str:
+        from .. import performance
+
+        return performance.render_report(report)
+
     def performance_export_report(self, report_id: str, target_path: str | os.PathLike[str]) -> Path:
         self.ensure_initialized()
         from .. import performance

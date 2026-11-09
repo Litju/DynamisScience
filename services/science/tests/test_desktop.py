@@ -1064,6 +1064,10 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     qtbot.waitUntil(lambda: not window.runner.active)
     reports = service.performance_page_data("report")["reports"]
     assert reports
+    preview = window.performance.report_preview.toPlainText()
+    assert reports[-1]["title"] in preview
+    assert reports[-1]["sections"][0]["body"][0] in preview
+    assert reports[-1]["limitations"][0] in preview
     report_id = window.performance.selected_report_id
     window.performance._freeze_report()
     qtbot.waitUntil(lambda: not window.runner.active)
