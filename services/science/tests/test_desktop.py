@@ -169,7 +169,8 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     qtbot.waitUntil(lambda: not window.runner.active)
     window.research.tabs.setCurrentIndex(3)
     assert window.research.parameters.width() >= 100
-    assert window.frameGeometry().width() <= max(available.width(), 1280)
+    assert window.frameGeometry().width() <= available.width()
+    assert window.frameGeometry().height() <= available.height()
     screenshot = tmp_path / "g1-native-research.png"
     assert window.grab().save(str(screenshot))
     assert screenshot.stat().st_size > 0
@@ -1002,6 +1003,7 @@ def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, m
     assert window.performance.pose_plot.plotItem.listDataItems()
     window.show_performance_page("today")
     qtbot.waitUntil(lambda: not window.runner.active)
+    assert window.frameGeometry().width() <= max(window.screen().availableGeometry().width(), 800)
     assert {key: button.accessibleName() for key, button in window.performance_rail.buttons.items()} == {
         "today": "Today", "plan": "Plan", "monitor": "Monitor", "test": "Test",
         "research": "Research", "report": "Reports",

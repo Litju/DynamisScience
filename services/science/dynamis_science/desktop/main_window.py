@@ -27,8 +27,10 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QToolBar,
     QSplitter,
+    QStyle,
     QStackedWidget,
     QTabWidget,
     QTableView,
@@ -137,7 +139,10 @@ class MainWindow(QMainWindow):
         self.performance_header = None
         self.performance_rail = None
         self.performance_toolbar = None
-        layout.addWidget(self.workspace, 1)
+        self.workspace_scroll = QScrollArea()
+        self.workspace_scroll.setWidgetResizable(True)
+        self.workspace_scroll.setWidget(self.workspace)
+        layout.addWidget(self.workspace_scroll, 1)
         self.setCentralWidget(central)
 
         self.status_text = QLabel("Starting")
@@ -286,7 +291,15 @@ class MainWindow(QMainWindow):
         self.performance_toolbar.setObjectName("PerformanceToolbar")
         self.performance_toolbar.setMovable(False)
         self.performance_toolbar.setFloatable(False)
-        self.performance_toolbar.addWidget(self.performance_header)
+        header_scroll = QScrollArea()
+        header_scroll.setWidgetResizable(True)
+        header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        header_scroll.setWidget(self.performance_header)
+        header_scroll.setFixedHeight(
+            self.performance_header.sizeHint().height()
+            + self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent) + 2
+        )
+        self.performance_toolbar.addWidget(header_scroll)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
         self.performance_toolbar.hide()
 
