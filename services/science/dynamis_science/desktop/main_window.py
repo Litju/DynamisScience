@@ -139,10 +139,16 @@ class MainWindow(QMainWindow):
         self.performance_header = None
         self.performance_rail = None
         self.performance_toolbar = None
-        self.workspace_scroll = QScrollArea()
-        self.workspace_scroll.setWidgetResizable(True)
-        self.workspace_scroll.setWidget(self.workspace)
-        layout.addWidget(self.workspace_scroll, 1)
+        screen = self.screen()
+        available = screen.availableGeometry() if screen is not None else None
+        # shortcut: compact layout follows the startup screen, reevaluate when supporting live monitor changes
+        if available is not None and (available.width() < 1100 or available.height() < 650):
+            self.workspace_scroll = QScrollArea()
+            self.workspace_scroll.setWidgetResizable(True)
+            self.workspace_scroll.setWidget(self.workspace)
+            layout.addWidget(self.workspace_scroll, 1)
+        else:
+            layout.addWidget(self.workspace, 1)
         self.setCentralWidget(central)
 
         self.status_text = QLabel("Starting")
