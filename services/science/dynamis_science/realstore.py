@@ -900,6 +900,10 @@ def _default_section(artifact_id: str, study_id: str) -> str:
 
 
 def cite(study_id: str, artifact_id: str, section: str | None = None) -> dict[str, Any]:
+    from . import realanalysis, researchstore
+
+    if realanalysis.get_evidence(artifact_id) is None and realanalysis.get_figure(artifact_id) is None:
+        raise researchstore.ResearchNotFound(f"Artifact {artifact_id} not found")
     report = _read_json(_report_path(study_id), get_report(study_id))
     section = section or _default_section(artifact_id, study_id)
     key = "figure_ids" if artifact_id.startswith("FIG-REAL-") else "evidence_ids"

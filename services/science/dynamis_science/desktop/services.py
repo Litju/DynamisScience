@@ -747,10 +747,14 @@ class DynamisAppService:
         self, study_id: str, artifact_id: str, section: str | None = None
     ) -> dict[str, Any]:
         self.ensure_initialized()
+        if study_id in realstore.real_study_ids():
+            return realstore.cite(study_id, artifact_id, section)
         return researchstore.cite_artifact(study_id, artifact_id, section)
 
     def uncite_report_artifact(self, study_id: str, artifact_id: str) -> dict[str, Any]:
         self.ensure_initialized()
+        if study_id in realstore.real_study_ids():
+            return realstore.uncite(study_id, artifact_id)
         return researchstore.uncite_artifact(study_id, artifact_id)
 
     def export_report_html(

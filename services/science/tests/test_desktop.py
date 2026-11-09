@@ -239,6 +239,13 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert background_mendeley["result"] == mendeley["result"]
     promoted = service.promote_run_to_evidence(mendeley["id"])
     assert promoted["evidence_artifact"]["analysis_run_id"] == mendeley["id"]
+    evidence_id = promoted["evidence_artifact"]["id"]
+    service.cite_report_artifact(realstore.STUDY_MENDELEY, evidence_id)
+    assert evidence_id in service.get_report(realstore.STUDY_MENDELEY)["evidence_ids"]
+    service.uncite_report_artifact(realstore.STUDY_MENDELEY, evidence_id)
+    assert evidence_id not in service.get_report(realstore.STUDY_MENDELEY)["evidence_ids"]
+    with pytest.raises(researchstore.ResearchNotFound):
+        service.cite_report_artifact(realstore.STUDY_MENDELEY, "EVID-REAL-MISSING")
     graph = service.get_lineage_graph(promoted["evidence_artifact"]["id"])
     assert any(node["id"] == mendeley["snapshot_id"] for node in graph["nodes"])
     figure = run_figure(mendeley)
