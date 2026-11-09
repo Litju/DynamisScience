@@ -167,6 +167,9 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     qtbot.waitUntil(lambda: window.current_study_id == "STUDY-001")
     qtbot.waitUntil(lambda: window.research.table_model.rowCount() == 500)
     qtbot.waitUntil(lambda: not window.runner.active)
+    window.research.tabs.setCurrentIndex(3)
+    assert window.research.parameters.width() >= 100
+    assert window.frameGeometry().width() <= max(available.width(), 1280)
     screenshot = tmp_path / "g1-native-research.png"
     assert window.grab().save(str(screenshot))
     assert screenshot.stat().st_size > 0

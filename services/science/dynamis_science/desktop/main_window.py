@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -1346,9 +1347,12 @@ class ResearchWorkbench(QWidget):
         self.analysis_tabs = QTabWidget()
         run_page = QWidget()
         run_layout = QVBoxLayout(run_page)
-        controls = QHBoxLayout()
+        controls = QGridLayout()
         self.method_picker = QComboBox()
         self.analysis_metric_picker = QComboBox()
+        for picker in (self.method_picker, self.analysis_metric_picker):
+            picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            picker.setMinimumContentsLength(16)
         self.parameters = QPlainTextEdit()
         self.parameters.setMaximumHeight(75)
         self.parameters.setPlaceholderText('{"activity":"Walking","max_trials":8}')
@@ -1360,12 +1364,12 @@ class ResearchWorkbench(QWidget):
         self.show_figure_button.clicked.connect(self._show_run_figure)
         export_run = QPushButton("Export figure…")
         export_run.clicked.connect(self._export_run_figure)
-        controls.addWidget(self.method_picker, 2)
-        controls.addWidget(self.analysis_metric_picker, 2)
-        controls.addWidget(self.parameters, 3)
-        controls.addWidget(execute_button)
-        controls.addWidget(self.show_figure_button)
-        controls.addWidget(export_run)
+        controls.addWidget(self.method_picker, 0, 0, 1, 2)
+        controls.addWidget(self.analysis_metric_picker, 0, 2)
+        controls.addWidget(self.parameters, 1, 0, 1, 3)
+        controls.addWidget(execute_button, 2, 0)
+        controls.addWidget(self.show_figure_button, 2, 1)
+        controls.addWidget(export_run, 2, 2)
         run_layout.addLayout(controls)
         results = QSplitter(Qt.Orientation.Horizontal)
         self.run_output = QTextBrowser()
@@ -1385,7 +1389,7 @@ class ResearchWorkbench(QWidget):
     def _build_evidence(self) -> None:
         page = self.tabs.widget(4)
         layout = QVBoxLayout(page)
-        buttons = QHBoxLayout()
+        buttons = QGridLayout()
         promote_button = QPushButton("Promote completed run to evidence")
         promote_button.clicked.connect(self._promote)
         cite_button = QPushButton("Cite promoted evidence")
@@ -1398,12 +1402,8 @@ class ResearchWorkbench(QWidget):
         lineage_button.clicked.connect(self._lineage)
         export_button = QPushButton("Export versioned HTML report…")
         export_button.clicked.connect(self.export_report)
-        buttons.addWidget(promote_button)
-        buttons.addWidget(cite_button)
-        buttons.addWidget(uncite_button)
-        buttons.addWidget(lineage_button)
-        buttons.addWidget(freeze_button)
-        buttons.addWidget(export_button)
+        for index, button in enumerate((promote_button, cite_button, uncite_button, lineage_button, freeze_button, export_button)):
+            buttons.addWidget(button, index // 2, index % 2)
         layout.addLayout(buttons)
         self.evidence_output = QTextBrowser()
         self.evidence_output.setMinimumHeight(130)
