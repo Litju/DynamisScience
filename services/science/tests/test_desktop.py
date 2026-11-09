@@ -971,6 +971,10 @@ def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, m
     assert window.performance.pose_plot.plotItem.listDataItems()
     window.show_performance_page("today")
     qtbot.waitUntil(lambda: not window.runner.active)
+    assert {key: button.accessibleName() for key, button in window.performance_rail.buttons.items()} == {
+        "today": "Today", "plan": "Plan", "monitor": "Monitor", "test": "Test",
+        "research": "Research", "report": "Reports",
+    }
     window.performance._open_selected_athlete()
     qtbot.waitUntil(
         lambda: window.performance.context_panel.views.currentWidget()

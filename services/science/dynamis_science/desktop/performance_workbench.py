@@ -335,6 +335,7 @@ class PerformanceRail(QWidget):
             for name, key, tag in items:
                 button = QPushButton()
                 button.setObjectName("PerformanceRailItem")
+                button.setAccessibleName(name)
                 button.setCheckable(True)
                 row = QHBoxLayout(button)
                 row.setContentsMargins(5, 3, 5, 3)
