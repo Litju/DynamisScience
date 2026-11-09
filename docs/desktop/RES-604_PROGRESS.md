@@ -35,15 +35,15 @@ Performance results: [G1 benchmark JSON](evidence/g1-desktop-benchmarks.json). T
 
 | Benchmark | Measured | Design target | Result |
 |---|---:|---:|---|
-| Cold start to populated catalogue (5 samples) | median 1,473 ms; p95 1,514 ms | median <1,500 ms | Met |
-| Idle working set, 5 s after opening Mendeley | 218.16 MB | <250 MB | Met |
-| First `force_signals.parquet` page (500 rows) | 21.34 ms; +2.38 MB working set | <80 ms; <25 MB delta | Met |
-| MoveSmart waveform to plot update | 51.32 ms | <120 ms | Met |
-| Mendeley MixedLM worker runtime | 3,313.0 ms; 4,640.9 ms wall | <2,500 ms | Missed; qualified optimizer sequence preserved |
-| Maximum GUI timer gap during MixedLM | 5.60 ms | <16 ms | Met |
-| Peak session working set including report export | 245.25 MB | <500 MB | Met |
+| Cold start to populated catalogue (5 samples) | median 1,558.224 ms; p95 3,106.507 ms (first sample 3,490.364 ms) | median <1,500 ms | Missed by 58 ms; p95 reflects one cold outlier |
+| Idle working set, 5 s after opening Mendeley | 224.43 MB | <250 MB | Met |
+| First `force_signals.parquet` page (500 rows) | 29.370 ms; +2.55 MB working set | <80 ms; <25 MB delta | Met |
+| MoveSmart waveform to plot update | 48.994 ms | <120 ms | Met |
+| Mendeley MixedLM worker runtime | 2,637.623 ms; 3,730.474 ms wall | <2,500 ms | Missed by 138 ms; qualified optimizer sequence preserved |
+| Maximum GUI timer gap during MixedLM | 29.207 ms | <16 ms | Missed; analysis completed, evidence promotion and report export remained responsive |
+| Peak session working set including report export | 251.43 MB | <500 MB | Met |
 
-The MixedLM duration target remains missed in the completed native-only application; the model, optimizer set and qualification tolerances are unchanged.
+The frozen-candidate BENCH-01..06 protocol ran once at source commit `39315b41974fa7a6b9e535467efb7371bda9c89b` against checksum-verified snapshots and an SQLite backup in a disposable root. The real-data analysis ran in the existing isolated Python subprocess; the benchmark records worker and total wall time, but does not collect per-process CPU utilization. The application remained responsive and completed analysis, evidence promotion and report export. Cold-start median, MixedLM duration and the maximum GUI timer gap are recorded as explicit target deviations; no equation, optimizer sequence or tolerance changed.
 
 ## G2 — Research authoring and data management
 
