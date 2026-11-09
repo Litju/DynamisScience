@@ -1,0 +1,191 @@
+{
+  "issue": "RES-604",
+  "release_candidate": {
+    "branch": "main",
+    "build_source_commit": "5447b5466fdd1b81b20a055275e98374a24cea7c",
+    "working_tree_status_at_build": [
+      " M data/synthetic/generator_manifest.json"
+    ],
+    "working_tree_diff_sha256": "D0691F70663717FC86A4D9AB51AD62650903F0F3D19AB21457FABEB593DDBF4B",
+    "preserved_manifest_sha256": "835398DA594421BC9F04647992B0E9CEFD5DC844FD931D1964896B2E164A2587",
+    "application_source_unchanged_between_test_and_build": true
+  },
+  "recovery_audit": {
+    "head_at_recovery_start": "04d933c4b78db835d99257da47afa68796ccb6e4",
+    "ahead_behind_cached_origin_main_at_start": "28/0",
+    "previously_tested_installer": {
+      "path": "services/science/build/res604-20261107-151713-2e4aa442/dist/installer/DynamisScience-Setup-x64.exe",
+      "bytes": 141523998,
+      "sha256": "FB925226A70E2F799A318698D2921B6BAC0D396BDD5B34C0D9712A7F3B3E4774",
+      "source_commit_recorded": false,
+      "reused": false
+    },
+    "excluded_recovery_build": "res604-20261109-062330-3f0986d5: installer was produced but source identity recording failed; not installed or reused",
+    "root_cause": "Later source and qualification edits were not tied to the last installed package by a commit or worktree fingerprint. The expanded installer test prepared real worker requests without executing them and did not remove its copied temporary research data. The first recovery rebuild completed compilation but failed while recording source identity; it was excluded, the Git metadata call was corrected, and the final build was made from the new candidate commit.",
+    "worker_architecture": "Existing Qt task pool plus isolated Python subprocess for qualified real-data analyses; no Qt-thread/warmup experiment remains in the source diff.",
+    "recovery_commits": [
+      {
+        "sha": "39315b41974fa7a6b9e535467efb7371bda9c89b",
+        "subject": "RES-604: qualify frozen workers and capture package source"
+      },
+      {
+        "sha": "70d9624829e3dc731b52399828174e053a28d047",
+        "subject": "RES-604: record frozen-candidate BENCH deviations"
+      },
+      {
+        "sha": "5447b5466fdd1b81b20a055275e98374a24cea7c",
+        "subject": "RES-604: fix Windows build source stamping"
+      }
+    ]
+  },
+  "scientific_and_functional_qualification": {
+    "python_qt_suite": {
+      "command": "uv run pytest -q",
+      "result": "93 tests passed",
+      "tested_application_commit": "39315b41974fa7a6b9e535467efb7371bda9c89b",
+      "r_version": "4.6.2",
+      "lme4_version": "2.1.0",
+      "data_isolation": "pytest temporary roots and disposable SQLite/snapshot copies"
+    },
+    "installed_real_workers": {
+      "METH-REAL-TREND": {
+        "status": "COMPLETED",
+        "direct_result_digest_match": true,
+        "result_digest": "c6de44b82ef0c7c5"
+      },
+      "METH-REAL-RELIABILITY": {
+        "status": "COMPLETED",
+        "direct_result_digest_match": true,
+        "result_digest": "701ce1653ab28cfd"
+      },
+      "METH-REAL-SIGNAL-QA": {
+        "status": "COMPLETED",
+        "direct_result_digest_match": true,
+        "result_digest": "58646a2b61d32de9"
+      }
+    },
+    "independent_real_qualification": {
+      "Mendeley MixedLM": "QUALIFIED",
+      "MoveSmart ICC": "QUALIFIED",
+      "MoveSmart signal": "QUALIFIED"
+    },
+    "synthetic_only_qualification_state": "NO_REAL_SNAPSHOTS",
+    "matplotlib_exports": {
+      "extensions": [
+        "png",
+        "pdf",
+        "svg"
+      ],
+      "direct_result_digest_match": true,
+      "provenance_embedded": true
+    },
+    "installed_gui": {
+      "catalogue_startup": "passed",
+      "Performance OS navigation": "passed",
+      "study_reopen": "passed",
+      "listening_tcp_ports": 0
+    },
+    "workflow_coverage": [
+      "Research authoring and dataset admission",
+      "Source rights and provenance",
+      "Evidence promotion and lineage",
+      "Scientific report generation and exports",
+      "Performance OS navigation and persistence",
+      "SQLite transaction and recovery behavior"
+    ],
+    "sqlite_recovery": {
+      "integrity_check": "ok",
+      "online_backup": "passed",
+      "restore_logical_hash_preserved": true,
+      "application_reopened_after_restore": true,
+      "test_database_unchanged_by_maintenance": true,
+      "database_survived_uninstall": true,
+      "temporary_test_root_removed": true
+    }
+  },
+  "performance": {
+    "protocol": "BENCH-01..06, run once against the frozen application source",
+    "source_commit": "39315b41974fa7a6b9e535467efb7371bda9c89b",
+    "cold_start_ms": {
+      "median": 1558.224,
+      "p95": 3106.507,
+      "samples": [
+        3490.364,
+        1558.224,
+        1571.079,
+        1520.438,
+        1540.727
+      ]
+    },
+    "idle_working_set_mb": 224.43,
+    "parquet_500_row_page_ms": 29.37,
+    "parquet_working_set_delta_mb": 2.55,
+    "waveform_load_ms": 48.994,
+    "mixedlm_worker_ms": 2637.623,
+    "mixedlm_wall_ms": 3730.474,
+    "gui_timer_gap_max_ms": 29.207,
+    "peak_working_set_mb": 251.43,
+    "subprocess_behavior": "Real analysis ran in the existing child Python worker; wall and worker duration were recorded.",
+    "cpu_utilization": "Not collected by the existing BENCH protocol.",
+    "accepted_deviations": [
+      "Cold-start median was 58 ms above the 1.5 s target; the 3.49 s first sample raised p95.",
+      "MixedLM worker duration was 138 ms above the 2.5 s target; scientific qualification and direct/worker digest equivalence passed.",
+      "Maximum GUI timer gap was 29.207 ms against 16 ms; the UI completed analysis, evidence promotion and report export without a functional freeze.",
+      "Installed Performance OS Today navigation measured 4615.396 ms; navigation completed successfully."
+    ],
+    "acceptance": "Performance deviations are recorded and accepted for this candidate; no equation, optimizer sequence, tolerance or execution architecture was changed."
+  },
+  "windows_installer": {
+    "build_id": "res604-20261109-063239-387d9bb5",
+    "path": "D:/projects/DynamisScience/services/science/build/res604-20261109-063239-387d9bb5/dist/installer/DynamisScience-Setup-x64.exe",
+    "sha256": "17C04C46F882690EDF49FA799DCD958C89938EEE0959CF9621E7AB0166889B2F",
+    "bytes": 141528142,
+    "bundle_bytes": 582741889,
+    "python": "3.12.13",
+    "pyinstaller": "6.22.3",
+    "inno_setup": "6.7.3",
+    "installed_startup_ms": {
+      "unpacked": 3694.823,
+      "installed_catalogue": 1608.1125,
+      "installed_performance_today": 4615.3964,
+      "installed_study_reopen": 1571.3199,
+      "installed_after_restore": 1082.1911
+    },
+    "installed_peak_working_set_mb": {
+      "catalogue": 108.69,
+      "performance_today": 232.86,
+      "study_reopen": 128.37,
+      "after_restore": 125.93,
+      "unpacked_sample_reported_but_excluded_as_implausible": 5.51
+    },
+    "contents_verified": [
+      "PySide6 QtWidgets, QtOpenGL and QtOpenGLWidgets",
+      "pyqtgraph",
+      "Matplotlib QtAgg, Agg, PDF and SVG backends",
+      "scientific worker and qualification modules",
+      "SQLite recovery module",
+      "third-party and LGPL notices",
+      "R/lme4 reference script"
+    ],
+    "authenticode": {
+      "installer": "NotSigned",
+      "app_executable": "NotSigned",
+      "host_rscript_executable": "NotSigned",
+      "mark_of_the_web": false,
+      "user_reported_r_qualification_block": "Windows blocked the R qualification invocation; the user selected Allow and the qualification passed.",
+      "security_policy_changed": false
+    }
+  },
+  "private_data_preservation": {
+    "sqlite_file_count": 5,
+    "sqlite_bytes": 1167360,
+    "aggregate_fingerprint_before_sha256": "FEF535256162EC5297E1C091B54299687A80EDD1E525C4EB9400C1743CBCAC41",
+    "aggregate_fingerprint_after_sha256": "FEF535256162EC5297E1C091B54299687A80EDD1E525C4EB9400C1743CBCAC41",
+    "unchanged": true
+  },
+  "remaining_limitations": [
+    "The installer and application are unsigned; Windows may prompt again for an unknown publisher or R qualification execution on another machine.",
+    "BENCH did not collect per-process CPU utilization.",
+    "The unpacked-launch working-set sample was implausibly low and was excluded from conclusions."
+  ]
+}

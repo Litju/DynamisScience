@@ -1,57 +1,114 @@
 {
   "platform": "Microsoft Windows NT 10.0.22631.0",
+  "source_commit": "5447b5466fdd1b81b20a055275e98374a24cea7c",
+  "source_status": [
+    " M data/synthetic/generator_manifest.json"
+  ],
+  "source_diff_sha256": "D0691F70663717FC86A4D9AB51AD62650903F0F3D19AB21457FABEB593DDBF4B",
+  "installer_path": "D:\\projects\\DynamisScience\\services\\science\\build\\res604-20261109-063239-387d9bb5\\dist\\installer\\DynamisScience-Setup-x64.exe",
+  "installer_sha256": "17C04C46F882690EDF49FA799DCD958C89938EEE0959CF9621E7AB0166889B2F",
   "runs": [
     {
+      "process_exit_code": 0,
+      "peak_working_set_mb": 5.51,
       "label": "onedir",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 3502.6117000000004,
-      "peak_working_set_mb": 110.66,
-      "process_exit_code": 0
+      "startup_to_catalogue_ms": 3694.823
     },
     {
+      "process_exit_code": 0,
+      "peak_working_set_mb": 108.69,
       "label": "installed",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 1733.5649,
-      "peak_working_set_mb": 118.72,
-      "process_exit_code": 0
+      "startup_to_catalogue_ms": 1608.1125
     },
     {
+      "process_exit_code": 0,
+      "peak_working_set_mb": 232.86,
       "label": "installed-performance",
       "listener_count": 0,
-      "startup_to_catalogue_ms": 3330.2878,
-      "peak_working_set_mb": 245.5,
-      "process_exit_code": 0
+      "startup_to_catalogue_ms": 4615.3964
+    },
+    {
+      "process_exit_code": 0,
+      "peak_working_set_mb": 128.37,
+      "label": "installed-reopen",
+      "listener_count": 0,
+      "startup_to_catalogue_ms": 1571.3199
+    },
+    {
+      "process_exit_code": 0,
+      "peak_working_set_mb": 125.93,
+      "label": "installed-after-restore",
+      "listener_count": 0,
+      "startup_to_catalogue_ms": 1082.1911
     }
   ],
   "network_listeners": [],
   "scientific_worker": {
-    "method_id": "METH-U-DESC",
     "status": "COMPLETED",
+    "elapsed_ms": 800.91,
+    "method_id": "METH-U-DESC",
     "result_digest_matches_direct": true,
-    "elapsed_ms": 2519.49
+    "result_digest": "e40b1aeb32d84f1a"
   },
+  "real_scientific_workers": {
+    "mendeley-trend": {
+      "elapsed_ms": 3023.85,
+      "method_id": "METH-REAL-TREND",
+      "result_digest_matches_direct": true,
+      "result_digest": "c6de44b82ef0c7c5"
+    },
+    "movesmart-reliability": {
+      "elapsed_ms": 1727.38,
+      "method_id": "METH-REAL-RELIABILITY",
+      "result_digest_matches_direct": true,
+      "result_digest": "701ce1653ab28cfd"
+    },
+    "movesmart-signal": {
+      "elapsed_ms": 799.34,
+      "method_id": "METH-REAL-SIGNAL-QA",
+      "result_digest_matches_direct": true,
+      "result_digest": "58646a2b61d32de9"
+    }
+  },
+  "real_data_qualification": [
+    {
+      "status": "QUALIFIED",
+      "id": "QUAL-REAL-MIXEDLM"
+    },
+    {
+      "status": "QUALIFIED",
+      "id": "QUAL-REAL-RELIABILITY"
+    },
+    {
+      "status": "QUALIFIED",
+      "id": "QUAL-REAL-SIGNAL"
+    }
+  ],
   "matplotlib_exports": {
     "provenance_embedded": true,
+    "result_digest_matches_direct": true,
     "extensions": [
       "png",
       "pdf",
       "svg"
-    ],
-    "result_digest_matches_direct": true
+    ]
   },
   "qualification_worker": {
-    "empty_state": true,
-    "status": "NO_REAL_SNAPSHOTS"
+    "status": "NO_REAL_SNAPSHOTS",
+    "empty_state": true
   },
   "sqlite_recovery": {
-    "elapsed_ms": 2260.54,
     "logical_hash_preserved": true,
+    "integrity_check": "ok",
     "operational_database_unchanged": true,
-    "restore_reopened": true,
-    "integrity_check": "ok"
+    "elapsed_ms": 779.62,
+    "restore_reopened": true
   },
-  "data_root": "D:\\SWE_HOME\\tmp\\dynamis-g4-installer-d351244bb8c0481f82f35d488d45646b\\installed-data",
+  "data_root": "disposable isolated test root",
   "database_survived_uninstall": true,
-  "bundle_bytes": 582741845,
-  "installer_bytes": 141523998
+  "bundle_bytes": 582741889.0,
+  "installer_bytes": 141528142,
+  "temporary_test_root_removed": true
 }
