@@ -1521,6 +1521,15 @@ class ResearchWorkbench(QWidget):
         self.window.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
 
     def _clear_study_views(self) -> None:
+        if hasattr(self, "table_model"):
+            self.table_picker.blockSignals(True)
+            self.table_picker.clear()
+            self.table_picker.blockSignals(False)
+            self.table_model.set_table("", "", 0, [])
+            self.table_status.setText("Loading dataset metadata…")
+            self.cohort_picker.clear()
+            self.cohort_table_model.set_rows([])
+            self.cohort_summary.setText("Open a study to resolve its cohort.")
         if hasattr(self, "run_output"):
             self.run_output.clear()
             self.parameters.clear()
@@ -1533,9 +1542,14 @@ class ResearchWorkbench(QWidget):
             self.exploration_plot.figure.clear()
             self.exploration_plot.canvas.draw_idle()
             self.signal_plot.clear()
+            self.trial_picker.clear()
         if hasattr(self, "evidence_output"):
             self.evidence_output.clear()
             self.report_preview.clear()
+            self.report_title.clear()
+            self.report_summary.clear()
+            self.report_conclusion.clear()
+            self.report_recommendations.clear()
 
     def _load_dataset(self, snapshot_id: str | None, detail: dict[str, Any] | None = None) -> None:
         if not snapshot_id:
