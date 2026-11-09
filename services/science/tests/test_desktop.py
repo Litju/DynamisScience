@@ -251,6 +251,10 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert any(node["id"] == mendeley["snapshot_id"] for node in graph["nodes"])
     figure = run_figure(mendeley)
     assert len(figure.axes) == 2
+    qq = mendeley["diagnostics"]["residual_qq"]
+    assert list(figure.axes[1].collections[0].get_offsets()[:, 0]) == [point["theoretical"] for point in qq]
+    assert not figure.axes[1].lines
+    assert "Marginal residual" in figure.axes[1].get_ylabel()
     assert "result_digest" in figure._dynamis_metadata["DynamisScience provenance"]
     for extension in ("png", "pdf", "svg"):
         output = export_figure(figure, tmp_path / f"result.{extension}")

@@ -138,14 +138,9 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 s=18,
                 color="#176b87",
             )
-            bounds = [
-                min(min(item["theoretical"], item["observed"]) for item in qq),
-                max(max(item["theoretical"], item["observed"]) for item in qq),
-            ]
-            diagnostic_axis.plot(bounds, bounds, color="#777", linewidth=0.8)
-            diagnostic_axis.set_title("Residual Q–Q diagnostic")
+            diagnostic_axis.set_title("Marginal residual Q–Q · exploratory")
             diagnostic_axis.set_xlabel("Theoretical normal quantile")
-            diagnostic_axis.set_ylabel("Standardized residual")
+            diagnostic_axis.set_ylabel("Marginal residual / conditional SD")
         elif cv:
             diagnostic_axis.plot(
                 [item["subject_id"] for item in cv],
