@@ -35,6 +35,7 @@ class LineageDialog(QDialog):
         self.graph = graph
         self.scene = QGraphicsScene(self)
         self.node_items: dict[str, QGraphicsRectItem] = {}
+        self.node_labels: list[QGraphicsTextItem] = []
         nodes = graph.get("nodes", [])
         edges = graph.get("edges", [])
 
@@ -112,6 +113,7 @@ class LineageDialog(QDialog):
             text.setTextWidth(174)
             text.setPos(position.x() + 8, position.y() + 7)
             text.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            self.node_labels.append(text)
             self.node_items[node["id"]] = rect
 
         self.scene.setSceneRect(self.scene.itemsBoundingRect().adjusted(-32, -32, 32, 32))

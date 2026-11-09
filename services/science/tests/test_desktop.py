@@ -566,6 +566,8 @@ def test_native_investigation_editor_and_report_version_comparison(
     lineage_dialog = LineageDialog(lineage_graph)
     qtbot.addWidget(lineage_dialog)
     assert len(lineage_dialog.node_items) == len(lineage_graph["nodes"])
+    assert len(lineage_dialog.node_labels) == len(lineage_graph["nodes"])
+    assert all(label.scene() is lineage_dialog.scene and label.toPlainText() for label in lineage_dialog.node_labels)
     assert lineage_graph["edges"]
     selected_node = lineage_graph["nodes"][-1]
     lineage_dialog.scene.clearSelection()
