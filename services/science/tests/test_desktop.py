@@ -772,6 +772,7 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     source_file = tmp_path / "local-cmj.csv"
     dialog = DatasetAdmissionDialog(service, window.run_task, window._admission_saved, window)
     qtbot.addWidget(dialog)
+    assert dialog.summary.minimumHeight() >= 100
     source_file.write_text(
         "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week,body_mass_kg,jump_height_cm,concentric_impulse_n_s_kg\n"
         f"P01,S01,T01,{dialog.instrument_id},{dialog.protocol_id},1000,1,80,38,1.7\n"

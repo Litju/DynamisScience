@@ -498,6 +498,7 @@ class DatasetAdmissionDialog(QDialog):
         footer.addWidget(cancel)
         layout.addLayout(footer)
         self.summary = QTextBrowser()
+        self.summary.setMinimumHeight(100)
         self.summary.setMaximumHeight(160)
         layout.addWidget(self.summary)
 
