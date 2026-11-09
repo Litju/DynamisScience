@@ -439,6 +439,8 @@ class PerformanceContextPanel(QWidget):
         self.injury.setObjectName("PerformanceCalloutWarning")
         self.movement = QLabel("Movement scope is a bounded segment, not full-match distance.")
         self.movement.setObjectName("PerformanceCalloutInfo")
+        self.injury.setWordWrap(True)
+        self.movement.setWordWrap(True)
         for title, widget in (
             ("TODAY'S CHECKLIST", self.checklist),
             ("READINESS DISTRIBUTION", self.readiness_bar),

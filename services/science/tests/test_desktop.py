@@ -979,6 +979,8 @@ def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, m
         "today": "Today", "plan": "Plan", "monitor": "Monitor", "test": "Test",
         "research": "Research", "report": "Reports",
     }
+    assert window.performance.context_panel.injury.wordWrap()
+    assert window.performance.context_panel.movement.wordWrap()
     window.performance._open_selected_athlete()
     qtbot.waitUntil(
         lambda: window.performance.context_panel.views.currentWidget()
