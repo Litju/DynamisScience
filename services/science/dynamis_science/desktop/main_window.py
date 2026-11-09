@@ -1371,13 +1371,14 @@ class ResearchWorkbench(QWidget):
         controls.addWidget(self.show_figure_button, 2, 1)
         controls.addWidget(export_run, 2, 2)
         run_layout.addLayout(controls)
-        results = QSplitter(Qt.Orientation.Horizontal)
+        results = QTabWidget()
+        self.run_result_tabs = results
         self.run_output = QTextBrowser()
         self.run_plot_holder = QWidget()
         holder_layout = QVBoxLayout(self.run_plot_holder)
         holder_layout.addWidget(QLabel("Run an analysis to create a scientific figure."))
-        results.addWidget(self.run_output)
-        results.addWidget(self.run_plot_holder)
+        results.addTab(self.run_output, "Result")
+        results.addTab(self.run_plot_holder, "Figure")
         run_layout.addWidget(results, 1)
         self.analysis_tabs.addTab(run_page, "Analysis run")
         self.investigation_editor = InvestigationEditor(
@@ -1843,6 +1844,7 @@ class ResearchWorkbench(QWidget):
                 placeholder.deleteLater()
             self.run_plot_holder.layout().addWidget(self.run_plot)
         self.run_plot.show_figure(run_figure(self.latest_run))
+        self.run_result_tabs.setCurrentWidget(self.run_plot_holder)
 
     def _promote(self) -> None:
         if not self.latest_run:

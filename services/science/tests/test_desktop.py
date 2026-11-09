@@ -461,6 +461,7 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     assert not errors, errors
     window.research._show_run_figure()
     assert window.research.run_plot.figure.axes
+    assert window.research.run_result_tabs.currentWidget() is window.research.run_plot_holder
     assert window.research.latest_run["result_digest"] == reference_run["result_digest"]
     assert window.current_study_id == study_id
 
