@@ -522,11 +522,25 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     assert "single-arm observational design" in html
     assert "doi" in html.lower()
     qtbot.waitUntil(lambda: not window.runner.active)
+    run_id = window.research.latest_run["id"]
+    evidence_id = window.research.latest_evidence_id
+    window._navigation_activated(
+        next(study_parent.child(index) for index in range(study_parent.childCount())
+             if study_parent.child(index).data(0, Qt.ItemDataRole.UserRole)["id"] == movesmart["id"]), 0
+    )
+    qtbot.waitUntil(lambda: window.current_study_id == movesmart["id"])
+    assert window.research.latest_run is None
+    assert not window.research.run_output.toPlainText()
+    assert not window.research.parameters.toPlainText()
+    assert not window.research.show_figure_button.isEnabled()
+    assert not window.research.run_plot.figure.axes
+    assert not window.research.signal_plot.listDataItems()
+    qtbot.waitUntil(lambda: not window.runner.active)
     window.close()
 
     reopened = DynamisAppService().get_study_detail(study_id)
-    assert any(run["id"] == window.research.latest_run["id"] for run in reopened["runs"])
-    assert any(item["id"] == window.research.latest_evidence_id for item in reopened["evidence"])
+    assert any(run["id"] == run_id for run in reopened["runs"])
+    assert any(item["id"] == evidence_id for item in reopened["evidence"])
     with sqlite3.connect(root / "research" / "research.db") as database:
         assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     assert service.get_report(study_id)["status"] == "FROZEN"

@@ -1431,6 +1431,7 @@ class ResearchWorkbench(QWidget):
     def set_study(self, study_id: str, detail: dict[str, Any]) -> None:
         for index in range(1, len(self._builders)):
             self._ensure_tab(index)
+        self._clear_study_views()
         self.study_id = study_id
         self.detail = detail
         self.snapshot_id = detail.get("snapshot", {}).get("id") or detail.get("study", {}).get("dataset_snapshot_id")
@@ -1482,6 +1483,7 @@ class ResearchWorkbench(QWidget):
 
     def select_project(self, project: dict[str, Any]) -> None:
         self._ensure_tab(0)
+        self._clear_study_views()
         self.study_id = None
         self.detail = {}
         self.snapshot_id = None
@@ -1498,6 +1500,7 @@ class ResearchWorkbench(QWidget):
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
         self._ensure_tab(1)
+        self._clear_study_views()
         self.study_id = None
         self.detail = {"snapshot": detail}
         self.snapshot_id = snapshot_id
@@ -1516,6 +1519,23 @@ class ResearchWorkbench(QWidget):
         self._load_dataset(snapshot_id, detail)
         self.dataset_tabs.setCurrentIndex(0)
         self.window.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
+
+    def _clear_study_views(self) -> None:
+        if hasattr(self, "run_output"):
+            self.run_output.clear()
+            self.parameters.clear()
+            self.show_figure_button.setEnabled(False)
+            self.run_result_tabs.setCurrentIndex(0)
+        if hasattr(self, "run_plot"):
+            self.run_plot.figure.clear()
+            self.run_plot.canvas.draw_idle()
+        if hasattr(self, "exploration_plot"):
+            self.exploration_plot.figure.clear()
+            self.exploration_plot.canvas.draw_idle()
+            self.signal_plot.clear()
+        if hasattr(self, "evidence_output"):
+            self.evidence_output.clear()
+            self.report_preview.clear()
 
     def _load_dataset(self, snapshot_id: str | None, detail: dict[str, Any] | None = None) -> None:
         if not snapshot_id:
