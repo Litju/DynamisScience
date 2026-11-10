@@ -143,6 +143,17 @@ Occasion summaries (Mendeley) have exactly one row per athlete per occasion, so 
 
 `figure-*.png` are the exported Matplotlib figures; PNG, PDF and SVG were all produced. Figure provenance includes the method status, source DOI and licence.
 
+### Installed package (`res619-evidence/installer-smoke.json`)
+
+- Built with `scripts/build_windows.ps1` (PyInstaller onedir + Inno Setup), source commit `c6255bb` (application source identical to `4c014d5`; only documentation differs). The working tree held only the owner's pre-existing `generator_manifest.json` edit.
+- Installer `DynamisScience-Setup-x64.exe`, SHA-256 `BF275A0E2457E2539A3F67BB8D0EF935CDBB5E5542B33B738F0EA2C2B085560D`, 141,555,829 bytes.
+- `scripts/test_windows_installer.ps1` ran with the disposable restore as its source root. It covers a silent install, the catalogue smoke (onedir, installed, Performance, reopen and post-restore), and installed scientific workers with digests equal to direct runs.
+- **RES-619 values from the installed reliability worker:** method 1.1.0, ICC(3,1) 0.8887265872, CI 0.7451953776–0.9692965400, TE 75.782606 N, MDC95 210.054807 N.
+- The installed trend worker recorded method 1.1.0 with `CONDITIONAL_PEARSON` residuals and slope 0.99845 cm per occasion.
+- The installed real-data qualification passed (MIXEDLM, RELIABILITY and SIGNAL all QUALIFIED), and PNG/PDF/SVG exports carried embedded provenance.
+- SQLite integrity was ok, the logical hash was preserved, and the operational database was unchanged. The database survived uninstall, and the temporary root was removed.
+- The script's default output file `docs/desktop/evidence/g4-packaging-benchmarks.json` (RES-604/613 evidence) was restored to its committed content; this run's output lives here instead.
+
 ### Claims that require independent human or statistical judgement
 
 1. ICC(3,1) vs ICC(2,1) as the primary reliability estimand, and whether mixed-plate trials or IMU-match eligibility should change the analysis set.
