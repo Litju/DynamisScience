@@ -1007,9 +1007,11 @@ def reliability(snapshot_id: str, cohort_ids: list[str], activity: str, max_tria
     trials = read_table(snapshot_id, "signal_trials")
     rows = [row for row in trials.iter_rows(named=True) if row["subject_id"] in cohort_ids and row["activity"] == activity]
     by_subject: dict[str, list[float]] = {}
+    plates: dict[str, list[int]] = {}
     # Keep acquisition order: trials are the ICC(3,1) column factor, never sort by value.
     for row in sorted(rows, key=lambda item: (item["subject_id"], int(item["trial_number"]))):
         by_subject.setdefault(row["subject_id"], []).append(float(row["fz_peak_n"]))
+        plates.setdefault(row["subject_id"], []).append(int(row.get("force_file_count") or 0))
     complete = {key: values for key, values in by_subject.items() if len(values) >= 2}
     if len(complete) < 3:
         return {"method": "ICC(3,1)", "status": "INSUFFICIENT_DATA", "message": "Fewer than three participants have at least two trials.", "activity": activity}
@@ -1017,6 +1019,8 @@ def reliability(snapshot_id: str, cohort_ids: list[str], activity: str, max_tria
     subjects = sorted(complete)
     matrix = np.array([complete[subject][:k] for subject in subjects], dtype=float)
     result = _reliability_matrix(matrix)
+    mixed_plates = sorted(subject for subject in subjects if len(set(plates[subject][:k])) > 1)
+    dropped = sorted(set(by_subject) - set(complete))
     result.update(
         {
             "activity": activity,
@@ -1027,7 +1031,11 @@ def reliability(snapshot_id: str, cohort_ids: list[str], activity: str, max_tria
             "n_trials_used": int(matrix.size),
             "excluded_trials": len(rows) - int(matrix.size),
             "limitations": [
-                f"Balanced subset: the first {k} trials per participant are used; later trials are excluded to keep the ICC design balanced.",
+                f"Balanced subset: the first {k} trials per participant in acquisition order are used; later trials are excluded to keep the ICC design balanced.",
+                "ICC(3,1) is within-session consistency of a single trial (systematic trial effects removed); it is not between-day reliability. ICC(1,1) and ICC(2,1) are reported as sensitivities.",
+                "Eligibility follows the admitted snapshot: only force trials matched to an IMU recording are included.",
+                *([f"Participants with fewer than two trials are excluded: {', '.join(dropped)}."] if dropped else []),
+                *([f"The number of contributing force plates differs between selected trials for {', '.join(mixed_plates)}; peaks may not be fully comparable."] if mixed_plates else []),
                 "Peak force is not normalised to body weight, so between-participant differences remain.",
                 "Walking speed is not controlled in the deposited trials.",
                 "The deposit has no calibration log.",
@@ -1131,7 +1139,7 @@ def execute(
             "trials_per_subject": result.get("trials_per_subject"),
             "n_trials_used": result.get("n_trials_used"),
             "excluded_trials": result.get("excluded_trials"),
-            "assumptions": ["Balanced subset of the first k trials per participant.", "Peak force is measured in the same activity."],
+            "assumptions": ["Balanced subset of the first k trials per participant in acquisition order.", "Peak force is measured in the same activity.", "Trials are a fixed factor; consistency ICC(3,1) removes systematic trial effects."],
             "limitations": result.get("limitations", []),
         }
     else:  # pragma: no cover

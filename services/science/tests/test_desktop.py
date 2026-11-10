@@ -357,6 +357,10 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     records = json.loads(ledger.read_text(encoding="utf-8"))
     current_reliability = max((record for record in records if record["method_id"] == "METH-REAL-RELIABILITY"), key=lambda record: record["created_at"])
     assert current_reliability["method_version"] == "1.1.0"
+    limitations = current_reliability["result"]["limitations"]
+    assert "Participants with fewer than two trials are excluded: MS-06." in limitations
+    assert any("force plates differs between selected trials for MS-03, MS-04, MS-07" in item for item in limitations)
+    assert any("not between-day reliability" in item for item in limitations)
     legacy = {key: value for key, value in current_reliability.items() if key != "method_version"}
     legacy.update({"id": "RUN-REAL-9001", "created_at": "2026-11-06T14:48:32+00:00", "result": {**legacy["result"], "icc_3_1": 0.9511167659496643}})
     legacy["execution"] = {**legacy["execution"], "analysis_spec": {**legacy["execution"]["analysis_spec"], "method_version": "1.0.0"}}
