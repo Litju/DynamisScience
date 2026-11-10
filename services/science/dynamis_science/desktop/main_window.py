@@ -58,6 +58,9 @@ from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .tasks import TaskRunner
 from .theme import apply_theme
+from .workbench.controller import WorkbenchController
+from .workbench.data_pane import DataPane
+from .workbench.options_pane import OptionsPane
 from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
 
 
@@ -113,8 +116,8 @@ class MainWindow(QMainWindow):
         self.inspector_dock.setWidget(self.inspector_stack)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
 
-        # Research perspective: design E workbench. Until later RES-620 gates fill the panes,
-        # Data hosts the research navigator and Results hosts the existing study workspace.
+        # Research perspective: design E workbench. Data and Options are the native panes (the research
+        # navigator lives in the Data pane's Library section); Results still hosts the study workspace.
         self.workbench = WorkbenchShell(self.settings, self)
         self.context = self.workbench.context_label
         self.provenance = self.workbench.provenance_label
@@ -126,14 +129,18 @@ class MainWindow(QMainWindow):
         self.workspace.addWidget(self.welcome)
         self.research = ResearchWorkbench(self)
         self.workspace.addWidget(self.research)
-        self.workbench.set_data_widget(self.navigator)
+        self.data_pane = DataPane(self.service, self.navigator)
+        self.options_pane = OptionsPane()
+        self.workbench.set_data_widget(self.data_pane)
+        self.workbench.set_options_widget(self.options_pane)
+        self.controller = WorkbenchController(self.workbench, self.data_pane, self.options_pane, self)
+        self.controller.run_requested.connect(self._run_spec)
         results_scroll = QScrollArea()
         results_scroll.setObjectName("WorkbenchResultsScroll")
         results_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         results_scroll.setWidgetResizable(True)
         results_scroll.setWidget(self.workspace)
         self.workbench.set_results_widget(results_scroll)
-        self.workbench.action_run.triggered.connect(lambda: self.research._execute())
         self.workbench.action_add_to_report.triggered.connect(lambda: self.research._cite_latest())
         self.workbench.action_promote.triggered.connect(lambda: self.research._promote())
         self.workbench.action_export.triggered.connect(lambda: self.research.export_report())
@@ -503,6 +510,31 @@ class MainWindow(QMainWindow):
         self.inspector_stack.setCurrentWidget(self.inspector)
         self.inspector_dock.setMinimumWidth(0)
         self.inspector_dock.setMaximumWidth(16777215)
+        self.controller.refresh_provenance()
+
+    def _run_spec(self, spec) -> None:
+        """HOOK (results gate): replace this body with ResultsDocument/run_analysis; it must end in controller.set_last_run_hash(spec.spec_hash(), run, digest) or controller.mark_run_failed()."""
+        if spec.kind not in ("mixed_model", "reliability"):
+            self.controller.mark_run_failed()
+            self.workbench.show_toast(f"{spec.kind.replace('_', ' ')} has no engine yet; no run was created")
+            return
+        study_id, payload = spec.study_id, spec.to_run_payload()
+
+        def ok(run: dict[str, Any]) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Ready")
+            self.research._run_completed(study_id, run)
+            self.controller.set_last_run_hash(spec.spec_hash(), run.get("id", ""), str(run.get("result_digest", "")))
+
+        def failed(error: Exception) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Operation failed")
+            self.controller.mark_run_failed()
+            QMessageBox.warning(self, "DynamisScience", f"{type(error).__name__}: {error}")
+
+        self.status_text.setText("Running qualified scientific analysis")
+        self.progress.setVisible(True)
+        self.runner.submit(lambda: self.service.execute_analysis_isolated(study_id, payload), ok, failed)
 
     def show_performance_page(self, page: str) -> None:
         self._ensure_performance()
@@ -517,7 +549,7 @@ class MainWindow(QMainWindow):
             page, self.performance.page_names[self.performance.page_keys.index(page)]
         )
         self.context.setText(title)
-        self.workbench.set_provenance("DS-SYNTH-001 · NO REAL DATA", provenance="synthetic")
+        self.workbench.set_provenance("DS-SYNTH-001 · NO REAL DATA", provenance="synthetic")  # until research mode returns
         self.perspectives.setCurrentWidget(self.performance)
         self.performance.select_page(page)
 
@@ -723,6 +755,8 @@ class MainWindow(QMainWindow):
             self.current_project = None
             self.current_study_id = None
             self.current_study = {}
+            self.controller.set_source("")
+            self.data_pane.clear()
             self.workspace.setCurrentWidget(self.welcome)
             self.welcome.setText(item.text(0))
 
@@ -745,7 +779,8 @@ class MainWindow(QMainWindow):
         self.current_study = {}
         self.current_snapshot_id = None
         self.context.setText(project.get("title", project_id))
-        self.workbench.set_provenance("RESEARCH PROJECT")
+        self.controller.set_source("RESEARCH PROJECT")
+        self.data_pane.clear()
         self.research.select_project(project)
         self.workspace.setCurrentWidget(self.research)
         self.research.tabs.setCurrentIndex(0)
@@ -777,7 +812,17 @@ class MainWindow(QMainWindow):
             badge = f"SYNTHETIC FIXTURE · {snapshot.get('id', 'unknown snapshot')}"
         self.context.setText(detail.get("study", {}).get("title") or study_id)
         real = bool(detail.get("real_data") or snapshot.get("real_data"))
-        self.workbench.set_provenance(badge, provenance="real" if real else "synthetic")
+        self.controller.set_source(badge, "real" if real else "synthetic", study_id)
+        snapshot_id = self.current_snapshot_id
+        if snapshot_id:
+            self.run_task(
+                lambda: self.service.get_dataset_detail(snapshot_id),
+                lambda dataset: self.data_pane.set_dataset(snapshot_id, dataset)
+                if self.current_snapshot_id == snapshot_id else None,
+                "Reading dataset",
+            )
+        else:
+            self.data_pane.clear()
         self.research.set_study(study_id, detail)
         self.workspace.setCurrentWidget(self.research)
 
@@ -800,7 +845,8 @@ class MainWindow(QMainWindow):
             badge = f"SYNTHETIC FIXTURE · {snapshot_id}"
         if license_id:
             badge = f"{badge}  ·  {license_id}"
-        self.workbench.set_provenance(badge, provenance="real" if detail.get("real_data") else "synthetic")
+        self.controller.set_source(badge, "real" if detail.get("real_data") else "synthetic")
+        self.data_pane.set_dataset(snapshot_id, detail)
         self.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
         self.research.select_dataset(snapshot_id, detail)
         self.workspace.setCurrentWidget(self.research)
@@ -1539,7 +1585,8 @@ class ResearchWorkbench(QWidget):
         self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
-        self._ensure_tab(1)
+        for index in range(1, len(self._builders)):  # method_picker etc. live in later lazy tabs
+            self._ensure_tab(index)
         self._clear_study_views()
         self.study_id = None
         self.detail = {"snapshot": detail}
