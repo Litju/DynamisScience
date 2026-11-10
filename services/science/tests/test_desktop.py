@@ -209,6 +209,22 @@ def _isolated_real_root(tmp_path: Path) -> Path:
     return target_root
 
 
+def _restore_pre_res619_citations(study_id: str) -> list[str]:
+    """Recreate, in an isolated copy only, a draft that still cites method 1.0.0 evidence.
+
+    The operational store was reconciled (RES-619), so this pre-reconciliation state is
+    written directly; normal citation of superseded evidence is refused by design.
+    """
+    legacy = [item["id"] for item in researchstore.study_detail(study_id)["evidence"] if item["method_status"]["state"] == "SUPERSEDED"]
+    with researchstore._tx() as connection:
+        report = researchstore._ensure_report_row(connection, researchstore.get_entity(study_id))
+        report["evidence_ids"] = sorted(set(report.get("evidence_ids", [])) | set(legacy))
+        report["version"] = int(report["version"]) + 1
+        report["status"] = "DRAFT"
+        connection.execute("UPDATE reports SET version = ?, status = 'DRAFT', document = ? WHERE entity_id = ?", (report["version"], researchstore._canonical(report), study_id))
+    return legacy
+
+
 def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, monkeypatch):
     root = _isolated_real_root(tmp_path)
     monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(root))
@@ -427,8 +443,9 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert authored_figure.axes[0].get_legend().get_texts()[1].get_text() == "95% CI of the mean (between-athlete)"
     assert list(authored_figure.axes[0].get_xticks()) == [1, 2, 3, 4]
     # The isolated copy of the operational store holds pre-RES-619 evidence (method 1.0.0).
+    assert _restore_pre_res619_citations(study_id), "expected historical 1.0.0 evidence in the isolated copy"
     legacy = [item for item in service.get_report(study_id)["evidence"] if item["method_status"]["state"] == "SUPERSEDED"]
-    assert legacy, "expected historical 1.0.0 evidence in the isolated restore"
+    assert legacy
     legacy_html = service.render_report_html(study_id)
     assert "Superseded evidence." in legacy_html and legacy[0]["id"] in legacy_html
     with pytest.raises(researchstore.ResearchValidation, match="superseded by 1.1.0"):
@@ -659,7 +676,10 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     qtbot.waitUntil(lambda: not window.runner.active)
     assert not errors, errors
     assert service.get_report(study_id).get("summary") == "The observed within-subject estimate is reported with its stored interval."
-    # The restored store still cites method 1.0.0 evidence: the GUI must refuse to freeze it.
+    # A draft that still cites method 1.0.0 evidence: the GUI must refuse to freeze it.
+    assert _restore_pre_res619_citations(study_id)
+    window.research._load_runs_and_report()
+    qtbot.waitUntil(lambda: not window.runner.active)
     window.research._freeze_report()
     qtbot.waitUntil(lambda: bool(errors) and not window.runner.active)
     assert "superseded by 1.1.0" in errors.pop()
