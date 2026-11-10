@@ -319,7 +319,7 @@ SPAN = {"x": 10.0, "depth": 8.0, "y": 6.0}  # scene units for occasion, depth an
 PRESETS = {"Front": (0.0, -90.0), "Side": (0.0, 0.0), "3D": (20.0, -68.0)}  # (elevation, azimuth) degrees
 ELEVATION = (math.degrees(-0.1), math.degrees(1.35))  # 06-interactions: pitch clamped -0.1 .. 1.35 rad
 ZOOM = (0.6, 2.2)
-DISTANCE = 21.0
+DISTANCE = 14.0  # fills the pane (E5-3d-dark); 21 left the scene at 40 % of the view
 
 
 def _gl():

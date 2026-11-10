@@ -377,6 +377,7 @@ QPushButton#PerformancePrimaryButton:hover { background: $accent_hover; border-c
 QPushButton#PerformanceLinkButton { border: 0; background: transparent; color: $accent_text; text-align: left; padding: 2px 0; min-height: 16px; }
 QPushButton#PerformanceLinkButton:hover { color: $text; }
 QTableView#PerformanceAttentionTable { font-size: 8px; }
+QTableView#PerformanceAttentionTable QHeaderView::section { font-size: 8px; padding: 4px 3px; }
 QTextBrowser#PerformanceReportPreview { background: $base; color: $text; }
 """
 )

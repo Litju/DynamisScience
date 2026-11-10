@@ -1108,7 +1108,7 @@ class PerformanceWorkbench(QWidget):
                     for row in attention
                 ]
             )
-            for index, width in enumerate((60, 32, 85, 50, 50, 64)):
+            for index, width in enumerate((64, 36, 84, 62, 52, 66)):
                 self.today_view.setColumnWidth(index, width)
             self.pulse_values["roster"][0].setText(
                 f"{pulse['roster_active']} / {pulse['roster_total']}"
