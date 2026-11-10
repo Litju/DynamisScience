@@ -101,7 +101,7 @@ METHODS: dict[str, dict[str, Any]] = {
         "id": "METH-REAL-DESC",
         "name": "Descriptive occasion trajectory",
         "version": "1.0.0",
-        "qualification": {"status": "QUALIFIED", "record": "QUAL-REAL-DESCRIPTIVE", "reference": "Independent deterministic recomputation", "basis": "Means, SD and normal 95% intervals recomputed from the snapshot in qualification."},
+        "qualification": {"status": "QUALIFIED", "record": "QUAL-REAL-DESCRIPTIVE", "reference": "Independent deterministic recomputation", "basis": "Means, SD and Student-t 95% intervals (df = n - 1, RES-619) recomputed from the snapshot."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
         "required_tables": ["cmj_occasions"],
         "required_shape": "One numeric outcome per subject and occasion.",
@@ -109,7 +109,7 @@ METHODS: dict[str, dict[str, Any]] = {
         "missingness": "Reported as missing; no imputation.",
         "parameter_schema": {},
         "assumptions": [],
-        "diagnostics": ["occasion counts", "missingness", "normal 95% intervals"],
+        "diagnostics": ["occasion counts", "missingness", "Student-t 95% intervals"],
         "output_schema": ["occasion means", "SD", "95% CI", "first-to-last change"],
     },
     "METH-U-CHANGE": {

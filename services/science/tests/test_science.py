@@ -475,3 +475,11 @@ def test_scenario_simulation_extends_the_fitted_model(dataset: dict) -> None:
     assert steady["summary"]["scenario_final_performance"] != pytest.approx(heavy["summary"]["scenario_final_performance"])
     again = simulate_scenario(fitted, [300.0] * 8)
     assert again["states"] == steady["states"]
+
+
+def test_descriptive_mean_interval_uses_student_t() -> None:
+    from dynamis_science.realanalysis import mean_ci_half_width
+
+    # t(0.975, 20) = 2.085963 (standard tables); z = 1.96 would under-cover at n = 21.
+    assert mean_ci_half_width(1.0, 21) == pytest.approx(2.085963447 / math.sqrt(21), rel=1e-8)
+    assert mean_ci_half_width(1.0, 1) is None and mean_ci_half_width(0.0, 10) is None

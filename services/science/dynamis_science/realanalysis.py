@@ -334,7 +334,7 @@ def explore(study_id: str, metric_id: str, excluded: list[str] | None, reference
                 values = np.array(centered, dtype=float)
             mean = float(values.mean()) if len(values) else None
             sd = float(values.std(ddof=1)) if len(values) > 1 else None
-            half = float(1.96 * sd / math.sqrt(len(values))) if sd and len(values) else None
+            half = mean_ci_half_width(sd, len(values))
             summary.append(
                 {
                     "arm": "INTERVENTION",
@@ -417,7 +417,7 @@ def explore(study_id: str, metric_id: str, excluded: list[str] | None, reference
         values = np.array([float(v) for v in rows[definition["column"]].to_list() if v is not None], dtype=float)
         mean = float(values.mean()) if len(values) else None
         sd = float(values.std(ddof=1)) if len(values) > 1 else None
-        half = float(1.96 * sd / math.sqrt(len(values))) if sd and len(values) else None
+        half = mean_ci_half_width(sd, len(values))
         summary.append(
             {
                 "arm": "INTERVENTION",
@@ -609,6 +609,15 @@ def athlete_longitudinal(study_id: str, subject_id: str, metric_id: str) -> dict
         "individual": individual,
         "provenance": {"snapshot_id": study["snapshot"]["id"], "source_doi": study["source"]["doi"]},
     }
+
+
+def mean_ci_half_width(sd: float | None, n: int) -> float | None:
+    """Student-t 95% half-width for a mean (df = n - 1); z = 1.96 under-covers at n < 30."""
+    if not sd or n < 2:
+        return None
+    from scipy import stats
+
+    return float(stats.t.ppf(1 - ALPHA / 2, n - 1) * sd / math.sqrt(n))
 
 
 # --------------------------------------------------------------------------- #
@@ -883,13 +892,13 @@ def descriptive_trend(snapshot_id: str, outcome: str, cohort_ids: list[str], uni
         values = np.array([float(row[outcome]) for row in rows if int(row["occasion"]) == occasion], dtype=float)
         mean = float(values.mean())
         sd = float(values.std(ddof=1)) if len(values) > 1 else None
-        half = float(1.96 * sd / math.sqrt(len(values))) if sd and len(values) else None
+        half = mean_ci_half_width(sd, len(values))
         summary.append({"occasion": occasion, "n": int(len(values)), "mean": mean, "sd": sd, "ci_low": mean - half if half else None, "ci_high": mean + half if half else None})
     first = next((item for item in summary if item["occasion"] == 1), None)
     last = summary[-1] if summary else None
     change = last["mean"] - first["mean"] if first and last else None
     return {
-        "method": "Descriptive occasion means with normal 95% intervals",
+        "method": "Descriptive occasion means with Student-t 95% intervals",
         "status": "COMPUTED",
         "outcome": outcome,
         "unit": unit,
@@ -1247,7 +1256,7 @@ def _evidence_payload(run: dict[str, Any], study: dict[str, Any]) -> tuple[dict[
             values = np.array([float(row["cmj_height_cm"]) for row in frame.iter_rows(named=True) if row["occasion"] == occasion and row["cmj_height_cm"] is not None])
             mean = float(values.mean()) if values.size else None
             sd = float(values.std(ddof=1)) if values.size > 1 else None
-            half = float(1.96 * sd / math.sqrt(values.size)) if sd and values.size else None
+            half = mean_ci_half_width(sd, int(values.size))
             figure["data"]["series"].append({"arm": "INTERVENTION", "week": occasion, "n": int(values.size), "mean": mean, "sd": sd, "ci_low": mean - half if half else None, "ci_high": mean + half if half else None})
         return evidence, figure
     if run["method_id"] == "METH-REAL-RELIABILITY":

@@ -85,7 +85,7 @@ def _descriptive(snapshot_id: str, metric: dict[str, Any], cohort_ids: list[str]
         values = [float(row[metric["column"]]) for row in rows if int(row[axis]) == point and row.get(metric["column"]) is not None]
         mean = float(np.mean(values)) if values else None
         sd = float(np.std(values, ddof=1)) if len(values) > 1 else None
-        half = float(1.96 * sd / math.sqrt(len(values))) if sd and values else None
+        half = realanalysis.mean_ci_half_width(sd, len(values))
         summary.append(
             {
                 axis: point,
@@ -106,7 +106,7 @@ def _descriptive(snapshot_id: str, metric: dict[str, Any], cohort_ids: list[str]
     last = summary[-1] if summary else None
     change = last["mean"] - first["mean"] if first and last and first["mean"] is not None and last["mean"] is not None else None
     return {
-        "method": f"Descriptive {axis_label.lower()} summaries with normal 95% intervals",
+        "method": f"Descriptive {axis_label.lower()} summaries with Student-t 95% intervals",
         "status": "COMPUTED",
         "outcome": metric["id"],
         "unit": metric["unit"],
@@ -514,7 +514,7 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         if last.get("ci_low") is not None and last.get("ci_high") is not None:
             uncertainty = (last["ci_high"] - last["ci_low"]) / 2
             uncertainty_label = "95% CI half-width at the final point"
-            interval = {"low": last["ci_low"], "high": last["ci_high"], "level": 0.95, "kind": "normal 95% CI"}
+            interval = {"low": last["ci_low"], "high": last["ci_high"], "level": 0.95, "kind": "Student-t 95% CI"}
         interpretation = (
             f"Observed mean {metric['label'].lower()} changed by {value if value is not None else '—'} {metric['unit']} "
             f"from the first to the last available {result.get('axis_label', 'observation').lower()}. "
@@ -632,7 +632,7 @@ def explore(entity: dict[str, Any], cohort: dict[str, Any], metric_id: str, excl
                 values.append(athlete["values"][index])
         mean = float(np.mean(values)) if values else None
         sd = float(np.std(values, ddof=1)) if len(values) > 1 else None
-        half = float(1.96 * sd / math.sqrt(len(values))) if sd and values else None
+        half = realanalysis.mean_ci_half_width(sd, len(values))
         summary.append(
             {
                 "arm": "INTERVENTION",
