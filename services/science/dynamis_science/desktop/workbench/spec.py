@@ -86,7 +86,8 @@ STUDY_FOR_TABLE = {"cmj_occasions": "STUDY-REAL-001", "signal_trials": "STUDY-RE
 
 # Defaults mirror realstore's registered specs (SPEC-REAL-TREND-001 / SPEC-REAL-REL-001).
 DEFAULTS: dict[str, dict[str, Any]] = {
-    "descriptives": {},
+    "descriptives": {"stat_n_missing": True, "stat_mean_sd": True, "stat_median_iqr": True, "stat_min_max": False,
+                     "stat_ci": False, "plot_box": True, "plot_hist": False},
     "frequencies": {},
     "athlete_change": {"reference_occasion": None, "contrast_occasion": None},
     "mixed_model": {"reference_occasion": 1, "contrast_occasion": 4, "alpha": 0.05, "excluded_subject_ids": []},
@@ -95,6 +96,28 @@ DEFAULTS: dict[str, dict[str, Any]] = {
     "anova": {},
     "regression": {},
 }
+
+
+def descriptives_syntax(variables: list[str], by: str | None, o: dict[str, Any]) -> str:
+    """The pandas call that produces the chosen statistics and plots (shared by the syntax bar and the result)."""
+    q = json.dumps
+    stats = []
+    for flag, names in (("stat_n_missing", ['"count"']), ("stat_mean_sd", ['"mean"', '"std"']),
+                        ("stat_median_iqr", ['"median"', "iqr"]), ("stat_min_max", ['"min"', '"max"']),
+                        ("stat_ci", ['"sem"'])):
+        stats += names if o[flag] else []
+    cols = f"[[{', '.join(q(v) for v in variables)}]]"
+    out = (f"data.groupby({q(by)}){cols}" if by else f"data{cols}") + f".agg([{', '.join(stats)}])"
+    notes = ["iqr = q75 - q25"] * o["stat_median_iqr"] + ["missing = isna().sum()"] * o["stat_n_missing"] \
+        + ["95% CI = mean ± t(0.975, n-1) × sem"] * o["stat_ci"]
+    if notes:
+        out += "  # " + "; ".join(notes)
+    y = q(variables[0])
+    if o["plot_box"]:
+        out += f"\ndata.boxplot(column={y}" + (f", by={q(by)})" if by else ")")
+    if o["plot_hist"]:
+        out += f"\ndata.groupby({q(by)})[{y}].hist(bins=\"auto\", alpha=0.5)" if by else f"\ndata[{y}].hist(bins=\"auto\")"
+    return out
 
 
 def method_status(kind: str) -> dict[str, Any]:
@@ -194,6 +217,8 @@ class AnalysisSpec:
         def err(msg: str) -> None:
             out.append({"role": "options", "severity": "error", "message": msg})
 
+        if self.kind == "descriptives" and not any(o[k] for k in DEFAULTS["descriptives"] if k.startswith("stat_")):
+            err("Choose at least one statistic")
         if self.kind == "mixed_model":
             ref, con, alpha = o["reference_occasion"], o["contrast_occasion"], o["alpha"]
             if not isinstance(ref, int) or ref < 1:
@@ -281,8 +306,7 @@ class AnalysisSpec:
             head = "# DESCRIPTIVE: no inference; not promoted as a modeled claim.\n"
         k = self.kind
         if k == "descriptives":
-            by = f"data.groupby({q(fac[0])})" if fac else "data"
-            return head + f"{by}[[{', '.join(q(v) for v in out)}]].describe()"
+            return head + descriptives_syntax(out or ["<variables>"], fac[0] if fac else None, o)
         if k == "frequencies":
             return head + "\n".join(f"data[{q(v)}].value_counts(dropna=False)" for v in fac)
         if k == "athlete_change":

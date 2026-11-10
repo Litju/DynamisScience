@@ -141,6 +141,20 @@ def test_describe_counts_absent_and_null_as_missing():
     assert (plain.iloc[0].n, plain.iloc[0].missing) == (4, 1)
 
 
+def test_descriptives_block_follows_statistic_and_plot_options(app):
+    only = {"stat_n_missing": False, "stat_mean_sd": False, "stat_median_iqr": False, "stat_min_max": True,
+            "stat_ci": True, "plot_box": False, "plot_hist": True}
+    block = descriptive.DescriptivesBlock(_frame(), ["height"], by="occasion", subject="subject_id", options=only)
+    text = _texts(block)
+    assert "Min" in text and "Max" in text and "95% CI low" in text and "Median" not in text and "Mean" not in text
+    assert "Histogram of observed values" in text and "Box: median" not in text
+    assert ".agg([" in block.syntax and '"sem"' in block.syntax and ".hist(" in block.syntax
+    row = block.table.iloc[0]  # occasion 1: 30, 40, 35 -> mean 35, SD 5, t(0.975, 2) = 4.303
+    assert row.ci_low == pytest.approx(35 - 4.302653 * 5 / math.sqrt(3), rel=1e-5)
+    default = descriptive.DescriptivesBlock(_frame(), ["height"], provenance={})  # no split: box plot of all rows
+    assert "Box: median" in _texts(default) and "Min" not in _texts(default) and "95% CI" not in _texts(default)
+
+
 def test_frequencies_always_list_missing():
     table = descriptive.frequencies(_frame(), ["position"])
     assert table.level.tolist() == ["B", "F", "Missing"] and table["count"].tolist() == [2, 2, 1]

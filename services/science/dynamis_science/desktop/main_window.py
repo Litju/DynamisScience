@@ -610,7 +610,7 @@ class MainWindow(QMainWindow):
             if spec.kind == "descriptives":
                 factors = spec.role("factors")
                 return [descriptive.DescriptivesBlock(frame, spec.role("outcome"), factors[0] if factors else None,
-                                                      subject, provenance, units)]
+                                                      subject, provenance, units, options)]
             if spec.kind == "frequencies":
                 return [descriptive.FrequenciesBlock(frame, spec.role("factors"), provenance)]
             outcome, athlete, occasion = spec.role("outcome")[0], spec.role("subject")[0], spec.role("occasion")[0]

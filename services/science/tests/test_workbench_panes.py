@@ -210,3 +210,18 @@ def test_palette_offers_and_runs_variable_assignments(wb):
     shell.palette.list.setCurrentIndex(shell.palette.proxy.index(offered.index("Assign cmj_height_cm as outcome"), 0))
     shell.palette._run_current()
     assert ctl.current_spec().role("outcome") == ["cmj_height_cm"]
+
+
+def test_descriptives_options_are_checkboxes_bound_to_the_spec(wb):
+    from PySide6.QtWidgets import QCheckBox
+
+    shell, _, options, ctl = wb
+    shell.select_analysis("descriptives")
+    boxes = {k: w for k, w in options._option_widgets.items() if isinstance(w, QCheckBox)}
+    assert [k for k, w in boxes.items() if w.isChecked()] == ["stat_n_missing", "stat_mean_sd", "stat_median_iqr", "plot_box"]
+    options.slots["outcome"].box.dropped.emit(["cmj_height_cm"])
+    boxes["stat_ci"].setChecked(True)
+    assert ctl.current_spec().options["stat_ci"] is True and '"sem"' in shell.syntax.toPlainText()
+    for key in ("stat_n_missing", "stat_mean_sd", "stat_median_iqr", "stat_ci"):
+        boxes[key].setChecked(False)
+    assert "at least one statistic" in options.issues_text()

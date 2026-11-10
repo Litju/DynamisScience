@@ -10,7 +10,7 @@ from PySide6.QtCore import QMimeData, QSortFilterProxyModel, Qt
 from PySide6.QtWidgets import QApplication
 
 from dynamis_science.desktop.workbench import data_models as dm
-from dynamis_science.desktop.workbench.spec import AnalysisSpec, method_status
+from dynamis_science.desktop.workbench.spec import DEFAULTS, AnalysisSpec, method_status
 
 TYPES = {
     "subject_id": "identifier", "occasion": "ordinal", "cmj_height_cm": "numerical",
@@ -150,7 +150,7 @@ def test_payload_keys_match_service_contract():
 
 def test_syntax_per_analysis():
     d = spec("descriptives", roles={"outcome": ["cmj_height_cm"], "factors": ["occasion"]})
-    assert d.to_python_syntax().endswith('data.groupby("occasion")[["cmj_height_cm"]].describe()')
+    assert 'data.groupby("occasion")[["cmj_height_cm"]].agg(["count", "mean", "std", "median", iqr])' in d.to_python_syntax()
     assert "DESCRIPTIVE" in d.to_python_syntax()
     f = spec("frequencies", roles={"factors": ["quality_state"]})
     assert "value_counts(dropna=False)" in f.to_python_syntax()
@@ -231,3 +231,13 @@ def test_by_athlete_pivot_shows_missing_and_sorts():
     assert proxy.data(proxy.index(0, 0), dm.SortRole) == 66.0
     capped = dm.ByAthleteModel(FakeService(2000), "S", "t", "subject_id", "occasion", "cmj_height_cm", max_rows=600)
     assert capped.truncated and capped.rowCount() <= 150
+
+
+def test_descriptives_options_drive_syntax_and_validation():
+    d = spec("descriptives", roles={"outcome": ["cmj_height_cm"]},
+             options={"stat_mean_sd": False, "stat_median_iqr": False, "stat_min_max": True, "stat_ci": True, "plot_hist": True})
+    text = d.to_python_syntax()
+    assert '.agg(["count", "min", "max", "sem"])' in text and "95% CI" in text and "boxplot" in text and ".hist(" in text
+    assert "iqr" not in text
+    none = spec("descriptives", roles={"outcome": ["cmj_height_cm"]}, options={k: False for k in DEFAULTS["descriptives"] if k.startswith("stat_")})
+    assert any("at least one statistic" in i["message"] for i in none.validate())

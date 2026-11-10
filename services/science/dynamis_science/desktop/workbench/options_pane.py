@@ -11,7 +11,7 @@ from typing import Any
 from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDoubleSpinBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QAbstractItemView, QCheckBox, QDoubleSpinBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QPushButton, QScrollArea, QSizePolicy, QSpinBox, QStackedLayout, QStyledItemDelegate, QListView,
     QVBoxLayout, QWidget,
 )
@@ -40,6 +40,19 @@ OPTION_SECTIONS: dict[str, list[tuple[str, list[tuple[str, str, str, dict]]]]] =
         ("reference_occasion", "int", "From occasion", {"min": 0, "max": 99, "special": "First"}),
         ("contrast_occasion", "int", "To occasion", {"min": 0, "max": 99, "special": "Last"}),
     ])],
+    "descriptives": [
+        ("Statistics", [
+            ("stat_n_missing", "check", "N and missing", {}),
+            ("stat_mean_sd", "check", "Mean and SD", {}),
+            ("stat_median_iqr", "check", "Median and IQR", {}),
+            ("stat_min_max", "check", "Minimum and maximum", {}),
+            ("stat_ci", "check", "95% CI of the mean", {}),
+        ]),
+        ("Plots", [
+            ("plot_box", "check", "Box plot with points", {}),
+            ("plot_hist", "check", "Histogram", {}),
+        ]),
+    ],
     "ttest": [("Comparison", [
         ("level_1", "level", "Level 1", {}),
         ("level_2", "level", "Level 2", {}),
@@ -419,11 +432,18 @@ class OptionsPane(QWidget):
             widget = self._option_widget(key, widget_kind, cfg)
             widget.setAccessibleName(label)
             self._option_widgets[key] = widget
-            form.addRow(label, widget)
+            if widget_kind == "check":
+                widget.setText(label)
+                form.addRow(widget)
+            else:
+                form.addRow(label, widget)
         return _Collapsible(title, body, True)
 
     def _option_widget(self, key: str, kind: str, cfg: dict) -> QWidget:
-        if kind == "int":
+        if kind == "check":
+            w = QCheckBox()
+            w.toggled.connect(lambda v, key=key: self._emit_option(key, v))
+        elif kind == "int":
             w = QSpinBox()
             w.setRange(cfg["min"], cfg["max"])
             if "special" in cfg:
@@ -481,7 +501,9 @@ class OptionsPane(QWidget):
             options = spec.effective_options()
             for key, widget in self._option_widgets.items():
                 value = options.get(key)
-                if isinstance(widget, QSpinBox):
+                if isinstance(widget, QCheckBox):
+                    widget.setChecked(bool(value))
+                elif isinstance(widget, QSpinBox):
                     widget.setValue(widget.minimum() if value is None else int(value))
                 elif isinstance(widget, QDoubleSpinBox):
                     widget.setValue(float(value))

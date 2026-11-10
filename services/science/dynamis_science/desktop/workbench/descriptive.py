@@ -15,10 +15,13 @@ import html
 import math
 from typing import Any
 
+import numpy as np
 import pandas as pd
+from scipy import stats
 from matplotlib.figure import Figure
 
 from .. import theme
+from .spec import DEFAULTS, descriptives_syntax
 from .figures import _style
 from .results import ResultBlock, _table
 
@@ -45,7 +48,7 @@ def load_table(service: Any, snapshot_id: str, table: str, max_rows: int = MAX_R
 
 def describe(frame: pd.DataFrame, variables: list[str], by: str | None = None,
              subject: str | None = None) -> pd.DataFrame:
-    """n, missing, mean, SD, median, IQR, min, max per variable (and per ``by`` level).
+    """n, missing, mean, SD, median, IQR, min, max, 95 % t-interval of the mean per variable (and per ``by`` level).
 
     With ``by`` and ``subject``, missing counts athletes absent at that level as well as null
     values, so an athlete-occasion row that was never recorded is still counted.
@@ -61,6 +64,7 @@ def describe(frame: pd.DataFrame, variables: list[str], by: str | None = None,
                 missing = expected - part.loc[values.notna(), subject].nunique()
             else:
                 missing = int(values.isna().sum())
+            half = stats.t.ppf(0.975, len(valid) - 1) * valid.std(ddof=1) / math.sqrt(len(valid)) if len(valid) > 1 else math.nan
             q1, q3 = (valid.quantile(0.25), valid.quantile(0.75)) if len(valid) else (math.nan, math.nan)
             out.append({
                 "variable": variable, "group": level, "n": len(valid), "missing": int(missing),
@@ -68,6 +72,8 @@ def describe(frame: pd.DataFrame, variables: list[str], by: str | None = None,
                 "sd": valid.std(ddof=1) if len(valid) > 1 else math.nan,
                 "median": valid.median() if len(valid) else math.nan, "iqr": q3 - q1,
                 "min": valid.min() if len(valid) else math.nan, "max": valid.max() if len(valid) else math.nan,
+                "ci_low": valid.mean() - half if len(valid) > 1 else math.nan,
+                "ci_high": valid.mean() + half if len(valid) > 1 else math.nan,
             })
     return pd.DataFrame(out)
 
@@ -172,28 +178,39 @@ class DescriptivesBlock(DescriptiveBlock):
 
     def __init__(self, frame: pd.DataFrame, variables: list[str], by: str | None = None,
                  subject: str | None = None, provenance: dict[str, Any] | None = None,
-                 units: dict[str, str] | None = None, plot: bool = True) -> None:
+                 units: dict[str, str] | None = None, options: dict[str, Any] | None = None) -> None:
         self.table = describe(frame, variables, by, subject)
         units = units or {}
-        columns = ", ".join(f'"{v}"' for v in variables)
-        syntax = (f'data.groupby("{by}")[[{columns}]].describe()' if by else f"data[[{columns}]].describe()")
+        o = {**DEFAULTS["descriptives"], **(options or {})}
+        syntax = descriptives_syntax(variables, by, o)
         super().__init__("Descriptives", provenance or {}, frame, syntax,
                          "Descriptive only. No inference. Missing athlete-occasions are counted, never imputed.")
         self.heading("Descriptive statistics")
-        # E8 default columns (minimum / maximum stay in self.table); fits the 551 px Results pane
-        headers = ["Variable"] + ([by.capitalize()] if by else []) + ["N", "Missing", "Mean", "SD", "Median", "IQR"]
+        # columns follow the Statistics options; every value stays in self.table
+        spec = [("stat_n_missing", ["N", "Missing"], ("n", "missing")), ("stat_mean_sd", ["Mean", "SD"], ("mean", "sd")),
+                ("stat_median_iqr", ["Median", "IQR"], ("median", "iqr")), ("stat_min_max", ["Min", "Max"], ("min", "max")),
+                ("stat_ci", ["95% CI low", "95% CI high"], ("ci_low", "ci_high"))]
+        chosen = [(heads, keys) for flag, heads, keys in spec if o[flag]]
+        headers = ["Variable"] + ([by.capitalize()] if by else []) + [h for heads, _ in chosen for h in heads]
         rows = []
         for row in self.table.itertuples():
             first = row.variable if row.Index == 0 or self.table.variable[row.Index - 1] != row.variable else ""
             name = f"<b>{html.escape(first)}</b>" + (f" ({html.escape(units[first])})" if first in units else "")
-            rows.append([name] + ([_level(row.group)] if by else [])
-                        + [str(row.n), _count(row.missing)]
-                        + [_num(getattr(row, key)) for key in ("mean", "sd", "median", "iqr")])
+            cells = []
+            for _, keys in chosen:
+                for key in keys:
+                    value = getattr(row, key)
+                    cells.append(str(value) if key == "n" else _count(value) if key == "missing" else _num(value))
+            rows.append([name] + ([_level(row.group)] if by else []) + cells)
         self.rich(_table(headers, rows, numeric_from=2 if by else 1))
-        if plot and by:
-            self.figure(box_figure(frame, variables[0], by, units.get(variables[0], "")), 260)
-            self.rich(f"{html.escape(variables[0])} by {html.escape(by)}. Box: median and IQR; whiskers 1.5 × IQR; "
-                      "dots: observations.")
+        unit = units.get(variables[0], "")
+        if o["plot_box"]:
+            self.figure(box_figure(frame, variables[0], by, unit), 260)
+            self.rich(f"{html.escape(variables[0])}{f' by {html.escape(by)}' if by else ''}. Box: median and IQR; "
+                      "whiskers 1.5 × IQR; dots: observations.")
+        if o["plot_hist"]:
+            self.figure(hist_figure(frame, variables[0], by, unit), 260)
+            self.rich(f"{html.escape(variables[0])}{f' by {html.escape(by)}' if by else ''}. Histogram of observed values.")
 
 
 class FrequenciesBlock(DescriptiveBlock):
@@ -254,11 +271,13 @@ class AthleteChangeBlock(DescriptiveBlock):
 # --------------------------------------------------------------------------- #
 
 
-def box_figure(frame: pd.DataFrame, variable: str, by: str, unit: str = "", theme_name: str | None = None) -> Figure:
+def box_figure(frame: pd.DataFrame, variable: str, by: str | None, unit: str = "", theme_name: str | None = None) -> Figure:
     t = theme.tokens(theme_name)
     figure = Figure(figsize=(7.2, 2.6), dpi=100, constrained_layout=True)
     axis = figure.subplots()
     values = frame.assign(_v=pd.to_numeric(frame[variable], errors="coerce"))
+    if by is None:
+        values, by = values.assign(_all="All"), "_all"
     levels = sorted(values[by].dropna().unique())
     data = [values.loc[values[by] == level, "_v"].dropna().to_numpy() for level in levels]
     positions = list(range(len(levels)))
@@ -269,8 +288,26 @@ def box_figure(frame: pd.DataFrame, variable: str, by: str, unit: str = "", them
         jitter = [0.26 + ((i * 7) % 11) * 0.012 for i in range(len(sample))]  # deterministic offset to the right
         axis.scatter([x + j for j in jitter], sample, s=7, color=t["obs"], alpha=0.75, linewidths=0)
     axis.set_xticks(positions, [_level(level) for level in levels])
-    axis.set_xlabel(by)
+    axis.set_xlabel("" if by == "_all" else by)
     axis.set_ylabel(f"{variable} ({unit})" if unit else variable)
+    _style(figure, t)
+    return figure
+
+
+def hist_figure(frame: pd.DataFrame, variable: str, by: str | None, unit: str = "", theme_name: str | None = None) -> Figure:
+    t = theme.tokens(theme_name)
+    figure = Figure(figsize=(7.2, 2.6), dpi=100, constrained_layout=True)
+    axis = figure.subplots()
+    values = pd.to_numeric(frame[variable], errors="coerce")
+    bins = np.histogram_bin_edges(values.dropna(), bins="auto") if values.notna().any() else 10
+    parts = [(None, values)] if by is None else [(lvl, values[frame[by] == lvl]) for lvl in sorted(frame[by].dropna().unique())]
+    for level, part in parts:
+        axis.hist(part.dropna(), bins=bins, alpha=0.9 if by is None else 0.45, color=t["obs"],
+                  label=None if level is None else _level(level))
+    if by is not None:
+        axis.legend(frameon=False, fontsize=7, title=by, title_fontsize=7)
+    axis.set_xlabel(f"{variable} ({unit})" if unit else variable)
+    axis.set_ylabel("Count")
     _style(figure, t)
     return figure
 
@@ -309,5 +346,6 @@ __all__ = [
     "change_figure",
     "describe",
     "frequencies",
+    "hist_figure",
     "load_table",
 ]
