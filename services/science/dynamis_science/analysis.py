@@ -359,6 +359,42 @@ def _cluster_robust_covariance(
     return bread @ meat @ bread * correction
 
 
+def two_way_icc(values: np.ndarray) -> dict[str, float]:
+    """Shrout & Fleiss (1979) / McGraw & Wong (1996) ICC(3,1) for an n x k matrix.
+
+    Rows are subjects, columns are trials *in trial order*. ICC(3,1) uses the
+    two-way residual mean square (subject and trial effects removed), so a
+    systematic trial effect (learning, fatigue) does not lower consistency.
+    Typical error is sqrt(MSE), i.e. Hopkins (2000) typical error with the mean
+    trial change removed. ICC(1,1) and ICC(2,1) are returned as sensitivities.
+    """
+    n, k = values.shape
+    grand = float(values.mean())
+    row_means = values.mean(axis=1)
+    col_means = values.mean(axis=0)
+    ms_subjects = float(k * np.sum((row_means - grand) ** 2) / max(1, n - 1))
+    ms_trials = float(n * np.sum((col_means - grand) ** 2) / max(1, k - 1))
+    ms_within = float(np.sum((values - row_means[:, None]) ** 2) / max(1, n * (k - 1)))
+    residual = values - row_means[:, None] - col_means[None, :] + grand
+    ms_error = float(np.sum(residual**2) / max(1, (n - 1) * (k - 1)))
+    ci_low, ci_high = _icc_confidence_interval(ms_subjects, ms_error, n, k)
+    return {
+        "icc_3_1": float((ms_subjects - ms_error) / max(1e-12, ms_subjects + (k - 1) * ms_error)),
+        "icc_3_1_ci_low": ci_low,
+        "icc_3_1_ci_high": ci_high,
+        "icc_1_1_sensitivity": float((ms_subjects - ms_within) / max(1e-12, ms_subjects + (k - 1) * ms_within)),
+        "icc_2_1_sensitivity": float(
+            (ms_subjects - ms_error)
+            / max(1e-12, ms_subjects + (k - 1) * ms_error + k * (ms_trials - ms_error) / n)
+        ),
+        "typical_error": float(math.sqrt(max(0.0, ms_error))),
+        "ms_between": ms_subjects,
+        "ms_trials": ms_trials,
+        "ms_error": ms_error,
+        "ms_within": ms_within,
+    }
+
+
 def _reliability(trial_rows: list[dict[str, Any]], outcome: str, baseline_weeks: tuple[int, ...] = (1,)) -> dict[str, Any]:
     """Balanced two-way ICC(3,1) with within-subject CV and typical error.
 
@@ -372,7 +408,7 @@ def _reliability(trial_rows: list[dict[str, Any]], outcome: str, baseline_weeks:
         if row.get("week") in baseline_weeks and row.get("quality_state") == "VALID"
     ]
     by_subject: dict[str, list[float]] = {}
-    for row in baseline:
+    for row in sorted(baseline, key=lambda item: (item.get("week", 0), item.get("trial_number", 0))):
         by_subject.setdefault(row["subject_id"], []).append(_safe_float(row[outcome]))
     complete = {key: values for key, values in by_subject.items() if len(values) >= 2}
     if len(complete) < 3:
@@ -394,11 +430,8 @@ def _reliability(trial_rows: list[dict[str, Any]], outcome: str, baseline_weeks:
     cv_values = within_sd / np.maximum(np.abs(means), 1e-9)
     grand_mean = float(means.mean())
     n = int(subject_values.shape[0])
-    ms_between = float(k * np.sum((means - grand_mean) ** 2) / max(1, n - 1))
-    ms_within = float(np.sum((subject_values - means[:, None]) ** 2) / max(1, n * (k - 1)))
-    typical_error = float(math.sqrt(max(0.0, ms_within)))
-    icc = float((ms_between - ms_within) / max(1e-12, ms_between + (k - 1) * ms_within))
-    ci_low, ci_high = _icc_confidence_interval(ms_between, ms_within, n, k)
+    icc = two_way_icc(subject_values)
+    typical_error = icc["typical_error"]
     return {
         "method": "ICC(3,1) repeated-measures reliability",
         "outcome": outcome,
@@ -416,19 +449,17 @@ def _reliability(trial_rows: list[dict[str, Any]], outcome: str, baseline_weeks:
         ],
         "typical_error": typical_error,
         "typical_error_percent": float(typical_error / abs(grand_mean) * 100) if grand_mean else None,
-        "smallest_worthwhile_change": float(typical_error * Z_CRITICAL * math.sqrt(2)),
-        "icc_3_1": icc,
-        "icc_3_1_ci_low": ci_low,
-        "icc_3_1_ci_high": ci_high,
+        # 1.96 * sqrt(2) * TE is the 95% minimal detectable change, not a smallest worthwhile change.
+        "minimal_detectable_change_95": float(typical_error * Z_CRITICAL * math.sqrt(2)),
+        **icc,
         "mean_subject_mean": grand_mean,
-        "ms_between": ms_between,
-        "ms_within": ms_within,
-        "interpretation": "Relative to the synthetic typical error, changes smaller than this threshold should be treated cautiously.",
+        "interpretation": "Changes smaller than the 95% minimal detectable change (1.96 x sqrt(2) x typical error) are within measurement error.",
     }
 
 
-def _icc_confidence_interval(ms_between: float, ms_within: float, n: int, k: int) -> tuple[float, float]:
-    """Shrout-Fleiss confidence limits for ICC(3,1) via the F distribution."""
+def _icc_confidence_interval(ms_between: float, ms_error: float, n: int, k: int) -> tuple[float, float]:
+    """Shrout-Fleiss confidence limits for ICC(3,1): F = MS_subjects / MS_error."""
+    ms_within = ms_error
     if ms_within <= 0 or ms_between <= 0 or n < 2 or k < 2:
         return (float("nan"), float("nan"))
     try:

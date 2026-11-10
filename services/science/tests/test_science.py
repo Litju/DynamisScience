@@ -21,7 +21,9 @@ from dynamis_science.analysis import (
     _reliability,
     simulate_scenario,
     simulate_training_response,
+    two_way_icc,
 )
+from dynamis_science.qualification import anova_icc_reference
 from dynamis_science.generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID, generate_data
 
 WEEKS = range(1, 17)
@@ -268,17 +270,30 @@ def test_reliability_math_is_correct(dataset: dict) -> None:
 
     baseline = [row for row in rows if row["week"] == 1 and row["quality_state"] == "VALID"]
     by_subject: dict[str, list[float]] = {}
-    for row in baseline:
+    for row in sorted(baseline, key=lambda item: item["trial_number"]):
         by_subject.setdefault(row["subject_id"], []).append(row["concentric_impulse_n_s_kg"])
     values = np.array([by_subject[key] for key in sorted(by_subject)], dtype=float)
-    means = values.mean(axis=1)
-    ms_within = float(np.sum((values - means[:, None]) ** 2) / (values.shape[0] * (values.shape[1] - 1)))
-    # Typical error is the within-subject SD, i.e. sqrt(MSE) - not the standard error of the mean.
-    assert result["typical_error"] == pytest.approx(math.sqrt(ms_within), rel=1e-9)
-    ms_between = float(values.shape[1] * np.sum((means - means.mean()) ** 2) / (values.shape[0] - 1))
-    expected_icc = (ms_between - ms_within) / (ms_between + (values.shape[1] - 1) * ms_within)
-    assert result["icc_3_1"] == pytest.approx(expected_icc, rel=1e-9)
+    reference = anova_icc_reference(values)
+    # Typical error is sqrt of the two-way residual MS (mean trial change removed).
+    assert result["typical_error"] == pytest.approx(reference["typical_error"], rel=1e-9)
+    assert result["icc_3_1"] == pytest.approx(reference["icc_3_1"], rel=1e-9)
+    assert result["minimal_detectable_change_95"] == pytest.approx(1.959963984540054 * math.sqrt(2) * reference["typical_error"], rel=1e-12)
     assert len(result["cv_percent_by_subject"]) == 28
+
+
+def test_two_way_icc_reproduces_shrout_fleiss_1979_table() -> None:
+    # Shrout & Fleiss (1979), Psychol Bull 86:420, Table 2: 6 targets x 4 judges.
+    values = np.array([[9, 2, 5, 8], [6, 1, 3, 2], [8, 4, 6, 8], [7, 1, 2, 6], [10, 5, 6, 9], [6, 2, 4, 7]], dtype=float)
+    result = two_way_icc(values)
+    assert round(result["icc_1_1_sensitivity"], 2) == 0.17
+    assert round(result["icc_2_1_sensitivity"], 2) == 0.29
+    assert round(result["icc_3_1"], 2) == 0.71
+    assert result["icc_3_1"] == pytest.approx(anova_icc_reference(values)["icc_3_1"], rel=1e-12)
+    assert result["icc_3_1_ci_low"] < result["icc_3_1"] < result["icc_3_1_ci_high"]
+    # A pure systematic trial shift must not change ICC(3,1) consistency or typical error.
+    shifted = values + np.array([0.0, 3.0, -2.0, 5.0])
+    assert two_way_icc(shifted)["icc_3_1"] == pytest.approx(result["icc_3_1"], rel=1e-12)
+    assert two_way_icc(shifted)["typical_error"] == pytest.approx(result["typical_error"], rel=1e-12)
 
 
 def test_individual_change_reports_baseline_current_and_typical_error(dataset: dict) -> None:

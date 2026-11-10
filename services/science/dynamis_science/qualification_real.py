@@ -23,6 +23,7 @@ import polars as pl
 
 from . import realanalysis, realstore
 from .data_root import data_root, ensure_layout
+from .qualification import anova_icc_reference
 from .real_movesmart import _read_force, _support_intervals
 
 
@@ -184,54 +185,50 @@ def _reliability_qualification(snapshot_id: str) -> dict[str, Any]:
     frame = realstore.read_table(snapshot_id, "signal_trials")
     rows = [row for row in frame.iter_rows(named=True) if row["activity"] == activity]
     by_subject: dict[str, list[float]] = {}
-    for row in rows:
+    for row in sorted(rows, key=lambda item: (item["subject_id"], int(item["trial_number"]))):
         by_subject.setdefault(row["subject_id"], []).append(float(row["fz_peak_n"]))
-    complete = {key: sorted(values) for key, values in by_subject.items() if len(values) >= 2}
+    complete = {key: values for key, values in by_subject.items() if len(values) >= 2}
     k = min(int(run["parameters"].get("max_trials", 8)), min(len(values) for values in complete.values()))
     subjects = sorted(complete)
     matrix = np.array([complete[subject][:k] for subject in subjects], dtype=float)
     n = matrix.shape[0]
     means = matrix.mean(axis=1)
-    grand = float(means.mean())
-    ms_between = float(k * np.sum((means - grand) ** 2) / (n - 1))
-    ms_within = float(np.sum((matrix - means[:, None]) ** 2) / (n * (k - 1)))
-    icc = float((ms_between - ms_within) / (ms_between + (k - 1) * ms_within))
-    te = float(math.sqrt(ms_within))
+    anova = anova_icc_reference(matrix)
+    icc, te = anova["icc_3_1"], anova["typical_error"]
     cv = float(np.mean(matrix.std(axis=1, ddof=1) / np.maximum(np.abs(means), 1e-9)) * 100)
-    # ICC(2,1) sensitivity: two-way random effects, absolute agreement.
-    subject_ms = ms_between
-    trial_means = matrix.mean(axis=0)
-    ms_trial = float(n * np.sum((trial_means - grand) ** 2) / (k - 1))
-    ms_error = ms_within
-    icc_2_1 = float((subject_ms - ms_error) / (subject_ms + (k - 1) * ms_error + k * (ms_trial - ms_error) / n))
-    icc_3_k = float((subject_ms - ms_error) / subject_ms)
     result = run["result"]
+
+    def compare(reference: float, current: float) -> dict[str, Any]:
+        relative = abs(reference - current) / max(abs(reference), 1e-12)
+        return {"reference": reference, "dynamis": current, "absolute_difference": abs(reference - current), "relative_difference": relative, "tolerance_relative": 1e-9, "pass": relative <= 1e-9}
+
     comparisons = {
-        "icc_3_1": {"reference": icc, "dynamis": result["icc_3_1"], "absolute_difference": abs(icc - result["icc_3_1"]), "tolerance": 1e-9, "pass": abs(icc - result["icc_3_1"]) <= 1e-9},
-        "typical_error": {"reference": te, "dynamis": result["typical_error"], "absolute_difference": abs(te - result["typical_error"]), "tolerance": 1e-9, "pass": abs(te - result["typical_error"]) <= 1e-9},
-        "mean_cv_percent": {"reference": cv, "dynamis": result["mean_cv_percent"], "absolute_difference": abs(cv - result["mean_cv_percent"]), "tolerance": 1e-9, "pass": abs(cv - result["mean_cv_percent"]) <= 1e-9},
+        "icc_3_1": compare(icc, result["icc_3_1"]),
+        "typical_error": compare(te, result["typical_error"]),
+        "mean_cv_percent": compare(cv, result["mean_cv_percent"]),
     }
     passed = all(item["pass"] for item in comparisons.values())
     return {
         "id": "QUAL-REAL-RELIABILITY",
         "scientific_method": "ICC(3,1) repeated-trial reliability of peak vertical GRF",
-        "method_version": "1.0.0",
+        "method_version": "1.1.0",
         "status": "QUALIFIED" if passed else "FAILED",
         "pass_fail": "PASS" if passed else "FAIL",
         "input_snapshot": snapshot_id,
         "input_checksum": realstore.get_snapshot(snapshot_id)["checksums"].get("signal_trials.parquet"),
         "dynamis_run": run["id"],
         "activity": activity,
-        "reference_implementation": "Independent explicit two-way ANOVA mean-square computation in NumPy",
+        "reference_implementation": "statsmodels OLS two-way ANOVA (anova_lm, y ~ C(subject) + C(trial)); trials in acquisition order",
         "statistical_model": "Two-way ANOVA; participants random, repeated trials fixed; single measurement, consistency; ICC(3,1).",
         "sample": {"n_subjects": n, "k_trials": k, "trials_used": int(matrix.size), "trials_available": len(rows), "subjects": subjects},
-        "reference_result": {"icc_3_1": icc, "typical_error_n": te, "mean_cv_percent": cv, "ms_between": ms_between, "ms_within": ms_within, "icc_2_1_sensitivity": icc_2_1, "icc_3_k_sensitivity": icc_3_k},
-        "dynamis_result": {"icc_3_1": result["icc_3_1"], "typical_error_n": result["typical_error"], "mean_cv_percent": result["mean_cv_percent"], "ms_between": result["ms_between"], "ms_within": result["ms_within"]},
+        "reference_result": {"icc_3_1": icc, "typical_error_n": te, "mean_cv_percent": cv, "ms_between": anova["ms_between"], "ms_error": anova["ms_error"]},
+        "dynamis_result": {"icc_3_1": result["icc_3_1"], "typical_error_n": result["typical_error"], "mean_cv_percent": result["mean_cv_percent"], "ms_between": result["ms_between"], "ms_error": result.get("ms_error"), "icc_1_1_sensitivity": result.get("icc_1_1_sensitivity"), "icc_2_1_sensitivity": result.get("icc_2_1_sensitivity")},
         "comparisons": comparisons,
         "confidence_interval": {"low": result["icc_3_1_ci_low"], "high": result["icc_3_1_ci_high"], "method": "Shrout-Fleiss F-based 95% interval"},
         "known_limitations": [
             "Only one activity (walking) is the primary reliability analysis; other activities are sensitivity analyses.",
-            "Balanced subset uses the first k trials per participant; later trials are excluded.",
+            "Balanced subset uses the first k trials per participant in acquisition order; later trials are excluded.",
+            "Method 1.0.0 (RES-587..RES-613) sorted values before trimming and used the one-way MS within; its ICC and typical error are superseded by 1.1.0 (RES-619).",
             "Peak force is not normalised to body weight, so between-participant variation remains.",
             "The deposit contains no calibration log or speed control.",
         ],

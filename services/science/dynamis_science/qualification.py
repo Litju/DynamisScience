@@ -15,6 +15,32 @@ from .generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 QUALIFICATION_PATH = ARTIFACT_DIR / "qualification_records.json"
 
 
+def anova_icc_reference(values: np.ndarray) -> dict[str, float]:
+    """Independent ICC(3,1) reference: OLS two-way ANOVA (statsmodels anova_lm).
+
+    Uses least-squares sums of squares for ``y ~ C(subject) + C(trial)`` rather
+    than the closed-form mean-square formulas in ``analysis.two_way_icc``.
+    """
+    import pandas as pd
+    import statsmodels.formula.api as smf
+    from statsmodels.stats.anova import anova_lm
+
+    n, k = values.shape
+    frame = pd.DataFrame(
+        [(f"s{i}", f"t{j}", float(values[i, j])) for i in range(n) for j in range(k)],
+        columns=["subject", "trial", "y"],
+    )
+    table = anova_lm(smf.ols("y ~ C(subject) + C(trial)", frame).fit(), typ=1)
+    ms_subjects = float(table.loc["C(subject)", "mean_sq"])
+    ms_error = float(table.loc["Residual", "mean_sq"])
+    return {
+        "icc_3_1": (ms_subjects - ms_error) / (ms_subjects + (k - 1) * ms_error),
+        "typical_error": math.sqrt(ms_error),
+        "ms_between": ms_subjects,
+        "ms_error": ms_error,
+    }
+
+
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True, default=_json_default), encoding="utf-8")
@@ -89,25 +115,18 @@ def _reliability_record() -> dict[str, Any]:
 
     trials = pl.read_parquet(PARQUET_DIR / "cmj_trials.parquet").to_dicts()
     service = _reliability(trials, "concentric_impulse_n_s_kg")
-    # Independent recomputation from the same balanced design, using explicit two-way ANOVA formulas.
+    # Independent recomputation from the same balanced design via an OLS two-way ANOVA.
     baseline = [row for row in trials if row["week"] == 1 and row["quality_state"] == "VALID"]
     by_subject: dict[str, list[float]] = {}
-    for row in baseline:
+    for row in sorted(baseline, key=lambda item: item["trial_number"]):
         by_subject.setdefault(row["subject_id"], []).append(float(row["concentric_impulse_n_s_kg"]))
     complete = {k: v for k, v in by_subject.items() if len(v) >= 2}
     k = min(len(v) for v in complete.values())
-    balanced = {key: values[:k] for key, values in complete.items()}
-    subject_ids = sorted(balanced)
-    values = np.array([balanced[key] for key in subject_ids], dtype=float)
+    values = np.array([complete[key][:k] for key in sorted(complete)], dtype=float)
     means = values.mean(axis=1)
-    grand_mean = float(means.mean())
-    n = values.shape[0]
-    ms_between = float(k * np.sum((means - grand_mean) ** 2) / max(1, n - 1))
-    ms_within = float(np.sum((values - means[:, None]) ** 2) / max(1, n * (k - 1)))
-    icc = float((ms_between - ms_within) / max(1e-12, ms_between + (k - 1) * ms_within))
-    te = float(math.sqrt(max(0.0, ms_within)))
+    anova = anova_icc_reference(values)
     cv = float(np.mean(values.std(axis=1, ddof=1) / np.maximum(np.abs(means), 1e-9)) * 100.0)
-    reference = {"icc_3_1": icc, "typical_error": te, "mean_cv_percent": cv}
+    reference = {"icc_3_1": anova["icc_3_1"], "typical_error": anova["typical_error"], "mean_cv_percent": cv}
     service_values = {key: _safe_float(service.get(key)) for key in reference}
     diffs = {key: abs(reference[key] - service_values[key]) for key in reference}
     tolerance = 1e-9
@@ -115,9 +134,9 @@ def _reliability_record() -> dict[str, Any]:
     return {
         "id": "QUAL-RELIABILITY",
         "scientific_method": "Repeated-trial reliability ICC(3,1)",
-        "method_version": "1.1.0",
+        "method_version": "1.2.0",
         "input_fixture": "DS-SYNTH-001 cmj_trials baseline week 1",
-        "independent_reference_implementation": "Independent two-way ANOVA mean-square computation",
+        "independent_reference_implementation": "statsmodels OLS two-way ANOVA (anova_lm, y ~ C(subject) + C(trial)); R aov cross-check recorded in RES-619",
         "reference_result": reference,
         "dynamis_result": service_values,
         "absolute_difference": diffs,

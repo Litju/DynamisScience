@@ -1417,7 +1417,7 @@ def tests() -> dict[str, Any]:
                 "typical_error": _round(computed.get("typical_error"), 4),
                 "typical_error_percent": _round(computed.get("typical_error_percent"), 3),
                 "mean_cv_percent": _round(computed.get("mean_cv_percent"), 3),
-                "smallest_worthwhile_change": _round(computed.get("smallest_worthwhile_change"), 4),
+                "minimal_detectable_change_95": _round(computed.get("minimal_detectable_change_95"), 4),
                 "n_subjects": computed.get("n_subjects"),
                 "trials_per_subject": computed.get("trials_per_subject"),
                 "method": computed.get("method"),

@@ -616,32 +616,16 @@ def athlete_longitudinal(study_id: str, subject_id: str, metric_id: str) -> dict
 # --------------------------------------------------------------------------- #
 
 
-def _icc_ci(ms_between: float, ms_within: float, n: int, k: int) -> tuple[float, float]:
-    if ms_between <= 0 or ms_within <= 0 or n < 2 or k < 2:
-        return (float("nan"), float("nan"))
-    from scipy import stats
-
-    f_value = ms_between / ms_within
-    df1 = n - 1
-    df2 = (n - 1) * (k - 1)
-    f_low = float(stats.f.ppf(ALPHA / 2, df1, df2))
-    f_high = float(stats.f.ppf(1 - ALPHA / 2, df1, df2))
-    lower = (f_value / f_high - 1) / (k + f_value / f_high - 1)
-    upper = (f_value / f_low - 1) / (k + f_value / f_low - 1)
-    return float(max(-1.0, lower)), float(min(1.0, upper))
-
-
 def _reliability_matrix(values: np.ndarray) -> dict[str, Any]:
+    from .analysis import two_way_icc
+
     n, k = values.shape
     means = values.mean(axis=1)
     within_sd = values.std(axis=1, ddof=1) if k > 1 else np.zeros(n)
     cv_values = within_sd / np.maximum(np.abs(means), 1e-9)
     grand_mean = float(means.mean())
-    ms_between = float(k * np.sum((means - grand_mean) ** 2) / max(1, n - 1))
-    ms_within = float(np.sum((values - means[:, None]) ** 2) / max(1, n * (k - 1)))
-    typical_error = float(math.sqrt(max(0.0, ms_within)))
-    icc = float((ms_between - ms_within) / max(1e-12, ms_between + (k - 1) * ms_within))
-    ci_low, ci_high = _icc_ci(ms_between, ms_within, n, k)
+    icc = two_way_icc(values)
+    typical_error = icc["typical_error"]
     return {
         "method": "ICC(3,1) repeated-measures reliability",
         "status": "COMPUTED",
@@ -652,15 +636,10 @@ def _reliability_matrix(values: np.ndarray) -> dict[str, Any]:
         "cv_percent_by_subject": [
             {"subject_id": str(index), "cv_percent": float(cv * 100)} for index, cv in enumerate(cv_values)
         ],
-        "typical_error": typical_error,
         "typical_error_percent": float(typical_error / abs(grand_mean) * 100) if grand_mean else None,
-        "smallest_worthwhile_change": float(typical_error * Z_CRITICAL * math.sqrt(2)),
-        "icc_3_1": icc,
-        "icc_3_1_ci_low": ci_low,
-        "icc_3_1_ci_high": ci_high,
+        "minimal_detectable_change_95": float(typical_error * Z_CRITICAL * math.sqrt(2)),
+        **icc,
         "mean_subject_mean": grand_mean,
-        "ms_between": ms_between,
-        "ms_within": ms_within,
     }
 
 
@@ -986,9 +965,10 @@ def reliability(snapshot_id: str, cohort_ids: list[str], activity: str, max_tria
     trials = read_table(snapshot_id, "signal_trials")
     rows = [row for row in trials.iter_rows(named=True) if row["subject_id"] in cohort_ids and row["activity"] == activity]
     by_subject: dict[str, list[float]] = {}
-    for row in rows:
+    # Keep acquisition order: trials are the ICC(3,1) column factor, never sort by value.
+    for row in sorted(rows, key=lambda item: (item["subject_id"], int(item["trial_number"]))):
         by_subject.setdefault(row["subject_id"], []).append(float(row["fz_peak_n"]))
-    complete = {key: sorted(values) for key, values in by_subject.items() if len(values) >= 2}
+    complete = {key: values for key, values in by_subject.items() if len(values) >= 2}
     if len(complete) < 3:
         return {"method": "ICC(3,1)", "status": "INSUFFICIENT_DATA", "message": "Fewer than three participants have at least two trials.", "activity": activity}
     k = min(max_trials, min(len(values) for values in complete.values()))
