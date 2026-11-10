@@ -107,6 +107,7 @@ try {
         "_internal\PySide6\QtOpenGL.pyd",
         "_internal\PySide6\QtOpenGLWidgets.pyd",
         "_internal\pyqtgraph",
+        "_internal\OpenGL",
         "_internal\THIRD_PARTY_LICENSES.md",
         "_internal\THIRD_PARTY_NOTICES.txt",
         "_internal\licenses\LGPL-3.0.txt",

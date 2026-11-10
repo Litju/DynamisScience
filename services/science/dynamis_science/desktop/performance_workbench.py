@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from .models import RecordTableModel
+from .theme import tokens
 from .performance_navigation import PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES
 
 
@@ -425,8 +426,10 @@ class PerformanceContextPanel(QWidget):
         self.readiness_bar = QHBoxLayout()
         self.readiness_bar.setSpacing(2)
         self.readiness_segments: list[QFrame] = []
-        for _ in range(4):
+        for band in range(4):
             segment = QFrame()
+            segment.setObjectName("PerformanceReadinessSegment")
+            segment.setProperty("band", band)
             segment.setFixedHeight(7)
             self.readiness_bar.addWidget(segment)
             self.readiness_segments.append(segment)
@@ -544,11 +547,9 @@ class PerformanceContextPanel(QWidget):
             row.addWidget(status)
             self.checklist.addLayout(row)
         bands = today.get("readiness_bands", {})
-        colors = ("#ef6b63", "#e0a458", "#5fd4e8", "#c8f36b")
         labels = ("<5.5", "5.5–6.5", "6.5–7.5", "≥7.5")
         values = [int(bands.get(key, 0)) for key in ("l1", "l2", "l3", "l4")]
-        for index, (segment, count, color) in enumerate(zip(self.readiness_segments, values, colors)):
-            segment.setStyleSheet(f"background:{color}; border:0;")
+        for index, count in enumerate(values):
             stretch = max(count, 1)
             self.readiness_bar.setStretch(index, stretch)
         self.readiness_legend.setText(
@@ -620,8 +621,9 @@ class PerformanceWorkbench(QWidget):
 
     def __init__(self, window: QWidget) -> None:
         super().__init__(window)
-        pg.setConfigOption("background", "#101922")
-        pg.setConfigOption("foreground", "#7f919d")
+        # plots take the theme active at creation; changeEvent restyles them on a theme switch
+        pg.setConfigOption("background", tokens()["base"])
+        pg.setConfigOption("foreground", tokens()["dim_text"])
         pg.setConfigOption("antialias", True)
         self.window = window
         self.service = window.service
@@ -645,6 +647,18 @@ class PerformanceWorkbench(QWidget):
         self._build_report()
         self.tabs.currentChanged.connect(self._tab_changed)
 
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        if event.type() == event.Type.PaletteChange:  # theme switch: plot canvases follow the tokens
+            t = tokens()
+            pg.setConfigOption("background", t["base"])
+            pg.setConfigOption("foreground", t["dim_text"])
+            for plot in self.findChildren(pg.PlotWidget):
+                plot.setBackground(t["base"])
+                for name in ("left", "bottom"):
+                    axis = plot.getPlotItem().getAxis(name)
+                    axis.setPen(pg.mkPen(t["line2"]))
+                    axis.setTextPen(pg.mkPen(t["dim_text"]))
     def select_page(self, page: str) -> None:
         if page not in self.page_keys:
             return
@@ -1025,7 +1039,7 @@ class PerformanceWorkbench(QWidget):
         self.report_view, self.report_model = _record_view()
         split.addWidget(self.report_view)
         self.report_preview = QTextBrowser()
-        self.report_preview.setStyleSheet("background: white; color: #17212b;")
+        self.report_preview.setObjectName("PerformanceReportPreview")
         split.addWidget(self.report_preview)
         self.report_view.clicked.connect(self._select_report)
         layout.addWidget(split, 1)
@@ -1094,7 +1108,7 @@ class PerformanceWorkbench(QWidget):
                     for row in attention
                 ]
             )
-            for index, width in enumerate((60, 32, 85, 50, 50, 64)):
+            for index, width in enumerate((64, 36, 84, 62, 52, 66)):
                 self.today_view.setColumnWidth(index, width)
             self.pulse_values["roster"][0].setText(
                 f"{pulse['roster_active']} / {pulse['roster_total']}"

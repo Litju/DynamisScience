@@ -8,7 +8,7 @@ import sys
 import difflib
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QToolBar,
     QSplitter,
-    QStyle,
     QStackedWidget,
     QTabWidget,
     QTableView,
@@ -58,6 +57,11 @@ from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .tasks import TaskRunner
 from .theme import apply_theme
+from .workbench.controller import WorkbenchController
+from .workbench.data_pane import DataPane
+from .workbench.options_pane import OptionsPane
+from .workbench.results import DESCRIPTIVE_KINDS, ENGINE_KINDS, ResultsDocument, run_analysis
+from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
 
 
 class MainWindow(QMainWindow):
@@ -65,10 +69,14 @@ class MainWindow(QMainWindow):
 
     def __init__(self, service: DynamisAppService) -> None:
         super().__init__()
+        self.service = service
+        # Layout and theme are per data root, so tests and separate data roots never share UI state.
+        self.settings = QSettings(
+            str(service.root / "desktop" / "workbench.ini"), QSettings.Format.IniFormat
+        )
         application = QApplication.instance()
         if application is not None:
-            apply_theme(application)
-        self.service = service
+            apply_theme(application, self.settings.value("workbench/theme", "light"))
         self.runner = TaskRunner(self)
         self._close_after_tasks = False
         self.runner.idle.connect(self._close_if_idle)
@@ -85,20 +93,22 @@ class MainWindow(QMainWindow):
         else:
             self.resize(1420, 900)
         self._build_shell()
+        self.workbench.set_compact(self.width() < COMPACT_WIDTH)
         self._load()
 
     def _build_shell(self) -> None:
         self.navigator = QTreeWidget()
         self.navigator.setHeaderHidden(True)
+        self.navigator.setAccessibleName("Research navigator")
         self.navigator.itemClicked.connect(self._navigation_activated)
-        self.navigator_dock = QDockWidget("Research navigator", self)
+        self.navigator_dock = QDockWidget("Navigator", self)
         self.navigator_dock.setObjectName("ResearchNavigator")
         self.navigator_stack = QStackedWidget(self.navigator_dock)
-        self.navigator_stack.addWidget(self.navigator)
         self.navigator_dock.setWidget(self.navigator_stack)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.navigator_dock)
 
         self.inspector = QTextBrowser()
+        self.inspector.setAccessibleName("Inspector raw detail")
         self.inspector_dock = QDockWidget("Inspector", self)
         self.inspector_dock.setObjectName("Inspector")
         self.inspector_stack = QStackedWidget(self.inspector_dock)
@@ -106,35 +116,53 @@ class MainWindow(QMainWindow):
         self.inspector_dock.setWidget(self.inspector_stack)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
 
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        header = QHBoxLayout()
-        brand = QLabel("DYNAMISSCIENCE  /  SCIENTIFIC & PERFORMANCE WORKSTATION")
-        brand.setStyleSheet("font-weight: 700; letter-spacing: 1px")
-        self.context = QLabel("Select a project, study or dataset")
-        self.provenance = QLabel("")
-        for label in (brand, self.context, self.provenance):
-            label.setWordWrap(True)
-        self.provenance.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        header.addWidget(brand)
-        header.addStretch(1)
-        header.addWidget(self.context)
-        header.addWidget(self.provenance)
-        self.research_header = QWidget()
-        self.research_header.setObjectName("ResearchHeader")
-        header_layout = QHBoxLayout(self.research_header)
-        header_layout.setContentsMargins(12, 0, 12, 0)
-        header_layout.addLayout(header)
-        layout.addWidget(self.research_header)
-
+        # Research perspective: design E workbench. Data and Options are the native panes (the research
+        # navigator lives in the Data pane's Library section); Results still hosts the study workspace.
+        self.workbench = WorkbenchShell(self.settings, self)
+        self.context = self.workbench.context_label
+        self.provenance = self.workbench.provenance_label
         self.workspace = QStackedWidget()
         self.welcome = QLabel("Loading the validated research catalogue…")
+        self.welcome.setObjectName("PaneEmpty")
         self.welcome.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.welcome.setWordWrap(True)
         self.workspace.addWidget(self.welcome)
         self.research = ResearchWorkbench(self)
         self.workspace.addWidget(self.research)
+        self.data_pane = DataPane(self.service, self.navigator)
+        self.options_pane = OptionsPane()
+        self.workbench.set_data_widget(self.data_pane)
+        self.workbench.set_options_widget(self.options_pane)
+        self.controller = WorkbenchController(self.workbench, self.data_pane, self.options_pane, self)
+        self.controller.run_requested.connect(self._run_spec)
+        results_scroll = QScrollArea()
+        results_scroll.setObjectName("WorkbenchResultsScroll")
+        results_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        results_scroll.setWidgetResizable(True)
+        results_scroll.setWidget(self.workspace)
+        # The workbench result document is the primary Results view; the study record is under View.
+        self.results_doc = ResultsDocument(self.service)
+        self.results_stack = QStackedWidget()
+        self.results_stack.addWidget(self.results_doc)
+        self.results_stack.addWidget(results_scroll)
+        self.workbench.set_results_widget(self.results_stack)
+        self.controller.spec_changed.connect(self._spec_changed)
+        self.workbench.action_promote.triggered.connect(self.results_doc.promote)
+        self.workbench.action_add_to_report.triggered.connect(lambda: self.results_doc.add_to_report())
+        self.workbench.action_export.triggered.connect(lambda: self._export_results())
+        self.results_doc.evidence_promoted.connect(self._evidence_promoted)
+        self.results_doc.report_cited.connect(self._report_cited)
+        self.results_doc.action_failed.connect(self.workbench.show_toast)
+        # linked athlete selection: Data pane By athlete <-> trajectory views
+        self.results_doc.athlete_selected.connect(self.data_pane.select_athlete)
+        self.data_pane.athlete_selected.connect(self.results_doc.select_athlete)
+        self.signals_view = None  # SignalsView, created when the Signals key is first chosen
+        self.workbench.analysis_selected.connect(self._analysis_selected)
+        self.data_pane.dataset_changed.connect(
+            lambda *_: self._analysis_selected(self.workbench.current_analysis() or ""))
+        self._sync_result_actions()
+        self.perspectives = QStackedWidget()
+        self.perspectives.addWidget(self.workbench)
         self.performance = None
         self.performance_header = None
         self.performance_rail = None
@@ -143,21 +171,25 @@ class MainWindow(QMainWindow):
         available = screen.availableGeometry() if screen is not None else None
         # shortcut: compact layout follows the startup screen, reevaluate when supporting live monitor changes
         if available is not None and (available.width() < 1100 or available.height() < 650):
-            self.workspace_scroll = QScrollArea()
-            self.workspace_scroll.setWidgetResizable(True)
-            self.workspace_scroll.setWidget(self.workspace)
-            layout.addWidget(self.workspace_scroll, 1)
+            perspectives_scroll = QScrollArea()
+            perspectives_scroll.setWidgetResizable(True)
+            perspectives_scroll.setWidget(self.perspectives)
+            self.setCentralWidget(perspectives_scroll)
         else:
-            layout.addWidget(self.workspace, 1)
-        self.setCentralWidget(central)
+            self.setCentralWidget(self.perspectives)
 
-        self.status_text = QLabel("Starting")
+        self.status_text = self.workbench.app_status
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(160)
         self.progress.setRange(0, 0)
+        self.progress.setAccessibleName("Background task in progress")
         self.statusBar().addWidget(self.status_text, 1)
         self.statusBar().addPermanentWidget(self.progress)
+        self.statusBar().addPermanentWidget(self.workbench.status_items)
+        self._perspective = ""
         self._build_menu()
+        self._show_research_mode()
+        self.navigator.setFocus()
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("File")
@@ -247,9 +279,47 @@ class MainWindow(QMainWindow):
             self.action_run_qualification,
         ):
             tools_menu.addAction(action)
+        analyses_menu = self.menuBar().addMenu("Analyses")
+        analyses_menu.addActions(list(self.workbench.analysis_actions.values()))
+        results_menu = self.menuBar().addMenu("Results")
+        results_menu.addActions(
+            [
+                self.workbench.action_run,
+                self.workbench.action_add_to_report,
+                self.workbench.action_promote,
+                self.workbench.action_export,
+            ]
+        )
         view_menu = self.menuBar().addMenu("View")
-        view_menu.addAction(self.navigator_dock.toggleViewAction())
-        view_menu.addAction(self.inspector_dock.toggleViewAction())
+        view_menu.addActions(self.workbench.view_actions)
+        view_menu.addSeparator()
+        self.trajectory_actions = {}
+        for mode in ("2D", "3D"):
+            action = QAction(f"Show {mode} trajectories", self)
+            action.setToolTip(f"Mixed-model results: {mode} trajectories of the observed values and fitted mean")
+            action.triggered.connect(lambda _checked=False, mode=mode: self._show_trajectories(mode))
+            view_menu.addAction(action)
+            self.trajectory_actions[mode] = action
+        view_menu.addSeparator()
+        self.action_study_record = QAction("Study record", self)
+        self.action_study_record.setCheckable(True)
+        self.action_study_record.setToolTip("Overview, dataset, exploration, analysis plan and evidence of the open study")
+        self.action_study_record.toggled.connect(self._set_record_view)
+        view_menu.addAction(self.action_study_record)
+        advanced = view_menu.addMenu("Advanced")
+        inspector_toggle = self.inspector_dock.toggleViewAction()
+        inspector_toggle.setText("Inspector raw detail")
+        advanced.addAction(inspector_toggle)
+        # Perspectives: the research workbench and the practitioner Performance OS (its own layout,
+        # not the three-pane workbench). The Performance header menu repeats these menus.
+        perspective_menu = self.menuBar().addMenu("Perspective")
+        self.action_research_perspective = QAction("Research workbench", self)
+        self.action_research_perspective.triggered.connect(self._show_research_mode)
+        perspective_menu.addAction(self.action_research_perspective)
+        perspective_menu.addSeparator()
+        for key, name in zip(PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES):
+            action = perspective_menu.addAction(f"Performance OS · {name}")
+            action.triggered.connect(lambda _checked=False, key=key: self.show_performance_page(key))
         help_menu = self.menuBar().addMenu("Help")
         about = QAction("About DynamisScience", self)
         about.triggered.connect(
@@ -263,13 +333,13 @@ class MainWindow(QMainWindow):
         licenses_action = QAction("Open-source licenses…", self)
         licenses_action.triggered.connect(self._open_third_party_licenses)
         help_menu.addAction(licenses_action)
-
-        self.research_toolbar = QToolBar("Research authoring", self)
-        self.research_toolbar.setObjectName("ResearchToolbar")
-        self.research_toolbar.setMovable(False)
-        for action in (self.action_new_project, self.action_new_study, self.action_admit):
-            self.research_toolbar.addAction(action)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.research_toolbar)
+        for menu_action in self.menuBar().actions():
+            if menu_action.menu() not in (analyses_menu, results_menu, view_menu):
+                self.workbench.palette.add_menu(menu_action.menu(), menu_action.text())
+        self.workbench.palette.add_action(inspector_toggle, "View")
+        self.workbench.palette.add_action(self.action_study_record, "View")
+        for action in self.trajectory_actions.values():
+            self.workbench.palette.add_action(action, "View")
 
     def _ensure_performance(self) -> None:
         if self.performance is not None:
@@ -286,7 +356,7 @@ class MainWindow(QMainWindow):
         self.performance.context_panel.back_to_daily.connect(self._show_daily_context)
         self.performance.context_panel.open_full_athlete.connect(self._open_full_athlete_profile)
         self.inspector_stack.addWidget(self.performance.context_panel)
-        self.workspace.addWidget(self.performance)
+        self.perspectives.addWidget(self.performance)
         self.performance_header = PerformanceHeader(self)
         self.performance_header.search_requested.connect(self._search_performance)
         self.performance_header.set_menu_actions(self.menuBar().actions())
@@ -301,10 +371,10 @@ class MainWindow(QMainWindow):
         header_scroll.setWidgetResizable(True)
         header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         header_scroll.setWidget(self.performance_header)
-        header_scroll.setFixedHeight(
-            self.performance_header.sizeHint().height()
-            + self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent) + 2
-        )
+        header_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        # The toolbar is 48 px (theme); a taller scroll area was clipped and cut "SPORTS SCIENCE" off.
+        # shortcut: in a window narrower than the header the horizontal scroll bar overlays its bottom edge.
+        header_scroll.setFixedHeight(self.performance_header.minimumHeight())  # its fixed 48 px, not the 29 px hint
         self.performance_toolbar.addWidget(header_scroll)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
         self.performance_toolbar.hide()
@@ -435,10 +505,13 @@ class MainWindow(QMainWindow):
     def _show_performance_mode(self) -> None:
         self._ensure_performance()
         self.menuBar().hide()
-        self.research_header.hide()
-        self.provenance.hide()
         self.performance_toolbar.show()
-        self.research_toolbar.hide()
+        # the toolbar layout keeps the generic QToolBar margins (12 px) until a StyleChange; they clip the header
+        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
+        if self._perspective != "performance":
+            self._perspective = "performance"
+            self.navigator_dock.show()
+            self.inspector_dock.show()
         self.navigator_stack.setCurrentWidget(self.performance_rail)
         self.navigator_dock.setTitleBarWidget(QWidget())
         self.navigator_dock.setMinimumWidth(196)
@@ -472,18 +545,219 @@ class MainWindow(QMainWindow):
         self.menuBar().show()
         if self.performance_toolbar is not None:
             self.performance_toolbar.hide()
-        self.research_toolbar.show()
-        self.research_header.show()
-        self.provenance.show()
-        self.navigator_stack.setCurrentWidget(self.navigator)
-        self.navigator_dock.setTitleBarWidget(None)
-        self.navigator_dock.setWindowTitle("Research navigator")
-        self.navigator_dock.setMinimumWidth(0)
-        self.navigator_dock.setMaximumWidth(16777215)
+        self.perspectives.setCurrentWidget(self.workbench)
+        if self._perspective != "research":
+            # The navigator lives in the Data pane; raw inspector detail is behind View > Advanced.
+            self._perspective = "research"
+            self.navigator_dock.hide()
+            self.inspector_dock.hide()
         self.inspector_dock.setWindowTitle("Inspector")
         self.inspector_stack.setCurrentWidget(self.inspector)
         self.inspector_dock.setMinimumWidth(0)
         self.inspector_dock.setMaximumWidth(16777215)
+        self.controller.refresh_provenance()
+
+    def _run_spec(self, spec) -> None:
+        """Results gate: run through the isolated worker, render in the result document, record the hash."""
+        self._set_record_view(False)
+        self.results_doc.clear()
+        self._sync_result_actions()
+        if spec.kind in DESCRIPTIVE_KINDS:
+            self._run_descriptive(spec)
+            return
+        study_id = spec.study_id
+
+        def finish(run: dict[str, Any] | None) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Ready")
+            if spec.kind in ENGINE_KINDS and self.current_study_id != study_id:
+                return  # the study changed while the run was in flight; never show it against another study
+            if run is None:  # kind without a qualified engine: stated, never promotable
+                self.results_doc.show_unavailable(spec)
+                self.controller.set_last_run_hash(spec.spec_hash())
+            else:
+                self.results_doc.show_run(run, spec)
+                self.research._run_completed(study_id, run)
+                self.controller.set_last_run_hash(spec.spec_hash(), run.get("id", ""),
+                                                  str(run.get("result_digest", ""))[:8])
+                self._load_observed(run, spec)
+            self._spec_changed(self.controller.current_spec())
+
+        def failed(error: Exception) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Operation failed")
+            self.controller.mark_run_failed()
+            self.workbench.show_toast(f"{type(error).__name__}: {error}")
+
+        self.status_text.setText("Running qualified scientific analysis")
+        self.progress.setVisible(True)
+        run_analysis(self.service, study_id, spec, self.runner, finish, failed)
+
+    def _run_descriptive(self, spec) -> None:
+        """Descriptives, Frequencies, Athlete change: observed summaries of the snapshot rows (pandas),
+        shown as descriptive blocks. No engine run, never promotable."""
+        from .workbench import descriptive
+
+        snapshot, table = spec.snapshot_id, spec.table
+        provenance = {"source": "real" if snapshot.startswith("DS-REAL") else "synthetic",
+                      "snapshot_id": snapshot, "table": table}
+        units = {v.name: v.unit for v in self.data_pane.variables() if v.unit}
+        types = dict(spec.variable_types)
+        subject = "subject_id" if types.get("subject_id") == "identifier" else None
+        options = spec.effective_options()
+
+        def build(frame) -> list:
+            if spec.kind == "descriptives":
+                factors = spec.role("factors")
+                return [descriptive.DescriptivesBlock(frame, spec.role("outcome"), factors[0] if factors else None,
+                                                      subject, provenance, units, options)]
+            if spec.kind == "frequencies":
+                return [descriptive.FrequenciesBlock(frame, spec.role("factors"), provenance)]
+            outcome, athlete, occasion = spec.role("outcome")[0], spec.role("subject")[0], spec.role("occasion")[0]
+            levels = sorted(frame[occasion].dropna().unique())
+            first = options["reference_occasion"] if options["reference_occasion"] is not None else levels[0]
+            last = options["contrast_occasion"] if options["contrast_occasion"] is not None else levels[-1]
+            return [descriptive.AthleteChangeBlock(frame, outcome, athlete, occasion, first, last, provenance,
+                                                   unit=units.get(outcome, ""))]
+
+        def finish(frame) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Ready")
+            if (self.data_pane.snapshot_id, self.data_pane.table) != (snapshot, table):
+                return  # the dataset changed while the rows were loading
+            try:
+                self.results_doc.show_blocks(lambda: build(frame), spec, descriptive.DESCRIPTIVE_STATE)
+            except (KeyError, IndexError, ValueError, TypeError) as error:
+                failed(error)
+                return
+            self.controller.set_last_run_hash(spec.spec_hash())
+            block = self.results_doc.blocks[0]
+            # the syntax bar shows what was computed for the visible result (rule 6)
+            self.workbench.set_syntax("# DESCRIPTIVE: no inference; not promoted as a modeled claim.\n" + block.syntax)
+            self._spec_changed(self.controller.current_spec())
+
+        def failed(error: Exception) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Operation failed")
+            self.controller.mark_run_failed()
+            self.workbench.show_toast(f"{type(error).__name__}: {error}")
+
+        self.status_text.setText("Summarising observed rows")
+        self.progress.setVisible(True)
+        self.runner.submit(lambda: descriptive.load_table(self.service, snapshot, table), finish, failed)
+
+    def _analysis_selected(self, key: str) -> None:
+        """Signals shows the trial viewer in the Results pane; every other key the result document."""
+        if key != "signals":
+            if self.signals_view is not None and self.results_stack.currentWidget() is self.signals_view:
+                self.results_stack.setCurrentWidget(self.results_doc)
+            return
+        from .workbench.signals_view import SignalsView
+
+        if self.signals_view is None:
+            self.signals_view = SignalsView(self.service, lambda fn, done: self.run_task(fn, done, "Loading signals"))
+            self.signals_view.setAccessibleName("Signal inspection")
+            self.signals_view.trial_selected.connect(lambda trial_id: self.workbench.set_syntax(
+                "# OBSERVED signal, min/max-decimated for display; no analysis\n"
+                f"DynamisAppService().get_signal_waveform({self.signals_view.snapshot_id!r}, {trial_id!r}, 2500)"))
+            self.results_stack.addWidget(self.signals_view)
+        self.action_study_record.setChecked(False)  # before switching: it resets the stack to the document
+        self.results_stack.setCurrentWidget(self.signals_view)
+        snapshot = self.data_pane.snapshot_id
+        tables = {t["name"] for t in (self.data_pane._detail or {}).get("tables", [])}
+        if snapshot and "signal_trials" in tables:
+            if snapshot != self.signals_view.snapshot_id:
+                self.signals_view.set_snapshot(snapshot)
+        elif snapshot:
+            self.workbench.show_toast("Signals needs a dataset with signal trials (e.g. the MoveSmart study)")
+
+    def _show_trajectories(self, mode: str) -> None:
+        if self.results_doc.trajectory_plot is None:
+            self.workbench.show_toast("Run a mixed model to see its trajectories")
+            return
+        self._set_record_view(False)
+        self.results_doc.set_trajectory_mode(mode)
+        block = next(b for b in self.results_doc.blocks if getattr(b, "trajectory_stack", None))
+        self.results_doc.ensureWidgetVisible(block, 0, 0)
+
+    def _load_observed(self, run: dict[str, Any], spec) -> None:
+        """Add the observed layer (snapshot rows) to a mixed-model trajectory figure, and the
+        interactive 2D / 3D trajectories (explore_longitudinal of the run's outcome)."""
+        if spec.kind != "mixed_model" or not run.get("snapshot_id"):
+            return
+        snapshot_id, table = run["snapshot_id"], spec.table
+        study_id, metric = run.get("study_id") or spec.study_id, spec.outcome_metric_id()
+        excluded = list(spec.effective_options().get("excluded_subject_ids") or [])
+
+        def read() -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+            rows: list[dict[str, Any]] = []
+            while True:
+                page = self.service.read_table_page(snapshot_id, table, len(rows), 500)
+                rows += page["rows"]
+                if not page["rows"] or len(rows) >= int(page["total_rows"]):
+                    break
+            try:
+                explore = self.service.explore_longitudinal(study_id, metric, excluded) if metric else None
+            except Exception:  # noqa: BLE001 - the interactive views are optional; the run stands alone
+                explore = None
+            return rows, explore
+
+        def show(loaded) -> None:
+            rows, explore = loaded
+            if self.results_doc.run is run:  # still the visible result
+                stale = self.results_doc.stale
+                self.results_doc.selected_athlete = self.data_pane.selected_athlete()
+                self.results_doc.show_run(run, self.results_doc.spec, rows, explore)
+                self.results_doc.mark_stale(stale)
+                self._sync_result_actions()
+
+        self.runner.submit(read, show, lambda _error: None)  # the observed layer is optional
+
+    def _spec_changed(self, spec) -> None:
+        self.results_doc.check_spec(spec)
+        self._sync_result_actions()
+
+    def _sync_result_actions(self) -> None:
+        doc = self.results_doc
+        self.workbench.action_promote.setEnabled(doc.promotable)
+        self.workbench.action_add_to_report.setEnabled(doc.promotable)
+        self.workbench.action_export.setEnabled(bool(doc.run))
+
+    def _set_record_view(self, record: bool) -> None:
+        self.results_stack.setCurrentIndex(1 if record else 0)
+        if self.action_study_record.isChecked() != record:
+            self.action_study_record.setChecked(record)
+
+    def _reset_results(self, record: bool = False) -> None:
+        """Dataset or study switch: no result, spec or run state outlives its data."""
+        self.results_doc.clear()
+        self.controller.reset()
+        self._sync_result_actions()
+        self._set_record_view(record)
+
+    def _export_results(self, path: str | None = None) -> None:
+        if path is None:
+            path, selected = QFileDialog.getSaveFileName(
+                self, "Export figures", "", "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)")
+            if not path:
+                return
+            if not path.lower().endswith((".png", ".pdf", ".svg")):
+                path += "." + selected.split("*.")[1].rstrip(")")
+        try:
+            written = self.results_doc.export(path)
+        except (ValueError, OSError) as error:
+            self.workbench.show_toast(str(error))
+            return
+        self.workbench.show_toast(f"Exported {len(written)} figure(s)")
+
+    def _evidence_promoted(self, outcome: dict[str, Any]) -> None:
+        run = self.results_doc.run or {}
+        self.research._evidence_promoted(run.get("study_id", ""), outcome)
+        self.workbench.show_toast("Promoted to evidence")
+
+    def _report_cited(self, result: dict[str, Any]) -> None:
+        run = self.results_doc.run or {}
+        self.research._report_cited(run.get("study_id", ""), result)
 
     def show_performance_page(self, page: str) -> None:
         self._ensure_performance()
@@ -498,8 +772,8 @@ class MainWindow(QMainWindow):
             page, self.performance.page_names[self.performance.page_keys.index(page)]
         )
         self.context.setText(title)
-        self.provenance.setText("SYNTHETIC FIXTURE · DS-SYNTH-001 · NO REAL DATA")
-        self.workspace.setCurrentWidget(self.performance)
+        self.workbench.set_provenance("DS-SYNTH-001 · NO REAL DATA", provenance="synthetic")  # until research mode returns
+        self.perspectives.setCurrentWidget(self.performance)
         self.performance.select_page(page)
 
     def _search_performance(self, query: str) -> None:
@@ -555,6 +829,7 @@ class MainWindow(QMainWindow):
                 self.status_text.setText("Finishing the active research task before closing…")
             event.ignore()
             return
+        self.workbench.save_state()
         event.accept()
 
     def _close_if_idle(self) -> None:
@@ -703,6 +978,9 @@ class MainWindow(QMainWindow):
             self.current_project = None
             self.current_study_id = None
             self.current_study = {}
+            self._reset_results(record=True)
+            self.controller.set_source("")
+            self.data_pane.clear()
             self.workspace.setCurrentWidget(self.welcome)
             self.welcome.setText(item.text(0))
 
@@ -725,7 +1003,9 @@ class MainWindow(QMainWindow):
         self.current_study = {}
         self.current_snapshot_id = None
         self.context.setText(project.get("title", project_id))
-        self.provenance.setText("RESEARCH PROJECT")
+        self._reset_results(record=True)
+        self.controller.set_source("RESEARCH PROJECT")
+        self.data_pane.clear()
         self.research.select_project(project)
         self.workspace.setCurrentWidget(self.research)
         self.research.tabs.setCurrentIndex(0)
@@ -756,7 +1036,19 @@ class MainWindow(QMainWindow):
         else:
             badge = f"SYNTHETIC FIXTURE · {snapshot.get('id', 'unknown snapshot')}"
         self.context.setText(detail.get("study", {}).get("title") or study_id)
-        self.provenance.setText(badge)
+        self._reset_results()
+        real = bool(detail.get("real_data") or snapshot.get("real_data"))
+        self.controller.set_source(badge, "real" if real else "synthetic", study_id)
+        snapshot_id = self.current_snapshot_id
+        if snapshot_id:
+            self.run_task(
+                lambda: self.service.get_dataset_detail(snapshot_id),
+                lambda dataset: self.data_pane.set_dataset(snapshot_id, dataset)
+                if self.current_snapshot_id == snapshot_id else None,
+                "Reading dataset",
+            )
+        else:
+            self.data_pane.clear()
         self.research.set_study(study_id, detail)
         self.workspace.setCurrentWidget(self.research)
 
@@ -777,9 +1069,11 @@ class MainWindow(QMainWindow):
             badge = f"FIXTURE-ONLY ADMISSION · {snapshot_id}"
         else:
             badge = f"SYNTHETIC FIXTURE · {snapshot_id}"
-        self.provenance.setText(badge)
         if license_id:
-            self.provenance.setText(f"{self.provenance.text()}  ·  {license_id}")
+            badge = f"{badge}  ·  {license_id}"
+        self._reset_results(record=True)
+        self.controller.set_source(badge, "real" if detail.get("real_data") else "synthetic")
+        self.data_pane.set_dataset(snapshot_id, detail)
         self.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
         self.research.select_dataset(snapshot_id, detail)
         self.workspace.setCurrentWidget(self.research)
@@ -1518,7 +1812,8 @@ class ResearchWorkbench(QWidget):
         self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
-        self._ensure_tab(1)
+        for index in range(1, len(self._builders)):  # method_picker etc. live in later lazy tabs
+            self._ensure_tab(index)
         self._clear_study_views()
         self.study_id = None
         self.detail = {"snapshot": detail}

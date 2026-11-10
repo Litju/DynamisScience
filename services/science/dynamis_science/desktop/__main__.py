@@ -30,6 +30,35 @@ def _settings_path() -> Path:
     return Path(location) / "settings.json"
 
 
+DESIGN_WORK_AREA = (1440, 860)  # the workbench layout is drawn for a 1440x900 window
+MIN_FIT_SCALE = 0.85  # below this, 12 px body text drops under ~10 px
+
+
+def fit_scale(work_width: float, work_height: float) -> float:
+    """Uniform UI scale so the design fits a smaller work area (logical px); never enlarges."""
+    ratio = min(1.0, work_width / DESIGN_WORK_AREA[0], work_height / DESIGN_WORK_AREA[1])
+    return round(max(MIN_FIT_SCALE, ratio), 2)
+
+
+def _apply_fit_scale() -> None:
+    """Set QT_SCALE_FACTOR from the primary work area before QApplication exists; a user value wins."""
+    if sys.platform != "win32" or os.environ.get("QT_SCALE_FACTOR"):
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    rect = wintypes.RECT()
+    user32 = ctypes.windll.user32
+    if not user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):  # SPI_GETWORKAREA
+        return
+    # physical px if the process is DPI aware, logical if not; GetDpiForSystem matches either way
+    dpi = user32.GetDpiForSystem() if hasattr(user32, "GetDpiForSystem") else 96
+    unit = (dpi or 96) / 96
+    scale = fit_scale((rect.right - rect.left) / unit, (rect.bottom - rect.top) / unit)
+    if scale < 1.0:
+        os.environ["QT_SCALE_FACTOR"] = str(scale)
+
+
 def _configured_root() -> str | None:
     inherited = os.environ.get("DYNAMISSCIENCE_DATA_ROOT", "").strip()
     if inherited:
@@ -74,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         help=argparse.SUPPRESS,
     )
     args = parser.parse_args(argv)
+    _apply_fit_scale()
     app = QApplication(sys.argv[:1])
     app.setApplicationName("DynamisScience")
     app.setOrganizationName("DynamisScience")

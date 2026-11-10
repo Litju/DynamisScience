@@ -1,0 +1,1932 @@
+{
+ "mixed_run": {
+  "id": "RUN-REAL-0006",
+  "method_id": "METH-REAL-TREND",
+  "method_version": "1.1.0",
+  "snapshot_id": "DS-REAL-MENDELEY-2C44490E08AD",
+  "result_digest": "519fe1309a9ace7c",
+  "status": "COMPLETED",
+  "evidence_ids": []
+ },
+ "mixed_result": {
+  "coefficients": {
+   "intercept": {
+    "ci_high": 42.08689139471016,
+    "ci_low": 35.21337472270047,
+    "estimate": 38.650133058705315,
+    "std_error": 1.7534803512276531
+   },
+   "occasion_slope": {
+    "ci_high": 1.374780655501696,
+    "ci_low": 0.6221217715575355,
+    "estimate": 0.9984512135296157,
+    "std_error": 0.19200834553110105
+   }
+  },
+  "contrast_occasion": 4,
+  "contrasts": {
+   "occasion_1_to_4": {
+    "ci_high": 4.124341966505089,
+    "ci_low": 1.8663653146726065,
+    "contrast": "Change from occasion 1 to occasion 4",
+    "estimate": 2.9953536405888475,
+    "interpretation": "Model-implied within-athlete change over the observed span.",
+    "std_error": 0.5760250365933032,
+    "unit": "cm"
+   },
+   "occasion_slope": {
+    "ci_high": 1.374780655501696,
+    "ci_low": 0.6221217715575355,
+    "contrast": "Within-athlete change in cmj_height_cm per testing occasion",
+    "estimate": 0.9984512135296157,
+    "interpretation": "Positive values indicate higher outcome values at later occasions.",
+    "std_error": 0.19200834553110105,
+    "unit": "cm per occasion"
+   }
+  },
+  "converged": true,
+  "diagnostics": {
+   "assumptions": [
+    "Linearity of the occasion effect on the model scale.",
+    "Normally distributed athlete intercepts and occasion slopes.",
+    "Missing CMJ rows are missing at random conditional on athlete.",
+    "The four COND values are ordered testing occasions, not randomised conditions."
+   ],
+   "baseline_balance": {
+    "ci_high": 0.0,
+    "ci_low": 0.0,
+    "contrast": "Single-arm study; baseline between-arm balance is not applicable.",
+    "estimate": 0.0,
+    "interpretation": "There is no comparison arm in the deposited table.",
+    "std_error": 0.0,
+    "unit": "cm"
+   },
+   "conditional_residual_summary": {
+    "max_abs_pearson": 2.415469188934146,
+    "sd_over_sigma": 0.8364324035697773
+   },
+   "conditional_residuals": [
+    {
+     "occasion": 1,
+     "residual": -3.484909717018958,
+     "subject_id": "MEN-01"
+    },
+    {
+     "occasion": 2,
+     "residual": 1.9877463931457982,
+     "subject_id": "MEN-01"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.6370691699772166,
+     "subject_id": "MEN-01"
+    },
+    {
+     "occasion": 4,
+     "residual": 0.8697252801419779,
+     "subject_id": "MEN-01"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.09488522988979753,
+     "subject_id": "MEN-02"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.5141365385900301,
+     "subject_id": "MEN-02"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.11994548604304356,
+     "subject_id": "MEN-02"
+    },
+    {
+     "occasion": 4,
+     "residual": 0.2573608440094688,
+     "subject_id": "MEN-02"
+    },
+    {
+     "occasion": 1,
+     "residual": 0.733355861145867,
+     "subject_id": "MEN-03"
+    },
+    {
+     "occasion": 2,
+     "residual": -1.6643555124991352,
+     "subject_id": "MEN-03"
+    },
+    {
+     "occasion": 3,
+     "residual": 1.0879331138558683,
+     "subject_id": "MEN-03"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.19311159312245962,
+     "subject_id": "MEN-03"
+    },
+    {
+     "occasion": 1,
+     "residual": -3.974332708648099,
+     "subject_id": "MEN-04"
+    },
+    {
+     "occasion": 2,
+     "residual": 4.055726918744121,
+     "subject_id": "MEN-04"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.022453212803007716,
+     "subject_id": "MEN-04"
+    },
+    {
+     "occasion": 1,
+     "residual": 0.33252845150461496,
+     "subject_id": "MEN-05"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.9654321636666694,
+     "subject_id": "MEN-05"
+    },
+    {
+     "occasion": 3,
+     "residual": 1.3499405544953689,
+     "subject_id": "MEN-05"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.8580200606759192,
+     "subject_id": "MEN-05"
+    },
+    {
+     "occasion": 1,
+     "residual": 1.3639711141943422,
+     "subject_id": "MEN-06"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.6412430704571364,
+     "subject_id": "MEN-06"
+    },
+    {
+     "occasion": 3,
+     "residual": -1.2131239217752707,
+     "subject_id": "MEN-06"
+    },
+    {
+     "occasion": 4,
+     "residual": 0.24499522690658182,
+     "subject_id": "MEN-06"
+    },
+    {
+     "occasion": 1,
+     "residual": -1.7076892430988053,
+     "subject_id": "MEN-07"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.08779360617702281,
+     "subject_id": "MEN-07"
+    },
+    {
+     "occasion": 3,
+     "residual": -0.4612319692552447,
+     "subject_id": "MEN-07"
+    },
+    {
+     "occasion": 4,
+     "residual": 2.125330000999874,
+     "subject_id": "MEN-07"
+    },
+    {
+     "occasion": 1,
+     "residual": 1.4366949978271464,
+     "subject_id": "MEN-08"
+    },
+    {
+     "occasion": 2,
+     "residual": -1.0869074023144059,
+     "subject_id": "MEN-08"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.11949019754402457,
+     "subject_id": "MEN-08"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.8174455359308652,
+     "subject_id": "MEN-08"
+    },
+    {
+     "occasion": 1,
+     "residual": 2.2700222724964263,
+     "subject_id": "MEN-09"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.9890968237230666,
+     "subject_id": "MEN-09"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.8851174133907733,
+     "subject_id": "MEN-09"
+    },
+    {
+     "occasion": 4,
+     "residual": -2.0373350161620536,
+     "subject_id": "MEN-09"
+    },
+    {
+     "occasion": 1,
+     "residual": 2.7037155427261013,
+     "subject_id": "MEN-10"
+    },
+    {
+     "occasion": 2,
+     "residual": -2.7049973809629115,
+     "subject_id": "MEN-10"
+    },
+    {
+     "occasion": 3,
+     "residual": 1.2729563620147317,
+     "subject_id": "MEN-10"
+    },
+    {
+     "occasion": 4,
+     "residual": -1.5724232283409307,
+     "subject_id": "MEN-10"
+    },
+    {
+     "occasion": 1,
+     "residual": 1.493167205682468,
+     "subject_id": "MEN-11"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.6418731388547343,
+     "subject_id": "MEN-11"
+    },
+    {
+     "occasion": 3,
+     "residual": -0.2102468167252809,
+     "subject_id": "MEN-11"
+    },
+    {
+     "occasion": 4,
+     "residual": 0.24804617207085755,
+     "subject_id": "MEN-11"
+    },
+    {
+     "occasion": 1,
+     "residual": 0.7714671656210825,
+     "subject_id": "MEN-12"
+    },
+    {
+     "occasion": 2,
+     "residual": 1.1004423270095316,
+     "subject_id": "MEN-12"
+    },
+    {
+     "occasion": 3,
+     "residual": -0.7872491782687021,
+     "subject_id": "MEN-12"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.15494068354691848,
+     "subject_id": "MEN-12"
+    },
+    {
+     "occasion": 1,
+     "residual": 1.8606454256384168,
+     "subject_id": "MEN-13"
+    },
+    {
+     "occasion": 2,
+     "residual": 0.24049360311229862,
+     "subject_id": "MEN-13"
+    },
+    {
+     "occasion": 3,
+     "residual": -1.3729915527471448,
+     "subject_id": "MEN-13"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.8298100419399361,
+     "subject_id": "MEN-13"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.4744628389089556,
+     "subject_id": "MEN-14"
+    },
+    {
+     "occasion": 2,
+     "residual": 0.3786217708971691,
+     "subject_id": "MEN-14"
+    },
+    {
+     "occasion": 3,
+     "residual": -0.10162695263004196,
+     "subject_id": "MEN-14"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.8827958114289274,
+     "subject_id": "MEN-15"
+    },
+    {
+     "occasion": 2,
+     "residual": -1.2145656577819608,
+     "subject_id": "MEN-15"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.0003311625316655409,
+     "subject_id": "MEN-15"
+    },
+    {
+     "occasion": 4,
+     "residual": 2.0685613161786307,
+     "subject_id": "MEN-15"
+    },
+    {
+     "occasion": 1,
+     "residual": -2.2866047549815534,
+     "subject_id": "MEN-16"
+    },
+    {
+     "occasion": 2,
+     "residual": 1.7523470166339479,
+     "subject_id": "MEN-16"
+    },
+    {
+     "occasion": 3,
+     "residual": 1.2512987882494642,
+     "subject_id": "MEN-16"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.5197494401350298,
+     "subject_id": "MEN-16"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.8583804049342518,
+     "subject_id": "MEN-17"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.3642434748345451,
+     "subject_id": "MEN-17"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.6898934552651568,
+     "subject_id": "MEN-17"
+    },
+    {
+     "occasion": 4,
+     "residual": 0.5140303853648476,
+     "subject_id": "MEN-17"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.20532457509970214,
+     "subject_id": "MEN-18"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.816535102550219,
+     "subject_id": "MEN-18"
+    },
+    {
+     "occasion": 3,
+     "residual": 2.618921036665931,
+     "subject_id": "MEN-18"
+    },
+    {
+     "occasion": 4,
+     "residual": -1.8089561574512416,
+     "subject_id": "MEN-18"
+    },
+    {
+     "occasion": 1,
+     "residual": -1.0306583371128895,
+     "subject_id": "MEN-19"
+    },
+    {
+     "occasion": 2,
+     "residual": 1.4551954681866448,
+     "subject_id": "MEN-19"
+    },
+    {
+     "occasion": 3,
+     "residual": 0.5610492734861623,
+     "subject_id": "MEN-19"
+    },
+    {
+     "occasion": 4,
+     "residual": -1.0430969212142998,
+     "subject_id": "MEN-19"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.41375390853034233,
+     "subject_id": "MEN-20"
+    },
+    {
+     "occasion": 2,
+     "residual": 0.1314707039704608,
+     "subject_id": "MEN-20"
+    },
+    {
+     "occasion": 3,
+     "residual": 1.7033619831379312,
+     "subject_id": "MEN-20"
+    },
+    {
+     "occasion": 4,
+     "residual": -1.9980800710279354,
+     "subject_id": "MEN-20"
+    },
+    {
+     "occasion": 1,
+     "residual": -0.18789807332478858,
+     "subject_id": "MEN-21"
+    },
+    {
+     "occasion": 2,
+     "residual": -0.44780037955062113,
+     "subject_id": "MEN-21"
+    },
+    {
+     "occasion": 3,
+     "residual": 1.8089639808901836,
+     "subject_id": "MEN-21"
+    },
+    {
+     "occasion": 4,
+     "residual": -0.8042716586689735,
+     "subject_id": "MEN-21"
+    }
+   ],
+   "converged": true,
+   "estimator": "MIXEDLM_RANDOM_SLOPE",
+   "estimator_attempts": [
+    "slope-lbfgs:RuntimeError",
+    "slope-bfgs:RuntimeError",
+    "slope:selected=nm:logLik=-208.311800"
+   ],
+   "limitations": [
+    "Single-arm design; no causal contrast against a concurrent control.",
+    "The deposit does not map COND 1-4 to calendar weeks or training phases.",
+    "No raw force traces, so CMJ height cannot be independently recomputed.",
+    "Only 19 athletes contribute the fourth occasion; two are missing."
+   ],
+   "log_likelihood": -208.31180031144507,
+   "model_status": "COMPLETED",
+   "n_observations": 82,
+   "n_subjects": 21,
+   "optimizer": "nm",
+   "quality_note": "Complete-case analysis; missing CMJ rows are not imputed.",
+   "residual_by_arm": {
+    "INTERVENTION": {
+     "mean": 0.020466795478988505,
+     "n": 82,
+     "sd": 8.197805450614247
+    }
+   },
+   "residual_by_week": [
+    {
+     "mean_residual": -0.12552988410213994,
+     "week": 1
+    },
+    {
+     "mean_residual": -0.04937790715556273,
+     "week": 2
+    },
+    {
+     "mean_residual": 0.47534546661640575,
+     "week": 3
+    },
+    {
+     "mean_residual": -0.24373231332924736,
+     "week": 4
+    }
+   ],
+   "residual_definitions": {
+    "residual_by_week": "marginal: y - X beta_hat, mean per occasion",
+    "residual_qq": "standardized conditional residual (y - X beta_hat - Z b_hat) / sigma_hat (nlme 'pearson' convention; lme4 2.1 type='pearson' is not divided by sigma). BLUP shrinkage and leverage make these under-dispersed and correlated, not independent N(0,1); the Q-Q is exploratory",
+    "residual_summary": "marginal: y - X beta_hat (includes between-athlete deviations)"
+   },
+   "residual_qq": [
+    {
+     "observed": -2.3669932410748524,
+     "theoretical": -2.4276364603770038
+    },
+    {
+     "observed": -2.0755076010598597,
+     "theoretical": -2.058797118711582
+    },
+    {
+     "observed": -1.6110152287784487,
+     "theoretical": -1.8533669070077183
+    },
+    {
+     "observed": -1.3618331420199643,
+     "theoretical": -1.7052602549787732
+    },
+    {
+     "observed": -1.2133755693294912,
+     "theoretical": -1.587223624066259
+    },
+    {
+     "observed": -1.1899965025470254,
+     "theoretical": -1.4878967857188372
+    },
+    {
+     "observed": -1.0773599776311404,
+     "theoretical": -1.4014008945764984
+    },
+    {
+     "observed": -1.017048443748951,
+     "theoretical": -1.3242792045014768
+    },
+    {
+     "observed": -0.9912401747993523,
+     "theoretical": -1.2543180005234138
+    },
+    {
+     "observed": -0.9364880664100519,
+     "theoretical": -1.1900097671160506
+    },
+    {
+     "observed": -0.8177125479036265,
+     "theoretical": -1.1302790423981752
+    },
+    {
+     "observed": -0.7233588412353738,
+     "theoretical": -1.0743300708434116
+    },
+    {
+     "observed": -0.7225001865545958,
+     "theoretical": -1.021556444025143
+    },
+    {
+     "observed": -0.6473294169243192,
+     "theoretical": -0.971484654935606
+    },
+    {
+     "observed": -0.6212372096899976,
+     "theoretical": -0.9237373125988413
+    },
+    {
+     "observed": -0.6138291624390683,
+     "theoretical": -0.8780083087614783
+    },
+    {
+     "observed": -0.58907637285291,
+     "theoretical": -0.8340455451790011
+    },
+    {
+     "observed": -0.5749824118002935,
+     "theoretical": -0.7916386077433746
+    },
+    {
+     "observed": -0.5257666813738514,
+     "theoretical": -0.7506097726616676
+    },
+    {
+     "observed": -0.511225598282031,
+     "theoretical": -0.7108073144070857
+    },
+    {
+     "observed": -0.5110109880602753,
+     "theoretical": -0.6721004393566447
+    },
+    {
+     "observed": -0.4942099478420345,
+     "theoretical": -0.6343753903319223
+    },
+    {
+     "observed": -0.4868460192788781,
+     "theoretical": -0.597532409318382
+    },
+    {
+     "observed": -0.4863037924910329,
+     "theoretical": -0.5614833390479699
+    },
+    {
+     "observed": -0.4790000534970515,
+     "theoretical": -0.5261497068853624
+    },
+    {
+     "observed": -0.4688619752314608,
+     "theoretical": -0.4914611774441739
+    },
+    {
+     "observed": -0.3822803707376229,
+     "theoretical": -0.4573542903238079
+    },
+    {
+     "observed": -0.38190512091636764,
+     "theoretical": -0.42377142057976047
+    },
+    {
+     "observed": -0.3095471622632548,
+     "theoretical": -0.3906599147897024
+    },
+    {
+     "observed": -0.3062042866175084,
+     "theoretical": -0.3579713666809119
+    },
+    {
+     "observed": -0.2825758221990174,
+     "theoretical": -0.3256610044665333
+    },
+    {
+     "observed": -0.2746959134596887,
+     "theoretical": -0.2936871681332832
+    },
+    {
+     "observed": -0.26669646188419416,
+     "theoretical": -0.26201085950838
+    },
+    {
+     "observed": -0.24641940591147882,
+     "theoretical": -0.23059535141255755
+    },
+    {
+     "observed": -0.21693247803912663,
+     "theoretical": -0.19940584486526697
+    },
+    {
+     "observed": -0.12521669186461334,
+     "theoretical": -0.16840916535261968
+    },
+    {
+     "observed": -0.12228515253139899,
+     "theoretical": -0.13757349074654557
+    },
+    {
+     "observed": -0.11501146713243919,
+     "theoretical": -0.10686810468305773
+    },
+    {
+     "observed": -0.11190645126488366,
+     "theoretical": -0.0762631701475923
+    },
+    {
+     "observed": -0.09227801938298828,
+     "theoretical": -0.045729518734236245
+    },
+    {
+     "observed": -0.06052596187101019,
+     "theoretical": -0.015238451585825475
+    },
+    {
+     "observed": -0.05651079421163542,
+     "theoretical": 0.015238451585825336
+    },
+    {
+     "observed": -0.0522872360379933,
+     "theoretical": 0.045729518734236106
+    },
+    {
+     "observed": 0.00019723046146687806,
+     "theoretical": 0.07626317014759217
+    },
+    {
+     "observed": 0.013372459439414383,
+     "theoretical": 0.10686810468305759
+    },
+    {
+     "observed": 0.0711647742389471,
+     "theoretical": 0.13757349074654543
+    },
+    {
+     "observed": 0.07143593039997309,
+     "theoretical": 0.16840916535261954
+    },
+    {
+     "observed": 0.07830000417939023,
+     "theoretical": 0.19940584486526677
+    },
+    {
+     "observed": 0.14323076974654764,
+     "theoretical": 0.2305953514125574
+    },
+    {
+     "observed": 0.14591180172752505,
+     "theoretical": 0.2620108595083799
+    },
+    {
+     "observed": 0.14772885306975833,
+     "theoretical": 0.29368716813328305
+    },
+    {
+     "observed": 0.1532763920248002,
+     "theoretical": 0.3256610044665331
+    },
+    {
+     "observed": 0.19804396231442994,
+     "theoretical": 0.3579713666809117
+    },
+    {
+     "observed": 0.22549575949876588,
+     "theoretical": 0.3906599147897023
+    },
+    {
+     "observed": 0.3061410649435961,
+     "theoretical": 0.4237714205797603
+    },
+    {
+     "observed": 0.3341441030747102,
+     "theoretical": 0.4573542903238078
+    },
+    {
+     "observed": 0.37941927110228657,
+     "theoretical": 0.4914611774441738
+    },
+    {
+     "observed": 0.41087982949214913,
+     "theoretical": 0.5261497068853624
+    },
+    {
+     "observed": 0.4367647335759562,
+     "theoretical": 0.5614833390479699
+    },
+    {
+     "observed": 0.45946268231715914,
+     "theoretical": 0.597532409318382
+    },
+    {
+     "observed": 0.5179822653519752,
+     "theoretical": 0.6343753903319223
+    },
+    {
+     "observed": 0.5271493578015692,
+     "theoretical": 0.6721004393566447
+    },
+    {
+     "observed": 0.647940299923785,
+     "theoretical": 0.7108073144070857
+    },
+    {
+     "observed": 0.6553904117177615,
+     "theoretical": 0.7506097726616676
+    },
+    {
+     "observed": 0.7452359909140873,
+     "theoretical": 0.7916386077433746
+    },
+    {
+     "observed": 0.7581345916298552,
+     "theoretical": 0.8340455451790011
+    },
+    {
+     "observed": 0.8039840653980586,
+     "theoretical": 0.8780083087614783
+    },
+    {
+     "observed": 0.8123402455194918,
+     "theoretical": 0.9237373125988413
+    },
+    {
+     "observed": 0.8556524072438975,
+     "theoretical": 0.971484654935606
+    },
+    {
+     "observed": 0.8666707319559556,
+     "theoretical": 1.021556444025143
+    },
+    {
+     "observed": 0.88928555879441,
+     "theoretical": 1.0743300708434116
+    },
+    {
+     "observed": 1.0144712576322792,
+     "theoretical": 1.1302790423981752
+    },
+    {
+     "observed": 1.0436452729195744,
+     "theoretical": 1.1900097671160506
+    },
+    {
+     "observed": 1.0773646370364935,
+     "theoretical": 1.2543180005234138
+    },
+    {
+     "observed": 1.1081445539120645,
+     "theoretical": 1.3242792045014768
+    },
+    {
+     "observed": 1.1838420742453286,
+     "theoretical": 1.4014008945764984
+    },
+    {
+     "observed": 1.2319730161215479,
+     "theoretical": 1.4878967857188372
+    },
+    {
+     "observed": 1.2657827404519244,
+     "theoretical": 1.587223624066259
+    },
+    {
+     "observed": 1.3519571133027084,
+     "theoretical": 1.7052602549787732
+    },
+    {
+     "observed": 1.5597507423593715,
+     "theoretical": 1.8533669070077188
+    },
+    {
+     "observed": 1.6102518044088485,
+     "theoretical": 2.058797118711582
+    },
+    {
+     "observed": 2.415469188934146,
+     "theoretical": 2.4276364603770046
+    }
+   ],
+   "residual_qq_type": "CONDITIONAL_PEARSON",
+   "residual_summary": {
+    "max_abs_residual": 21.681415727765078,
+    "mean_residual": 0.020466795478988505,
+    "rmse": 8.147691203462653
+   },
+   "sample_context": {
+    "excluded_trial_ids": [],
+    "excluded_trials_in_cohort": 0,
+    "observations_per_subject_max": 4,
+    "observations_per_subject_min": 3,
+    "valid_first_trials_used": 82,
+    "valid_repeat_trials_not_modelled": 0,
+    "weeks_observed": [
+     1,
+     2,
+     3,
+     4
+    ]
+   },
+   "week_centering": 1
+  },
+  "effect_size": 0.3603542504065089,
+  "effect_size_basis": "change from reference to contrast occasion divided by baseline between-athlete SD",
+  "estimator": "MIXEDLM_RANDOM_SLOPE",
+  "estimator_attempts": [
+   "slope-lbfgs:RuntimeError",
+   "slope-bfgs:RuntimeError",
+   "slope:selected=nm:logLik=-208.311800"
+  ],
+  "formula": "cmj_height_cm ~ occasion_c + (1 + occasion_c | subject_id), ML",
+  "log_likelihood": -208.31180031144507,
+  "method": "statsmodels MixedLM with athlete random intercept and random occasion slope",
+  "model_status": "COMPLETED",
+  "n_observations": 82,
+  "n_subjects": 21,
+  "optimizer": "nm",
+  "outcome": "cmj_height_cm",
+  "primary_contrast_id": "occasion_slope",
+  "random_effects": {
+   "residual_variance": 2.8192553050710427,
+   "subject_intercept_slope_covariance": -0.257222647664792,
+   "subject_intercept_variance": 62.57623628029039,
+   "subject_slope_variance": 0.16795855876783014
+  },
+  "reference_occasion": 1,
+  "unit": "cm"
+ },
+ "mixed_diagnostics": {
+  "assumptions": [
+   "Linearity of the occasion effect on the model scale.",
+   "Normally distributed athlete intercepts and occasion slopes.",
+   "Missing CMJ rows are missing at random conditional on athlete.",
+   "The four COND values are ordered testing occasions, not randomised conditions."
+  ],
+  "baseline_balance": {
+   "ci_high": 0.0,
+   "ci_low": 0.0,
+   "contrast": "Single-arm study; baseline between-arm balance is not applicable.",
+   "estimate": 0.0,
+   "interpretation": "There is no comparison arm in the deposited table.",
+   "std_error": 0.0,
+   "unit": "cm"
+  },
+  "conditional_residual_summary": {
+   "max_abs_pearson": 2.415469188934146,
+   "sd_over_sigma": 0.8364324035697773
+  },
+  "conditional_residuals": [
+   {
+    "occasion": 1,
+    "residual": -3.484909717018958,
+    "subject_id": "MEN-01"
+   },
+   {
+    "occasion": 2,
+    "residual": 1.9877463931457982,
+    "subject_id": "MEN-01"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.6370691699772166,
+    "subject_id": "MEN-01"
+   },
+   {
+    "occasion": 4,
+    "residual": 0.8697252801419779,
+    "subject_id": "MEN-01"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.09488522988979753,
+    "subject_id": "MEN-02"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.5141365385900301,
+    "subject_id": "MEN-02"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.11994548604304356,
+    "subject_id": "MEN-02"
+   },
+   {
+    "occasion": 4,
+    "residual": 0.2573608440094688,
+    "subject_id": "MEN-02"
+   },
+   {
+    "occasion": 1,
+    "residual": 0.733355861145867,
+    "subject_id": "MEN-03"
+   },
+   {
+    "occasion": 2,
+    "residual": -1.6643555124991352,
+    "subject_id": "MEN-03"
+   },
+   {
+    "occasion": 3,
+    "residual": 1.0879331138558683,
+    "subject_id": "MEN-03"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.19311159312245962,
+    "subject_id": "MEN-03"
+   },
+   {
+    "occasion": 1,
+    "residual": -3.974332708648099,
+    "subject_id": "MEN-04"
+   },
+   {
+    "occasion": 2,
+    "residual": 4.055726918744121,
+    "subject_id": "MEN-04"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.022453212803007716,
+    "subject_id": "MEN-04"
+   },
+   {
+    "occasion": 1,
+    "residual": 0.33252845150461496,
+    "subject_id": "MEN-05"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.9654321636666694,
+    "subject_id": "MEN-05"
+   },
+   {
+    "occasion": 3,
+    "residual": 1.3499405544953689,
+    "subject_id": "MEN-05"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.8580200606759192,
+    "subject_id": "MEN-05"
+   },
+   {
+    "occasion": 1,
+    "residual": 1.3639711141943422,
+    "subject_id": "MEN-06"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.6412430704571364,
+    "subject_id": "MEN-06"
+   },
+   {
+    "occasion": 3,
+    "residual": -1.2131239217752707,
+    "subject_id": "MEN-06"
+   },
+   {
+    "occasion": 4,
+    "residual": 0.24499522690658182,
+    "subject_id": "MEN-06"
+   },
+   {
+    "occasion": 1,
+    "residual": -1.7076892430988053,
+    "subject_id": "MEN-07"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.08779360617702281,
+    "subject_id": "MEN-07"
+   },
+   {
+    "occasion": 3,
+    "residual": -0.4612319692552447,
+    "subject_id": "MEN-07"
+   },
+   {
+    "occasion": 4,
+    "residual": 2.125330000999874,
+    "subject_id": "MEN-07"
+   },
+   {
+    "occasion": 1,
+    "residual": 1.4366949978271464,
+    "subject_id": "MEN-08"
+   },
+   {
+    "occasion": 2,
+    "residual": -1.0869074023144059,
+    "subject_id": "MEN-08"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.11949019754402457,
+    "subject_id": "MEN-08"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.8174455359308652,
+    "subject_id": "MEN-08"
+   },
+   {
+    "occasion": 1,
+    "residual": 2.2700222724964263,
+    "subject_id": "MEN-09"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.9890968237230666,
+    "subject_id": "MEN-09"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.8851174133907733,
+    "subject_id": "MEN-09"
+   },
+   {
+    "occasion": 4,
+    "residual": -2.0373350161620536,
+    "subject_id": "MEN-09"
+   },
+   {
+    "occasion": 1,
+    "residual": 2.7037155427261013,
+    "subject_id": "MEN-10"
+   },
+   {
+    "occasion": 2,
+    "residual": -2.7049973809629115,
+    "subject_id": "MEN-10"
+   },
+   {
+    "occasion": 3,
+    "residual": 1.2729563620147317,
+    "subject_id": "MEN-10"
+   },
+   {
+    "occasion": 4,
+    "residual": -1.5724232283409307,
+    "subject_id": "MEN-10"
+   },
+   {
+    "occasion": 1,
+    "residual": 1.493167205682468,
+    "subject_id": "MEN-11"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.6418731388547343,
+    "subject_id": "MEN-11"
+   },
+   {
+    "occasion": 3,
+    "residual": -0.2102468167252809,
+    "subject_id": "MEN-11"
+   },
+   {
+    "occasion": 4,
+    "residual": 0.24804617207085755,
+    "subject_id": "MEN-11"
+   },
+   {
+    "occasion": 1,
+    "residual": 0.7714671656210825,
+    "subject_id": "MEN-12"
+   },
+   {
+    "occasion": 2,
+    "residual": 1.1004423270095316,
+    "subject_id": "MEN-12"
+   },
+   {
+    "occasion": 3,
+    "residual": -0.7872491782687021,
+    "subject_id": "MEN-12"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.15494068354691848,
+    "subject_id": "MEN-12"
+   },
+   {
+    "occasion": 1,
+    "residual": 1.8606454256384168,
+    "subject_id": "MEN-13"
+   },
+   {
+    "occasion": 2,
+    "residual": 0.24049360311229862,
+    "subject_id": "MEN-13"
+   },
+   {
+    "occasion": 3,
+    "residual": -1.3729915527471448,
+    "subject_id": "MEN-13"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.8298100419399361,
+    "subject_id": "MEN-13"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.4744628389089556,
+    "subject_id": "MEN-14"
+   },
+   {
+    "occasion": 2,
+    "residual": 0.3786217708971691,
+    "subject_id": "MEN-14"
+   },
+   {
+    "occasion": 3,
+    "residual": -0.10162695263004196,
+    "subject_id": "MEN-14"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.8827958114289274,
+    "subject_id": "MEN-15"
+   },
+   {
+    "occasion": 2,
+    "residual": -1.2145656577819608,
+    "subject_id": "MEN-15"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.0003311625316655409,
+    "subject_id": "MEN-15"
+   },
+   {
+    "occasion": 4,
+    "residual": 2.0685613161786307,
+    "subject_id": "MEN-15"
+   },
+   {
+    "occasion": 1,
+    "residual": -2.2866047549815534,
+    "subject_id": "MEN-16"
+   },
+   {
+    "occasion": 2,
+    "residual": 1.7523470166339479,
+    "subject_id": "MEN-16"
+   },
+   {
+    "occasion": 3,
+    "residual": 1.2512987882494642,
+    "subject_id": "MEN-16"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.5197494401350298,
+    "subject_id": "MEN-16"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.8583804049342518,
+    "subject_id": "MEN-17"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.3642434748345451,
+    "subject_id": "MEN-17"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.6898934552651568,
+    "subject_id": "MEN-17"
+   },
+   {
+    "occasion": 4,
+    "residual": 0.5140303853648476,
+    "subject_id": "MEN-17"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.20532457509970214,
+    "subject_id": "MEN-18"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.816535102550219,
+    "subject_id": "MEN-18"
+   },
+   {
+    "occasion": 3,
+    "residual": 2.618921036665931,
+    "subject_id": "MEN-18"
+   },
+   {
+    "occasion": 4,
+    "residual": -1.8089561574512416,
+    "subject_id": "MEN-18"
+   },
+   {
+    "occasion": 1,
+    "residual": -1.0306583371128895,
+    "subject_id": "MEN-19"
+   },
+   {
+    "occasion": 2,
+    "residual": 1.4551954681866448,
+    "subject_id": "MEN-19"
+   },
+   {
+    "occasion": 3,
+    "residual": 0.5610492734861623,
+    "subject_id": "MEN-19"
+   },
+   {
+    "occasion": 4,
+    "residual": -1.0430969212142998,
+    "subject_id": "MEN-19"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.41375390853034233,
+    "subject_id": "MEN-20"
+   },
+   {
+    "occasion": 2,
+    "residual": 0.1314707039704608,
+    "subject_id": "MEN-20"
+   },
+   {
+    "occasion": 3,
+    "residual": 1.7033619831379312,
+    "subject_id": "MEN-20"
+   },
+   {
+    "occasion": 4,
+    "residual": -1.9980800710279354,
+    "subject_id": "MEN-20"
+   },
+   {
+    "occasion": 1,
+    "residual": -0.18789807332478858,
+    "subject_id": "MEN-21"
+   },
+   {
+    "occasion": 2,
+    "residual": -0.44780037955062113,
+    "subject_id": "MEN-21"
+   },
+   {
+    "occasion": 3,
+    "residual": 1.8089639808901836,
+    "subject_id": "MEN-21"
+   },
+   {
+    "occasion": 4,
+    "residual": -0.8042716586689735,
+    "subject_id": "MEN-21"
+   }
+  ],
+  "converged": true,
+  "estimator": "MIXEDLM_RANDOM_SLOPE",
+  "estimator_attempts": [
+   "slope-lbfgs:RuntimeError",
+   "slope-bfgs:RuntimeError",
+   "slope:selected=nm:logLik=-208.311800"
+  ],
+  "limitations": [
+   "Single-arm design; no causal contrast against a concurrent control.",
+   "The deposit does not map COND 1-4 to calendar weeks or training phases.",
+   "No raw force traces, so CMJ height cannot be independently recomputed.",
+   "Only 19 athletes contribute the fourth occasion; two are missing."
+  ],
+  "log_likelihood": -208.31180031144507,
+  "model_status": "COMPLETED",
+  "n_observations": 82,
+  "n_subjects": 21,
+  "optimizer": "nm",
+  "quality_note": "Complete-case analysis; missing CMJ rows are not imputed.",
+  "residual_by_arm": {
+   "INTERVENTION": {
+    "mean": 0.020466795478988505,
+    "n": 82,
+    "sd": 8.197805450614247
+   }
+  },
+  "residual_by_week": [
+   {
+    "mean_residual": -0.12552988410213994,
+    "week": 1
+   },
+   {
+    "mean_residual": -0.04937790715556273,
+    "week": 2
+   },
+   {
+    "mean_residual": 0.47534546661640575,
+    "week": 3
+   },
+   {
+    "mean_residual": -0.24373231332924736,
+    "week": 4
+   }
+  ],
+  "residual_definitions": {
+   "residual_by_week": "marginal: y - X beta_hat, mean per occasion",
+   "residual_qq": "standardized conditional residual (y - X beta_hat - Z b_hat) / sigma_hat (nlme 'pearson' convention; lme4 2.1 type='pearson' is not divided by sigma). BLUP shrinkage and leverage make these under-dispersed and correlated, not independent N(0,1); the Q-Q is exploratory",
+   "residual_summary": "marginal: y - X beta_hat (includes between-athlete deviations)"
+  },
+  "residual_qq": [
+   {
+    "observed": -2.3669932410748524,
+    "theoretical": -2.4276364603770038
+   },
+   {
+    "observed": -2.0755076010598597,
+    "theoretical": -2.058797118711582
+   },
+   {
+    "observed": -1.6110152287784487,
+    "theoretical": -1.8533669070077183
+   },
+   {
+    "observed": -1.3618331420199643,
+    "theoretical": -1.7052602549787732
+   },
+   {
+    "observed": -1.2133755693294912,
+    "theoretical": -1.587223624066259
+   },
+   {
+    "observed": -1.1899965025470254,
+    "theoretical": -1.4878967857188372
+   },
+   {
+    "observed": -1.0773599776311404,
+    "theoretical": -1.4014008945764984
+   },
+   {
+    "observed": -1.017048443748951,
+    "theoretical": -1.3242792045014768
+   },
+   {
+    "observed": -0.9912401747993523,
+    "theoretical": -1.2543180005234138
+   },
+   {
+    "observed": -0.9364880664100519,
+    "theoretical": -1.1900097671160506
+   },
+   {
+    "observed": -0.8177125479036265,
+    "theoretical": -1.1302790423981752
+   },
+   {
+    "observed": -0.7233588412353738,
+    "theoretical": -1.0743300708434116
+   },
+   {
+    "observed": -0.7225001865545958,
+    "theoretical": -1.021556444025143
+   },
+   {
+    "observed": -0.6473294169243192,
+    "theoretical": -0.971484654935606
+   },
+   {
+    "observed": -0.6212372096899976,
+    "theoretical": -0.9237373125988413
+   },
+   {
+    "observed": -0.6138291624390683,
+    "theoretical": -0.8780083087614783
+   },
+   {
+    "observed": -0.58907637285291,
+    "theoretical": -0.8340455451790011
+   },
+   {
+    "observed": -0.5749824118002935,
+    "theoretical": -0.7916386077433746
+   },
+   {
+    "observed": -0.5257666813738514,
+    "theoretical": -0.7506097726616676
+   },
+   {
+    "observed": -0.511225598282031,
+    "theoretical": -0.7108073144070857
+   },
+   {
+    "observed": -0.5110109880602753,
+    "theoretical": -0.6721004393566447
+   },
+   {
+    "observed": -0.4942099478420345,
+    "theoretical": -0.6343753903319223
+   },
+   {
+    "observed": -0.4868460192788781,
+    "theoretical": -0.597532409318382
+   },
+   {
+    "observed": -0.4863037924910329,
+    "theoretical": -0.5614833390479699
+   },
+   {
+    "observed": -0.4790000534970515,
+    "theoretical": -0.5261497068853624
+   },
+   {
+    "observed": -0.4688619752314608,
+    "theoretical": -0.4914611774441739
+   },
+   {
+    "observed": -0.3822803707376229,
+    "theoretical": -0.4573542903238079
+   },
+   {
+    "observed": -0.38190512091636764,
+    "theoretical": -0.42377142057976047
+   },
+   {
+    "observed": -0.3095471622632548,
+    "theoretical": -0.3906599147897024
+   },
+   {
+    "observed": -0.3062042866175084,
+    "theoretical": -0.3579713666809119
+   },
+   {
+    "observed": -0.2825758221990174,
+    "theoretical": -0.3256610044665333
+   },
+   {
+    "observed": -0.2746959134596887,
+    "theoretical": -0.2936871681332832
+   },
+   {
+    "observed": -0.26669646188419416,
+    "theoretical": -0.26201085950838
+   },
+   {
+    "observed": -0.24641940591147882,
+    "theoretical": -0.23059535141255755
+   },
+   {
+    "observed": -0.21693247803912663,
+    "theoretical": -0.19940584486526697
+   },
+   {
+    "observed": -0.12521669186461334,
+    "theoretical": -0.16840916535261968
+   },
+   {
+    "observed": -0.12228515253139899,
+    "theoretical": -0.13757349074654557
+   },
+   {
+    "observed": -0.11501146713243919,
+    "theoretical": -0.10686810468305773
+   },
+   {
+    "observed": -0.11190645126488366,
+    "theoretical": -0.0762631701475923
+   },
+   {
+    "observed": -0.09227801938298828,
+    "theoretical": -0.045729518734236245
+   },
+   {
+    "observed": -0.06052596187101019,
+    "theoretical": -0.015238451585825475
+   },
+   {
+    "observed": -0.05651079421163542,
+    "theoretical": 0.015238451585825336
+   },
+   {
+    "observed": -0.0522872360379933,
+    "theoretical": 0.045729518734236106
+   },
+   {
+    "observed": 0.00019723046146687806,
+    "theoretical": 0.07626317014759217
+   },
+   {
+    "observed": 0.013372459439414383,
+    "theoretical": 0.10686810468305759
+   },
+   {
+    "observed": 0.0711647742389471,
+    "theoretical": 0.13757349074654543
+   },
+   {
+    "observed": 0.07143593039997309,
+    "theoretical": 0.16840916535261954
+   },
+   {
+    "observed": 0.07830000417939023,
+    "theoretical": 0.19940584486526677
+   },
+   {
+    "observed": 0.14323076974654764,
+    "theoretical": 0.2305953514125574
+   },
+   {
+    "observed": 0.14591180172752505,
+    "theoretical": 0.2620108595083799
+   },
+   {
+    "observed": 0.14772885306975833,
+    "theoretical": 0.29368716813328305
+   },
+   {
+    "observed": 0.1532763920248002,
+    "theoretical": 0.3256610044665331
+   },
+   {
+    "observed": 0.19804396231442994,
+    "theoretical": 0.3579713666809117
+   },
+   {
+    "observed": 0.22549575949876588,
+    "theoretical": 0.3906599147897023
+   },
+   {
+    "observed": 0.3061410649435961,
+    "theoretical": 0.4237714205797603
+   },
+   {
+    "observed": 0.3341441030747102,
+    "theoretical": 0.4573542903238078
+   },
+   {
+    "observed": 0.37941927110228657,
+    "theoretical": 0.4914611774441738
+   },
+   {
+    "observed": 0.41087982949214913,
+    "theoretical": 0.5261497068853624
+   },
+   {
+    "observed": 0.4367647335759562,
+    "theoretical": 0.5614833390479699
+   },
+   {
+    "observed": 0.45946268231715914,
+    "theoretical": 0.597532409318382
+   },
+   {
+    "observed": 0.5179822653519752,
+    "theoretical": 0.6343753903319223
+   },
+   {
+    "observed": 0.5271493578015692,
+    "theoretical": 0.6721004393566447
+   },
+   {
+    "observed": 0.647940299923785,
+    "theoretical": 0.7108073144070857
+   },
+   {
+    "observed": 0.6553904117177615,
+    "theoretical": 0.7506097726616676
+   },
+   {
+    "observed": 0.7452359909140873,
+    "theoretical": 0.7916386077433746
+   },
+   {
+    "observed": 0.7581345916298552,
+    "theoretical": 0.8340455451790011
+   },
+   {
+    "observed": 0.8039840653980586,
+    "theoretical": 0.8780083087614783
+   },
+   {
+    "observed": 0.8123402455194918,
+    "theoretical": 0.9237373125988413
+   },
+   {
+    "observed": 0.8556524072438975,
+    "theoretical": 0.971484654935606
+   },
+   {
+    "observed": 0.8666707319559556,
+    "theoretical": 1.021556444025143
+   },
+   {
+    "observed": 0.88928555879441,
+    "theoretical": 1.0743300708434116
+   },
+   {
+    "observed": 1.0144712576322792,
+    "theoretical": 1.1302790423981752
+   },
+   {
+    "observed": 1.0436452729195744,
+    "theoretical": 1.1900097671160506
+   },
+   {
+    "observed": 1.0773646370364935,
+    "theoretical": 1.2543180005234138
+   },
+   {
+    "observed": 1.1081445539120645,
+    "theoretical": 1.3242792045014768
+   },
+   {
+    "observed": 1.1838420742453286,
+    "theoretical": 1.4014008945764984
+   },
+   {
+    "observed": 1.2319730161215479,
+    "theoretical": 1.4878967857188372
+   },
+   {
+    "observed": 1.2657827404519244,
+    "theoretical": 1.587223624066259
+   },
+   {
+    "observed": 1.3519571133027084,
+    "theoretical": 1.7052602549787732
+   },
+   {
+    "observed": 1.5597507423593715,
+    "theoretical": 1.8533669070077188
+   },
+   {
+    "observed": 1.6102518044088485,
+    "theoretical": 2.058797118711582
+   },
+   {
+    "observed": 2.415469188934146,
+    "theoretical": 2.4276364603770046
+   }
+  ],
+  "residual_qq_type": "CONDITIONAL_PEARSON",
+  "residual_summary": {
+   "max_abs_residual": 21.681415727765078,
+   "mean_residual": 0.020466795478988505,
+   "rmse": 8.147691203462653
+  },
+  "sample_context": {
+   "excluded_trial_ids": [],
+   "excluded_trials_in_cohort": 0,
+   "observations_per_subject_max": 4,
+   "observations_per_subject_min": 3,
+   "valid_first_trials_used": 82,
+   "valid_repeat_trials_not_modelled": 0,
+   "weeks_observed": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  "week_centering": 1
+ },
+ "mixed_state": {
+  "kind": "qualified",
+  "label": "qualified",
+  "promotable": true,
+  "record": "QUAL-REAL-MIXEDLM",
+  "reason": ""
+ },
+ "exports": [
+  "mixed-residuals.pdf",
+  "mixed-residuals.png",
+  "mixed-residuals.svg",
+  "mixed-trajectory.pdf",
+  "mixed-trajectory.png",
+  "mixed-trajectory.svg",
+  "rel-reliability.pdf",
+  "rel-reliability.png",
+  "rel-reliability.svg"
+ ],
+ "promote": {
+  "evidence_artifact": {
+   "id": "EVID-REAL-0001",
+   "title": "CMJ height change across four repeated testing occasions",
+   "kind": "EFFECT",
+   "metric_id": "MET-REAL-CMJ-HEIGHT",
+   "value": 2.9953536405888475,
+   "unit": "cm"
+  },
+  "figure_artifact": {
+   "id": "FIG-REAL-0001",
+   "title": "CMJ height by testing occasion",
+   "kind": "LINE",
+   "analysis_run_id": "RUN-REAL-0006",
+   "dataset_snapshot_id": "DS-REAL-MENDELEY-2C44490E08AD",
+   "spec": {
+    "x": "occasion",
+    "y": "CMJ height",
+    "unit": "cm",
+    "series": [
+     "INTERVENTION"
+    ],
+    "metric_id": "MET-REAL-CMJ-HEIGHT",
+    "cohort_id": "COHORT-REAL-001",
+    "source_artifact": "cmj_occasions.parquet"
+   }
+  },
+  "already_promoted": false
+ },
+ "report_cited": [
+  {
+   "report_id": "REPORT-REAL-001",
+   "artifact_id": "EVID-REAL-0001",
+   "section": "Intervention result",
+   "already_cited": false
+  },
+  {
+   "report_id": "REPORT-REAL-001",
+   "artifact_id": "FIG-REAL-0001",
+   "section": "Intervention result",
+   "already_cited": false
+  }
+ ],
+ "state_after_promote": {
+  "promote_enabled": true,
+  "evidence_ids": [
+   "EVID-REAL-0001"
+  ]
+ },
+ "rel_run": {
+  "id": "RUN-REAL-0007",
+  "method_id": "METH-REAL-RELIABILITY",
+  "method_version": "1.1.0",
+  "snapshot_id": "DS-REAL-MOVESMART-805259588272",
+  "result_digest": "e0eedb0e3428d3c7",
+  "status": "COMPLETED"
+ },
+ "rel_result": {
+  "activity": "Walking",
+  "cv_percent_by_subject": [
+   {
+    "cv_percent": 2.997987761199112,
+    "subject_id": "MS-01"
+   },
+   {
+    "cv_percent": 8.554788304421349,
+    "subject_id": "MS-02"
+   },
+   {
+    "cv_percent": 11.545538918781173,
+    "subject_id": "MS-03"
+   },
+   {
+    "cv_percent": 3.932433551344746,
+    "subject_id": "MS-04"
+   },
+   {
+    "cv_percent": 3.8617637143627928,
+    "subject_id": "MS-05"
+   },
+   {
+    "cv_percent": 2.8010276636708253,
+    "subject_id": "MS-07"
+   },
+   {
+    "cv_percent": 9.882752502892032,
+    "subject_id": "MS-08"
+   },
+   {
+    "cv_percent": 4.4239344236519855,
+    "subject_id": "MS-09"
+   },
+   {
+    "cv_percent": 11.450233318535144,
+    "subject_id": "MS-10"
+   }
+  ],
+  "excluded_trials": 37,
+  "icc_1_1_sensitivity": 0.8950423045054271,
+  "icc_2_1_sensitivity": 0.894896570762491,
+  "icc_3_1": 0.8887265871617835,
+  "icc_3_1_ci_high": 0.9692965399576995,
+  "icc_3_1_ci_low": 0.7451953776144685,
+  "limitations": [
+   "Balanced subset: the first 5 trials per participant in acquisition order are used; later trials are excluded to keep the ICC design balanced.",
+   "ICC(3,1) is within-session consistency of a single trial (systematic trial effects removed); it is not between-day reliability. ICC(1,1) and ICC(2,1) are reported as sensitivities.",
+   "Eligibility follows the admitted snapshot: only force trials matched to an IMU recording are included.",
+   "Participants with fewer than two trials are excluded: MS-06.",
+   "The number of contributing force plates differs between selected trials for MS-03, MS-04, MS-07; peaks may not be fully comparable.",
+   "Peak force is not normalised to body weight, so between-participant differences remain.",
+   "Walking speed is not controlled in the deposited trials.",
+   "The deposit has no calibration log."
+  ],
+  "mean_cv_percent": 6.605606684317684,
+  "mean_subject_mean": 1038.1811546222223,
+  "median_cv_percent": 4.4239344236519855,
+  "method": "ICC(3,1) repeated-measures reliability",
+  "minimal_detectable_change_95": 210.0548069159465,
+  "ms_between": 235086.18855675642,
+  "ms_error": 5743.003370334557,
+  "ms_trials": 2540.413408632436,
+  "ms_within": 5387.160041256548,
+  "n_subjects": 9,
+  "n_trials_available": 82,
+  "n_trials_used": 45,
+  "outcome": "peak vertical GRF",
+  "status": "COMPUTED",
+  "subject_ids": [
+   "MS-01",
+   "MS-02",
+   "MS-03",
+   "MS-04",
+   "MS-05",
+   "MS-07",
+   "MS-08",
+   "MS-09",
+   "MS-10"
+  ],
+  "trials_per_subject": 5,
+  "typical_error": 75.78260598801388,
+  "typical_error_percent": 7.299555154763908,
+  "unit": "N"
+ },
+ "rel_diagnostics": {
+  "activity": "Walking",
+  "assumptions": [
+   "Balanced subset of the first k trials per participant in acquisition order.",
+   "Peak force is measured in the same activity.",
+   "Trials are a fixed factor; consistency ICC(3,1) removes systematic trial effects."
+  ],
+  "excluded_trials": 37,
+  "limitations": [
+   "Balanced subset: the first 5 trials per participant in acquisition order are used; later trials are excluded to keep the ICC design balanced.",
+   "ICC(3,1) is within-session consistency of a single trial (systematic trial effects removed); it is not between-day reliability. ICC(1,1) and ICC(2,1) are reported as sensitivities.",
+   "Eligibility follows the admitted snapshot: only force trials matched to an IMU recording are included.",
+   "Participants with fewer than two trials are excluded: MS-06.",
+   "The number of contributing force plates differs between selected trials for MS-03, MS-04, MS-07; peaks may not be fully comparable.",
+   "Peak force is not normalised to body weight, so between-participant differences remain.",
+   "Walking speed is not controlled in the deposited trials.",
+   "The deposit has no calibration log."
+  ],
+  "n_subjects": 9,
+  "n_trials_used": 45,
+  "status": "COMPUTED",
+  "trials_per_subject": 5
+ },
+ "rel_state": {
+  "kind": "qualified",
+  "label": "qualified",
+  "promotable": true,
+  "record": "QUAL-REAL-RELIABILITY",
+  "reason": ""
+ },
+ "rel_promote": true
+}

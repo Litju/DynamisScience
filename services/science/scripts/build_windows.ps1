@@ -1,7 +1,27 @@
 param([string]$AppVersion = "0.1.0")
 
 $ErrorActionPreference = "Stop"
+
+# Windows PowerShell 5.1 turns every line a native command writes to stderr into a terminating
+# NativeCommandError under $ErrorActionPreference = "Stop" once the caller merges streams (2>&1, a CI
+# log, a hidden launcher). uv and PyInstaller write warnings to stderr, so the build used to stop silently
+# between PyInstaller and Inno Setup. Native commands run here with stderr kept as text and only the exit
+# code decides success; a failure prints the tail of the output, throws, and the script exits non-zero.
+function Invoke-Native {
+    param([Parameter(Mandatory)][string]$What, [Parameter(Mandatory)][scriptblock]$Command)
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { $lines = @(& $Command 2>&1 | ForEach-Object { "$_" }) }
+    finally { $ErrorActionPreference = $saved }
+    if ($LASTEXITCODE -ne 0) {
+        $lines | Select-Object -Last 20 | ForEach-Object { [Console]::Error.WriteLine($_) }
+        throw "$What failed (exit code $LASTEXITCODE)."
+    }
+    return $lines
+}
+
 $serviceRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $serviceRoot)
 $buildName = "res604-" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
 $buildRoot = Join-Path (Join-Path $serviceRoot "build") $buildName
 $fixtureRoot = Join-Path $buildRoot "fixture-data"
@@ -23,14 +43,13 @@ $env:DYNAMISSCIENCE_FIXTURE_DIR = $fixtureRoot
 $env:DYNAMISSCIENCE_THIRD_PARTY_NOTICES = $thirdPartyNotices
 Push-Location $serviceRoot
 try {
-    uv run python -m dynamis_science.generate
-    if ($LASTEXITCODE -ne 0) { throw "Generating the bundled synthetic fixture failed." }
+    Invoke-Native "Generating the bundled synthetic fixture" { uv run python -m dynamis_science.generate } | Out-Host
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot "artifacts\dataset_snapshot.json"))) {
         throw "The generated synthetic snapshot manifest is missing."
     }
 
-    uv run python scripts\build_third_party_notices.py --output $thirdPartyNotices
-    if ($LASTEXITCODE -ne 0) { throw "Collecting third-party license notices failed." }
+    Invoke-Native "Collecting third-party license notices" {
+        uv run python scripts\build_third_party_notices.py --output $thirdPartyNotices } | Out-Host
 
     $originalPath = $env:PATH
     $uvDirectory = Split-Path -Parent (Get-Command uv.exe).Source
@@ -45,12 +64,12 @@ try {
     ) -join ";"
     try {
         $env:PATH = $cleanBuildPath
-        uv run python -m PyInstaller packaging\DynamisScience.spec --noconfirm --clean --log-level WARN --distpath $distRoot --workpath $workRoot
+        Invoke-Native "PyInstaller (onedir application)" {
+            uv run python -m PyInstaller packaging\DynamisScience.spec --noconfirm --clean --log-level WARN --distpath $distRoot --workpath $workRoot } | Out-Host
     }
     finally {
         $env:PATH = $originalPath
     }
-    if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed to build the onedir application." }
     if (-not (Test-Path -LiteralPath (Join-Path $bundleRoot "DynamisScience.exe"))) {
         throw "The PyInstaller executable was not produced."
     }
@@ -61,20 +80,18 @@ try {
         "/DOutputDir=$installerRoot",
         (Join-Path $serviceRoot "packaging\DynamisScience.iss")
     )
-    & $isccPath /Qp @innoArgs
-    if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed to build the per-user installer." }
+    Invoke-Native "Inno Setup (per-user installer)" { & $isccPath /Qp @innoArgs } | Out-Host
 
     $bundleBytes = (Get-ChildItem -LiteralPath $bundleRoot -File -Recurse | Measure-Object -Property Length -Sum).Sum
-    $installer = Get-Item -LiteralPath (Join-Path $installerRoot "DynamisScience-Setup-x64.exe")
+    $installerPath = Join-Path $installerRoot "DynamisScience-Setup-x64.exe"
+    if (-not (Test-Path -LiteralPath $installerPath)) { throw "Inno Setup reported success but $installerPath was not produced." }
+    $installer = Get-Item -LiteralPath $installerPath
     $sourceDiffPath = Join-Path $buildRoot ".source-diff.tmp"
     Push-Location $repoRoot
     try {
-        $sourceCommit = (& git rev-parse HEAD | Out-String).Trim()
-        if ($LASTEXITCODE -ne 0) { throw "Could not record the source Git commit." }
-        $sourceStatus = @(& git status --porcelain --untracked-files=all)
-        if ($LASTEXITCODE -ne 0) { throw "Could not record the source working-tree state." }
-        & git diff --binary HEAD "--output=$sourceDiffPath"
-        if ($LASTEXITCODE -ne 0) { throw "Could not fingerprint the source diff." }
+        $sourceCommit = (Invoke-Native "Recording the source Git commit" { git rev-parse HEAD }) -join ""
+        $sourceStatus = @(Invoke-Native "Recording the source working-tree state" { git status --porcelain --untracked-files=all })
+        Invoke-Native "Fingerprinting the source diff" { git diff --binary HEAD "--output=$sourceDiffPath" } | Out-Null
         $sourceDiffSha256 = (Get-FileHash -LiteralPath $sourceDiffPath -Algorithm SHA256).Hash
     }
     finally {
@@ -86,8 +103,8 @@ try {
         source_status = $sourceStatus
         source_diff_sha256 = $sourceDiffSha256
         app_version = $AppVersion
-        python_version = (uv run python --version 2>&1 | Out-String).Trim()
-        pyinstaller_version = (uv run python -m PyInstaller --version 2>&1 | Out-String).Trim()
+        python_version = (Invoke-Native "Python version" { uv run python --version }) -join " "
+        pyinstaller_version = (Invoke-Native "PyInstaller version" { uv run python -m PyInstaller --version }) -join " "
         inno_setup = $isccPath
         fixture = "DS-SYNTH-001 generated in an isolated build directory"
         bundle_bytes = [long]$bundleBytes
