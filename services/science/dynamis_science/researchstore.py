@@ -100,7 +100,7 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-REAL-DESC": {
         "id": "METH-REAL-DESC",
         "name": "Descriptive occasion trajectory",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "qualification": {"status": "QUALIFIED", "record": "QUAL-REAL-DESCRIPTIVE", "reference": "Independent deterministic recomputation", "basis": "Means, SD and Student-t 95% intervals (df = n - 1, RES-619) recomputed from the snapshot."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
         "required_tables": ["cmj_occasions"],
@@ -160,8 +160,8 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-U-DESC": {
         "id": "METH-U-DESC",
         "name": "Descriptive longitudinal summary",
-        "version": "1.0.0",
-        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "QUAL-U-DESC", "reference": "Deterministic recomputation", "basis": "Mean, SD and 95% interval computed from the selected snapshot and cohort."},
+        "version": "1.1.0",
+        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "QUAL-U-DESC", "reference": "Deterministic recomputation", "basis": "Mean, SD and Student-t 95% interval (df = n - 1, RES-619) computed from the selected snapshot and cohort."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "MEASUREMENT_REPEATED_TRIALS", "DESCRIPTIVE"],
         "required_tables": ["cmj_occasions", "cmj_trials", "signal_trials"],
         "required_shape": "A numeric outcome identified by the snapshot metric registry.",
@@ -173,6 +173,50 @@ METHODS: dict[str, dict[str, Any]] = {
         "output_schema": ["per-axis mean", "SD", "95% CI", "coverage"],
     },
 }
+
+# RES-619: implementation versions whose outputs must not be presented as currently
+# qualified. Historical records are never rewritten; status is derived on read.
+SUPERSEDED_METHOD_VERSIONS: dict[tuple[str, str], dict[str, str]] = {
+    ("METH-REAL-RELIABILITY", "1.0.0"): {
+        "affects": "PRIMARY_RESULT",
+        "reason": "ICC labelled (3,1) was the one-way ICC(1,1) on value-sorted (smallest-k) trials; ICC, CI, typical error and threshold are invalid.",
+    },
+    ("METH-REAL-TREND", "1.0.0"): {
+        "affects": "DIAGNOSTICS_AND_FIGURE_INTERVALS",
+        "reason": "Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.",
+    },
+    ("METH-REAL-DESC", "1.0.0"): {
+        "affects": "INTERVALS",
+        "reason": "Mean intervals used z = 1.96 instead of Student-t (df = n - 1); intervals were too narrow.",
+    },
+    ("METH-U-DESC", "1.0.0"): {
+        "affects": "INTERVALS",
+        "reason": "Mean intervals used z = 1.96 instead of Student-t (df = n - 1); intervals were too narrow.",
+    },
+}
+
+
+def method_status(run: dict[str, Any]) -> dict[str, Any]:
+    """CURRENT or SUPERSEDED for the implementation version that produced ``run``."""
+    method_id = str(run.get("method_id") or "")
+    spec = (run.get("execution") or {}).get("analysis_spec") or {}
+    # Runs before RES-619 recorded only the registered spec version, which was always 1.0.0.
+    computed_with = str(run.get("method_version") or spec.get("method_version") or "1.0.0")
+    current = METHODS.get(method_id, {}).get("version")
+    superseded = SUPERSEDED_METHOD_VERSIONS.get((method_id, computed_with))
+    if superseded:
+        return {"state": "SUPERSEDED", "computed_with": computed_with, "current_version": current, **superseded}
+    return {"state": "CURRENT", "computed_with": computed_with, "current_version": current}
+
+
+def ensure_current(run: dict[str, Any], action: str) -> None:
+    status = method_status(run)
+    if status["state"] == "SUPERSEDED":
+        raise ResearchValidation(
+            f"{run.get('id')} was computed with {run.get('method_id')} {status['computed_with']}, superseded by "
+            f"{status['current_version']} ({status['reason']}) It cannot be used to {action}; re-run the analysis."
+        )
+
 
 REJECTED_METHODS = {
     "METH-REAL-BODYWEIGHT": {
@@ -2073,7 +2117,7 @@ def append_run(document: dict[str, Any]) -> dict[str, Any]:
             ),
         )
         _audit(connection, "run.executed", "analysis_run", run_id, {"method_id": document["method_id"], "spec_id": document["analysis_spec_id"]})
-    return document
+    return _with_method_status(document)
 
 
 def list_runs(entity_id: str | None = None) -> list[dict[str, Any]]:
@@ -2082,13 +2126,17 @@ def list_runs(entity_id: str | None = None) -> list[dict[str, Any]]:
             rows = connection.execute("SELECT * FROM runs WHERE entity_id = ? ORDER BY created_at", (entity_id,)).fetchall()
         else:
             rows = connection.execute("SELECT * FROM runs ORDER BY created_at").fetchall()
-    return [_row_document(row) for row in rows]
+    return [_with_method_status(_row_document(row)) for row in rows]
+
+
+def _with_method_status(run: dict[str, Any]) -> dict[str, Any]:
+    return {**run, "method_status": method_status(run)}
 
 
 def get_run(run_id: str) -> dict[str, Any] | None:
     with _connect() as connection:
         row = connection.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
-    return _row_document(row) if row else None
+    return _with_method_status(_row_document(row)) if row else None
 
 
 def append_evidence(project_id: str, entity_id: str, run_id: str, document: dict[str, Any]) -> dict[str, Any]:
@@ -2295,7 +2343,8 @@ def study_detail(entity_id: str) -> dict[str, Any]:
         "version": entity["version"],
     }
     runs = list_runs(entity_id)
-    evidence = list_evidence(entity_id)
+    statuses = {run["id"]: run["method_status"] for run in runs}
+    evidence = [{**item, "method_status": statuses.get(item.get("analysis_run_id"), {"state": "UNKNOWN"})} for item in list_evidence(entity_id)]
     figures = list_figures(entity_id)
     investigations = list_investigations(entity_id)
     eligibility = method_eligibility(entity, current_cohort, resolved, current_plan)
@@ -2558,6 +2607,9 @@ def cite_artifact(entity_id: str, artifact_id: str, section: str | None = None) 
     if evidence is None and figure is None:
         raise ResearchNotFound(f"Artifact {artifact_id} not found")
     kind = "figure" if figure is not None else "evidence"
+    run = get_run((evidence or figure).get("analysis_run_id") or "")
+    if run is not None:
+        ensure_current(run, "add a new report citation")
     if section is None:
         section = "Primary result" if evidence and evidence.get("kind") in {"EFFECT", "RELIABILITY"} else ("Measurement qualification" if evidence and evidence.get("kind") == "DESCRIPTIVE" else "Exploratory results")
     with _tx() as connection:
@@ -2607,6 +2659,8 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
     if entity is None:
         raise ResearchNotFound(f"Research object {entity_id} not found")
     payload = report_payload(entity_id)
+    for run in payload["runs"]:
+        ensure_current(run, "freeze a new report version")
     with _tx() as connection:
         report = _ensure_report_row(connection, entity)
         content = {
@@ -2825,6 +2879,21 @@ def export_html(entity_id: str, version: int | None = None) -> str:
     evidence = payload.get("evidence", [])
     figures = payload.get("figures", [])
     limitations = payload.get("research", {}).get("limitations", [])
+    statuses = {}
+    for item in evidence:
+        run = get_run(item.get("analysis_run_id") or "")
+        statuses[item["id"]] = method_status(run) if run else {"state": "UNKNOWN"}
+    superseded = {key: value for key, value in statuses.items() if value["state"] == "SUPERSEDED"}
+    warning_html = (
+        "<div class=\"warning\" role=\"alert\"><strong>Superseded evidence.</strong> "
+        + " ".join(
+            f"{html.escape(key)} was computed with method version {html.escape(value['computed_with'])}, superseded by {html.escape(str(value['current_version']))}: {html.escape(value['reason'])}"
+            for key, value in superseded.items()
+        )
+        + " It is shown for audit only and is not currently qualified evidence.</div>"
+        if superseded
+        else ""
+    )
     manifest = {
         "report_id": payload.get("id"),
         "study_id": entity_id,
@@ -2832,13 +2901,13 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         "snapshot_id": snapshot["id"],
         "snapshot_checksums": snapshot.get("checksums", {}),
         "source": snapshot.get("source", {}),
-        "evidence": [{"id": item["id"], "run": item["analysis_run_id"], "spec": item.get("analysis_spec_id"), "digest": item.get("result_digest"), "interval": item.get("interval")} for item in evidence],
+        "evidence": [{"id": item["id"], "run": item["analysis_run_id"], "spec": item.get("analysis_spec_id"), "digest": item.get("result_digest"), "interval": item.get("interval"), "method_status": statuses[item["id"]]} for item in evidence],
         "figures": [{"id": item["id"], "evidence_ids": item.get("evidence_ids", [])} for item in figures],
         "generated_at": generated_at,
         "limitations": limitations,
     }
     rows = "".join(
-        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(str(item.get('unit', '')))}</td><td>{html.escape(str(item.get('interval', {}).get('low') if item.get('interval') else ''))} – {html.escape(str(item.get('interval', {}).get('high') if item.get('interval') else ''))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
+        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(str(item.get('unit', '')))}</td><td>{html.escape(str(item.get('interval', {}).get('low') if item.get('interval') else ''))} – {html.escape(str(item.get('interval', {}).get('high') if item.get('interval') else ''))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
         for item in evidence
     )
     figure_html = "".join(
@@ -2875,11 +2944,13 @@ figure {{ margin:18px 0; border:1px solid #2e2e2e; padding:12px; }}
 figcaption {{ color:#a9a9a2; font-size:12px; margin-bottom:8px; }}
 .muted {{ color:#8e8e88; }}
 .badge {{ display:inline-block; border:1px solid #4a4a4a; padding:1px 6px; font-size:11px; margin-right:6px; }}
+.warning {{ border:1px solid #c4553a; background:#2a1410; color:#f2c4b8; padding:10px 12px; margin:14px 0; }}
 pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid #2e2e2e; font-size:11px; }}
 </style></head>
 <body><main>
 <div class="meta">{html.escape(payload.get('id',''))} · {html.escape(str(payload.get('status','DRAFT')))} · version {html.escape(str(payload.get('version','')))}</div>
 <h1>{title}</h1>
+{warning_html}
 <p class="muted">{html.escape(detail['study']['title'])} · {html.escape(detail['project']['title'])}</p>
 <h2>1. Question and design</h2>
 <p>{html.escape(detail['question']['statement'])}</p>
@@ -2892,7 +2963,7 @@ pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid 
 <p>{html.escape(detail['plan']['primary_estimand'])}</p>
 <p class="meta">{html.escape(str(detail['plan'].get('method_id') or ''))} · {html.escape(detail['plan']['status'])} · {html.escape(str(detail['plan'].get('parameters', {})))}</p>
 <h2>4. Results</h2>
-{'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>95% interval</th><th>Run</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
+{'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>95% interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
 {figure_html}
 {narrative}
 <h2>5. Limitations</h2><ul>{limitation_html}</ul>

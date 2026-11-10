@@ -349,6 +349,34 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
             comparison["pass"]
             for comparison in checks
         )
+    # A pre-RES-619 ledger record (no implementation version, spec 1.0.0) stays readable but superseded.
+    from dynamis_science import realanalysis
+
+    ledger = realanalysis.artifact_dir() / "real_runs.json"
+    records = json.loads(ledger.read_text(encoding="utf-8"))
+    current_reliability = max((record for record in records if record["method_id"] == "METH-REAL-RELIABILITY"), key=lambda record: record["created_at"])
+    assert current_reliability["method_version"] == "1.1.0"
+    legacy = {key: value for key, value in current_reliability.items() if key != "method_version"}
+    legacy.update({"id": "RUN-REAL-9001", "created_at": "2026-11-06T14:48:32+00:00", "result": {**legacy["result"], "icc_3_1": 0.9511167659496643}})
+    legacy["execution"] = {**legacy["execution"], "analysis_spec": {**legacy["execution"]["analysis_spec"], "method_version": "1.0.0"}}
+    ledger.write_text(json.dumps(records + [legacy], indent=2, sort_keys=True), encoding="utf-8")
+    listed = realanalysis.get_run("RUN-REAL-9001")
+    assert listed["result"]["icc_3_1"] == 0.9511167659496643  # original value preserved
+    assert listed["method_status"] == {**researchstore.SUPERSEDED_METHOD_VERSIONS[("METH-REAL-RELIABILITY", "1.0.0")], "state": "SUPERSEDED", "computed_with": "1.0.0", "current_version": "1.1.0"}
+    with pytest.raises(researchstore.ResearchValidation, match="cannot be used to promote new evidence"):
+        service.promote_run_to_evidence("RUN-REAL-9001")
+    legacy_figure = run_figure(listed)
+    assert legacy_figure._suptitle.get_text().startswith("SUPERSEDED · METH-REAL-RELIABILITY 1.0.0")
+    assert json.loads(legacy_figure._dynamis_metadata["DynamisScience provenance"])["method_status"]["state"] == "SUPERSEDED"
+    current_figure = run_figure(realanalysis.get_run(current_reliability["id"]))
+    assert current_figure._suptitle is None
+    current_provenance = json.loads(current_figure._dynamis_metadata["DynamisScience provenance"])
+    assert current_provenance["source_license"] == "CC0-1.0" and current_provenance["source_doi"] == "10.5281/zenodo.17376717"
+    # The newest reliability run is now legacy; qualification must still bind to the current one.
+    requalified = {item["id"]: item for item in qualification_real.run()}
+    assert requalified["QUAL-REAL-RELIABILITY"]["dynamis_run"] == current_reliability["id"]
+    assert requalified["QUAL-REAL-RELIABILITY"]["status"] == "QUALIFIED"
+    assert list((realanalysis.artifact_dir().parent / "qualification" / "history").glob("real_qualification-*.json"))
     trial = service.list_signal_trials(movesmart["snapshot_id"], activity="Walking")[0]
     waveform = service.get_signal_waveform(movesmart["snapshot_id"], trial["trial_id"])
     assert waveform["source_rows"] > waveform["sample_count"]
@@ -375,7 +403,26 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     authored_evidence = service.promote_run_to_evidence(authored_run["id"])
     assert authored_evidence["evidence_artifact"]["analysis_run_id"] == authored_run["id"]
     service.cite_report_artifact(study_id, authored_evidence["evidence_artifact"]["id"])
+    assert authored_run["method_version"] == "1.1.0"
+    assert authored_run["method_status"]["state"] == "CURRENT"
+    # The isolated copy of the operational store holds pre-RES-619 evidence (method 1.0.0).
+    legacy = [item for item in service.get_report(study_id)["evidence"] if item["method_status"]["state"] == "SUPERSEDED"]
+    assert legacy, "expected historical 1.0.0 evidence in the isolated restore"
+    legacy_html = service.render_report_html(study_id)
+    assert "Superseded evidence." in legacy_html and legacy[0]["id"] in legacy_html
+    with pytest.raises(researchstore.ResearchValidation, match="superseded by 1.1.0"):
+        service.freeze_report(study_id)
+    with pytest.raises(researchstore.ResearchValidation, match="cannot be used to add a new report citation"):
+        service.cite_report_artifact(study_id, legacy[0]["id"])
+    historical_versions = service.report_versions(study_id)
+    for item in legacy:
+        service.uncite_report_artifact(study_id, item["id"])
     frozen = service.freeze_report(study_id)
+    assert "Superseded evidence." not in service.render_report_html(study_id, frozen["version"])
+    # Earlier frozen versions stay exportable and are flagged, never rewritten.
+    for version in historical_versions:
+        historical = service.render_report_html(study_id, version["version"])
+        assert ("Superseded evidence." in historical) == any(item["id"] in historical for item in legacy)
     report_path = service.export_report_html(
         study_id, tmp_path / "frozen-report.html", frozen["version"]
     )
@@ -513,11 +560,21 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     qtbot.waitUntil(lambda: not window.runner.active)
     assert not errors, errors
     assert service.get_report(study_id).get("summary") == "The observed within-subject estimate is reported with its stored interval."
+    # The restored store still cites method 1.0.0 evidence: the GUI must refuse to freeze it.
+    window.research._freeze_report()
+    qtbot.waitUntil(lambda: bool(errors) and not window.runner.active)
+    assert "superseded by 1.1.0" in errors.pop()
+    assert window.status_text.text() == "Operation failed"
+    for legacy in [item for item in service.get_report(study_id)["evidence"] if item["method_status"]["state"] == "SUPERSEDED"]:
+        service.uncite_report_artifact(study_id, legacy["id"])
+    window.research._load_runs_and_report()
+    qtbot.waitUntil(lambda: not window.runner.active)
     expected_report_version = service.get_report(study_id)["version"]
     window.research._freeze_report()
     qtbot.waitUntil(
-        lambda: window.research.report_version == expected_report_version
+        lambda: window.research.report_version == expected_report_version or bool(errors)
     )
+    assert not errors, errors
 
     output = tmp_path / "native-report.html"
     monkeypatch.setattr(

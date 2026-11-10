@@ -1873,7 +1873,7 @@ class ResearchWorkbench(QWidget):
         self.show_figure_button.setEnabled(True)
         self.run_output.setPlainText(
             json.dumps(
-                {key: run.get(key) for key in ("id", "method_id", "status", "result", "diagnostics", "result_digest", "reproducibility_key")},
+                {key: run.get(key) for key in ("id", "method_id", "method_version", "method_status", "status", "result", "diagnostics", "result_digest", "reproducibility_key")},
                 indent=2,
                 ensure_ascii=False,
                 default=str,

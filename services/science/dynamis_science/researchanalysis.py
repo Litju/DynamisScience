@@ -386,6 +386,8 @@ def execute(
         "cohort_id": cohort["id"],
         "plan_id": plan["id"] if plan else None,
         "method_id": method_id,
+        # Implementation version; a frozen plan keeps the version it was registered with.
+        "method_version": methods[method_id]["version"],
         "outcome_metric_id": outcome_metric_id,
         "status": "COMPLETED",
         "plan_alignment": alignment,
@@ -419,6 +421,7 @@ def promote(run_id: str) -> dict[str, Any]:
         raise researchstore.ResearchNotFound("Study not found")
     if run.get("status") != "COMPLETED":
         raise researchstore.ResearchValidation("Only completed runs can be promoted")
+    researchstore.ensure_current(run, "promote new evidence")
     if not run.get("diagnostics"):
         raise researchstore.ResearchValidation("A result without diagnostics cannot become evidence")
     profile = _evidence_profile(run, entity)

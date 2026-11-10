@@ -51,9 +51,9 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
 
 
 def _mixedlm_qualification(snapshot_id: str) -> dict[str, Any]:
-    runs = [run for run in realanalysis.list_runs() if run["method_id"] == "METH-REAL-TREND" and run["status"] == "COMPLETED"]
+    runs = [run for run in realanalysis.list_runs() if run["method_id"] == "METH-REAL-TREND" and run["status"] == "COMPLETED" and run["method_status"]["state"] == "CURRENT"]
     if not runs:
-        return {"id": "QUAL-REAL-MIXEDLM", "status": "BLOCKED", "reason": "No real-data trend run has been executed."}
+        return {"id": "QUAL-REAL-MIXEDLM", "status": "BLOCKED", "reason": "No real-data trend run with the current method version has been executed."}
     run = max(runs, key=lambda item: item["created_at"])
     frame = realstore.read_table(snapshot_id, "cmj_occasions").select(["subject_id", "occasion", "cmj_height_cm"]).drop_nulls()
     qualification = data_root() / "qualification"
@@ -195,9 +195,9 @@ def _mixedlm_qualification(snapshot_id: str) -> dict[str, Any]:
 
 
 def _reliability_qualification(snapshot_id: str) -> dict[str, Any]:
-    runs = [run for run in realanalysis.list_runs() if run["method_id"] == "METH-REAL-RELIABILITY"]
+    runs = [run for run in realanalysis.list_runs() if run["method_id"] == "METH-REAL-RELIABILITY" and run["method_status"]["state"] == "CURRENT"]
     if not runs:
-        return {"id": "QUAL-REAL-RELIABILITY", "status": "BLOCKED", "reason": "No reliability run has been executed."}
+        return {"id": "QUAL-REAL-RELIABILITY", "status": "BLOCKED", "reason": "No reliability run with the current method version has been executed."}
     run = max(runs, key=lambda item: item["created_at"])
     activity = run["result"].get("activity", "Walking")
     frame = realstore.read_table(snapshot_id, "signal_trials")
@@ -350,6 +350,12 @@ def run() -> list[dict[str, Any]]:
         records.append(_signal_qualification(movesmart["id"]))
     path = data_root() / "qualification" / "real_qualification.json"
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        # Keep every earlier qualification receipt; a new run must not erase the audit trail.
+        history = path.parent / "history"
+        history.mkdir(exist_ok=True)
+        stamp = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        shutil.copy2(path, history / f"real_qualification-{stamp}.json")
     path.write_text(json.dumps(records, indent=2, sort_keys=True, default=str), encoding="utf-8")
     return records
 

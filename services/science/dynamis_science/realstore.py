@@ -859,6 +859,8 @@ def get_report(study_id: str) -> dict[str, Any]:
     runs = realanalysis.list_runs()
     cited_evidence = [item for item in evidence if item["id"] in report.get("evidence_ids", [])]
     cited_figures = [item for item in figures if item["id"] in report.get("figure_ids", [])]
+    statuses = {run["id"]: run["method_status"] for run in runs}
+    cited_evidence = [{**item, "method_status": statuses.get(item.get("analysis_run_id"), {"state": "UNKNOWN"})} for item in cited_evidence]
     run_ids = {item["analysis_run_id"] for item in cited_evidence}
     return {
         **report,
@@ -902,8 +904,12 @@ def _default_section(artifact_id: str, study_id: str) -> str:
 def cite(study_id: str, artifact_id: str, section: str | None = None) -> dict[str, Any]:
     from . import realanalysis, researchstore
 
-    if realanalysis.get_evidence(artifact_id) is None and realanalysis.get_figure(artifact_id) is None:
+    artifact = realanalysis.get_evidence(artifact_id) or realanalysis.get_figure(artifact_id)
+    if artifact is None:
         raise researchstore.ResearchNotFound(f"Artifact {artifact_id} not found")
+    run = realanalysis.get_run(artifact.get("analysis_run_id") or "")
+    if run is not None:
+        researchstore.ensure_current(run, "add a new report citation")
     report = _read_json(_report_path(study_id), get_report(study_id))
     section = section or _default_section(artifact_id, study_id)
     key = "figure_ids" if artifact_id.startswith("FIG-REAL-") else "evidence_ids"

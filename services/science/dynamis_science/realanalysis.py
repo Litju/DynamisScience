@@ -57,6 +57,8 @@ def _write(path, value):
 
 
 def list_runs() -> list[dict[str, Any]]:
+    from .researchstore import method_status
+
     runs = _read(artifact_dir() / "real_runs.json", [])
     evidence = list_evidence()
     result = []
@@ -74,6 +76,7 @@ def list_runs() -> list[dict[str, Any]]:
                 **run,
                 "reproduces": reproduces,
                 "evidence_ids": [item["id"] for item in evidence if item.get("analysis_run_id") == run["id"]],
+                "method_status": method_status(run),
             }
         )
     return result
@@ -1122,6 +1125,9 @@ def execute(
         }
     else:  # pragma: no cover
         raise ValueError("Unhandled method")
+    from .researchstore import METHODS
+
+    method_version = METHODS[method_id]["version"] if method_id in METHODS else "1.0.0"
     if spec is None:
         digest = hashlib.sha256(
             json.dumps([study_id, method_id, outcome_metric_id, parameters, cohort["cohort"]["id"]], sort_keys=True).encode()
@@ -1131,7 +1137,7 @@ def execute(
             "study_id": study_id,
             "name": f"Exploratory {method_id}",
             "method_id": method_id,
-            "method_version": "1.0.0",
+            "method_version": method_version,
             "cohort_id": cohort["cohort"]["id"],
             "snapshot_id": study["snapshot"]["id"],
             "outcome_metric_id": outcome_metric_id,
@@ -1159,6 +1165,7 @@ def execute(
         "snapshot_id": study["snapshot"]["id"],
         "cohort_id": cohort["cohort"]["id"],
         "method_id": method_id,
+        "method_version": method_version,
         "outcome_metric_id": outcome_metric_id,
         "status": "COMPLETED",
         "plan_alignment": "EXPLORATORY",
@@ -1385,6 +1392,9 @@ def promote(run_id: str) -> dict[str, Any]:
     if existing:
         figure = next((item for item in list_figures() if existing["id"] in item.get("evidence_ids", [])), None)
         return {"evidence_artifact": existing, "figure_artifact": figure, "already_promoted": True}
+    from .researchstore import ensure_current
+
+    ensure_current(run, "promote new evidence")
     study = get_study(run["study_id"])
     assert study is not None
     evidence, figure = _evidence_payload(run, study)

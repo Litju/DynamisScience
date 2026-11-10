@@ -188,8 +188,24 @@ def run_figure(run: dict[str, Any]) -> Figure:
             diagnostic_axis.set_ylabel("Difference (N)")
             diagnostic_axis.legend(frameon=False)
         diagnostic_axis.grid(True, alpha=0.25)
+    from ..researchstore import get_snapshot, method_status
+
+    status = method_status(run)
+    source = (get_snapshot(run.get("snapshot_id") or "") or {}).get("source") or {}
+    licence = source.get("license")
+    if status["state"] == "SUPERSEDED":
+        figure.suptitle(
+            f"SUPERSEDED · {run.get('method_id')} {status['computed_with']} → {status['current_version']} · audit only, not current evidence",
+            color="#b3261e",
+            fontsize=9,
+            fontweight="bold",
+        )
     provenance = {
         "run_id": run.get("id"),
+        "method_id": run.get("method_id"),
+        "method_status": status,
+        "source_doi": source.get("doi"),
+        "source_license": licence.get("id") if isinstance(licence, dict) else licence,
         "study_id": run.get("study_id"),
         "snapshot_id": run.get("snapshot_id"),
         "cohort_id": run.get("cohort_id"),
