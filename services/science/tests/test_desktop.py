@@ -255,6 +255,7 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert list(figure.axes[1].collections[0].get_offsets()[:, 0]) == [point["theoretical"] for point in qq]
     assert mendeley["diagnostics"]["residual_qq_type"] == "CONDITIONAL_PEARSON"
     assert figure.axes[1].get_title().startswith("Conditional residual Q–Q")
+    assert figure.axes[0].get_title() == "Model-implied slope · 95% Wald CI"
     assert figure.axes[1].get_ylabel() == "(y − Xβ̂ − Zb̂) / σ̂"
     assert len(figure.axes[1].lines) == 1  # N(0, 1) identity reference
     # Conditional Pearson residuals are on the sigma scale; marginal/sigma was ~5x wider.
@@ -370,6 +371,9 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert json.loads(legacy_figure._dynamis_metadata["DynamisScience provenance"])["method_status"]["state"] == "SUPERSEDED"
     current_figure = run_figure(realanalysis.get_run(current_reliability["id"]))
     assert current_figure._suptitle is None
+    assert current_figure.axes[0].get_title() == "ICC(3,1) · Walking · within-session"
+    assert current_figure.axes[0].texts[0].get_text() == f"{current_reliability['result']['icc_3_1']:.3f} (95% CI {current_reliability['result']['icc_3_1_ci_low']:.3f} to {current_reliability['result']['icc_3_1_ci_high']:.3f})"
+    assert all(line.get_linestyle() == "None" for line in current_figure.axes[1].lines)
     current_provenance = json.loads(current_figure._dynamis_metadata["DynamisScience provenance"])
     assert current_provenance["source_license"] == "CC0-1.0" and current_provenance["source_doi"] == "10.5281/zenodo.17376717"
     # The newest reliability run is now legacy; qualification must still bind to the current one.
@@ -414,6 +418,10 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     service.cite_report_artifact(study_id, authored_evidence["evidence_artifact"]["id"])
     assert authored_run["method_version"] == "1.1.0"
     assert authored_run["method_status"]["state"] == "CURRENT"
+    authored_figure = run_figure(authored_run)
+    assert authored_figure.axes[0].get_title() == "Observed means by occasion"
+    assert authored_figure.axes[0].get_legend().get_texts()[1].get_text() == "95% CI of the mean (between-athlete)"
+    assert list(authored_figure.axes[0].get_xticks()) == [1, 2, 3, 4]
     # The isolated copy of the operational store holds pre-RES-619 evidence (method 1.0.0).
     legacy = [item for item in service.get_report(study_id)["evidence"] if item["method_status"]["state"] == "SUPERSEDED"]
     assert legacy, "expected historical 1.0.0 evidence in the isolated restore"

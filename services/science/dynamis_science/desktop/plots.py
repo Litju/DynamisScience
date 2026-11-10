@@ -55,18 +55,22 @@ def run_figure(run: dict[str, Any]) -> Figure:
     axis = axes[0]
     diagnostic_axis = axes[1] if len(axes) > 1 else None
     kind = data.get("kind")
+    title = result.get("method", run.get("method_id", "Scientific result"))
     if kind == "LINE" and data.get("series"):
         series = data["series"]
         x = [point.get("week", index + 1) for index, point in enumerate(series)]
         y = [point.get("mean") for point in series]
-        axis.plot(x, y, marker="o", color="#176b87", label="Mean")
+        # Observed descriptive means, not model predictions, even when the run also has model contrasts.
+        axis.plot(x, y, marker="o", color="#176b87", label="Observed mean")
         low = [point.get("ci_low") for point in series]
         high = [point.get("ci_high") for point in series]
         if all(value is not None for value in [*low, *high]):
-            axis.fill_between(x, low, high, alpha=0.18, color="#176b87", label="95% interval")
-        axis.set_xlabel("Testing occasion / activity")
+            axis.fill_between(x, low, high, alpha=0.18, color="#176b87", label="95% CI of the mean (between-athlete)")
+        axis.set_xticks(x)
+        axis.set_xlabel("Testing occasion")
+        title = "Observed means by occasion"
         axis.set_ylabel(data.get("unit", "Estimate"))
-        axis.legend(frameon=False)
+        axis.legend(frameon=False, fontsize=8, loc="upper left")
     elif kind == "SCATTER" and data.get("points"):
         points = data["points"]
         axis.scatter([item["baseline"] for item in points], [item["change"] for item in points], color="#176b87")
@@ -83,13 +87,19 @@ def run_figure(run: dict[str, Any]) -> Figure:
             x = [row.get("occasion", row.get("activity", index + 1)) for index, row in enumerate(rows)]
             y = [row.get("mean", row.get("peak_fz_mean_n")) for row in rows]
             errors = [row.get("sd", row.get("peak_fz_sd_n")) for row in rows]
+            categorical = any(isinstance(value, str) for value in x)
+            unit = result.get("unit") or ("N" if "peak_fz_mean_n" in rows[0] else "")
+            label = "Peak vertical force" if "peak_fz_mean_n" in rows[0] else run.get("outcome_metric_id", "Estimate")
+            style = {"marker": "o", "color": "#176b87", "linestyle": "none" if categorical else "-"}
             if all(value is not None for value in errors):
-                axis.errorbar(x, y, yerr=errors, marker="o", color="#176b87", capsize=3)
-                axis.set_ylabel(f"{run.get('outcome_metric_id', 'Estimate')} (mean ± SD)")
+                axis.errorbar(x, y, yerr=errors, capsize=3, **style)
+                axis.set_ylabel(f"{label}, mean ± SD" + (f" ({unit})" if unit else ""))
             else:
-                axis.plot(x, y, marker="o", color="#176b87")
-                axis.set_ylabel(run.get("outcome_metric_id", "Estimate"))
-            axis.set_xlabel("Testing occasion / activity")
+                axis.plot(x, y, **style)
+                axis.set_ylabel(label + (f" ({unit})" if unit else ""))
+            if categorical:
+                axis.tick_params(axis="x", labelrotation=30)
+            axis.set_xlabel("Activity" if categorical else "Testing occasion")
         else:
             contrasts = result.get("contrasts", {})
             contrast = contrasts.get(result.get("primary_contrast_id"), {})
@@ -110,6 +120,7 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 axis.axhline(0, color="#777", linewidth=0.8)
                 axis.set_xticks([0], [contrast.get("contrast", "Primary contrast")])
                 axis.set_ylabel(contrast.get("unit", run.get("outcome_metric_id", "Estimate")))
+                title = "Model-implied slope · 95% Wald CI"
             elif result.get("icc_3_1") is not None:
                 axis.errorbar(
                     [0],
@@ -125,17 +136,23 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 axis.set_xticks([0], ["ICC(3,1)"])
                 axis.set_ylabel("Intraclass correlation")
                 axis.set_ylim(-1, 1)
+                axis.annotate(
+                    f"{result['icc_3_1']:.3f} (95% CI {result['icc_3_1_ci_low']:.3f} to {result['icc_3_1_ci_high']:.3f})",
+                    (0, result["icc_3_1"]),
+                    xytext=(8, -16),
+                    textcoords="offset points",
+                    fontsize=8,
+                )
+                title = " · ".join(item for item in ("ICC(3,1)", result.get("activity"), "within-session") if item)
             elif result.get("cv_percent_by_subject"):
                 cv = result["cv_percent_by_subject"]
-                axis.plot([item["subject_id"] for item in cv], [item["cv_percent"] for item in cv], marker="o", color="#176b87")
+                axis.plot([item["subject_id"] for item in cv], [item["cv_percent"] for item in cv], marker="o", linestyle="none", color="#176b87")
                 axis.tick_params(axis="x", labelrotation=45)
                 axis.set_ylabel("Within-subject CV (%)")
             else:
                 axis.text(0.5, 0.5, "No plot data supplied by this analysis", ha="center", va="center", transform=axis.transAxes)
                 axis.set_axis_off()
-    axis.set_title(
-        "Model-implied estimate" if result.get("contrasts") else result.get("method", run.get("method_id", "Scientific result"))
-    )
+    axis.set_title(title, fontsize=10)
     axis.grid(True, alpha=0.25)
     if diagnostic_axis is not None:
         if qq:
@@ -153,7 +170,7 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 # Standardized residuals are compared against the N(0, 1) identity line.
                 bounds = [min(item["theoretical"] for item in qq), max(item["theoretical"] for item in qq)]
                 diagnostic_axis.plot(bounds, bounds, color="#777", linewidth=0.8)
-            diagnostic_axis.set_title(title)
+            diagnostic_axis.set_title(title, fontsize=10)
             diagnostic_axis.set_xlabel("Theoretical normal quantile")
             diagnostic_axis.set_ylabel(ylabel)
         elif cv:
@@ -161,10 +178,11 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 [item["subject_id"] for item in cv],
                 [item["cv_percent"] for item in cv],
                 marker="o",
+                linestyle="none",  # participants are categories, not a sequence
                 color="#c07139",
             )
             diagnostic_axis.tick_params(axis="x", labelrotation=45)
-            diagnostic_axis.set_title("Within-subject variation")
+            diagnostic_axis.set_title("Within-subject CV by participant", fontsize=10)
             diagnostic_axis.set_xlabel("Participant")
             diagnostic_axis.set_ylabel("CV (%)")
         else:
@@ -178,12 +196,12 @@ def run_figure(run: dict[str, Any]) -> Figure:
             body = result["body_weight"]
             for value, style, label in (
                 (body.get("bias_n"), "-", "Bias"),
-                (body.get("loa_low_n"), "--", "95% limits"),
+                (body.get("loa_low_n"), "--", "95% limits of agreement"),
                 (body.get("loa_high_n"), "--", None),
             ):
                 if value is not None:
                     diagnostic_axis.axhline(value, linestyle=style, linewidth=0.9, label=label)
-            diagnostic_axis.set_title("Metadata comparison · not a validated measure")
+            diagnostic_axis.set_title("Metadata comparison · not a validated measure", fontsize=10)
             diagnostic_axis.set_xlabel("Mean support force and metadata weight (N)")
             diagnostic_axis.set_ylabel("Difference (N)")
             diagnostic_axis.legend(frameon=False)
