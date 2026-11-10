@@ -1,0 +1,243 @@
+{
+  "authored_trend_old_vs_new": {
+    "figure_series_ci_occasion1": [
+      {
+        "arm": "INTERVENTION",
+        "ci_high": 42.079810064479936,
+        "ci_low": 34.96939628472642,
+        "mean": 38.52460317460318,
+        "n": 21,
+        "sd": 8.312247287800393,
+        "week": 1
+      },
+      {
+        "arm": "INTERVENTION",
+        "ci_high": 42.30829277651679,
+        "ci_low": 34.74091357268957,
+        "mean": 38.52460317460318,
+        "n": 21,
+        "sd": 8.312247287800393,
+        "week": 1
+      }
+    ],
+    "slope": [
+      {
+        "ci_high": 1.374780655501696,
+        "ci_low": 0.6221217715575355,
+        "estimate": 0.9984512135296157,
+        "std_error": 0.19200834553110105
+      },
+      {
+        "ci_high": 1.374780655501696,
+        "ci_low": 0.6221217715575355,
+        "estimate": 0.9984512135296157,
+        "std_error": 0.19200834553110105
+      }
+    ],
+    "status": [
+      {
+        "affects": "DIAGNOSTICS_AND_FIGURE_INTERVALS",
+        "computed_with": "1.0.0",
+        "current_version": "1.1.0",
+        "reason": "Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.",
+        "state": "SUPERSEDED"
+      },
+      {
+        "computed_with": "1.1.0",
+        "current_version": "1.1.0",
+        "state": "CURRENT"
+      }
+    ]
+  },
+  "checks": {
+    "freeze_with_legacy_refused": "RUN-U-0001 was computed with METH-REAL-TREND 1.0.0, superseded by 1.1.0 (Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.) It cannot be used to freeze a new report version; re-run the analysis.",
+    "frozen_v2_export_flags_superseded": true,
+    "ledger_appended_only": true,
+    "ledger_check_note": "The in-script comparison was faulty (it stripped stored keys). Verified separately: RUN-REAL-0001..0003 in the restore are byte-identical (canonical JSON SHA-256) to the private ledger; the ledger is append-only.",
+    "ledger_historical_runs_unchanged": true,
+    "legacy_evidence_cited_in_draft": [
+      "EVID-U-0001"
+    ],
+    "new_frozen_flags_superseded": false,
+    "new_frozen_version": 4,
+    "new_reliability_promoted": "EVID-REAL-0001",
+    "new_run_versions": {
+      "METH-REAL-RELIABILITY": [
+        "RUN-REAL-0004",
+        "1.1.0",
+        "CURRENT"
+      ],
+      "METH-REAL-SIGNAL-QA": [
+        "RUN-REAL-0006",
+        "1.0.0",
+        "CURRENT"
+      ],
+      "METH-REAL-TREND": [
+        "RUN-REAL-0005",
+        "1.1.0",
+        "CURRENT"
+      ],
+      "authored": [
+        "RUN-U-0002",
+        "1.1.0",
+        "CURRENT"
+      ]
+    },
+    "promote_legacy_authored_refused": "already promoted (returns existing evidence)",
+    "promote_legacy_reliability_refused": "RUN-REAL-0002 was computed with METH-REAL-RELIABILITY 1.0.0, superseded by 1.1.0 (ICC labelled (3,1) was the one-way ICC(1,1) on value-sorted (smallest-k) trials; ICC, CI, typical error and threshold are invalid.) It cannot be used to promote new evidence; re-run the analysis.",
+    "qualification": {
+      "QUAL-REAL-MIXEDLM": [
+        "QUALIFIED",
+        "1.1.0",
+        "RUN-REAL-0005"
+      ],
+      "QUAL-REAL-RELIABILITY": [
+        "QUALIFIED",
+        "1.1.0",
+        "RUN-REAL-0004"
+      ],
+      "QUAL-REAL-SIGNAL": [
+        "QUALIFIED",
+        "1.0.0",
+        null
+      ]
+    },
+    "qualification_history": [
+      "real_qualification-20261110T092731809590Z.json"
+    ],
+    "real_report_status": [
+      [
+        "EVID-REAL-0001",
+        "CURRENT"
+      ]
+    ],
+    "recite_legacy_refused": "RUN-U-0001 was computed with METH-REAL-TREND 1.0.0, superseded by 1.1.0 (Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.) It cannot be used to add a new report citation; re-run the analysis.",
+    "sqlite_foreign_key_violations": 0,
+    "sqlite_historical_rows_unchanged": true,
+    "sqlite_integrity": "ok"
+  },
+  "environment": {
+    "private_root_written": false,
+    "restore": "SQLite Online Backup API copy (mode=ro source) + file copies in a session scratch directory"
+  },
+  "inventory": [
+    {
+      "affects": "DIAGNOSTICS_AND_FIGURE_INTERVALS",
+      "computed_with": "1.0.0",
+      "current_version": "1.1.0",
+      "evidence": [],
+      "method": "METH-REAL-TREND",
+      "reason": "Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.",
+      "run": "RUN-REAL-0001",
+      "state": "SUPERSEDED",
+      "store": "real_runs.json"
+    },
+    {
+      "affects": "PRIMARY_RESULT",
+      "computed_with": "1.0.0",
+      "current_version": "1.1.0",
+      "evidence": [],
+      "method": "METH-REAL-RELIABILITY",
+      "reason": "ICC labelled (3,1) was the one-way ICC(1,1) on value-sorted (smallest-k) trials; ICC, CI, typical error and threshold are invalid.",
+      "run": "RUN-REAL-0002",
+      "state": "SUPERSEDED",
+      "store": "real_runs.json"
+    },
+    {
+      "computed_with": "1.0.0",
+      "current_version": "1.0.0",
+      "evidence": [],
+      "method": "METH-REAL-SIGNAL-QA",
+      "run": "RUN-REAL-0003",
+      "state": "CURRENT",
+      "store": "real_runs.json"
+    },
+    {
+      "affects": "DIAGNOSTICS_AND_FIGURE_INTERVALS",
+      "computed_with": "1.0.0",
+      "current_version": "1.1.0",
+      "evidence": [
+        "EVID-U-0001"
+      ],
+      "method": "METH-REAL-TREND",
+      "reason": "Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.",
+      "run": "RUN-U-0001",
+      "state": "SUPERSEDED",
+      "store": "research.db"
+    }
+  ],
+  "reliability_old_vs_new": {
+    "icc_3_1": {
+      "new_1_1_0": 0.8887265871617835,
+      "old_1_0_0": 0.9511167659496643
+    },
+    "icc_3_1_ci_high": {
+      "new_1_1_0": 0.9692965399576995,
+      "old_1_0_0": 0.9870264237473062
+    },
+    "icc_3_1_ci_low": {
+      "new_1_1_0": 0.7451953776144685,
+      "old_1_0_0": 0.8795499094408492
+    },
+    "mean_cv_percent": {
+      "new_1_1_0": 6.605606684317684,
+      "old_1_0_0": 4.2061161975337615
+    },
+    "minimal_detectable_change_95": {
+      "new_1_1_0": 210.0548069159465,
+      "old_1_0_0": null
+    },
+    "ms_error": {
+      "new_1_1_0": 5743.003370334557,
+      "old_1_0_0": null
+    },
+    "ms_within": {
+      "new_1_1_0": 5387.160041256548,
+      "old_1_0_0": 2471.1852368241266
+    },
+    "n_subjects": {
+      "new_1_1_0": 9,
+      "old_1_0_0": 9
+    },
+    "smallest_worthwhile_change": {
+      "new_1_1_0": null,
+      "old_1_0_0": 137.78937786032088
+    },
+    "trials_per_subject": {
+      "new_1_1_0": 5,
+      "old_1_0_0": 5
+    },
+    "typical_error": {
+      "new_1_1_0": 75.78260598801388,
+      "old_1_0_0": 49.71101725798947
+    }
+  },
+  "trend_old_vs_new": {
+    "log_likelihood": [
+      -208.31180031144507,
+      -208.31180031144507
+    ],
+    "qq_observed_sd": [
+      4.882366806137623,
+      0.8364324035697773
+    ],
+    "qq_type": [
+      null,
+      "CONDITIONAL_PEARSON"
+    ],
+    "slope": [
+      {
+        "ci_high": 1.374780655501696,
+        "ci_low": 0.6221217715575355,
+        "estimate": 0.9984512135296157,
+        "std_error": 0.19200834553110105
+      },
+      {
+        "ci_high": 1.374780655501696,
+        "ci_low": 0.6221217715575355,
+        "estimate": 0.9984512135296157,
+        "std_error": 0.19200834553110105
+      }
+    ]
+  }
+}
