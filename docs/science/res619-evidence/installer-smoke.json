@@ -1,46 +1,50 @@
 ﻿{
     "platform":  "Microsoft Windows NT 10.0.22631.0",
-    "source_commit":  "c6255bb0007189b92c6e0d57485fb187b850d853",
+    "source_commit":  "d67a2752971de22e4f8a42d398af7bb01e06abd1",
     "source_status":  [
-                          " M data/synthetic/generator_manifest.json"
+                          " M data/synthetic/generator_manifest.json",
+                          "?? docs/science/res619-evidence/onscreen-01-reliability-result.png",
+                          "?? docs/science/res619-evidence/onscreen-02-reliability-figure.png",
+                          "?? docs/science/res619-evidence/onscreen-03-historical-report-superseded.png",
+                          "?? docs/science/res619-evidence/onscreen-05-legacy-figure-superseded.png"
                       ],
     "source_diff_sha256":  "D0691F70663717FC86A4D9AB51AD62650903F0F3D19AB21457FABEB593DDBF4B",
-    "installer_path":  "D:\\projects\\DynamisScience\\services\\science\\build\\res604-20261110-070253-4b05faa1\\dist\\installer\\DynamisScience-Setup-x64.exe",
-    "installer_sha256":  "BF275A0E2457E2539A3F67BB8D0EF935CDBB5E5542B33B738F0EA2C2B085560D",
+    "installer_path":  "D:\\projects\\DynamisScience\\services\\science\\build\\res604-20261110-072655-5825e4c0\\dist\\installer\\DynamisScience-Setup-x64.exe",
+    "installer_sha256":  "EC62A39D4C7D17A6F9CA226564C1AD38FF83480E2DA7DE85DCB5464AE332A82A",
     "runs":  [
                  {
                      "label":  "onedir",
                      "listener_count":  0,
-                     "startup_to_catalogue_ms":  3745.3091000000004,
-                     "peak_working_set_mb":  110.98,
+                     "startup_to_catalogue_ms":  2809.2051,
+                     "peak_working_set_mb":  111.43,
                      "process_exit_code":  0
                  },
                  {
                      "label":  "installed",
                      "listener_count":  0,
-                     "startup_to_catalogue_ms":  1698.0166000000002,
-                     "peak_working_set_mb":  116.88,
+                     "startup_to_catalogue_ms":  1634.2006000000001,
+                     "peak_working_set_mb":  110.42,
                      "process_exit_code":  0
                  },
                  {
                      "label":  "installed-performance",
                      "listener_count":  0,
-                     "startup_to_catalogue_ms":  2662.5803,
-                     "peak_working_set_mb":  236.49,
+                     "startup_to_catalogue_ms":  2893.0003,
+                     "peak_working_set_mb":  244.46,
                      "process_exit_code":  0
                  },
                  {
                      "label":  "installed-reopen",
                      "listener_count":  0,
-                     "startup_to_catalogue_ms":  1609.251,
-                     "peak_working_set_mb":  129.64,
+                     "startup_to_catalogue_ms":  1518.9582,
+                     "peak_working_set_mb":  129.85,
                      "process_exit_code":  0
                  },
                  {
                      "label":  "installed-after-restore",
                      "listener_count":  0,
-                     "startup_to_catalogue_ms":  1291.5246,
-                     "peak_working_set_mb":  126.29,
+                     "startup_to_catalogue_ms":  1511.221,
+                     "peak_working_set_mb":  118.36,
                      "process_exit_code":  0
                  }
              ],
@@ -50,26 +54,26 @@
     "scientific_worker":  {
                               "method_id":  "METH-U-DESC",
                               "status":  "COMPLETED",
-                              "elapsed_ms":  2230.81,
+                              "elapsed_ms":  2244.74,
                               "result_digest_matches_direct":  true,
                               "result_digest":  "351ead824fba637b"
                           },
     "real_scientific_workers":  {
                                     "mendeley-trend":  {
                                                            "method_id":  "METH-REAL-TREND",
-                                                           "elapsed_ms":  3263.09,
+                                                           "elapsed_ms":  3247.98,
                                                            "result_digest_matches_direct":  true,
                                                            "result_digest":  "519fe1309a9ace7c"
                                                        },
                                     "movesmart-reliability":  {
                                                                   "method_id":  "METH-REAL-RELIABILITY",
-                                                                  "elapsed_ms":  2233.42,
+                                                                  "elapsed_ms":  2226.08,
                                                                   "result_digest_matches_direct":  true,
                                                                   "result_digest":  "e0eedb0e3428d3c7"
                                                               },
                                     "movesmart-signal":  {
                                                              "method_id":  "METH-REAL-SIGNAL-QA",
-                                                             "elapsed_ms":  1233.12,
+                                                             "elapsed_ms":  1259.43,
                                                              "result_digest_matches_direct":  true,
                                                              "result_digest":  "58646a2b61d32de9"
                                                          }
@@ -115,7 +119,7 @@
                                  "status":  "NO_REAL_SNAPSHOTS"
                              },
     "sqlite_recovery":  {
-                            "elapsed_ms":  1225.81,
+                            "elapsed_ms":  1232.79,
                             "logical_hash_preserved":  true,
                             "operational_database_unchanged":  true,
                             "restore_reopened":  true,
@@ -123,7 +127,7 @@
                         },
     "data_root":  "disposable isolated test root",
     "database_survived_uninstall":  true,
-    "bundle_bytes":  582762462,
-    "installer_bytes":  141555829,
+    "bundle_bytes":  582762681,
+    "installer_bytes":  141560741,
     "temporary_test_root_removed":  true
 }

@@ -56,8 +56,8 @@ The tolerances are the existing RES-587 tolerances. The residual tolerance match
 1. Historical runs keep their recorded values, by design, and are now flagged SUPERSEDED on read (see below). The operational private store has **not** been migrated or re-run: that needs explicit owner authorization. Its frozen report `STUDY-U-60C639BA` v2 cites superseded trend evidence `EVID-U-0001` and exports with a warning banner.
 2. Mixed-model intervals are ML Wald z intervals with 21 athletes. A small-sample correction (Kenward–Roger via `pbkrtest`/`lmerTest`) was not implemented, because no independently qualified Python route exists here.
 3. The conditional-residual Q–Q is exploratory: BLUP-based residuals are shrunk and correlated. No formal normality test or random-effect Q–Q is provided. No sensitivity analysis (e.g. robust or REML) is offered.
-4. Individual-change "typical error" (change SD/√2 over an intervention block) is not measurement error. The key name is unchanged, to keep the contract stable. The real-data path labels it, but the synthetic path does not.
-5. The synthetic generator catalogue (`generate.py`, METH-REL outputs) still names "smallest worthwhile change". It was not edited, to keep the generated `DS-SYNTH-001` manifest and the pre-existing `generator_manifest.json` change untouched.
+4. Fixed in `f720b23`: individual-change typical error is now measurement error only (same-session trials or repeated baseline trials).
+5. Fixed in `d67a275`: the synthetic catalogue says 95% minimal detectable change; the ignored local fixture JSON updates on its next regeneration.
 6. Fitness–fatigue remains a prototype. Body-weight recovery remains rejected.
 7. GUI evidence was captured with the real `MainWindow` on the offscreen platform (Windows fonts). It was not captured on a physical display; the installed-package smoke (below) checks values, not pixels.
 8. No external practitioner or independent human statistical review has taken place (RES-589). This audit is an agent review, cross-checked only against R, statsmodels and the published tables above.
@@ -145,19 +145,36 @@ Occasion summaries (Mendeley) have exactly one row per athlete per occasion, so 
 
 ### Installed package (`res619-evidence/installer-smoke.json`)
 
-- Built with `scripts/build_windows.ps1` (PyInstaller onedir + Inno Setup), source commit `c6255bb` (application source identical to `4c014d5`; only documentation differs). The working tree held only the owner's pre-existing `generator_manifest.json` edit.
-- Installer `DynamisScience-Setup-x64.exe`, SHA-256 `BF275A0E2457E2539A3F67BB8D0EF935CDBB5E5542B33B738F0EA2C2B085560D`, 141,555,829 bytes.
-- `scripts/test_windows_installer.ps1` ran with the disposable restore as its source root. It covers a silent install, the catalogue smoke (onedir, installed, Performance, reopen and post-restore), and installed scientific workers with digests equal to direct runs.
-- **RES-619 values from the installed reliability worker:** method 1.1.0, ICC(3,1) 0.8887265872, CI 0.7451953776–0.9692965400, TE 75.782606 N, MDC95 210.054807 N.
-- The installed trend worker recorded method 1.1.0 with `CONDITIONAL_PEARSON` residuals and slope 0.99845 cm per occasion.
-- The installed real-data qualification passed (MIXEDLM, RELIABILITY and SIGNAL all QUALIFIED), and PNG/PDF/SVG exports carried embedded provenance.
-- SQLite integrity was ok, the logical hash was preserved, and the operational database was unchanged. The database survived uninstall, and the temporary root was removed.
-- The script's default output file `docs/desktop/evidence/g4-packaging-benchmarks.json` (RES-604/613 evidence) was restored to its committed content; this run's output lives here instead.
+- Rebuilt from source commit `d67a275` (exact application source; the working tree held only the owner's `generator_manifest.json` edit and the untracked on-screen screenshots). Installer SHA-256 `EC62A39D4C7D17A6F9CA226564C1AD38FF83480E2DA7DE85DCB5464AE332A82A`, 141,560,741 bytes. It supersedes the `c6255bb` build `BF275A0E…560D`.
+- `scripts/test_windows_installer.ps1` ran with the disposable restore as its source root. The installed reliability worker gave method 1.1.0, ICC(3,1) 0.8887265872, CI 0.7451953776–0.9692965400, TE 75.782606 N and MDC95 210.054807 N. The installed trend worker gave method 1.1.0 with `CONDITIONAL_PEARSON`.
+- All three real-data qualifications were QUALIFIED, and PNG/PDF/SVG exports carried provenance.
+- SQLite integrity was ok and the logical hash was preserved. The database survived uninstall, and the temporary root was removed.
+- `docs/desktop/evidence/g4-packaging-benchmarks.json` (RES-604/613 evidence) was restored after the run.
+- **On a real display:** `onscreen-*.png` were captured with `QT_QPA_PLATFORM=windows`:
+  - the reliability run with its computed limitations;
+  - the figure;
+  - the historical report banner;
+  - the legacy figure.
+- `onscreen-packaged-exe-catalogue.png` is the packaged `DynamisScience.exe` from this build, opened on the restore and cropped to the app window.
+
+### Round 3 corrections (2026-11-10)
+
+| Commit | Defect | Correction |
+|---|---|---|
+| `f720b23` | Individual change called change SD/√2 across separate occasions (and across the synthetic training block) "typical error", and flagged athletes against it. That SD includes true individual response. | Real/authored path: typical error is reported only between same-session trials, otherwise "not estimable". Synthetic path: TE is the two-way √MSE from the repeated baseline trials. `METH-U-CHANGE` 1.1.0; 1.0.0 is SUPERSEDED (interpretation). |
+| `d67a275` | The synthetic catalogue and STUDY-001 note still said "smallest worthwhile change". | They now say 95% minimal detectable change. The ignored local `data/artifacts/*.json` fixture keeps the old text until it is regenerated; it was not regenerated, to protect the modified `generator_manifest.json`. |
+| `ea9c4c2` | The real-data tests depended on the operational store still citing 1.0.0 evidence. After the authorized reconciliation that state no longer exists. | A fixture writes the pre-reconciliation draft citation into the isolated copy only. |
+
+### Operational store (owner-authorized)
+
+- A verified backup was made first: `backups/research-res619-20261110T101536Z.sqlite3`, logical SHA-256 `bd7709670c40…ebee`.
+- Appended `RUN-REAL-0004`, `RUN-REAL-0005`, `RUN-U-0002` and `EVID-U-0002`. Uncited `EVID-U-0001` and froze report v4 (`1bfb70eb9d70…`). v2 is byte-identical and keeps its banner.
+- Qualification re-run; the 2026-11-06 receipt was archived. Historical rows are hash-identical, and integrity is ok.
 
 ### Claims that require independent human or statistical judgement
 
 1. ICC(3,1) vs ICC(2,1) as the primary reliability estimand, and whether mixed-plate trials or IMU-match eligibility should change the analysis set.
 2. Whether ML Wald intervals are acceptable with 21 athletes, or whether a profile or Kenward–Roger interval should become the qualified method (RES-590 scope if new estimators are needed).
 3. How to interpret the non-normal random intercepts in the trend model.
-4. Owner authorization to append 1.1.0 runs and re-cite evidence in the **operational** store.
+4. ~~Owner authorization for the operational store~~: done 2026-11-10 (see "Operational store").
 5. The DataCite "© 2025 The Authors" statement alongside CC0, before any commercial distribution (privacy obligations remain regardless).
