@@ -471,6 +471,8 @@ class OptionsPane(QWidget):
         bits = [st["status"].upper()]
         if st["method_id"]:
             bits.append(f"{st['method_id']} v{st['version']}" + (f" · {st['record']}" if st["record"] else ""))
+        elif st["status"] == "descriptive":
+            bits.append("live workbench descriptive · no method record · cannot be promoted")
         elif st["status"] == "not qualified":
             bits.append("exploratory only; cannot be promoted")
         self.method_line.setText("  ·  ".join(bits))

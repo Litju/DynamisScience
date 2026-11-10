@@ -322,7 +322,8 @@ class WorkbenchShell(QWidget):
         self.syntax.setReadOnly(True)
         self.syntax.setFont(theme.mono_font())
         self.syntax.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
-        self.syntax.setFixedHeight(self.syntax.fontMetrics().lineSpacing() * 2 + 12)
+        self.syntax.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.syntax.setMinimumHeight(self.syntax.fontMetrics().lineSpacing() * 2 + 12)
         self.copy_button = QPushButton("Copy")
         self.copy_button.setAccessibleName("Copy syntax")
         self.copy_button.clicked.connect(self.copy_syntax)
@@ -427,8 +428,19 @@ class WorkbenchShell(QWidget):
         theme.repolish(self.run_dot)
         self.stale_bar.setVisible(state == "stale")
 
+    SYNTAX_MAX_LINES = 6  # longer syntax scrolls (scrollbar shown) instead of being clipped
+
     def set_syntax(self, text: str) -> None:
         self.syntax.setPlainText(text)
+        self._fit_syntax()
+
+    def _fit_syntax(self) -> None:
+        """Show every wrapped line up to SYNTAX_MAX_LINES; beyond that the bar scrolls."""
+        edit = self.syntax
+        edit.document().setTextWidth(max(edit.viewport().width(), 1))
+        lines = round(edit.document().size().height())  # QPlainTextEdit reports height in lines
+        lines = max(2, min(lines, self.SYNTAX_MAX_LINES))
+        edit.setFixedHeight(edit.cursorRect().height() * lines + 2 * (int(edit.document().documentMargin()) + edit.frameWidth()) + 2)
 
     def copy_syntax(self) -> None:
         QApplication.clipboard().setText(self.syntax.toPlainText())
@@ -523,6 +535,7 @@ class WorkbenchShell(QWidget):
     # ------------------------------------------------------------------ events
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        self._fit_syntax()
         self.set_compact(self.width() < COMPACT_WIDTH)
         if self.toast.isVisible():
             self.toast.move((self.width() - self.toast.width()) // 2, self.height() - self.toast.height() - 64)

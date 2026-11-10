@@ -480,6 +480,11 @@ class DataPane(QWidget):
     def selected_variable(self) -> str:
         return self._selected
 
+    def show_value(self, name: str) -> None:
+        """Make By athlete show ``name`` (the analysis outcome) when it is a numeric column of this table."""
+        if name and name != self.value_combo.currentText() and self.value_combo.findText(name) >= 0:
+            self.value_combo.setCurrentText(name)
+
     def select_variable(self, name: str) -> None:
         """Select a variable by name in the Variables view (and announce it)."""
         for row, variable in enumerate(self._variables_model.variables()):
@@ -515,7 +520,7 @@ class DataPane(QWidget):
         proxy.setSourceModel(self._variables_model)
         self.variables_view.setModel(proxy)
         self.variables_view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)  # natural order
-        for col, width in enumerate((190, 76, 46, 40, 56, 66, 90)):
+        for col, width in enumerate((160, 70, 44, 34, 62, 78, 76)):
             self.variables_view.setColumnWidth(col, width)
         self.variables_view.selectionModel().currentRowChanged.connect(self._variable_row_changed)
         self._rows_model = RowsModel(self.service, self.snapshot_id, table, self)

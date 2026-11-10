@@ -160,3 +160,41 @@ def test_method_status_chip_follows_analysis(wb):
     assert "QUALIFIED" in options.method_line.text() and shell.method_chip.text() == "QUALIFIED"
     shell.select_analysis("regression")
     assert shell.method_chip.text() == "NOT QUALIFIED" and "exploratory" in options.method_line.text()
+
+
+def test_descriptive_options_do_not_claim_a_method_record(wb):
+    shell, _, options, _ = wb
+    for analysis in ("descriptives", "frequencies", "athlete_change"):
+        shell.select_analysis(analysis)
+        text = options.method_line.text()
+        assert text.startswith("DESCRIPTIVE") and "no method record" in text and "METH-" not in text
+        assert shell.method_chip.text() == "DESCRIPTIVE"
+
+
+def test_by_athlete_value_follows_the_assigned_outcome(wb):
+    _, data, options, _ = wb
+    data.value_combo.insertItem(0, "body_mass_kg")  # an unrelated numeric column listed first
+    data.value_combo.setCurrentIndex(0)
+    options.slots["outcome"].box.dropped.emit(["cmj_height_cm"])
+    assert data.value_combo.currentText() == "cmj_height_cm"
+
+
+def test_rounded_zero_is_never_signed_negative():
+    from types import SimpleNamespace
+
+    model = SimpleNamespace(decimals=1)
+    assert dm.ByAthleteModel.format(model, -0.04, signed=True) == "0.0"
+    assert dm.ByAthleteModel.format(model, -0.04) == "0.0"
+    assert dm.ByAthleteModel.format(model, -0.06, signed=True) == "-0.1"
+    assert dm.ByAthleteModel.format(model, 1234.56, signed=True) == "+1,234.6"
+
+
+def test_syntax_bar_fits_its_lines_then_scrolls(wb):
+    shell, *_ = wb
+    shell.show()
+    shell.set_syntax(chr(10).join("abc"))
+    line = shell.syntax.cursorRect().height()
+    assert shell.syntax.height() >= 3 * line
+    short = shell.syntax.height()
+    shell.set_syntax(chr(10).join("x" for _ in range(40)))
+    assert short < shell.syntax.height() <= (shell.SYNTAX_MAX_LINES + 1) * line + 16

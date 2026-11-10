@@ -312,4 +312,5 @@ class ByAthleteModel(QAbstractTableModel):
         """``value`` at the variable's display precision (``signed``: always show + or -)."""
         if not isinstance(value, (int, float)):
             return str(value)
-        return f"{value:{'+' if signed else ''},.{self.decimals}f}"
+        text = f"{value:{'+' if signed else ''},.{self.decimals}f}"
+        return f"{0:,.{self.decimals}f}" if float(text.replace(",", "")) == 0 else text  # no "-0.0"

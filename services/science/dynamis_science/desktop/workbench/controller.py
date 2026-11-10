@@ -139,6 +139,8 @@ class WorkbenchController(QObject):
         else:
             self.options_pane.set_spec(spec)
             self.shell.set_syntax(spec.to_python_syntax())
+            if spec.role("outcome"):
+                self.data_pane.show_value(spec.role("outcome")[0])
         self._update_run_state()
         self._update_provenance()
         if spec is not None:

@@ -73,9 +73,9 @@ ROLES = ("outcome", "covariates", "factors", "subject", "occasion")
 
 # kind -> (method id in researchstore.METHODS or None, claim class)
 _METHOD = {
-    "descriptives": ("METH-REAL-DESC", DESCRIPTIVE),
+    "descriptives": (None, DESCRIPTIVE),  # live pandas summary; the registered METH-REAL-DESC is not what runs here
     "frequencies": (None, DESCRIPTIVE),
-    "athlete_change": ("METH-U-CHANGE", DESCRIPTIVE),
+    "athlete_change": (None, DESCRIPTIVE),
     "mixed_model": ("METH-REAL-TREND", QUALIFIED),
     "reliability": ("METH-REAL-RELIABILITY", QUALIFIED),
     "ttest": (None, NOT_QUALIFIED),

@@ -134,6 +134,11 @@ def _count(value: int) -> str:
     return _missing(str(value)) if value else "0"
 
 
+def _lit(value: Any) -> str:
+    """Python literal for a level (numpy scalars print as plain numbers, not ``np.int64(4)``)."""
+    return repr(value.item() if hasattr(value, "item") else value)
+
+
 def _level(value: Any) -> str:
     if isinstance(value, float) and value.is_integer():
         value = int(value)
@@ -224,7 +229,7 @@ class AthleteChangeBlock(DescriptiveBlock):
             limits = (f"Classified against a user-entered smallest worthwhile change of {swc:g} {unit}; this is not a "
                       "qualified threshold. Repeated rows per occasion are averaged within athlete.")
         super().__init__(f"Change in {outcome}: {_level(from_level)} → {_level(to_level)}", provenance or {}, frame,
-                         f'wide[{to_level!r}] - wide[{from_level!r}]  # wide = data.pivot_table("{outcome}", '
+                         f'wide[{_lit(to_level)}] - wide[{_lit(from_level)}]  # wide = data.pivot_table("{outcome}", '
                          f'"{subject}", "{occasion}")', limits)
         valid = self.table.dropna(subset=["change"])
         if sort:
