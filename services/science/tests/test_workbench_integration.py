@@ -88,3 +88,22 @@ def test_not_qualified_kind_is_stated_and_not_promotable(app, window):
     assert doc.state["kind"] == "not_qualified" and doc.blocks and doc.run is None
     assert not doc.promotable and not window.workbench.action_promote.isEnabled()
     assert not window.workbench.action_add_to_report.isEnabled()
+
+
+def test_reference_occasion_change_reruns(app, window):
+    """Regression: reference_occasion=2 made Nelder-Mead stall for ~3 minutes, so the rerun looked hung."""
+    _open_study(app, window, "STUDY-REAL-001")
+    _assign_mixed(window)
+    shell, doc = window.workbench, window.results_doc
+    shell.action_run.trigger()
+    _pump(app, lambda: doc.run is not None and not window.runner.active)
+    first = doc.run["id"]
+
+    window.options_pane.option_changed.emit("reference_occasion", 2)
+    assert doc.stale
+    started = time.time()
+    shell.action_run.trigger()
+    _pump(app, lambda: doc.run is not None and doc.run["id"] != first and not window.runner.active, timeout=60)
+    assert time.time() - started < 60
+    assert doc.run["result"]["reference_occasion"] == 2 and not doc.stale
+    assert shell.run_label.text() == "Results up to date"

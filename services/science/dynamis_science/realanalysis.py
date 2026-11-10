@@ -666,6 +666,12 @@ def _reliability_matrix(values: np.ndarray) -> dict[str, Any]:
     }
 
 
+# Nelder-Mead is capped: when it stalls (real Mendeley data with reference_occasion=2) it ran
+# all 20000 iterations (~3 min) without converging, so a rerun looked hung. When it converges it
+# needs ~125 iterations (references 1 and 3); a capped non-converged attempt is rejected as before.
+MAX_ITERATIONS = {"lbfgs": 20000, "bfgs": 20000, "powell": 20000, "nm": 500}
+
+
 def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contrast: int, unit: str = "cm") -> dict[str, Any]:
     from statsmodels.regression.mixed_linear_model import MixedLM
 
@@ -708,7 +714,7 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     candidate = model.fit(
-                        reml=False, method=method, maxiter=20000, disp=False
+                        reml=False, method=method, maxiter=MAX_ITERATIONS[method], disp=False
                     )
                 if not bool(candidate.converged):
                     raise RuntimeError(f"did not converge with {method}")
