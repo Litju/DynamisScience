@@ -198,3 +198,14 @@ def test_syntax_bar_fits_its_lines_then_scrolls(wb):
     short = shell.syntax.height()
     shell.set_syntax(chr(10).join("x" for _ in range(40)))
     assert short < shell.syntax.height() <= (shell.SYNTAX_MAX_LINES + 1) * line + 16
+
+
+def test_palette_offers_and_runs_variable_assignments(wb):
+    shell, _, _, ctl = wb
+    shell.palette.popup()
+    shell.palette.input.setText("assign cmj")
+    offered = shell.palette.commands()
+    assert "Assign cmj_height_cm as outcome" in offered
+    shell.palette.list.setCurrentIndex(shell.palette.proxy.index(offered.index("Assign cmj_height_cm as outcome"), 0))
+    shell.palette._run_current()
+    assert ctl.current_spec().role("outcome") == ["cmj_height_cm"]

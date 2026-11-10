@@ -52,6 +52,7 @@ class WorkbenchController(QObject):
         options_pane.variable_removed.connect(self._remove)
         options_pane.option_changed.connect(self._option)
         options_pane.message.connect(self._message)
+        shell.palette.add_provider(self._assign_commands)
         self._select(shell.current_analysis() or "")
 
     # ------------------------------------------------------------------ public API
@@ -145,6 +146,16 @@ class WorkbenchController(QObject):
         self._update_provenance()
         if spec is not None:
             self.spec_changed.emit(spec)
+
+    def _assign_commands(self) -> list[tuple[str, Any, str]]:
+        """Palette commands "Assign <variable> as <role>" for every variable the roles accept (E7)."""
+        spec = self.current_spec()
+        if spec is None:
+            return []
+        rules = ROLE_RULES[spec.kind]
+        return [(f"Assign {name} as {rule.label.lower()}", lambda role=role, name=name: self._assign(role, name), "Variable")
+                for name, vtype in spec.variable_types.items()
+                for role, rule in rules.items() if rule.max != 0 and vtype in rule.types]
 
     def _update_run_state(self) -> None:
         spec = self.current_spec()

@@ -43,6 +43,7 @@ class CommandPalette(QDialog):
         self.setAccessibleName("Command palette")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._commands: list[tuple[QAction, str]] = []
+        self._providers: list = []  # callables -> [(text, callback, category)] evaluated each time the palette opens
         self.input = QLineEdit()
         self.input.setObjectName("PaletteInput")
         self.input.setAccessibleName("Search commands")
@@ -80,6 +81,10 @@ class CommandPalette(QDialog):
         for action in actions:
             self.add_action(action, category)
 
+    def add_provider(self, provider) -> None:
+        """Context commands (for example "Assign x as outcome") that depend on the current state."""
+        self._providers.append(provider)
+
     def add_menu(self, menu: QMenu | QMenuBar, category: str = "") -> None:
         for action in menu.actions():
             submenu = action.menu()
@@ -100,6 +105,12 @@ class CommandPalette(QDialog):
                 item.setData(action, _ACTION)
                 item.setData(category, _CATEGORY)
                 item.setToolTip(action.toolTip())
+                self.model.appendRow(item)
+        for provider in self._providers:
+            for text, callback, category in provider():
+                item = QStandardItem(text)
+                item.setData(callback, _ACTION)
+                item.setData(category, _CATEGORY)
                 self.model.appendRow(item)
         self.input.clear()
         self._filter("")
@@ -136,4 +147,4 @@ class CommandPalette(QDialog):
             return
         action = index.data(_ACTION)
         self.accept()
-        action.trigger()
+        action.trigger() if isinstance(action, QAction) else action()
