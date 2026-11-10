@@ -62,6 +62,14 @@ def provenance(run: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def provenance_footer(run: dict[str, Any]) -> str:
+    """One line printed on exported figures: run id, method, method status and result digest."""
+    status = (run.get("method_status") or {}).get("state", "UNKNOWN")
+    version = run.get("method_version") or (run.get("method_status") or {}).get("computed_with") or "version not recorded"
+    return (f"Run {run.get('id')} · {run.get('method_id')} {version} · method status {status} · "
+            f"result digest {str(run.get('result_digest') or '')[:8]}")
+
+
 def _finish(figure: Figure, run: dict[str, Any], t: dict[str, str]) -> Figure:
     _style(figure, t)
     status = run.get("method_status") or {}
@@ -72,6 +80,7 @@ def _finish(figure: Figure, run: dict[str, Any], t: dict[str, str]) -> Figure:
             color=t["bad"], fontsize=8, fontweight="bold",
         )
     figure._dynamis_metadata = {"DynamisScience provenance": json.dumps(provenance(run), sort_keys=True, default=str)}
+    figure._dynamis_footer = provenance_footer(run)
     return figure
 
 
@@ -230,6 +239,22 @@ def export(figure: Figure, path: str | Path, fmt: str | None = None, dpi: int = 
     fmt = (fmt or target.suffix.lstrip(".")).lower()
     if fmt not in FORMATS:
         raise ValueError("Figures export as PNG, PDF or SVG")
-    # Keep text as text so SVG/PDF figures stay searchable and editable in journals' tools.
-    with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42}):
-        return export_figure(figure, target.with_suffix(f".{fmt}"), dpi=dpi)
+    footer = getattr(figure, "_dynamis_footer", "")
+    engine = figure.get_layout_engine()
+    layout = dict(engine.get()) if footer and engine is not None else None
+    artist = None
+    if footer:  # printed on the figure face (not only metadata); the layout leaves a strip for it
+        strip = 0.28 / figure.get_figheight()
+        if engine is not None:
+            engine.set(rect=(0, strip, 1, 1 - strip))
+        artist = figure.text(0.01, 0.1 / figure.get_figheight(), footer, fontsize=6.5, ha="left", va="bottom",
+                             color=theme.tokens("light")["muted"])
+    try:
+        # Keep text as text so SVG/PDF figures stay searchable and editable in journals' tools.
+        with rc_context({"svg.fonttype": "none", "pdf.fonttype": 42}):
+            return export_figure(figure, target.with_suffix(f".{fmt}"), dpi=dpi)
+    finally:
+        if artist is not None:
+            artist.remove()
+            if layout is not None:
+                engine.set(**layout)

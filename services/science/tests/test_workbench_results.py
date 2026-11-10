@@ -176,6 +176,43 @@ def test_stale_and_superseded_gate_promotion(app, real):
     assert "acquisition order (max_trials" not in _texts(doc)
 
 
+def test_exports_print_run_digest_and_method_status_on_the_figure(tmp_path):
+    from matplotlib.figure import Figure
+    from matplotlib.image import imread
+
+    run = {"id": "RUN-X-0001", "method_id": "METH-A", "method_version": "1.1.0", "result_digest": "abcd1234ef567890",
+           "method_status": {"state": "CURRENT"}}
+    expected = "Run RUN-X-0001 · METH-A 1.1.0 · method status CURRENT · result digest abcd1234"
+    assert figures.provenance_footer(run) == expected
+
+    def make(with_footer: bool) -> Figure:
+        figure = Figure(figsize=(7.2, 3.0), dpi=100, constrained_layout=True)
+        figure.subplots().plot([0, 1], [0, 1])
+        if with_footer:
+            figure._dynamis_footer = figures.provenance_footer(run)
+        return figure
+
+    with_footer, plain = make(True), make(False)
+    layout = dict(with_footer.get_layout_engine().get())
+    svg = figures.export(with_footer, tmp_path / "f.svg")
+    assert expected in svg.read_text(encoding="utf-8")  # text on the figure, not only metadata
+    assert not with_footer.texts and dict(with_footer.get_layout_engine().get()) == layout  # figure restored
+    png, bare = figures.export(with_footer, tmp_path / "f.png"), figures.export(plain, tmp_path / "bare.png")
+    image, reference = imread(png), imread(bare)
+    assert (image[-60:, :, :3] < 0.8).sum() > (reference[-60:, :, :3] < 0.8).sum()  # extra ink: the footer text
+    import re
+    import zlib
+
+    pdf = figures.export(with_footer, tmp_path / "f.pdf").read_bytes()  # TrueType text: two-byte codes in TJ arrays
+    text = ""
+    for stream in re.findall(rb"stream\r?\n(.*?)\r?\nendstream", pdf, re.S):
+        try:
+            text += "".join(m.decode("latin-1") for m in re.findall(rb"\(\x00(.)\)", zlib.decompress(stream), re.S))
+        except zlib.error:
+            continue
+    assert expected in text
+
+
 def test_promote_add_to_report_and_export(app, real, tmp_path):
     service, runs, _ = real
     doc = ResultsDocument(service)
