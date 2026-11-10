@@ -113,7 +113,7 @@ def test_assignment_syntax_and_run_state(wb):
     shell.action_run.trigger()
     assert runs == [spec] and shell.run_label.text().startswith("Running")
     ctl.set_last_run_hash(spec.spec_hash(), "RUN-1", "abcd")
-    assert shell.run_label.text() == "Results up to date" and "digest abcd" in shell.provenance_label.text()
+    assert shell.run_label.text() == "Results up to date" and "result digest abcd" in shell.provenance_label.text()
     options.option_changed.emit("alpha", 0.1)
     assert shell.run_label.text() == "Specification changed"  # stale
     options.option_changed.emit("alpha", 0.05)

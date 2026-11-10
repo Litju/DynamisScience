@@ -403,7 +403,10 @@ class WorkbenchShell(QWidget):
         ``provenance`` is "real" or "synthetic"; ``method_status`` is a method-axis chip kind
         (e.g. "qualified", "descriptive", "not_qualified"). Promote is enabled only when qualified.
         """
-        self.provenance_label.setText("  ·  ".join(part for part in (source, run, digest and f"digest {digest}") if part))
+        self.provenance_label.setText("  ·  ".join(part for part in (source, run, digest and f"result digest {digest}") if part))
+        self.provenance_label.setToolTip(
+            f"Result digest of {run}: first 8 hex digits of the SHA-256 of the run's recorded result. Identical "
+            "data and specification give the identical digest on every rerun." if digest else "")
         theme.set_chip(self.source_chip, provenance.upper() if provenance else "", provenance or "real")
         label = method_status.replace("_", " ")
         for widget in (self.status_method_chip, self.method_chip):

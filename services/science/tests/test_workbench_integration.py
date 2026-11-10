@@ -107,3 +107,6 @@ def test_reference_occasion_change_reruns(app, window):
     assert time.time() - started < 60
     assert doc.run["result"]["reference_occasion"] == 2 and not doc.stale
     assert shell.run_label.text() == "Results up to date"
+    # the status bar names the digest and it is the new run's recorded result digest, not the previous one
+    assert f"result digest {doc.run['result_digest'][:8]}" in shell.provenance_label.text()
+    assert doc.run["result_digest"][:8] != "519fe130" and doc.run["id"] in shell.provenance_label.text()

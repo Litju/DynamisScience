@@ -75,7 +75,7 @@ def test_shell_api_layout_keyboard_and_accessibility(qtbot, tmp_path, monkeypatc
     assert not shell.action_promote.isEnabled()
     shell.set_provenance("STD-REAL-101", "RUN-REAL-0005", "519fe130", "qualified", "real")
     assert shell.action_promote.isEnabled()
-    assert "digest 519fe130" in shell.provenance_label.text()
+    assert "result digest 519fe130" in shell.provenance_label.text()
 
     shell.set_run_state("stale")
     assert shell.stale_bar.isVisible()
