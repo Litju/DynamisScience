@@ -428,7 +428,7 @@ class WorkbenchShell(QWidget):
         theme.repolish(self.run_dot)
         self.stale_bar.setVisible(state == "stale")
 
-    SYNTAX_MAX_LINES = 6  # longer syntax scrolls (scrollbar shown) instead of being clipped
+    SYNTAX_MAX_LINES = 6  # longer syntax scrolls (scrollbar shown) instead of being clipped; fewer in short windows
 
     def set_syntax(self, text: str) -> None:
         self.syntax.setPlainText(text)
@@ -439,7 +439,7 @@ class WorkbenchShell(QWidget):
         edit = self.syntax
         edit.document().setTextWidth(max(edit.viewport().width(), 1))
         lines = round(edit.document().size().height())  # QPlainTextEdit reports height in lines
-        lines = max(2, min(lines, self.SYNTAX_MAX_LINES))
+        lines = max(2, min(lines, self.SYNTAX_MAX_LINES if self.height() >= 800 else 4 if self.height() >= 600 else 3))
         edit.setFixedHeight(edit.cursorRect().height() * lines + 2 * (int(edit.document().documentMargin()) + edit.frameWidth()) + 2)
 
     def copy_syntax(self) -> None:

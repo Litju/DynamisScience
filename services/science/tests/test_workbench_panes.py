@@ -191,6 +191,7 @@ def test_rounded_zero_is_never_signed_negative():
 
 def test_syntax_bar_fits_its_lines_then_scrolls(wb):
     shell, *_ = wb
+    shell.resize(1440, 900)
     shell.show()
     shell.set_syntax(chr(10).join("abc"))
     line = shell.syntax.cursorRect().height()
