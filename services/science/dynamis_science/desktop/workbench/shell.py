@@ -42,6 +42,8 @@ ANALYSES = (
 PANES = ("data", "options", "results")
 PANE_MINIMUM = {"data": 300, "options": 260, "results": 420}
 COMPACT_WIDTH = 1100
+# v2: earlier builds saved the splitter even when the user never moved it, freezing a first-pass layout
+SPLITTER_KEY = "workbench/splitter-v2"
 
 # Line icons on a 20 x 20 grid: polylines, plus ("o", x, y, r) circles and ("r", x, y, w, h) boxes.
 _ICONS = {
@@ -293,6 +295,8 @@ class WorkbenchShell(QWidget):
         self.splitter.setStretchFactor(0, 112)
         self.splitter.setStretchFactor(1, 0)
         self.splitter.setStretchFactor(2, 115)
+        self.splitter.splitterMoved.connect(self._user_resized)
+        self.splitter.installEventFilter(self)  # default pane sizes follow the splitter's own resizes
 
         desk = QWidget()
         desk.setObjectName("WorkbenchDesk")
@@ -498,13 +502,16 @@ class WorkbenchShell(QWidget):
     def save_state(self) -> None:
         if self.settings is None:
             return
-        self.settings.setValue("workbench/splitter", self.splitter.saveState())
+        if self._sized:  # only a layout the user chose; otherwise the design defaults apply next time
+            self.settings.setValue(SPLITTER_KEY, self.splitter.saveState())
+        else:
+            self.settings.remove(SPLITTER_KEY)
         self.settings.sync()
 
     def restore_state(self) -> None:
         if self.settings is None:
             return
-        state = self.settings.value("workbench/splitter")
+        state = self.settings.value(SPLITTER_KEY)
         if isinstance(state, QByteArray) and self.splitter.restoreState(state):
             self._sized = True
         self.panes["options"].show()  # visibility is decided by the layout, not the saved state
@@ -517,13 +524,26 @@ class WorkbenchShell(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self.set_compact(self.width() < COMPACT_WIDTH)
-        if not self._sized and self.splitter.width() > 0 and self.isVisible():
-            self._sized = True
-            options = 320 if self.width() >= 1400 else 300
-            rest = max(self.splitter.width() - options - 16, 0)
-            self.splitter.setSizes([round(rest * 112 / 227), options, round(rest * 115 / 227)])
         if self.toast.isVisible():
             self.toast.move((self.width() - self.toast.width()) // 2, self.height() - self.toast.height() - 64)
+
+    def _apply_default_sizes(self) -> None:
+        """Sheet 03: Data 1.12 fr · Options 320 px (300 below 1400) · Results 1.15 fr, 8 px handles.
+
+        Reapplied on every resize until the user drags a splitter handle (or a saved layout is
+        restored), so the first, smaller layout pass no longer freezes narrow panes.
+        """
+        options = 320 if self.splitter.width() >= 1384 else 300  # window >= 1400
+        rest = max(self.splitter.width() - options - 2 * self.splitter.handleWidth(), 0)
+        self.splitter.setSizes([round(rest * 112 / 227), options, round(rest * 115 / 227)])
+
+    def _user_resized(self, *_args) -> None:
+        self._sized = True
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self.splitter and event.type() == QEvent.Type.Resize and not self._sized:
+            self._apply_default_sizes()
+        return super().eventFilter(watched, event)
 
     def changeEvent(self, event) -> None:
         super().changeEvent(event)

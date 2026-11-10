@@ -105,7 +105,17 @@ def test_shell_api_layout_keyboard_and_accessibility(qtbot, tmp_path, monkeypatc
     shell.palette._run_current()
     assert shell.current_analysis() == "reliability"
 
+    fresh = WorkbenchShell(QSettings(str(tmp_path / "fresh.ini"), QSettings.Format.IniFormat))
+    qtbot.addWidget(fresh)
+    fresh.resize(1440, 820)
+    fresh.show()
+    qtbot.waitExposed(fresh)
+    assert fresh.splitter.sizes() == [537, 320, 551]  # sheet 03 at 1440: 1.12 fr · 320 · 1.15 fr
+    fresh.save_state()
+    assert fresh.settings.value("workbench/splitter-v2") is None  # untouched defaults are not frozen
+
     shell.splitter.setSizes([500, 300, 600])
+    shell.splitter.splitterMoved.emit(500, 1)  # a user drag
     expected = shell.splitter.sizes()
     shell.save_state()
     restored = WorkbenchShell(QSettings(str(tmp_path / "workbench.ini"), QSettings.Format.IniFormat))
