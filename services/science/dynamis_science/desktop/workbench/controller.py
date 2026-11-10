@@ -133,12 +133,15 @@ class WorkbenchController(QObject):
             self.options_pane.set_placeholder("Open a dataset or study to assign variables.")
             self.shell.set_syntax("")
         elif kind is None:
+            self.data_pane.set_roles({})
             self.options_pane.set_placeholder(
                 "Signals has no variable roles: pick a trial and channels in the Results pane." if key == "signals"
                 else "Choose an analysis in the ribbon.")
             self.shell.set_syntax("")
         else:
             self.options_pane.set_spec(spec)
+            self.data_pane.set_roles({n: ROLE_RULES[spec.kind][r].label for r, names in spec.roles.items()
+                                      if r in ROLE_RULES[spec.kind] for n in names})
             self.shell.set_syntax(spec.to_python_syntax())
             if spec.role("outcome"):
                 self.data_pane.show_value(spec.role("outcome")[0])

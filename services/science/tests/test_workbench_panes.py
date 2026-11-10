@@ -225,3 +225,25 @@ def test_descriptives_options_are_checkboxes_bound_to_the_spec(wb):
     for key in ("stat_n_missing", "stat_mean_sd", "stat_median_iqr", "stat_ci"):
         boxes[key].setChecked(False)
     assert "at least one statistic" in options.issues_text()
+
+
+def test_variables_view_shows_role_and_distribution(wb):
+    from dynamis_science.desktop.workbench.data_models import HistRole
+
+    shell, data, options, _ = wb
+    shell.select_analysis("mixed_models")
+    options.slots["outcome"].box.dropped.emit(["cmj_height_cm"])
+    options.slots["subject"].box.dropped.emit(["subject_id"])
+    view, model = data.variables_view, data.variables_view.model()
+    header = view.horizontalHeader()
+    shown = [model.headerData(header.logicalIndex(i), Qt.Orientation.Horizontal) for i in range(4)]
+    assert shown == ["Variable", "Type", "Role", "Distribution"]
+    rows = {model.data(model.index(r, 0), dm.VariableRole).name: r for r in range(model.rowCount())}
+    assert model.data(model.index(rows["cmj_height_cm"], 7)) == "Outcome"
+    assert model.data(model.index(rows["subject_id"], 7)) == "Subject (random intercept)"
+    assert model.data(model.index(rows["occasion"], 7)) == dm.MISSING_TEXT  # no role
+    bins = model.data(model.index(rows["cmj_height_cm"], 8), HistRole)
+    assert len(bins) == 12 and sum(bins) == 39  # 40 rows, one missing, none imputed
+    assert model.data(model.index(rows["subject_id"], 8)) == "10 distinct" and model.data(model.index(rows["subject_id"], 8), HistRole) is None
+    options.variable_removed.emit("outcome", "cmj_height_cm")
+    assert model.data(model.index(rows["cmj_height_cm"], 7)) == dm.MISSING_TEXT

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from .. import theme
 from .data_models import (
-    MISSING_TEXT, ByAthleteModel, MissingRole, RowsModel, SortRole, VariableRole, VariablesModel,
+    DISTRIBUTION_ROWS, MISSING_TEXT, ByAthleteModel, HistRole, MissingRole, RowsModel, SortRole, VariableRole, VariablesModel,
 )
 from .spec import CATEGORICAL, IDENTIFIER, NUMERICAL, ORDINAL, STUDY_FOR_TABLE
 
@@ -114,6 +114,30 @@ class VariableNameDelegate(MissingDelegate):
         size = super().sizeHint(option, index)
         size.setHeight(max(size.height(), 28))
         return size
+
+
+class DistributionDelegate(MissingDelegate):
+    """Variables view Distribution column: a mini histogram for numeric variables, the levels as text otherwise."""
+
+    def paint(self, painter, option, index):
+        bins = index.data(HistRole)
+        if not bins:
+            return super().paint(painter, option, index)
+        opt = self._draw_background(painter, option, index)
+        r = opt.rect.adjusted(8, 6, -8, -5)
+        top = max(bins)
+        gap = 1.0
+        width = (r.width() - gap * (len(bins) - 1)) / len(bins)
+        painter.save()
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(theme.tokens()["mod"]))
+        for i, count in enumerate(bins):
+            height = max(1.0, r.height() * count / top) if count else 1.0
+            painter.drawRect(QRectF(r.left() + i * (width + gap), r.bottom() - height, width, height))
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        return QSize(120, 28)
 
 
 class SparklineDelegate(MissingDelegate):
@@ -311,6 +335,7 @@ class DataPane(QWidget):
         self._by_athlete_key: tuple | None = None
         self._selected = ""
         self._columns: list[str] = []
+        self._roles: dict[str, str] = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -371,6 +396,7 @@ class DataPane(QWidget):
 
         self.variables_view = _table(MissingDelegate(self))
         self.variables_view.setItemDelegateForColumn(0, VariableNameDelegate(self.variables_view))
+        self.variables_view.setItemDelegateForColumn(8, DistributionDelegate(self.variables_view))
         self.variables_view.setDragEnabled(True)
         self.variables_view.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.variables_view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -515,6 +541,19 @@ class DataPane(QWidget):
         if name and name != self.table and self._detail:
             self._load_table(name)
 
+    def set_roles(self, roles: dict[str, str]) -> None:
+        """Variable name -> role label of the current analysis, shown in the Variables view Role column."""
+        self._roles = dict(roles)
+        self._variables_model.set_roles(self._roles)
+
+    def _bounded_rows(self, table: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        while True:
+            page = self.service.read_table_page(self.snapshot_id, table, len(rows), min(500, DISTRIBUTION_ROWS - len(rows)))
+            rows += page["rows"]
+            if not page["rows"] or len(rows) >= min(DISTRIBUTION_ROWS, int(page["total_rows"])):
+                return rows
+
     def _load_table(self, table: str) -> None:
         self.table = table
         self._by_athlete_key = None
@@ -523,8 +562,13 @@ class DataPane(QWidget):
         proxy.setSourceModel(self._variables_model)
         self.variables_view.setModel(proxy)
         self.variables_view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)  # natural order
-        for col, width in enumerate((160, 70, 44, 34, 62, 78, 76)):
+        for col, width in enumerate((160, 70, 44, 34, 62, 78, 76, 120, 130)):
             self.variables_view.setColumnWidth(col, width)
+        header = self.variables_view.horizontalHeader()
+        for logical, visual in ((7, 2), (8, 3)):  # Role and Distribution follow Type; the model keeps them last
+            header.moveSection(header.visualIndex(logical), visual)
+        self._variables_model.set_distribution(self._bounded_rows(table))
+        self._variables_model.set_roles(self._roles)
         self.variables_view.selectionModel().currentRowChanged.connect(self._variable_row_changed)
         self._rows_model = RowsModel(self.service, self.snapshot_id, table, self)
         self._rows_model.fetchMore()

@@ -177,7 +177,27 @@ class RowsModel(QAbstractTableModel):
         return None
 
 
-VARIABLE_COLUMNS = ("Variable", "Type", "Unit", "N", "Missing", "Missing %", "Quality")
+VARIABLE_COLUMNS = ("Variable", "Type", "Unit", "N", "Missing", "Missing %", "Quality", "Role", "Distribution")
+HistRole = Qt.ItemDataRole.UserRole + 4  # list[int] bin counts of a numeric variable (Distribution column)
+HIST_BINS = 12
+DISTRIBUTION_ROWS = 2000  # the Distribution column summarises at most this many rows (bounded, not the whole table)
+
+
+def distribution_of(values: list[Any], vtype: str) -> tuple[list[int] | None, str]:
+    """(histogram bins for a numeric variable, text) from the bounded rows; missing values are left out."""
+    present = [v for v in values if not is_missing(v)]
+    if not present:
+        return None, MISSING_TEXT
+    if vtype == NUMERICAL:
+        lo, hi = min(present), max(present)
+        bins = [0] * HIST_BINS
+        for v in present:
+            bins[min(HIST_BINS - 1, int((v - lo) / (hi - lo) * HIST_BINS)) if hi > lo else 0] += 1
+        return bins, f"{lo:.4g} to {hi:.4g}"
+    levels = sorted({str(v) for v in present})
+    if vtype == IDENTIFIER:
+        return None, f"{len(levels)} distinct"
+    return None, " · ".join(levels[:4]) + (f" · +{len(levels) - 4}" if len(levels) > 4 else "")
 
 
 class VariablesModel(QAbstractTableModel):
@@ -186,6 +206,19 @@ class VariablesModel(QAbstractTableModel):
     def __init__(self, variables: list[Variable] | None = None, parent=None) -> None:
         super().__init__(parent)
         self._vars = list(variables or [])
+        self._roles: dict[str, str] = {}
+        self._distribution: dict[str, tuple[list[int] | None, str]] = {}
+
+    def set_roles(self, roles: dict[str, str]) -> None:
+        """Role column: the current spec's role label per variable ("" for none)."""
+        self._roles = dict(roles)
+        if self._vars:
+            self.dataChanged.emit(self.index(0, 7), self.index(len(self._vars) - 1, 7))
+
+    def set_distribution(self, rows: list[dict[str, Any]]) -> None:
+        self._distribution = {v.name: distribution_of([r.get(v.name) for r in rows], v.type) for v in self._vars}
+        if self._vars:
+            self.dataChanged.emit(self.index(0, 8), self.index(len(self._vars) - 1, 8))
 
     @classmethod
     def from_service(cls, service: Any, snapshot_id: str, table: str, parent=None) -> "VariablesModel":
@@ -212,10 +245,13 @@ class VariablesModel(QAbstractTableModel):
         if not index.isValid():
             return None
         v = self._vars[index.row()]
-        cells = (v.name, v.type, v.unit, v.n, v.missing, v.missing_pct, v.quality)
+        bins, text = self._distribution.get(v.name, (None, MISSING_TEXT))
+        cells = (v.name, v.type, v.unit, v.n, v.missing, v.missing_pct, v.quality, self._roles.get(v.name, ""), text)
         raw = cells[index.column()]
         if role == VariableRole:
             return v
+        if role == HistRole:
+            return bins if index.column() == 8 else None
         if role == MissingRole:  # the Missing columns flag any gap, or unknown counts
             return index.column() in (4, 5) and (raw is None or raw > 0)
         if role == SortRole:
