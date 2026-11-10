@@ -448,6 +448,84 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert authored_run["id"] in report
 
 
+def test_raw_archive_r_pipeline_reproduces_reliability_and_trial_selection(tmp_path, monkeypatch):
+    rscript = os.environ.get("DYNAMISSCIENCE_RSCRIPT", "")
+    raw = Path(r"D:\datasets\DynamisScience\extracted\zenodo-17376717\Dataset")
+    if not (rscript and Path(rscript).is_file() and raw.is_dir()):
+        pytest.skip("R and the extracted MoveSmart archive are required")
+    root = _isolated_real_root(tmp_path)
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(root))
+    from dynamis_science import realanalysis
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "real_reliability_pipeline.R"
+    output = tmp_path / "r"
+    subprocess.run([rscript, str(script), str(raw), str(output), "walk", "8"], check=True, capture_output=True, timeout=600)
+    reference = pl.read_csv(output / "icc.csv").row(0, named=True)
+    selected = pl.read_csv(output / "selected_trials.csv")
+    snapshot = next(path for path in (root / "snapshots").iterdir() if path.name.startswith("DS-REAL-MOVESMART"))
+    trials = pl.read_parquet(snapshot / "signal_trials.parquet").filter(pl.col("activity") == "Walking")
+    result = realanalysis.reliability(snapshot.name, sorted(set(trials["subject_id"])), "Walking", 8)
+    assert reference["all_orders_match_trial_number"]  # acquisition timestamps agree with trial numbers
+    assert sorted(set(selected["subject_id"])) == result["subject_ids"]
+    for subject in result["subject_ids"]:
+        expected = sorted(trials.filter(pl.col("subject_id") == subject)["trial_number"].to_list())[: result["trials_per_subject"]]
+        assert selected.filter(pl.col("subject_id") == subject)["trial"].to_list() == expected
+    pairs = {
+        "icc_3_1": "icc_3_1", "icc_3_1_ci_low": "icc_3_1_ci_low", "icc_3_1_ci_high": "icc_3_1_ci_high",
+        "icc_1_1_sensitivity": "icc_1_1", "icc_2_1_sensitivity": "icc_2_1", "typical_error": "typical_error_n",
+        "minimal_detectable_change_95": "mdc95_n", "ms_between": "ms_subject", "ms_error": "ms_error", "ms_trials": "ms_trial",
+    }
+    for key, reference_key in pairs.items():
+        assert result[key] == pytest.approx(reference[reference_key], rel=1e-9), key
+    assert (reference["df_subject"], reference["df_trial"], reference["df_error"]) == (8, 4, 32)
+
+
+def test_raw_source_r_pipeline_reproduces_mixedlm_fit_and_residuals(tmp_path, monkeypatch):
+    rscript = os.environ.get("DYNAMISSCIENCE_RSCRIPT", "")
+    workbook = Path(r"D:\datasets\DynamisScience\sources\mendeley-6p99569x66\DATA.xlsx")
+    if not (rscript and Path(rscript).is_file() and workbook.is_file()):
+        pytest.skip("R and the Mendeley source workbook are required")
+    import csv
+
+    import numpy as np
+    import openpyxl
+
+    root = _isolated_real_root(tmp_path)
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(root))
+    from dynamis_science import realanalysis
+
+    dump = tmp_path / "DATA.csv"  # verbatim sheet dump; all derivation happens in R
+    sheet = openpyxl.load_workbook(workbook, read_only=True, data_only=True)["DATA"]
+    with dump.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        for row in sheet.iter_rows(values_only=True):
+            writer.writerow(["" if value is None else repr(value) if isinstance(value, float) else value for value in row])
+    script = Path(__file__).resolve().parents[1] / "scripts" / "real_mixedlm_pipeline.R"
+    output = tmp_path / "r"
+    subprocess.run([rscript, str(script), str(dump), str(output)], check=True, capture_output=True, timeout=600)
+    derived = pl.read_csv(output / "derived_rows.csv")
+    summary = pl.read_csv(output / "summary.csv").row(0, named=True)
+    snapshot = next(path for path in (root / "snapshots").iterdir() if path.name.startswith("DS-REAL-MENDELEY"))
+    frame = pl.read_parquet(snapshot / "cmj_occasions.parquet")
+    rows = frame.select(["subject_id", "occasion", "cmj_height_cm"]).drop_nulls().sort(["subject_id", "occasion"])
+    assert derived.select(["subject_id", "occasion"]).rows() == rows.select(["subject_id", "occasion"]).rows()
+    assert np.max(np.abs(derived["cmj_height_cm"].to_numpy() - rows["cmj_height_cm"].to_numpy())) < 1e-9
+    result = realanalysis._fit_trend(frame, "cmj_height_cm", sorted(set(rows["subject_id"])), 1, 4)
+    slope = result["coefficients"]["occasion_slope"]
+    assert summary["converged"] and not summary["singular"]
+    assert result["log_likelihood"] == pytest.approx(summary["logLik"], abs=1e-3)
+    assert slope["estimate"] == pytest.approx(summary["slope"], abs=1e-4)
+    assert slope["std_error"] == pytest.approx(summary["se_slope"], rel=5e-3)
+    reference = pl.read_csv(output / "fitted_residuals.csv")
+    current = {(item["subject_id"], item["occasion"]): item["residual"] for item in result["diagnostics"]["conditional_residuals"]}
+    assert max(abs(current[(a, b)] - c) for a, b, c in reference.select(["subject_id", "occasion", "conditional_residual"]).iter_rows()) < 1e-4
+    qq = pl.read_csv(output / "qq.csv")
+    assert [round(point["theoretical"], 12) for point in result["diagnostics"]["residual_qq"]] == [round(value, 12) for value in qq["theoretical"]]
+    assert max(abs(point["observed"] - value) for point, value in zip(result["diagnostics"]["residual_qq"], qq["observed"])) < 1e-4
+    # Profile likelihood is wider than the reported Wald interval: the small-sample limitation is real.
+    assert summary["slope_profile_high"] - summary["slope_profile_low"] > slope["ci_high"] - slope["ci_low"]
+
+
 def test_native_research_journey_executes_promotes_freezes_and_exports(
     qtbot, tmp_path, monkeypatch
 ):

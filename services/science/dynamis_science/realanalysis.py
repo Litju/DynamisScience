@@ -851,7 +851,7 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
             "residual_definitions": {
                 "residual_summary": "marginal: y - X beta_hat (includes between-athlete deviations)",
                 "residual_by_week": "marginal: y - X beta_hat, mean per occasion",
-                "residual_qq": "conditional Pearson: (y - X beta_hat - Z b_hat) / sigma_hat; BLUP shrinkage makes these less dispersed than N(0,1) and correlated, so the Q-Q is exploratory",
+                "residual_qq": "standardized conditional residual (y - X beta_hat - Z b_hat) / sigma_hat (nlme 'pearson' convention; lme4 2.1 type='pearson' is not divided by sigma). BLUP shrinkage and leverage make these under-dispersed and correlated, not independent N(0,1); the Q-Q is exploratory",
             },
             "conditional_residual_summary": {
                 "sd_over_sigma": float(np.std(standardized, ddof=1)),
