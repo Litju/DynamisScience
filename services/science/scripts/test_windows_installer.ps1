@@ -257,6 +257,28 @@ for activity, prefix in {"Walking": "walk", "Running": "run", "Heel drop": "heel
         }
     }
     $benchmarks.real_scientific_workers = $realWorkerResults
+    # RES-619: the installed engine must produce the corrected, versioned values (R aov / lme4 references).
+    $reliability = Get-Content -LiteralPath (Join-Path $realDataRoot "tmp\movesmart-reliability-response.json") -Raw | ConvertFrom-Json
+    $trend = Get-Content -LiteralPath (Join-Path $realDataRoot "tmp\mendeley-trend-response.json") -Raw | ConvertFrom-Json
+    if ($reliability.method_version -ne "1.1.0" -or $reliability.method_status.state -ne "CURRENT" -or
+        [Math]::Abs([double]$reliability.result.icc_3_1 - 0.888726587162) -gt 1e-9 -or
+        [Math]::Abs([double]$reliability.result.icc_3_1_ci_low - 0.745195377614) -gt 1e-9 -or
+        [Math]::Abs([double]$reliability.result.typical_error - 75.782605988) -gt 1e-6) {
+        throw "The packaged reliability worker did not reproduce the RES-619 ICC(3,1) reference."
+    }
+    if ($trend.method_version -ne "1.1.0" -or $trend.diagnostics.residual_qq_type -ne "CONDITIONAL_PEARSON") {
+        throw "The packaged MixedLM worker did not record the RES-619 residual definition."
+    }
+    $benchmarks.res619_scientific_values = @{
+        reliability_method_version = $reliability.method_version
+        icc_3_1 = $reliability.result.icc_3_1
+        icc_3_1_ci = @($reliability.result.icc_3_1_ci_low, $reliability.result.icc_3_1_ci_high)
+        typical_error_n = $reliability.result.typical_error
+        minimal_detectable_change_95_n = $reliability.result.minimal_detectable_change_95
+        trend_method_version = $trend.method_version
+        trend_slope_cm_per_occasion = $trend.result.coefficients.occasion_slope.estimate
+        trend_residual_qq_type = $trend.diagnostics.residual_qq_type
+    }
 
     $realQualificationRequestPath = Join-Path $realDataRoot "tmp\real-qualification-request.json"
     $realQualificationResponsePath = Join-Path $realDataRoot "tmp\real-qualification-response.json"
