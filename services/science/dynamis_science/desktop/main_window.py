@@ -8,7 +8,7 @@ import sys
 import difflib
 from typing import Any
 
-from PySide6.QtCore import QSettings, Qt, Signal
+from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QToolBar,
     QSplitter,
-    QStyle,
     QStackedWidget,
     QTabWidget,
     QTableView,
@@ -372,10 +371,10 @@ class MainWindow(QMainWindow):
         header_scroll.setWidgetResizable(True)
         header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         header_scroll.setWidget(self.performance_header)
-        header_scroll.setFixedHeight(
-            self.performance_header.sizeHint().height()
-            + self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent) + 2
-        )
+        header_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        # The toolbar is 48 px (theme); a taller scroll area was clipped and cut "SPORTS SCIENCE" off.
+        # shortcut: in a window narrower than the header the horizontal scroll bar overlays its bottom edge.
+        header_scroll.setFixedHeight(self.performance_header.minimumHeight())  # its fixed 48 px, not the 29 px hint
         self.performance_toolbar.addWidget(header_scroll)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
         self.performance_toolbar.hide()
@@ -507,6 +506,8 @@ class MainWindow(QMainWindow):
         self._ensure_performance()
         self.menuBar().hide()
         self.performance_toolbar.show()
+        # the toolbar layout keeps the generic QToolBar margins (12 px) until a StyleChange; they clip the header
+        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         if self._perspective != "performance":
             self._perspective = "performance"
             self.navigator_dock.show()

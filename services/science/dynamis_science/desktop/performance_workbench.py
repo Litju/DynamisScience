@@ -621,7 +621,7 @@ class PerformanceWorkbench(QWidget):
 
     def __init__(self, window: QWidget) -> None:
         super().__init__(window)
-        # shortcut: plots take the theme active at creation; restyle live when Gate 7 ports figures
+        # plots take the theme active at creation; changeEvent restyles them on a theme switch
         pg.setConfigOption("background", tokens()["base"])
         pg.setConfigOption("foreground", tokens()["dim_text"])
         pg.setConfigOption("antialias", True)
@@ -647,6 +647,18 @@ class PerformanceWorkbench(QWidget):
         self._build_report()
         self.tabs.currentChanged.connect(self._tab_changed)
 
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        if event.type() == event.Type.PaletteChange:  # theme switch: plot canvases follow the tokens
+            t = tokens()
+            pg.setConfigOption("background", t["base"])
+            pg.setConfigOption("foreground", t["dim_text"])
+            for plot in self.findChildren(pg.PlotWidget):
+                plot.setBackground(t["base"])
+                for name in ("left", "bottom"):
+                    axis = plot.getPlotItem().getAxis(name)
+                    axis.setPen(pg.mkPen(t["line2"]))
+                    axis.setTextPen(pg.mkPen(t["dim_text"]))
     def select_page(self, page: str) -> None:
         if page not in self.page_keys:
             return
