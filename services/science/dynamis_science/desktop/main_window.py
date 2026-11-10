@@ -8,7 +8,7 @@ import sys
 import difflib
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -58,6 +58,7 @@ from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .tasks import TaskRunner
 from .theme import apply_theme
+from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
 
 
 class MainWindow(QMainWindow):
@@ -65,10 +66,14 @@ class MainWindow(QMainWindow):
 
     def __init__(self, service: DynamisAppService) -> None:
         super().__init__()
+        self.service = service
+        # Layout and theme are per data root, so tests and separate data roots never share UI state.
+        self.settings = QSettings(
+            str(service.root / "desktop" / "workbench.ini"), QSettings.Format.IniFormat
+        )
         application = QApplication.instance()
         if application is not None:
-            apply_theme(application)
-        self.service = service
+            apply_theme(application, self.settings.value("workbench/theme", "light"))
         self.runner = TaskRunner(self)
         self._close_after_tasks = False
         self.runner.idle.connect(self._close_if_idle)
@@ -85,20 +90,22 @@ class MainWindow(QMainWindow):
         else:
             self.resize(1420, 900)
         self._build_shell()
+        self.workbench.set_compact(self.width() < COMPACT_WIDTH)
         self._load()
 
     def _build_shell(self) -> None:
         self.navigator = QTreeWidget()
         self.navigator.setHeaderHidden(True)
+        self.navigator.setAccessibleName("Research navigator")
         self.navigator.itemClicked.connect(self._navigation_activated)
-        self.navigator_dock = QDockWidget("Research navigator", self)
+        self.navigator_dock = QDockWidget("Navigator", self)
         self.navigator_dock.setObjectName("ResearchNavigator")
         self.navigator_stack = QStackedWidget(self.navigator_dock)
-        self.navigator_stack.addWidget(self.navigator)
         self.navigator_dock.setWidget(self.navigator_stack)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.navigator_dock)
 
         self.inspector = QTextBrowser()
+        self.inspector.setAccessibleName("Inspector raw detail")
         self.inspector_dock = QDockWidget("Inspector", self)
         self.inspector_dock.setObjectName("Inspector")
         self.inspector_stack = QStackedWidget(self.inspector_dock)
@@ -106,35 +113,32 @@ class MainWindow(QMainWindow):
         self.inspector_dock.setWidget(self.inspector_stack)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
 
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        header = QHBoxLayout()
-        brand = QLabel("DYNAMISSCIENCE  /  SCIENTIFIC & PERFORMANCE WORKSTATION")
-        brand.setStyleSheet("font-weight: 700; letter-spacing: 1px")
-        self.context = QLabel("Select a project, study or dataset")
-        self.provenance = QLabel("")
-        for label in (brand, self.context, self.provenance):
-            label.setWordWrap(True)
-        self.provenance.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        header.addWidget(brand)
-        header.addStretch(1)
-        header.addWidget(self.context)
-        header.addWidget(self.provenance)
-        self.research_header = QWidget()
-        self.research_header.setObjectName("ResearchHeader")
-        header_layout = QHBoxLayout(self.research_header)
-        header_layout.setContentsMargins(12, 0, 12, 0)
-        header_layout.addLayout(header)
-        layout.addWidget(self.research_header)
-
+        # Research perspective: design E workbench. Until later RES-620 gates fill the panes,
+        # Data hosts the research navigator and Results hosts the existing study workspace.
+        self.workbench = WorkbenchShell(self.settings, self)
+        self.context = self.workbench.context_label
+        self.provenance = self.workbench.provenance_label
         self.workspace = QStackedWidget()
         self.welcome = QLabel("Loading the validated research catalogue…")
+        self.welcome.setObjectName("PaneEmpty")
         self.welcome.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.welcome.setWordWrap(True)
         self.workspace.addWidget(self.welcome)
         self.research = ResearchWorkbench(self)
         self.workspace.addWidget(self.research)
+        self.workbench.set_data_widget(self.navigator)
+        results_scroll = QScrollArea()
+        results_scroll.setObjectName("WorkbenchResultsScroll")
+        results_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        results_scroll.setWidgetResizable(True)
+        results_scroll.setWidget(self.workspace)
+        self.workbench.set_results_widget(results_scroll)
+        self.workbench.action_run.triggered.connect(lambda: self.research._execute())
+        self.workbench.action_add_to_report.triggered.connect(lambda: self.research._cite_latest())
+        self.workbench.action_promote.triggered.connect(lambda: self.research._promote())
+        self.workbench.action_export.triggered.connect(lambda: self.research.export_report())
+        self.perspectives = QStackedWidget()
+        self.perspectives.addWidget(self.workbench)
         self.performance = None
         self.performance_header = None
         self.performance_rail = None
@@ -143,21 +147,25 @@ class MainWindow(QMainWindow):
         available = screen.availableGeometry() if screen is not None else None
         # shortcut: compact layout follows the startup screen, reevaluate when supporting live monitor changes
         if available is not None and (available.width() < 1100 or available.height() < 650):
-            self.workspace_scroll = QScrollArea()
-            self.workspace_scroll.setWidgetResizable(True)
-            self.workspace_scroll.setWidget(self.workspace)
-            layout.addWidget(self.workspace_scroll, 1)
+            perspectives_scroll = QScrollArea()
+            perspectives_scroll.setWidgetResizable(True)
+            perspectives_scroll.setWidget(self.perspectives)
+            self.setCentralWidget(perspectives_scroll)
         else:
-            layout.addWidget(self.workspace, 1)
-        self.setCentralWidget(central)
+            self.setCentralWidget(self.perspectives)
 
-        self.status_text = QLabel("Starting")
+        self.status_text = self.workbench.app_status
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(160)
         self.progress.setRange(0, 0)
+        self.progress.setAccessibleName("Background task in progress")
         self.statusBar().addWidget(self.status_text, 1)
         self.statusBar().addPermanentWidget(self.progress)
+        self.statusBar().addPermanentWidget(self.workbench.status_items)
+        self._perspective = ""
         self._build_menu()
+        self._show_research_mode()
+        self.navigator.setFocus()
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("File")
@@ -247,9 +255,24 @@ class MainWindow(QMainWindow):
             self.action_run_qualification,
         ):
             tools_menu.addAction(action)
+        analyses_menu = self.menuBar().addMenu("Analyses")
+        analyses_menu.addActions(list(self.workbench.analysis_actions.values()))
+        results_menu = self.menuBar().addMenu("Results")
+        results_menu.addActions(
+            [
+                self.workbench.action_run,
+                self.workbench.action_add_to_report,
+                self.workbench.action_promote,
+                self.workbench.action_export,
+            ]
+        )
         view_menu = self.menuBar().addMenu("View")
-        view_menu.addAction(self.navigator_dock.toggleViewAction())
-        view_menu.addAction(self.inspector_dock.toggleViewAction())
+        view_menu.addActions(self.workbench.view_actions)
+        view_menu.addSeparator()
+        advanced = view_menu.addMenu("Advanced")
+        inspector_toggle = self.inspector_dock.toggleViewAction()
+        inspector_toggle.setText("Inspector raw detail")
+        advanced.addAction(inspector_toggle)
         help_menu = self.menuBar().addMenu("Help")
         about = QAction("About DynamisScience", self)
         about.triggered.connect(
@@ -263,13 +286,10 @@ class MainWindow(QMainWindow):
         licenses_action = QAction("Open-source licenses…", self)
         licenses_action.triggered.connect(self._open_third_party_licenses)
         help_menu.addAction(licenses_action)
-
-        self.research_toolbar = QToolBar("Research authoring", self)
-        self.research_toolbar.setObjectName("ResearchToolbar")
-        self.research_toolbar.setMovable(False)
-        for action in (self.action_new_project, self.action_new_study, self.action_admit):
-            self.research_toolbar.addAction(action)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.research_toolbar)
+        for menu_action in self.menuBar().actions():
+            if menu_action.menu() not in (analyses_menu, results_menu, view_menu):
+                self.workbench.palette.add_menu(menu_action.menu(), menu_action.text())
+        self.workbench.palette.add_action(inspector_toggle, "View")
 
     def _ensure_performance(self) -> None:
         if self.performance is not None:
@@ -286,7 +306,7 @@ class MainWindow(QMainWindow):
         self.performance.context_panel.back_to_daily.connect(self._show_daily_context)
         self.performance.context_panel.open_full_athlete.connect(self._open_full_athlete_profile)
         self.inspector_stack.addWidget(self.performance.context_panel)
-        self.workspace.addWidget(self.performance)
+        self.perspectives.addWidget(self.performance)
         self.performance_header = PerformanceHeader(self)
         self.performance_header.search_requested.connect(self._search_performance)
         self.performance_header.set_menu_actions(self.menuBar().actions())
@@ -435,10 +455,11 @@ class MainWindow(QMainWindow):
     def _show_performance_mode(self) -> None:
         self._ensure_performance()
         self.menuBar().hide()
-        self.research_header.hide()
-        self.provenance.hide()
         self.performance_toolbar.show()
-        self.research_toolbar.hide()
+        if self._perspective != "performance":
+            self._perspective = "performance"
+            self.navigator_dock.show()
+            self.inspector_dock.show()
         self.navigator_stack.setCurrentWidget(self.performance_rail)
         self.navigator_dock.setTitleBarWidget(QWidget())
         self.navigator_dock.setMinimumWidth(196)
@@ -472,14 +493,12 @@ class MainWindow(QMainWindow):
         self.menuBar().show()
         if self.performance_toolbar is not None:
             self.performance_toolbar.hide()
-        self.research_toolbar.show()
-        self.research_header.show()
-        self.provenance.show()
-        self.navigator_stack.setCurrentWidget(self.navigator)
-        self.navigator_dock.setTitleBarWidget(None)
-        self.navigator_dock.setWindowTitle("Research navigator")
-        self.navigator_dock.setMinimumWidth(0)
-        self.navigator_dock.setMaximumWidth(16777215)
+        self.perspectives.setCurrentWidget(self.workbench)
+        if self._perspective != "research":
+            # The navigator lives in the Data pane; raw inspector detail is behind View > Advanced.
+            self._perspective = "research"
+            self.navigator_dock.hide()
+            self.inspector_dock.hide()
         self.inspector_dock.setWindowTitle("Inspector")
         self.inspector_stack.setCurrentWidget(self.inspector)
         self.inspector_dock.setMinimumWidth(0)
@@ -498,8 +517,8 @@ class MainWindow(QMainWindow):
             page, self.performance.page_names[self.performance.page_keys.index(page)]
         )
         self.context.setText(title)
-        self.provenance.setText("SYNTHETIC FIXTURE · DS-SYNTH-001 · NO REAL DATA")
-        self.workspace.setCurrentWidget(self.performance)
+        self.workbench.set_provenance("DS-SYNTH-001 · NO REAL DATA", provenance="synthetic")
+        self.perspectives.setCurrentWidget(self.performance)
         self.performance.select_page(page)
 
     def _search_performance(self, query: str) -> None:
@@ -555,6 +574,7 @@ class MainWindow(QMainWindow):
                 self.status_text.setText("Finishing the active research task before closing…")
             event.ignore()
             return
+        self.workbench.save_state()
         event.accept()
 
     def _close_if_idle(self) -> None:
@@ -725,7 +745,7 @@ class MainWindow(QMainWindow):
         self.current_study = {}
         self.current_snapshot_id = None
         self.context.setText(project.get("title", project_id))
-        self.provenance.setText("RESEARCH PROJECT")
+        self.workbench.set_provenance("RESEARCH PROJECT")
         self.research.select_project(project)
         self.workspace.setCurrentWidget(self.research)
         self.research.tabs.setCurrentIndex(0)
@@ -756,7 +776,8 @@ class MainWindow(QMainWindow):
         else:
             badge = f"SYNTHETIC FIXTURE · {snapshot.get('id', 'unknown snapshot')}"
         self.context.setText(detail.get("study", {}).get("title") or study_id)
-        self.provenance.setText(badge)
+        real = bool(detail.get("real_data") or snapshot.get("real_data"))
+        self.workbench.set_provenance(badge, provenance="real" if real else "synthetic")
         self.research.set_study(study_id, detail)
         self.workspace.setCurrentWidget(self.research)
 
@@ -777,9 +798,9 @@ class MainWindow(QMainWindow):
             badge = f"FIXTURE-ONLY ADMISSION · {snapshot_id}"
         else:
             badge = f"SYNTHETIC FIXTURE · {snapshot_id}"
-        self.provenance.setText(badge)
         if license_id:
-            self.provenance.setText(f"{self.provenance.text()}  ·  {license_id}")
+            badge = f"{badge}  ·  {license_id}"
+        self.workbench.set_provenance(badge, provenance="real" if detail.get("real_data") else "synthetic")
         self.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
         self.research.select_dataset(snapshot_id, detail)
         self.workspace.setCurrentWidget(self.research)

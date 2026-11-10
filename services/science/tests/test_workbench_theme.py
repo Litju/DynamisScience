@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import pytest
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QAbstractButton, QApplication, QLineEdit, QPlainTextEdit, QWidget
 
 from dynamis_science.desktop import theme
+from dynamis_science.desktop.workbench.shell import ANALYSES, PANE_MINIMUM, WorkbenchShell
 
 
 @pytest.mark.parametrize("name", sorted(theme.THEMES))
@@ -40,3 +43,81 @@ def test_chip_axes_are_separate(qapp):
     with pytest.raises(ValueError):
         theme.chip("x", "unknown")
 
+
+def test_shell_api_layout_keyboard_and_accessibility(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    settings = QSettings(str(tmp_path / "workbench.ini"), QSettings.Format.IniFormat)
+    shell = WorkbenchShell(settings)
+    qtbot.addWidget(shell)
+    shell.resize(1440, 820)
+    shell.show()
+    qtbot.waitExposed(shell)
+    shell.activateWindow()
+    qtbot.waitUntil(shell.isActiveWindow)
+
+    assert [shell.ribbon.widgetForAction(a).text() for a in shell.analysis_actions.values()] == [
+        label for _key, label, _group in ANALYSES
+    ]
+    with qtbot.waitSignal(shell.analysis_selected) as selected:
+        shell.analysis_actions["mixed_models"].trigger()
+    assert selected.args == ["mixed_models"] and shell.current_analysis() == "mixed_models"
+    assert shell.panes["options"].title.text() == "Mixed Models"
+
+    data, options, results = QWidget(), QWidget(), QWidget()
+    shell.set_data_widget(data)
+    shell.set_options_widget(options)
+    previous = shell.set_results_widget(results)
+    assert previous is not None and shell.panes["results"].content is results
+    for key, minimum in PANE_MINIMUM.items():
+        assert shell.panes[key].minimumWidth() == minimum
+
+    shell.set_provenance("STD-REAL-101", "RUN-REAL-0005", "519fe130", "descriptive", "real")
+    assert not shell.action_promote.isEnabled()
+    shell.set_provenance("STD-REAL-101", "RUN-REAL-0005", "519fe130", "qualified", "real")
+    assert shell.action_promote.isEnabled()
+    assert "digest 519fe130" in shell.provenance_label.text()
+
+    shell.set_run_state("stale")
+    assert shell.stale_bar.isVisible()
+    shell.set_run_state("current")
+    assert not shell.stale_bar.isVisible()
+    shell.set_syntax("smf.mixedlm(...)")
+    shell.copy_syntax()
+    assert QApplication.clipboard().text() == "smf.mixedlm(...)" and shell.toast.isVisible()
+
+    shell.focus_pane(2)
+    assert shell.focused_pane() == "results"
+    shell.cycle_panes()
+    assert shell.focused_pane() == "data"
+
+    unnamed = [
+        type(widget).__name__
+        for kind in (QAbstractButton, QLineEdit, QPlainTextEdit)
+        for widget in shell.findChildren(kind)
+        if widget.isVisible() and not widget.accessibleName()
+    ]
+    assert not unnamed, unnamed
+
+    shell.palette.popup()
+    assert "Mixed Models" in shell.palette.commands()
+    shell.palette.input.setText("relia")
+    assert shell.palette.commands() == ["Reliability"]
+    shell.palette._run_current()
+    assert shell.current_analysis() == "reliability"
+
+    shell.splitter.setSizes([500, 300, 600])
+    expected = shell.splitter.sizes()
+    shell.save_state()
+    restored = WorkbenchShell(QSettings(str(tmp_path / "workbench.ini"), QSettings.Format.IniFormat))
+    qtbot.addWidget(restored)
+    restored.resize(1440, 820)
+    restored.show()
+    qtbot.waitExposed(restored)
+    assert restored.splitter.sizes() == expected
+    assert restored.current_analysis() == "reliability"
+
+    shell.resize(900, 500)
+    assert shell._compact and not shell.panes["options"].isVisible()
+    shell.focus_pane(1)
+    assert shell.panes["options"].isVisible()
+    shell.set_theme("light")
