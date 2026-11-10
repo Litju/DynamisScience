@@ -223,7 +223,7 @@ def test_by_athlete_pivot_shows_missing_and_sorts():
     # row i == 5 is athlete MEN-01, occasion 2: missing, not blank
     assert m.data(m.index(1, 1), dm.MissingRole) is True
     assert m.data(m.index(1, 1)) == dm.MISSING_TEXT
-    assert m.data(m.index(1, 0)) == "34"
+    assert m.data(m.index(1, 0)) == "34.0"  # cm at 0.1
     proxy = QSortFilterProxyModel()
     proxy.setSourceModel(m)
     proxy.setSortRole(dm.SortRole)
