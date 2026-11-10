@@ -483,3 +483,12 @@ def test_descriptive_mean_interval_uses_student_t() -> None:
     # t(0.975, 20) = 2.085963 (standard tables); z = 1.96 would under-cover at n = 21.
     assert mean_ci_half_width(1.0, 21) == pytest.approx(2.085963447 / math.sqrt(21), rel=1e-8)
     assert mean_ci_half_width(1.0, 1) is None and mean_ci_half_width(0.0, 10) is None
+
+
+def test_descriptive_interval_unit_is_the_athlete() -> None:
+    from dynamis_science.realanalysis import mean_ci_half_width, subject_means
+
+    # Two athletes, three and one trials: pooling would claim n = 4 independent values.
+    values = subject_means([("A", 1.0), ("A", 2.0), ("A", 3.0), ("B", 10.0)])
+    assert list(values) == [2.0, 10.0]
+    assert mean_ci_half_width(float(values.std(ddof=1)), len(values)) == pytest.approx(12.706204736 * 8.0 / math.sqrt(2) / math.sqrt(2), rel=1e-8)

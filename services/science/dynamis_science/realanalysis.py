@@ -378,7 +378,7 @@ def explore(study_id: str, metric_id: str, excluded: list[str] | None, reference
             },
             "method": {
                 "unit_of_analysis": "athlete-occasion (post-priming row)",
-                "interval": "mean ± 1.96 × between-athlete SEM",
+                "interval": "mean ± t(0.975, n−1) × between-athlete SEM",
                 "engine": "polars + numpy",
                 "note": f"Occasions are the four deposited testing blocks ({', '.join(labels)}), not calendar weeks. Missing rows are shown as missing and never imputed.",
             },
@@ -417,7 +417,8 @@ def explore(study_id: str, metric_id: str, excluded: list[str] | None, reference
         )
     for index, activity in enumerate(activities, start=1):
         rows = frame.filter(pl.col("activity") == activity)
-        values = np.array([float(v) for v in rows[definition["column"]].to_list() if v is not None], dtype=float)
+        observations = [(row["subject_id"], row[definition["column"]]) for row in rows.iter_rows(named=True) if row[definition["column"]] is not None]
+        values = subject_means(observations)
         mean = float(values.mean()) if len(values) else None
         sd = float(values.std(ddof=1)) if len(values) > 1 else None
         half = mean_ci_half_width(sd, len(values))
@@ -428,6 +429,8 @@ def explore(study_id: str, metric_id: str, excluded: list[str] | None, reference
                 "activity": activity,
                 "n": len(values),
                 "n_athletes": int(rows["subject_id"].n_unique()),
+                "n_trials": len(observations),
+                "unit_of_analysis": "athlete mean of repeated trials",
                 "mean": mean,
                 "sd": sd,
                 "ci_low": mean - half if mean is not None and half is not None else None,
@@ -458,8 +461,8 @@ def explore(study_id: str, metric_id: str, excluded: list[str] | None, reference
             "load_peak_rule": "No training-load data.",
         },
         "method": {
-            "unit_of_analysis": "trial for summaries; athlete-activity mean for individual traces",
-            "interval": "mean ± 1.96 × SEM across trials",
+            "unit_of_analysis": "athlete-activity mean (repeated trials averaged within athlete)",
+            "interval": "mean ± t(0.975, n−1) × between-athlete SEM; n = athletes, not trials",
             "engine": "polars + numpy",
             "note": "Activities are not a longitudinal sequence; the x-axis is an activity index, not time.",
         },
@@ -621,6 +624,14 @@ def mean_ci_half_width(sd: float | None, n: int) -> float | None:
     from scipy import stats
 
     return float(stats.t.ppf(1 - ALPHA / 2, n - 1) * sd / math.sqrt(n))
+
+
+def subject_means(pairs: list[tuple[str, float]]) -> np.ndarray:
+    """One value per athlete: repeated trials are averaged so the athlete is the unit of the interval."""
+    by_subject: dict[str, list[float]] = {}
+    for subject_id, value in pairs:
+        by_subject.setdefault(str(subject_id), []).append(float(value))
+    return np.array([float(np.mean(values)) for _, values in sorted(by_subject.items())], dtype=float)
 
 
 # --------------------------------------------------------------------------- #

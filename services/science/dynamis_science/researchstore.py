@@ -191,7 +191,7 @@ SUPERSEDED_METHOD_VERSIONS: dict[tuple[str, str], dict[str, str]] = {
     },
     ("METH-U-DESC", "1.0.0"): {
         "affects": "INTERVALS",
-        "reason": "Mean intervals used z = 1.96 instead of Student-t (df = n - 1); intervals were too narrow.",
+        "reason": "Mean intervals used z = 1.96 instead of Student-t (df = n - 1) and pooled repeated trials as independent observations; intervals were too narrow.",
     },
 }
 

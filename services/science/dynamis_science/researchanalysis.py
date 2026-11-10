@@ -82,7 +82,8 @@ def _descriptive(snapshot_id: str, metric: dict[str, Any], cohort_ids: list[str]
     subjects = sorted({str(row["subject_id"]) for row in rows})
     summary = []
     for point in points:
-        values = [float(row[metric["column"]]) for row in rows if int(row[axis]) == point and row.get(metric["column"]) is not None]
+        observations = [(row["subject_id"], row[metric["column"]]) for row in rows if int(row[axis]) == point and row.get(metric["column"]) is not None]
+        values = list(realanalysis.subject_means(observations))
         mean = float(np.mean(values)) if values else None
         sd = float(np.std(values, ddof=1)) if len(values) > 1 else None
         half = realanalysis.mean_ci_half_width(sd, len(values))
@@ -93,6 +94,7 @@ def _descriptive(snapshot_id: str, metric: dict[str, Any], cohort_ids: list[str]
                 "arm": "INTERVENTION",
                 "n": len(values),
                 "n_athletes": len({str(row["subject_id"]) for row in rows if int(row[axis]) == point}),
+                "n_observations": len(observations),
                 "mean": mean,
                 "sd": sd,
                 "ci_low": mean - half if mean is not None and half is not None else None,
@@ -668,7 +670,7 @@ def explore(entity: dict[str, Any], cohort: dict[str, Any], metric_id: str, excl
         },
         "method": {
             "unit_of_analysis": f"{axis_label.lower()} within participant",
-            "interval": "mean ± 1.96 × between-participant SEM",
+            "interval": "mean ± t(0.975, n−1) × between-participant SEM of participant means",
             "engine": "polars + numpy",
             "note": f"{axis_label} values are taken from the admitted snapshot. Missing values are shown as missing and never imputed.",
         },

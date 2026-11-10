@@ -377,6 +377,15 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert requalified["QUAL-REAL-RELIABILITY"]["dynamis_run"] == current_reliability["id"]
     assert requalified["QUAL-REAL-RELIABILITY"]["status"] == "QUALIFIED"
     assert list((realanalysis.artifact_dir().parent / "qualification" / "history").glob("real_qualification-*.json"))
+    # Repeated trials are averaged within athlete: the interval's n is athletes, never trials.
+    activity_summary = realanalysis.explore(realstore.STUDY_MOVESMART, "MET-REAL-FZ-PEAK", None)["summary"]
+    walking = next(item for item in activity_summary if item["activity"] == "Walking")
+    assert walking["n"] == walking["n_athletes"] == 10 and walking["n_trials"] == 82
+    athlete_means = realanalysis.subject_means(
+        [(row["subject_id"], row["fz_peak_n"]) for row in service.list_signal_trials(movesmart["snapshot_id"], activity="Walking")]
+    )
+    assert walking["mean"] == pytest.approx(float(athlete_means.mean()), rel=1e-12)
+    assert walking["ci_high"] - walking["mean"] == pytest.approx(realanalysis.mean_ci_half_width(float(athlete_means.std(ddof=1)), 10), rel=1e-12)
     trial = service.list_signal_trials(movesmart["snapshot_id"], activity="Walking")[0]
     waveform = service.get_signal_waveform(movesmart["snapshot_id"], trial["trial_id"])
     assert waveform["source_rows"] > waveform["sample_count"]
