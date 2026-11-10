@@ -131,3 +131,25 @@ def test_shell_api_layout_keyboard_and_accessibility(qtbot, tmp_path, monkeypatc
     shell.focus_pane(1)
     assert shell.panes["options"].isVisible()
     shell.set_theme("light")
+
+
+def test_options_title_follows_every_way_the_analysis_changes(qtbot, tmp_path):
+    shell = WorkbenchShell(QSettings(str(tmp_path / "t.ini"), QSettings.Format.IniFormat))
+    qtbot.addWidget(shell)
+    seen = []
+    shell.analysis_selected.connect(seen.append)
+    shell.select_analysis("mixed_models")
+    shell.analysis_actions["reliability"].setChecked(True)  # palette/accessibility path, no triggered()
+    assert shell.panes["options"].title.text() == "Reliability"
+    assert seen == ["mixed_models", "reliability"]
+    shell.select_analysis("reliability")  # re-selecting still refreshes listeners
+    assert seen[-1] == "reliability"
+
+
+def test_fit_scale_shrinks_uniformly_for_small_work_areas_only():
+    from dynamis_science.desktop.__main__ import fit_scale
+
+    assert fit_scale(1920, 1040) == 1.0
+    assert fit_scale(1366, 728) == 0.85  # 1366x768 laptop: height-bound, readability floor
+    assert fit_scale(1280, 1000) == 0.89
+    assert fit_scale(800, 500) == 0.85

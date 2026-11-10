@@ -165,7 +165,8 @@ class WorkbenchShell(QWidget):
             action.setCheckable(True)
             action.setData(key)
             action.setToolTip(f"{label} analysis")
-            action.triggered.connect(lambda _checked=False, key=key: self.select_analysis(key))
+            # toggled, not triggered: palette, keyboard, accessibility toggles and restore all land here
+            action.toggled.connect(lambda checked, key=key: checked and self._analysis_checked(key))
             self.analysis_group.addAction(action)
             self.analysis_actions[key] = action
         self.action_run = QAction("Run analysis", self)
@@ -385,8 +386,13 @@ class WorkbenchShell(QWidget):
 
     def select_analysis(self, key: str) -> None:
         action = self.analysis_actions[key]
-        action.setChecked(True)
-        self.panes["options"].title.setText(action.text())
+        if action.isChecked():
+            self._analysis_checked(key)
+        else:
+            action.setChecked(True)  # toggled -> _analysis_checked
+
+    def _analysis_checked(self, key: str) -> None:
+        self.panes["options"].title.setText(self.analysis_actions[key].text())
         if self.settings is not None:
             self.settings.setValue("workbench/analysis", key)
         self.analysis_selected.emit(key)
@@ -529,8 +535,7 @@ class WorkbenchShell(QWidget):
         self.panes["options"].show()  # visibility is decided by the layout, not the saved state
         analysis = self.settings.value("workbench/analysis")
         if analysis in self.analysis_actions:
-            self.analysis_actions[analysis].setChecked(True)
-            self.panes["options"].title.setText(self.analysis_actions[analysis].text())
+            self.select_analysis(analysis)
 
     # ------------------------------------------------------------------ events
     def resizeEvent(self, event) -> None:
