@@ -27,7 +27,7 @@
 - **Private Scientific Data Root (`DYNAMISSCIENCE_DATA_ROOT`):** `D:\datasets\DynamisScience` (`1,032,104,990 B` / `0.961 GiB` including verified M0 backups; baseline operational dataset `904,764,885 B` / `0.843 GiB`), located strictly outside the Git repository and enforced by `services/science/dynamis_science/data_root.py`.
 - **Admitted Snapshots & Research Database Verified on Disk:**
   1. `DS-REAL-MENDELEY-2C44490E08AD` — Holmberg et al. (2025) sprint priming & CMJ dataset (`DOI: 10.17632/6p99569x66.1`, CC BY 4.0): 21 athletes, 4 occasions (`Pre`, `Post 0`, `Post 10m`, `Post 24h`), 82 CMJ observations, 21 sprint rows. Derived summary scalars only; no raw force traces.
-  2. `DS-REAL-MOVESMART-805259588272` — MoveSmart lower-limb wearable IMU + laboratory force-plate dataset (`DOI: 10.5281/zenodo.17376717`, CC BY-NC-SA 4.0, **non-commercial research restriction**): 10 participants (`P1`–`P10`), 398 matched trials across 5 activities (`Walking`, `Jogging`, `Running`, `Heel drop`, `Step drop`), `5,896,294` force samples at `1000 Hz` (`103.59 MB` Parquet), and `453,167` IMU samples at `~100 Hz` (`20.47 MB` Parquet). No CMJ trials and no hardware trigger / sample-level clock synchronization between force plate and IMU.
+  2. `DS-REAL-MOVESMART-805259588272` — MoveSmart lower-limb wearable IMU + laboratory force-plate dataset (`DOI: 10.5281/zenodo.17376717`, CC0-1.0 per the admitted source manifest and Zenodo `license.id = cc-zero`; see RES-619 rights note): 10 participants (`P1`–`P10`), 398 matched trials across 5 activities (`Walking`, `Jogging`, `Running`, `Heel drop`, `Step drop`), `5,896,294` force samples at `1000 Hz` (`103.59 MB` Parquet), and `453,167` IMU samples at `~100 Hz` (`20.47 MB` Parquet). No CMJ trials and no hardware trigger / sample-level clock synchronization between force plate and IMU.
   3. `DS-SYNTH-001` — Deterministic synthetic football performance & biomechanics fixture (`dynamis-synthetic@1.0.0`, seed `20260924`): 28 athletes, 16 weeks, 884 CMJ trials, `397,150` force-trace samples at `1000 Hz`, 448 load rows, 448 wellness rows, and a 180 s match-tracking/pose segment. Stored in git-ignored `data/parquet/` and `data/artifacts/`. Explicit demonstration/regression fixture; zero empirical claims.
   4. `$DYNAMISSCIENCE_DATA_ROOT/research/research.db` — SQLite WAL database (`PRAGMA user_version = 1`, `synchronous = FULL`, `foreign_keys = ON`, 16 tables) storing scientist-authored projects (`PRJ-REAL-001`), studies (`STD-REAL-101`), monitoring workspaces (`MON-REAL-101`), versioned cohorts, frozen analysis plans, immutable runs, promoted evidence, figures, reports, and append-only audit logs.
 
@@ -151,7 +151,7 @@ To prevent synthetic demonstration data from ever being mistaken for empirical f
 1. **Persistent Provenance Badge in Top Context Header:**
    - Every study, dataset, run, and workspace displays a non-dismissible badge in the `QMainWindow` context header:
      - `REAL DATA · CC BY 4.0` (e.g., `DS-REAL-MENDELEY-2C44490E08AD`, emerald/teal border)
-     - `REAL DATA · CC BY-NC-SA 4.0 (NON-COMMERCIAL)` (e.g., `DS-REAL-MOVESMART-805259588272`, amber border)
+     - `REAL DATA · CC0-1.0` (e.g., `DS-REAL-MOVESMART-805259588272`, amber border; licence text is read from the source manifest)
      - `SYNTHETIC FIXTURE · DS-SYNTH-001 (NO EMPIRICAL CLAIMS)` (muted slate/copper border; permanent banner on all Performance OS and `STUDY-001` surfaces).
 2. **Catalog & Selector Grouping:**
    - Dataset and Study selectors group entries under explicit section headers: **Admitted Real Datasets / Studies** first, followed by **Synthetic Demonstration & Regression Fixtures** (which can be hidden via a single toolbar toggle `Show Synthetic Fixtures`).
@@ -181,7 +181,7 @@ To prevent synthetic demonstration data from ever being mistaken for empirical f
 #### Step 3: Dataset Admission, Qualification & Selection
 1. In the **Datasets & Admission** workspace, the user inspects admitted snapshots (`DS-REAL-MENDELEY-2C44490E08AD`, `DS-REAL-MOVESMART-805259588272`, `DS-SYNTH-001`), candidate sources (`admission.list_sources()`), and quarantined files.
 2. Each snapshot displays:
-   - Source DOI, license (`CC BY 4.0`, `CC BY-NC-SA 4.0`), commercial-use flag, de-identification status, Parquet table list, exact row counts, SHA-256 checksums, and `immutable.json` seal status.
+   - Source DOI, license from the source manifest (e.g. `CC-BY-4.0`, `CC0-1.0`), commercial-use flag, de-identification status, Parquet table list, exact row counts, SHA-256 checksums, and `immutable.json` seal status.
    - Schema & column inspector (`QTableView` backed by `ParquetPreviewTableModel`) and coverage matrix (subjects × occasions/activities).
 3. To admit a new local file (`.csv`, `.tsv`, `.parquet`, `.xlsx`, `.json`), the user clicks **Register Local Source…** (`QFileDialog`), enters publisher/license/privacy metadata, runs `admission.inspect_source()` + `admission.admit_source()` in a background worker, and either promotes the validated Parquet snapshot or inspects quarantine reasons.
 
@@ -346,7 +346,7 @@ QMainWindow (DynamisScience Workstation)
 
 ```
 +----------------------------------------------------------------------------------------------------------------------+
-| STUDY-REAL-002 · MoveSmart Wearable IMU + Force Plate | Snapshot: DS-REAL-MOVESMART [REAL · CC BY-NC-SA 4.0 NON-COMM]|
+| STUDY-REAL-002 · MoveSmart Wearable IMU + Force Plate | Snapshot: DS-REAL-MOVESMART [REAL · CC0-1.0]              |
 +----------------------------------------------------------------------------------------------------------------------+
 | [1.Overview] [2.Dataset & Cohort] [3.Exploration & Signals*] [4.Analysis & Runs] [5.Evidence & Report]               |
 +---------------------------------------------------+------------------------------------------------------------------+
@@ -678,8 +678,8 @@ No synthetic or unmeasured performance numbers are claimed in this specification
      1. **Dynamic Linking Only:** Qt libraries (`Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Widgets.dll`, etc.) remain separate shared DLLs in the `--onedir` bundle (`_internal/PySide6/`) so an end user can technically replace them with compatible LGPLv3 Qt DLLs. Static compilation (`Nuitka --standalone` linking Qt statically) is prohibited unless a commercial Qt license is acquired.
      2. **No Modification of Qt / PySide6 Source:** Uses unmodified upstream wheels.
      3. **License Attribution Dialog:** `Help → About & Open-Source Licenses` displays the complete LGPLv3 text, copyright notices for Qt / PySide6 / Polars / DuckDB / SciPy / statsmodels, and bundles `THIRD_PARTY_LICENSES.txt` alongside `DynamisScience.exe`.
-2. **Dataset License & Non-Commercial Enforcement:**
-   - `DS-REAL-MOVESMART-805259588272` carries `CC BY-NC-SA 4.0` (`commercial_use_allowed: false`). The desktop application displays a persistent `NON-COMMERCIAL RESEARCH ONLY (CC BY-NC-SA 4.0)` badge on all MoveSmart views and embeds the exact license notice in every exported report manifest.
+2. **Dataset License Display (RES-619 correction):**
+   - Licence, commercial-use and privacy labels are read from the admitted source manifest (`real_sources.py` → snapshot `provenance_manifest.json`), never hardcoded. The earlier `CC BY-NC-SA 4.0` / non-commercial claim for `DS-REAL-MOVESMART-805259588272` contradicted the publisher record: Zenodo `license.id = cc-zero` and DataCite `rightsIdentifier = cc0-1.0` (re-checked 2026-11-10). DataCite additionally lists a `© 2025 The Authors` In-Copyright statement; that ambiguity is an owner review item, not a reason to invent a non-commercial licence. The PSEUDONYMOUS privacy obligations in the manifest apply regardless of licence.
    - Raw datasets in `D:\datasets\DynamisScience` are **never bundled inside the Windows installer**; they reside strictly in the external `DYNAMISSCIENCE_DATA_ROOT`.
 
 ### 7.6 Proportional Local-First Security Model

@@ -45,7 +45,7 @@ The installer includes a deterministic synthetic fixture only. It does not inclu
 
 ## Scientific integrity and data boundaries
 
-- Mendeley and MoveSmart snapshots retain their checksums, source rights and limitations. MoveSmart is restricted to non-commercial research under its verified source manifest.
+- Mendeley and MoveSmart snapshots retain their checksums, source rights and limitations. Displayed licences come from each admitted source manifest, never from hardcoded labels. The MoveSmart manifest records CC0-1.0 (Zenodo `license.id = cc-zero`, re-checked 2026-11-10); DataCite also lists a "© 2025 The Authors" rights statement, so owner review is required before any commercial reliance. Pseudonymous participant metadata stays private regardless of licence.
 - Synthetic `DS-SYNTH-001` data are labeled as demonstration data and are never empirical evidence.
 - Unsupported models remain marked as prototypes or unavailable. The app does not produce athlete predictions or injury-risk estimates from unsupported methods.
 - Studies, cohorts, plans, runs, evidence, figures, reports and audit history persist in SQLite. Scientific tables and artifacts use Parquet and the configured private filesystem.
