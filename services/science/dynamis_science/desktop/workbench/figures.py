@@ -63,10 +63,10 @@ def provenance(run: dict[str, Any]) -> dict[str, Any]:
 
 
 def provenance_footer(run: dict[str, Any]) -> str:
-    """One line printed on exported figures: run id, method, method status and result digest."""
+    """One line printed on exported figures: run id, method, method-version state (CURRENT or SUPERSEDED) and result digest."""
     status = (run.get("method_status") or {}).get("state", "UNKNOWN")
     version = run.get("method_version") or (run.get("method_status") or {}).get("computed_with") or "version not recorded"
-    return (f"Run {run.get('id')} · {run.get('method_id')} {version} · method status {status} · "
+    return (f"Run {run.get('id')} · {run.get('method_id')} {version} · method version {status} · "
             f"result digest {str(run.get('result_digest') or '')[:8]}")
 
 

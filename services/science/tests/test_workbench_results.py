@@ -182,7 +182,7 @@ def test_exports_print_run_digest_and_method_status_on_the_figure(tmp_path):
 
     run = {"id": "RUN-X-0001", "method_id": "METH-A", "method_version": "1.1.0", "result_digest": "abcd1234ef567890",
            "method_status": {"state": "CURRENT"}}
-    expected = "Run RUN-X-0001 · METH-A 1.1.0 · method status CURRENT · result digest abcd1234"
+    expected = "Run RUN-X-0001 · METH-A 1.1.0 · method version CURRENT · result digest abcd1234"
     assert figures.provenance_footer(run) == expected
 
     def make(with_footer: bool) -> Figure:
