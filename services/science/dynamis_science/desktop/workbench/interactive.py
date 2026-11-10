@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from .. import theme
 
 TREND_METHOD = "METH-REAL-TREND"
+BAND_LABEL = "Approximate band from recorded limits, conservative; not the model's Wald band"
 LANES = "lanes"
 BASELINE = "baseline"
 
@@ -77,7 +78,7 @@ def model_band(run: dict[str, Any] | None, xs: list[float], outcome: str | None 
     half = [h0 + abs(x - reference) * h1 for x in xs]
     return {"mean": mean, "low": [m - h for m, h in zip(mean, half)], "high": [m + h for m, h in zip(mean, half)],
             "run_id": run.get("id"), "reference": reference, "slope": b1,
-            "label": "conservative Wald 95% band (covariance not recorded)"}
+            "label": BAND_LABEL}
 
 
 def depth_options(data: dict[str, Any], measures: dict[str, dict[str, float]] | None = None) -> dict[str, str]:
@@ -250,7 +251,8 @@ class TrajectoryPlot(QWidget):
             self.model_note.setText(
                 f"Modeled: fixed-effect mean from recorded run {self.model['run_id']} (slope "
                 f"{slope['estimate']:+.3f} {data['unit']}/occasion, 95% CI {slope['ci_low']:.3f} to {slope['ci_high']:.3f}). "
-                "Band bounds the unrecorded intercept-slope covariance, so it is wider than the exact Wald band.")
+                f"{BAND_LABEL}: runs do not record the intercept-slope covariance, so the band bounds it and is "
+                "wider than the model interval.")
         elif self.run is not None:
             self.model_note.setText("The supplied run is not a recorded mixed-model run for this outcome on the observed "
                                     "scale; no modeled values are shown.")
@@ -385,11 +387,16 @@ class Trajectory3D(QWidget):
             self.layer_buttons[key] = button
             controls.addWidget(button)
         controls.addStretch(1)
+        layout.addLayout(controls)
+        controls = QHBoxLayout()  # second row: the controls do not fit one row of the 551 px Results pane
+        controls.setSpacing(4)
         controls.addWidget(QLabel("Depth"))
         self.depth_combo = QComboBox()
         self.depth_combo.setAccessibleName("Depth axis")
+        self.depth_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.depth_combo.setMinimumContentsLength(14)
         self.depth_combo.currentIndexChanged.connect(self._depth_changed)
-        controls.addWidget(self.depth_combo)
+        controls.addWidget(self.depth_combo, 1)
         self.preset_group = QButtonGroup(self)
         for name in PRESETS:
             button = QPushButton(name)
@@ -452,6 +459,9 @@ class Trajectory3D(QWidget):
         self.depth_key = self.depth_combo.currentData()
         self.depth_combo.blockSignals(False)
         self.layer_buttons["model"].setEnabled(self.available and self.model is not None)
+        self.hint.setText("Drag to rotate · scroll to zoom · Front / Side / 3D presets" + (
+            f"\nModel surface: fitted mean from {self.model['run_id']}; faint surfaces: {BAND_LABEL.lower()}."
+            if self.model else ""))
         self._render()
 
     def set_depth(self, key: str) -> None:

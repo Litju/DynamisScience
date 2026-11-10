@@ -133,7 +133,7 @@ class WorkbenchController(QObject):
             self.shell.set_syntax("")
         elif kind is None:
             self.options_pane.set_placeholder(
-                "Signals has no variable roles; use the study's signal viewer." if key == "signals"
+                "Signals has no variable roles: pick a trial and channels in the Results pane." if key == "signals"
                 else "Choose an analysis in the ribbon.")
             self.shell.set_syntax("")
         else:

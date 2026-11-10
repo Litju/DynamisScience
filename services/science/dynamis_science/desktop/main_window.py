@@ -61,7 +61,7 @@ from .theme import apply_theme
 from .workbench.controller import WorkbenchController
 from .workbench.data_pane import DataPane
 from .workbench.options_pane import OptionsPane
-from .workbench.results import ENGINE_KINDS, ResultsDocument, run_analysis
+from .workbench.results import DESCRIPTIVE_KINDS, ENGINE_KINDS, ResultsDocument, run_analysis
 from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
 
 
@@ -154,6 +154,13 @@ class MainWindow(QMainWindow):
         self.results_doc.evidence_promoted.connect(self._evidence_promoted)
         self.results_doc.report_cited.connect(self._report_cited)
         self.results_doc.action_failed.connect(self.workbench.show_toast)
+        # linked athlete selection: Data pane By athlete <-> trajectory views
+        self.results_doc.athlete_selected.connect(self.data_pane.select_athlete)
+        self.data_pane.athlete_selected.connect(self.results_doc.select_athlete)
+        self.signals_view = None  # SignalsView, created when the Signals key is first chosen
+        self.workbench.analysis_selected.connect(self._analysis_selected)
+        self.data_pane.dataset_changed.connect(
+            lambda *_: self._analysis_selected(self.workbench.current_analysis() or ""))
         self._sync_result_actions()
         self.perspectives = QStackedWidget()
         self.perspectives.addWidget(self.workbench)
@@ -287,6 +294,14 @@ class MainWindow(QMainWindow):
         view_menu = self.menuBar().addMenu("View")
         view_menu.addActions(self.workbench.view_actions)
         view_menu.addSeparator()
+        self.trajectory_actions = {}
+        for mode in ("2D", "3D"):
+            action = QAction(f"Show {mode} trajectories", self)
+            action.setToolTip(f"Mixed-model results: {mode} trajectories of the observed values and fitted mean")
+            action.triggered.connect(lambda _checked=False, mode=mode: self._show_trajectories(mode))
+            view_menu.addAction(action)
+            self.trajectory_actions[mode] = action
+        view_menu.addSeparator()
         self.action_study_record = QAction("Study record", self)
         self.action_study_record.setCheckable(True)
         self.action_study_record.setToolTip("Overview, dataset, exploration, analysis plan and evidence of the open study")
@@ -296,6 +311,16 @@ class MainWindow(QMainWindow):
         inspector_toggle = self.inspector_dock.toggleViewAction()
         inspector_toggle.setText("Inspector raw detail")
         advanced.addAction(inspector_toggle)
+        # Perspectives: the research workbench and the practitioner Performance OS (its own layout,
+        # not the three-pane workbench). The Performance header menu repeats these menus.
+        perspective_menu = self.menuBar().addMenu("Perspective")
+        self.action_research_perspective = QAction("Research workbench", self)
+        self.action_research_perspective.triggered.connect(self._show_research_mode)
+        perspective_menu.addAction(self.action_research_perspective)
+        perspective_menu.addSeparator()
+        for key, name in zip(PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES):
+            action = perspective_menu.addAction(f"Performance OS · {name}")
+            action.triggered.connect(lambda _checked=False, key=key: self.show_performance_page(key))
         help_menu = self.menuBar().addMenu("Help")
         about = QAction("About DynamisScience", self)
         about.triggered.connect(
@@ -314,6 +339,8 @@ class MainWindow(QMainWindow):
                 self.workbench.palette.add_menu(menu_action.menu(), menu_action.text())
         self.workbench.palette.add_action(inspector_toggle, "View")
         self.workbench.palette.add_action(self.action_study_record, "View")
+        for action in self.trajectory_actions.values():
+            self.workbench.palette.add_action(action, "View")
 
     def _ensure_performance(self) -> None:
         if self.performance is not None:
@@ -534,6 +561,9 @@ class MainWindow(QMainWindow):
         self._set_record_view(False)
         self.results_doc.clear()
         self._sync_result_actions()
+        if spec.kind in DESCRIPTIVE_KINDS:
+            self._run_descriptive(spec)
+            return
         study_id = spec.study_id
 
         def finish(run: dict[str, Any] | None) -> None:
@@ -562,24 +592,121 @@ class MainWindow(QMainWindow):
         self.progress.setVisible(True)
         run_analysis(self.service, study_id, spec, self.runner, finish, failed)
 
+    def _run_descriptive(self, spec) -> None:
+        """Descriptives, Frequencies, Athlete change: observed summaries of the snapshot rows (pandas),
+        shown as descriptive blocks. No engine run, never promotable."""
+        from .workbench import descriptive
+
+        snapshot, table = spec.snapshot_id, spec.table
+        provenance = {"source": "real" if snapshot.startswith("DS-REAL") else "synthetic",
+                      "snapshot_id": snapshot, "table": table}
+        units = {v.name: v.unit for v in self.data_pane.variables() if v.unit}
+        types = dict(spec.variable_types)
+        subject = "subject_id" if types.get("subject_id") == "identifier" else None
+        options = spec.effective_options()
+
+        def build(frame) -> list:
+            if spec.kind == "descriptives":
+                factors = spec.role("factors")
+                return [descriptive.DescriptivesBlock(frame, spec.role("outcome"), factors[0] if factors else None,
+                                                      subject, provenance, units)]
+            if spec.kind == "frequencies":
+                return [descriptive.FrequenciesBlock(frame, spec.role("factors"), provenance)]
+            outcome, athlete, occasion = spec.role("outcome")[0], spec.role("subject")[0], spec.role("occasion")[0]
+            levels = sorted(frame[occasion].dropna().unique())
+            first = options["reference_occasion"] if options["reference_occasion"] is not None else levels[0]
+            last = options["contrast_occasion"] if options["contrast_occasion"] is not None else levels[-1]
+            return [descriptive.AthleteChangeBlock(frame, outcome, athlete, occasion, first, last, provenance,
+                                                   unit=units.get(outcome, ""))]
+
+        def finish(frame) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Ready")
+            if (self.data_pane.snapshot_id, self.data_pane.table) != (snapshot, table):
+                return  # the dataset changed while the rows were loading
+            try:
+                self.results_doc.show_blocks(lambda: build(frame), spec, descriptive.DESCRIPTIVE_STATE)
+            except (KeyError, IndexError, ValueError, TypeError) as error:
+                failed(error)
+                return
+            self.controller.set_last_run_hash(spec.spec_hash())
+            block = self.results_doc.blocks[0]
+            # the syntax bar shows what was computed for the visible result (rule 6)
+            self.workbench.set_syntax("# DESCRIPTIVE: no inference; not promoted as a modeled claim.\n" + block.syntax)
+            self._spec_changed(self.controller.current_spec())
+
+        def failed(error: Exception) -> None:
+            self.progress.setVisible(False)
+            self.status_text.setText("Operation failed")
+            self.controller.mark_run_failed()
+            self.workbench.show_toast(f"{type(error).__name__}: {error}")
+
+        self.status_text.setText("Summarising observed rows")
+        self.progress.setVisible(True)
+        self.runner.submit(lambda: descriptive.load_table(self.service, snapshot, table), finish, failed)
+
+    def _analysis_selected(self, key: str) -> None:
+        """Signals shows the trial viewer in the Results pane; every other key the result document."""
+        if key != "signals":
+            if self.signals_view is not None and self.results_stack.currentWidget() is self.signals_view:
+                self.results_stack.setCurrentWidget(self.results_doc)
+            return
+        from .workbench.signals_view import SignalsView
+
+        if self.signals_view is None:
+            self.signals_view = SignalsView(self.service, lambda fn, done: self.run_task(fn, done, "Loading signals"))
+            self.signals_view.setAccessibleName("Signal inspection")
+            self.signals_view.trial_selected.connect(lambda trial_id: self.workbench.set_syntax(
+                "# OBSERVED signal, min/max-decimated for display; no analysis\n"
+                f"DynamisAppService().get_signal_waveform({self.signals_view.snapshot_id!r}, {trial_id!r}, 2500)"))
+            self.results_stack.addWidget(self.signals_view)
+        self.action_study_record.setChecked(False)  # before switching: it resets the stack to the document
+        self.results_stack.setCurrentWidget(self.signals_view)
+        snapshot = self.data_pane.snapshot_id
+        tables = {t["name"] for t in (self.data_pane._detail or {}).get("tables", [])}
+        if snapshot and "signal_trials" in tables:
+            if snapshot != self.signals_view.snapshot_id:
+                self.signals_view.set_snapshot(snapshot)
+        elif snapshot:
+            self.workbench.show_toast("Signals needs a dataset with signal trials (e.g. the MoveSmart study)")
+
+    def _show_trajectories(self, mode: str) -> None:
+        if self.results_doc.trajectory_plot is None:
+            self.workbench.show_toast("Run a mixed model to see its trajectories")
+            return
+        self._set_record_view(False)
+        self.results_doc.set_trajectory_mode(mode)
+        block = next(b for b in self.results_doc.blocks if getattr(b, "trajectory_stack", None))
+        self.results_doc.ensureWidgetVisible(block, 0, 0)
+
     def _load_observed(self, run: dict[str, Any], spec) -> None:
-        """Add the observed layer (snapshot rows) to a mixed-model trajectory figure."""
+        """Add the observed layer (snapshot rows) to a mixed-model trajectory figure, and the
+        interactive 2D / 3D trajectories (explore_longitudinal of the run's outcome)."""
         if spec.kind != "mixed_model" or not run.get("snapshot_id"):
             return
         snapshot_id, table = run["snapshot_id"], spec.table
+        study_id, metric = run.get("study_id") or spec.study_id, spec.outcome_metric_id()
+        excluded = list(spec.effective_options().get("excluded_subject_ids") or [])
 
-        def read() -> list[dict[str, Any]]:
+        def read() -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
             rows: list[dict[str, Any]] = []
             while True:
                 page = self.service.read_table_page(snapshot_id, table, len(rows), 500)
                 rows += page["rows"]
                 if not page["rows"] or len(rows) >= int(page["total_rows"]):
-                    return rows
+                    break
+            try:
+                explore = self.service.explore_longitudinal(study_id, metric, excluded) if metric else None
+            except Exception:  # noqa: BLE001 - the interactive views are optional; the run stands alone
+                explore = None
+            return rows, explore
 
-        def show(rows: list[dict[str, Any]]) -> None:
+        def show(loaded) -> None:
+            rows, explore = loaded
             if self.results_doc.run is run:  # still the visible result
                 stale = self.results_doc.stale
-                self.results_doc.show_run(run, self.results_doc.spec, rows)
+                self.results_doc.selected_athlete = self.data_pane.selected_athlete()
+                self.results_doc.show_run(run, self.results_doc.spec, rows, explore)
                 self.results_doc.mark_stale(stale)
                 self._sync_result_actions()
 

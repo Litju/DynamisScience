@@ -110,3 +110,73 @@ def test_reference_occasion_change_reruns(app, window):
     # the status bar names the digest and it is the new run's recorded result digest, not the previous one
     assert f"result digest {doc.run['result_digest'][:8]}" in shell.provenance_label.text()
     assert doc.run["result_digest"][:8] != "519fe130" and doc.run["id"] in shell.provenance_label.text()
+
+
+def test_descriptive_kinds_render_blocks_and_never_promote(app, window):
+    from dynamis_science.desktop.workbench.descriptive import AthleteChangeBlock, DescriptivesBlock
+
+    _open_study(app, window, "STUDY-REAL-001")
+    shell, doc, drop = window.workbench, window.results_doc, window.options_pane
+    shell.select_analysis("descriptives")
+    drop.slots["outcome"].box.dropped.emit(["cmj_height_cm"])
+    drop.slots["factors"].box.dropped.emit(["occasion"])
+    shell.action_run.trigger()
+    _pump(app, lambda: doc.blocks and not window.runner.active)
+    assert isinstance(doc.blocks[0], DescriptivesBlock) and doc.state["kind"] == "descriptive"
+    assert not doc.promotable and not shell.action_promote.isEnabled() and doc.run is None
+    assert shell.run_label.text() == "Results up to date"
+    assert shell.syntax.toPlainText().endswith(doc.blocks[0].syntax)
+
+    shell.select_analysis("athlete_change")
+    for role, name in (("outcome", "cmj_height_cm"), ("subject", "subject_id"), ("occasion", "occasion")):
+        drop.slots[role].box.dropped.emit([name])
+    shell.action_run.trigger()
+    _pump(app, lambda: doc.blocks and isinstance(doc.blocks[0], AthleteChangeBlock) and not window.runner.active)
+    assert "1 → 4" in doc.blocks[0].title.text() and not doc.promotable
+    window.options_pane.option_changed.emit("contrast_occasion", 3)
+    assert doc.stale and shell.run_label.text() == "Specification changed"
+
+
+def test_mixed_model_trajectories_link_with_by_athlete(app, window):
+    _open_study(app, window, "STUDY-REAL-001")
+    _assign_mixed(window)
+    doc, data = window.results_doc, window.data_pane
+    window.workbench.action_run.trigger()
+    _pump(app, lambda: doc.trajectory_plot is not None and not window.runner.active)
+    data.set_view("By athlete")
+    doc.trajectory_plot.athlete_selected.emit("MEN-03")  # a click in the plot
+    assert data.selected_athlete() == "MEN-03"
+    data.select_athlete("")
+    row = next(r for r in range(data.athlete_view.model().rowCount())
+               if data.athlete_view.model().index(r, 0).data() == "MEN-05")
+    data.athlete_view.setCurrentIndex(data.athlete_view.model().index(row, 1))  # a click in the table
+    assert doc.trajectory_plot.selected == "MEN-05"
+    band = doc.trajectory_plot.model
+    assert band and "not the model's Wald band" in band["label"]
+    window.trajectory_actions["3D"].trigger()
+    assert doc.trajectory_mode == "3D" and doc.trajectory_3d is not None
+    assert doc.trajectory_3d.selected == "MEN-05"
+
+
+def test_signals_in_results_and_perspective_switch(app, window):
+    _open_study(app, window, "STUDY-REAL-002")
+    window.workbench.select_analysis("signals")
+    _pump(app, lambda: window.signals_view is not None and window.signals_view.trials and not window.runner.active)
+    assert window.results_stack.currentWidget() is window.signals_view
+    window.workbench.select_analysis("reliability")
+    assert window.results_stack.currentWidget() is window.results_doc
+
+    titles = [a.text() for a in window.menuBar().actions()]
+    assert "Perspective" in titles
+    window.show_performance_page("today")
+    _pump(app, lambda: not window.runner.active)  # closing with a task running would open a modal prompt
+    assert window.perspectives.currentWidget() is window.performance
+    assert "Perspective" in [a.text() for a in window.performance_header.menu_button.menu().actions()]
+    window.action_research_perspective.trigger()
+    assert window.perspectives.currentWidget() is window.workbench
+    window.workbench.palette.popup()
+    window.workbench.palette.input.setText("Performance OS")
+    assert "Performance OS · Today" in window.workbench.palette.commands()
+    window.workbench.palette.input.setText("trajectories")
+    assert window.workbench.palette.commands() == ["Show 2D trajectories", "Show 3D trajectories"]
+    window.workbench.palette.hide()

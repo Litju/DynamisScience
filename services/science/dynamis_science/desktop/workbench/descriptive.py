@@ -175,15 +175,15 @@ class DescriptivesBlock(DescriptiveBlock):
         super().__init__("Descriptives", provenance or {}, frame, syntax,
                          "Descriptive only. No inference. Missing athlete-occasions are counted, never imputed.")
         self.heading("Descriptive statistics")
-        headers = ["Variable"] + ([by.capitalize()] if by else []) + ["N", "Missing", "Mean", "SD", "Median", "IQR",
-                                                                     "Min", "Max"]
+        # E8 default columns (minimum / maximum stay in self.table); fits the 551 px Results pane
+        headers = ["Variable"] + ([by.capitalize()] if by else []) + ["N", "Missing", "Mean", "SD", "Median", "IQR"]
         rows = []
         for row in self.table.itertuples():
             first = row.variable if row.Index == 0 or self.table.variable[row.Index - 1] != row.variable else ""
             name = f"<b>{html.escape(first)}</b>" + (f" ({html.escape(units[first])})" if first in units else "")
             rows.append([name] + ([_level(row.group)] if by else [])
                         + [str(row.n), _count(row.missing)]
-                        + [_num(getattr(row, key)) for key in ("mean", "sd", "median", "iqr", "min", "max")])
+                        + [_num(getattr(row, key)) for key in ("mean", "sd", "median", "iqr")])
         self.rich(_table(headers, rows, numeric_from=2 if by else 1))
         if plot and by:
             self.figure(box_figure(frame, variables[0], by, units.get(variables[0], "")), 260)

@@ -28,6 +28,7 @@ from typing import Any
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
@@ -35,6 +36,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -45,6 +47,7 @@ from . import figures
 from .spec import NOT_QUALIFIED, AnalysisSpec, method_status
 
 ENGINE_KINDS = ("mixed_model", "reliability")
+DESCRIPTIVE_KINDS = ("descriptives", "frequencies", "athlete_change")
 STALE_OPACITY = 0.42
 
 
@@ -124,7 +127,7 @@ def _table(headers: list[str], rows: list[list[str]], numeric_from: int = 1) -> 
 
     def cell(tag: str, text: str, index: int, extra: str = "") -> str:
         align = "right" if index >= numeric_from else "left"
-        return f'<{tag} align="{align}" style="padding: 3px 10px; {extra}">{text}</{tag}>'
+        return f'<{tag} align="{align}" style="padding: 3px 6px; {extra}">{text}</{tag}>'
 
     head = "".join(cell("th", html.escape(h), i, rule) for i, h in enumerate(headers))
     body = []
@@ -147,7 +150,7 @@ class ResultBlock(QFrame):
         self.dependent = dependent  # dimmed when the specification changes
         self.figure_canvases: list[FigureCanvasQTAgg] = []
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 12)
+        layout.setContentsMargins(16, 16, 16, 12)
         layout.setSpacing(8)
         header = QHBoxLayout()
         header.setSpacing(6)
@@ -224,6 +227,7 @@ class ResultsDocument(QScrollArea):
     evidence_promoted = Signal(dict)
     report_cited = Signal(dict)
     action_failed = Signal(str)
+    athlete_selected = Signal(str)  # from the trajectory views; "" when cleared
 
     def __init__(self, service: Any | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -231,6 +235,11 @@ class ResultsDocument(QScrollArea):
         self.run: dict[str, Any] | None = None
         self.spec: AnalysisSpec | None = None
         self.observed: list[dict[str, Any]] | None = None
+        self.explore: dict[str, Any] | None = None  # explore_longitudinal result for the trajectory views
+        self.trajectory_mode = "2D"
+        self.selected_athlete = ""
+        self.trajectory_plot = self.trajectory_3d = None
+        self._build: Callable[[], list[ResultBlock]] | None = None  # descriptive blocks, rebuilt on theme change
         self.run_spec_hash: str | None = None
         self.stale = False
         self.blocks: list[ResultBlock] = []
@@ -239,12 +248,12 @@ class ResultsDocument(QScrollArea):
         self.setObjectName("ResultsDocument")
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # a wide table scrolls, never clips
         self.setAccessibleName("Results document")
         canvas = QWidget()
         canvas.setObjectName("ResultsCanvas")
         self.column = QVBoxLayout(canvas)
-        self.column.setContentsMargins(16, 16, 16, 16)
+        self.column.setContentsMargins(10, 12, 10, 12)  # at the 551 px design width tables must not clip
         self.column.setSpacing(14)
         self.superseded_bar = QFrame()
         self.superseded_bar.setObjectName("SupersededBar")
@@ -268,7 +277,9 @@ class ResultsDocument(QScrollArea):
             block.setParent(None)
             block.deleteLater()
         self.blocks = []
-        self.run = self.spec = self.observed = None
+        self.run = self.spec = self.observed = self.explore = None
+        self.trajectory_plot = self.trajectory_3d = None
+        self._build = None
         self.run_spec_hash = None
         self.state = {"kind": "unavailable", "label": "", "promotable": False, "reason": ""}
         self.superseded_bar.hide()
@@ -276,16 +287,17 @@ class ResultsDocument(QScrollArea):
         self.empty.show()
 
     def show_run(self, run: dict[str, Any] | None, spec: AnalysisSpec | None = None,
-                 observed: list[dict[str, Any]] | None = None) -> None:
+                 observed: list[dict[str, Any]] | None = None, explore: dict[str, Any] | None = None) -> None:
         """Render ``run`` (a run record). ``spec`` sets the stale-detection hash; ``observed``
-        (snapshot rows) adds the observed layer to the trajectory figure."""
+        (snapshot rows) adds the observed layer to the trajectory figure; ``explore``
+        (``explore_longitudinal``) adds the interactive 2D / 3D trajectories to a mixed model."""
         if spec is not None and spec.kind not in ENGINE_KINDS:
             self.show_unavailable(spec)
             return
         self.clear()
         if run is None:
             return
-        self.run, self.spec, self.observed = run, spec, observed
+        self.run, self.spec, self.observed, self.explore = run, spec, observed, explore
         self.run_spec_hash = spec.spec_hash() if spec is not None else None
         self.state = run_method_state(run)
         self.empty.hide()
@@ -326,6 +338,41 @@ class ResultsDocument(QScrollArea):
             block.set_note("Limits: descriptive only; not promoted as a modeled claim.")
         block.set_footer(self.state, "no run · no digest", "", False)
         self._add(block)
+
+    def show_blocks(self, build: Callable[[], list[ResultBlock]], spec: AnalysisSpec | None,
+                    state: dict[str, Any]) -> None:
+        """Descriptive results: blocks made by ``build()`` (re-run on theme change). No run, never promotable."""
+        self.clear()
+        self.spec, self.state = spec, {**state, "promotable": False}
+        self.run_spec_hash = spec.spec_hash() if spec is not None else None
+        self.empty.hide()
+        for block in build():
+            self._add(block)
+        self._build = build
+
+    def select_athlete(self, subject_id: str) -> None:
+        """Highlight ``subject_id`` in the trajectory views ("" clears)."""
+        self.selected_athlete = subject_id or ""
+        for view in (self.trajectory_plot, self.trajectory_3d):
+            if view is not None and view.selected != (subject_id or None):
+                view.select_athlete(subject_id or None)
+
+    def set_trajectory_mode(self, mode: str) -> None:
+        """``2D`` (pyqtgraph) or ``3D`` (pyqtgraph.opengl, created on first use)."""
+        self.trajectory_mode = mode
+        block = next((b for b in self.blocks if getattr(b, "trajectory_stack", None)), None)
+        if block is None:
+            return
+        if mode == "3D" and self.trajectory_3d is None:
+            from .interactive import Trajectory3D
+
+            self.trajectory_3d = Trajectory3D()
+            self.trajectory_3d.set_data(self.explore, self.run)
+            self.trajectory_3d.select_athlete(self.selected_athlete or None)
+            block.trajectory_stack.addWidget(self.trajectory_3d)
+        block.trajectory_stack.setCurrentWidget(self.trajectory_3d if mode == "3D" else self.trajectory_plot)
+        for button in block.trajectory_buttons.buttons():
+            button.setChecked(button.text() == mode)
 
     def mark_stale(self, stale: bool) -> None:
         self.stale = bool(stale) and bool(self.blocks)
@@ -492,6 +539,8 @@ class ResultsDocument(QScrollArea):
                                  "not imputed." if self.observed else "Observed layer not loaded."))
         self._footer(figure_block, run)
         self._add(figure_block)
+        if self.explore:
+            self._trajectories(run, prov)
 
         checks = ResultBlock("Assumption checks", [("mod", "mod")], prov)
         definitions = diagnostics.get("residual_definitions") or {}
@@ -521,6 +570,49 @@ class ResultsDocument(QScrollArea):
             + (f"Optimizer attempts: {attempts}." if attempts else ""))
         self._footer(checks, run)
         self._add(checks)
+
+    def _trajectories(self, run: dict[str, Any], prov: str) -> None:
+        """E5: interactive observed trajectories with the recorded fitted mean; 2D / 3D toggle."""
+        from .interactive import BAND_LABEL, TrajectoryPlot
+
+        block = ResultBlock("Trajectories", [("obs", "obs"), ("mod", "mod")], prov,
+                            "Athlete × occasion. Points are observed values; the cobalt line or surface is the "
+                            "fixed-effect mean of this run. Click an athlete to link it with the Data pane.")
+        switch = QFrame()
+        switch.setObjectName("Segmented")
+        row = QHBoxLayout(switch)
+        row.setContentsMargins(2, 2, 2, 2)
+        row.setSpacing(0)
+        block.trajectory_buttons = QButtonGroup(block)
+        for mode in ("2D", "3D"):
+            button = QPushButton(mode)
+            button.setCheckable(True)
+            button.setAccessibleName(f"{mode} trajectories")
+            button.clicked.connect(lambda _checked=False, mode=mode: self.set_trajectory_mode(mode))
+            block.trajectory_buttons.addButton(button)
+            row.addWidget(button)
+        bar = QHBoxLayout()
+        bar.addWidget(switch)
+        bar.addStretch(1)
+        block.body.addLayout(bar)
+        block.trajectory_stack = QStackedWidget()
+        block.trajectory_stack.setMinimumHeight(440)
+        self.trajectory_plot = TrajectoryPlot()
+        self.trajectory_plot.set_data(self.explore, run)
+        self.trajectory_plot.select_athlete(self.selected_athlete or None)
+        self.trajectory_plot.athlete_selected.connect(self._trajectory_selected)
+        block.trajectory_stack.addWidget(self.trajectory_plot)
+        block.body.addWidget(block.trajectory_stack)
+        block.set_note(f"Band: {BAND_LABEL}. Runs record the intercept and slope limits but not their covariance, "
+                       "so the band bounds it; it is not the model interval. Missing athlete-occasions are listed, "
+                       "never interpolated.")
+        self._footer(block, run)
+        self._add(block)
+        self.set_trajectory_mode(self.trajectory_mode)
+
+    def _trajectory_selected(self, subject_id: str) -> None:
+        self.select_athlete(subject_id)
+        self.athlete_selected.emit(subject_id)
 
     def _reliability(self, run: dict[str, Any]) -> None:
         t = theme.tokens()
@@ -602,7 +694,11 @@ class ResultsDocument(QScrollArea):
             self._theme = theme.current_theme()
             if self.run is not None:
                 stale = self.stale
-                self.show_run(self.run, self.spec, self.observed)
+                self.show_run(self.run, self.spec, self.observed, self.explore)
+                self.mark_stale(stale)
+            elif self._build is not None:
+                stale = self.stale
+                self.show_blocks(self._build, self.spec, self.state)
                 self.mark_stale(stale)
             elif self.spec is not None:
                 self.show_unavailable(self.spec)

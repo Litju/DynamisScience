@@ -297,6 +297,7 @@ class DataPane(QWidget):
 
     variable_selected = Signal(str)
     dataset_changed = Signal(str, str)  # snapshot id, table ("" = nothing open)
+    athlete_selected = Signal(str)  # By athlete row (subject id), "" when cleared
 
     def __init__(self, service: Any, navigator: QWidget | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -452,6 +453,30 @@ class DataPane(QWidget):
             self._build_by_athlete()
         self.stack.setCurrentWidget(self._pages[name])
 
+    def selected_athlete(self) -> str:
+        index = self.athlete_view.currentIndex()
+        return str(index.siblingAtColumn(0).data()) if index.isValid() else ""
+
+    def select_athlete(self, subject_id: str) -> None:
+        """Select the By athlete row of ``subject_id`` ("" clears) without re-announcing it."""
+        proxy = self.athlete_view.model()
+        if proxy is None or subject_id == self.selected_athlete():
+            return
+        self.athlete_view.blockSignals(True)
+        selection = self.athlete_view.selectionModel()
+        selection.blockSignals(True)
+        match = proxy.match(proxy.index(0, 0), Qt.ItemDataRole.DisplayRole, subject_id, 1,
+                            Qt.MatchFlag.MatchExactly) if subject_id else []
+        if match:
+            self.athlete_view.setCurrentIndex(match[0])
+            self.athlete_view.selectRow(match[0].row())
+            self.athlete_view.scrollTo(match[0])
+        else:
+            selection.clearSelection()
+            selection.setCurrentIndex(proxy.index(-1, -1), selection.SelectionFlag.Clear)
+        selection.blockSignals(False)
+        self.athlete_view.blockSignals(False)
+
     def selected_variable(self) -> str:
         return self._selected
 
@@ -541,8 +566,11 @@ class DataPane(QWidget):
         self.athlete_view.setSortingEnabled(True)
         self.athlete_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self.athlete_view.setItemDelegateForColumn(model.trend_column, SparklineDelegate(self.athlete_view))
+        self.athlete_view.selectionModel().currentRowChanged.connect(
+            lambda current, _previous: self.athlete_selected.emit(
+                str(current.siblingAtColumn(0).data()) if current.isValid() else ""))
         for col in range(model.columnCount()):
-            self.athlete_view.setColumnWidth(col, 66 if col == 0 else 58 if col <= model.trend_column - 2 else 60 if col < model.trend_column else 96)
+            self.athlete_view.setColumnWidth(col, 78 if col == 0 else 58 if col <= model.trend_column - 2 else 60 if col < model.trend_column else 96)
         total = int(next(t for t in self._detail["tables"] if t["name"] == self.table)["rows"])
         cells = source.rowCount() * source.columnCount()
         note = f"{source.rowCount()} subjects × {source.columnCount()} occasions"
