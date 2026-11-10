@@ -738,13 +738,18 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
     except Exception:
         random_effects = {}
     baseline_sd = float(np.std([float(row[outcome]) for row in rows if row["occasion"] == reference], ddof=1)) if sum(1 for row in rows if row["occasion"] == reference) > 1 else float(np.std(outcomes, ddof=1))
-    # Residual diagnostics.
-    order = np.argsort(residuals)
-    ranks = (np.arange(len(residuals)) + 0.375) / (len(residuals) + 0.25)
+    # Residual diagnostics. `residuals` are marginal (y - X beta): they keep the
+    # between-athlete variance and are used for population mean-structure misfit
+    # by occasion. The Q-Q uses conditional Pearson residuals (y - X beta - Z b) / sigma,
+    # the scale on which the within-athlete normality assumption is stated.
+    conditional = np.asarray(fitted.resid, dtype=float)
+    sigma = math.sqrt(max(1e-12, float(fitted.scale)))
+    order = np.argsort(conditional)
+    ranks = (np.arange(len(conditional)) + 0.625) / (len(conditional) + 0.25)
     from scipy import stats
 
     theoretical = stats.norm.ppf(ranks)
-    standardized = residuals / max(1e-9, math.sqrt(max(1e-12, float(fitted.scale))))
+    standardized = conditional / sigma
     residual_qq = [
         {"theoretical": float(theoretical[index]), "observed": float(standardized[order[index]])}
         for index in range(0, len(residuals), max(1, len(residuals) // 60))
@@ -819,6 +824,20 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
             "log_likelihood": float(fitted.llf),
             "residual_by_week": residual_by_occasion,
             "residual_qq": residual_qq,
+            "residual_qq_type": "CONDITIONAL_PEARSON",
+            "residual_definitions": {
+                "residual_summary": "marginal: y - X beta_hat (includes between-athlete deviations)",
+                "residual_by_week": "marginal: y - X beta_hat, mean per occasion",
+                "residual_qq": "conditional Pearson: (y - X beta_hat - Z b_hat) / sigma_hat; BLUP shrinkage makes these less dispersed than N(0,1) and correlated, so the Q-Q is exploratory",
+            },
+            "conditional_residual_summary": {
+                "sd_over_sigma": float(np.std(standardized, ddof=1)),
+                "max_abs_pearson": float(np.max(np.abs(standardized))),
+            },
+            "conditional_residuals": [
+                {"subject_id": subjects[index], "occasion": int(occasions[index]), "residual": float(conditional[index])}
+                for index in range(len(conditional))
+            ],
             "residual_by_arm": {"INTERVENTION": {"n": int(len(rows)), "sd": float(np.std(residuals, ddof=1)), "mean": float(np.mean(residuals))}},
             "sample_context": {
                 "valid_first_trials_used": int(len(rows)),

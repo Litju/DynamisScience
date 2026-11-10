@@ -413,6 +413,7 @@ def test_longitudinal_diagnostics_are_computed_and_attached(dataset: dict) -> No
     assert len(diagnostics["residual_by_week"]) == 16
     qq = diagnostics["residual_qq"]
     assert len(qq) >= 30
+    assert diagnostics["residual_qq_type"] == "CONDITIONAL_STANDARDIZED"  # MixedLM resid includes Z b
     assert [point["theoretical"] for point in qq] == sorted(point["theoretical"] for point in qq)
     # The only flagged trial is a trial-2 repeat, so it never enters the first-trial model.
     assert diagnostics["sample_context"]["valid_first_trials_used"] == diagnostics["n_observations"]

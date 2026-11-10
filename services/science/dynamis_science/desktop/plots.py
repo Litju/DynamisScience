@@ -35,6 +35,13 @@ def longitudinal_figure(exploration: dict[str, Any], provenance: dict[str, Any])
     return figure
 
 
+QQ_LABELS = {
+    "CONDITIONAL_PEARSON": ("Conditional residual Q–Q · exploratory", "(y − Xβ̂ − Zb̂) / σ̂"),
+    "CONDITIONAL_STANDARDIZED": ("Conditional residual Q–Q · exploratory", "Conditional residual (z-scored)"),
+    "MARGINAL_STANDARDIZED": ("Marginal residual Q–Q · exploratory", "Marginal residual y − Xβ̂ (z-scored)"),
+}
+
+
 def run_figure(run: dict[str, Any]) -> Figure:
     result = run.get("result", {})
     data = run.get("figure_data") or {}
@@ -138,9 +145,17 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 s=18,
                 color="#176b87",
             )
-            diagnostic_axis.set_title("Marginal residual Q–Q · exploratory")
+            title, ylabel = QQ_LABELS.get(
+                diagnostics.get("residual_qq_type"),
+                ("Residual Q–Q · residual type not recorded (legacy run)", "Residual (definition not recorded)"),
+            )
+            if diagnostics.get("residual_qq_type") in QQ_LABELS:
+                # Standardized residuals are compared against the N(0, 1) identity line.
+                bounds = [min(item["theoretical"] for item in qq), max(item["theoretical"] for item in qq)]
+                diagnostic_axis.plot(bounds, bounds, color="#777", linewidth=0.8)
+            diagnostic_axis.set_title(title)
             diagnostic_axis.set_xlabel("Theoretical normal quantile")
-            diagnostic_axis.set_ylabel("Marginal residual / conditional SD")
+            diagnostic_axis.set_ylabel(ylabel)
         elif cv:
             diagnostic_axis.plot(
                 [item["subject_id"] for item in cv],

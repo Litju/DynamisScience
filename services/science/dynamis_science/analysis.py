@@ -221,6 +221,10 @@ def _group_longitudinal(
         if int((weeks == week).sum()) > 0
     ]
     result["residual_qq"] = _normal_qq(residuals)
+    # statsmodels MixedLM resid is conditional (y - X beta - Z b); the OLS fallback is marginal.
+    result["residual_qq_type"] = (
+        "CONDITIONAL_STANDARDIZED" if result["estimator"].startswith("MIXEDLM") else "MARGINAL_STANDARDIZED"
+    )
     result["residual_by_arm"] = {
         arm: {
             "n": int(mask.sum()),
@@ -265,6 +269,7 @@ def _group_longitudinal(
         "log_likelihood": fitted_llf,
         "residual_by_week": result["residual_by_week"],
         "residual_qq": result["residual_qq"],
+        "residual_qq_type": result["residual_qq_type"],
         "residual_by_arm": result["residual_by_arm"],
         "sample_context": result["sample_context"],
         "baseline_balance": baseline_balance,

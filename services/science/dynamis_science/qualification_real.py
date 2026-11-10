@@ -144,11 +144,27 @@ def _mixedlm_qualification(snapshot_id: str) -> dict[str, Any]:
                 "tolerance_relative": 1e-3,
                 "pass": abs(value - current) / max(abs(value), 1e-12) <= 1e-3,
             }
+    residual_file = output_dir / "residuals.csv"
+    current = {(item["subject_id"], int(item["occasion"])): item["residual"] for item in (run.get("diagnostics") or dynamis.get("diagnostics") or {}).get("conditional_residuals", [])}
+    if residual_file.exists() and current:
+        reference = {(row["subject_id"], int(row["occasion"])): float(row["residual"]) for row in _read_csv(residual_file)}
+        shared = set(reference) & set(current)
+        worst = max(abs(reference[key] - current[key]) for key in shared) if shared else float("inf")
+        comparisons["conditional_residuals"] = {
+            "reference": "lme4 residuals(fit)",
+            "dynamis": "statsmodels MixedLMResults.resid",
+            "n_compared": len(shared),
+            "max_absolute_difference": worst,
+            "tolerance_absolute": 1e-4,
+            "pass": len(shared) == len(reference) == len(current) and worst <= 1e-4,
+        }
+    else:
+        comparisons["conditional_residuals"] = {"pass": False, "reason": "Run predates RES-619 conditional residual export or R output is missing; re-run METH-REAL-TREND."}
     passed = all(item["pass"] for item in comparisons.values())
     return {
         "id": "QUAL-REAL-MIXEDLM",
         "scientific_method": "Linear mixed-effects change model (CMJ height, four occasions)",
-        "method_version": "1.0.0",
+        "method_version": "1.1.0",
         "status": "QUALIFIED" if passed else "FAILED",
         "pass_fail": "PASS" if passed else "FAIL",
         "input_snapshot": snapshot_id,
@@ -165,6 +181,8 @@ def _mixedlm_qualification(snapshot_id: str) -> dict[str, Any]:
             "The comparison is a single real dataset with 21 athletes and four occasions.",
             "The initial L-BFGS fit stopped at logLik -215.824 while lme4 found -208.312; the production implementation now selects the best converged optimizer and the pre-fix run is retained in the ledger as RUN-REAL-0001.",
             "Residual diagnostics are not a substitute for external validation on a new cohort.",
+            "Intervals are ML Wald intervals (normal approximation); no Satterthwaite/Kenward-Roger small-sample correction with 21 athletes.",
+            "The Q-Q uses conditional Pearson residuals; BLUP shrinkage makes them under-dispersed and correlated, so it is exploratory, not a formal normality test.",
         ],
         "reproduction_commands": [
             f"$env:DYNAMISSCIENCE_DATA_ROOT='{data_root()}'",

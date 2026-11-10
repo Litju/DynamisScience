@@ -253,8 +253,14 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert len(figure.axes) == 2
     qq = mendeley["diagnostics"]["residual_qq"]
     assert list(figure.axes[1].collections[0].get_offsets()[:, 0]) == [point["theoretical"] for point in qq]
-    assert not figure.axes[1].lines
-    assert "Marginal residual" in figure.axes[1].get_ylabel()
+    assert mendeley["diagnostics"]["residual_qq_type"] == "CONDITIONAL_PEARSON"
+    assert figure.axes[1].get_title().startswith("Conditional residual Q–Q")
+    assert figure.axes[1].get_ylabel() == "(y − Xβ̂ − Zb̂) / σ̂"
+    assert len(figure.axes[1].lines) == 1  # N(0, 1) identity reference
+    # Conditional Pearson residuals are on the sigma scale; marginal/sigma was ~5x wider.
+    assert 0.5 < mendeley["diagnostics"]["conditional_residual_summary"]["sd_over_sigma"] < 1.0
+    legacy = {**mendeley, "diagnostics": {key: value for key, value in mendeley["diagnostics"].items() if key != "residual_qq_type"}}
+    assert "not recorded" in run_figure(legacy).axes[1].get_title()
     assert "result_digest" in figure._dynamis_metadata["DynamisScience provenance"]
     for extension in ("png", "pdf", "svg"):
         output = export_figure(figure, tmp_path / f"result.{extension}")

@@ -37,4 +37,9 @@ write.csv(
   file.path(output, "fit.csv"),
   row.names = FALSE
 )
+write.csv(
+  data.frame(subject_id = as.character(d$subject_id), occasion = d$occasion, residual = as.numeric(residuals(fit))),
+  file.path(output, "residuals.csv"),
+  row.names = FALSE
+)
 cat("R lme4 reference complete\n")

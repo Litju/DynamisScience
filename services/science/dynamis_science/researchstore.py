@@ -76,12 +76,12 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-REAL-TREND": {
         "id": "METH-REAL-TREND",
         "name": "Linear mixed-effects change model",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "qualification": {
             "status": "QUALIFIED",
             "record": "QUAL-REAL-MIXEDLM",
             "reference": "R 4.6.2 / lme4 2.1-0 (ML)",
-            "basis": "Fixed effects, standard errors, log likelihood and variance components compared independently in RES-587.",
+            "basis": "Fixed effects, standard errors, log likelihood and variance components compared in RES-587; conditional residuals compared with lme4 residuals() in RES-619.",
         },
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES"],
         "required_tables": ["cmj_occasions"],
@@ -94,7 +94,7 @@ METHODS: dict[str, dict[str, Any]] = {
             "alpha": {"type": "number", "default": 0.05},
         },
         "assumptions": ["Linear change on the model scale.", "Random intercept and random occasion slope for subject.", "Approximately normal residuals."],
-        "diagnostics": ["optimizer selection and all attempts", "convergence", "residual summary", "residuals by occasion", "normal QQ", "sample and missingness context"],
+        "diagnostics": ["optimizer selection and all attempts", "convergence", "residual summary", "marginal residuals by occasion", "conditional Pearson residual normal Q-Q (exploratory)", "sample and missingness context"],
         "output_schema": ["occasion slope with SE and 95% CI", "model-implied change between the selected occasions", "random-effect variances", "effect size against baseline SD"],
     },
     "METH-REAL-DESC": {
