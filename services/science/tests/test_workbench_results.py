@@ -162,12 +162,8 @@ def test_stale_and_superseded_gate_promotion(app, real):
     doc.show_run(runs["mixed"], spec)
     assert doc.check_spec(spec) is False and doc.promotable
     assert doc.check_spec(_mixed_spec(reference_occasion=2)) is True
-    assert doc.stale_bar.isVisibleTo(doc) and not doc.promotable
+    assert doc.stale and not doc.promotable
     assert all(block.graphicsEffect() is not None for block in doc.blocks)
-    rerun = []
-    doc.rerun_requested.connect(lambda: rerun.append(True))
-    doc.rerun_button.click()
-    assert rerun == [True]
     doc.mark_stale(False)
     assert all(block.graphicsEffect() is None for block in doc.blocks)
 

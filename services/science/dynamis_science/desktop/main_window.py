@@ -61,6 +61,7 @@ from .theme import apply_theme
 from .workbench.controller import WorkbenchController
 from .workbench.data_pane import DataPane
 from .workbench.options_pane import OptionsPane
+from .workbench.results import ENGINE_KINDS, ResultsDocument, run_analysis
 from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
 
 
@@ -140,10 +141,20 @@ class MainWindow(QMainWindow):
         results_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         results_scroll.setWidgetResizable(True)
         results_scroll.setWidget(self.workspace)
-        self.workbench.set_results_widget(results_scroll)
-        self.workbench.action_add_to_report.triggered.connect(lambda: self.research._cite_latest())
-        self.workbench.action_promote.triggered.connect(lambda: self.research._promote())
-        self.workbench.action_export.triggered.connect(lambda: self.research.export_report())
+        # The workbench result document is the primary Results view; the study record is under View.
+        self.results_doc = ResultsDocument(self.service)
+        self.results_stack = QStackedWidget()
+        self.results_stack.addWidget(self.results_doc)
+        self.results_stack.addWidget(results_scroll)
+        self.workbench.set_results_widget(self.results_stack)
+        self.controller.spec_changed.connect(self._spec_changed)
+        self.workbench.action_promote.triggered.connect(self.results_doc.promote)
+        self.workbench.action_add_to_report.triggered.connect(lambda: self.results_doc.add_to_report())
+        self.workbench.action_export.triggered.connect(lambda: self._export_results())
+        self.results_doc.evidence_promoted.connect(self._evidence_promoted)
+        self.results_doc.report_cited.connect(self._report_cited)
+        self.results_doc.action_failed.connect(self.workbench.show_toast)
+        self._sync_result_actions()
         self.perspectives = QStackedWidget()
         self.perspectives.addWidget(self.workbench)
         self.performance = None
@@ -276,6 +287,11 @@ class MainWindow(QMainWindow):
         view_menu = self.menuBar().addMenu("View")
         view_menu.addActions(self.workbench.view_actions)
         view_menu.addSeparator()
+        self.action_study_record = QAction("Study record", self)
+        self.action_study_record.setCheckable(True)
+        self.action_study_record.setToolTip("Overview, dataset, exploration, analysis plan and evidence of the open study")
+        self.action_study_record.toggled.connect(self._set_record_view)
+        view_menu.addAction(self.action_study_record)
         advanced = view_menu.addMenu("Advanced")
         inspector_toggle = self.inspector_dock.toggleViewAction()
         inspector_toggle.setText("Inspector raw detail")
@@ -297,6 +313,7 @@ class MainWindow(QMainWindow):
             if menu_action.menu() not in (analyses_menu, results_menu, view_menu):
                 self.workbench.palette.add_menu(menu_action.menu(), menu_action.text())
         self.workbench.palette.add_action(inspector_toggle, "View")
+        self.workbench.palette.add_action(self.action_study_record, "View")
 
     def _ensure_performance(self) -> None:
         if self.performance is not None:
@@ -513,28 +530,106 @@ class MainWindow(QMainWindow):
         self.controller.refresh_provenance()
 
     def _run_spec(self, spec) -> None:
-        """HOOK (results gate): replace this body with ResultsDocument/run_analysis; it must end in controller.set_last_run_hash(spec.spec_hash(), run, digest) or controller.mark_run_failed()."""
-        if spec.kind not in ("mixed_model", "reliability"):
-            self.controller.mark_run_failed()
-            self.workbench.show_toast(f"{spec.kind.replace('_', ' ')} has no engine yet; no run was created")
-            return
-        study_id, payload = spec.study_id, spec.to_run_payload()
+        """Results gate: run through the isolated worker, render in the result document, record the hash."""
+        self._set_record_view(False)
+        self.results_doc.clear()
+        self._sync_result_actions()
+        study_id = spec.study_id
 
-        def ok(run: dict[str, Any]) -> None:
+        def finish(run: dict[str, Any] | None) -> None:
             self.progress.setVisible(False)
             self.status_text.setText("Ready")
-            self.research._run_completed(study_id, run)
-            self.controller.set_last_run_hash(spec.spec_hash(), run.get("id", ""), str(run.get("result_digest", "")))
+            if spec.kind in ENGINE_KINDS and self.current_study_id != study_id:
+                return  # the study changed while the run was in flight; never show it against another study
+            if run is None:  # kind without a qualified engine: stated, never promotable
+                self.results_doc.show_unavailable(spec)
+                self.controller.set_last_run_hash(spec.spec_hash())
+            else:
+                self.results_doc.show_run(run, spec)
+                self.research._run_completed(study_id, run)
+                self.controller.set_last_run_hash(spec.spec_hash(), run.get("id", ""),
+                                                  str(run.get("result_digest", ""))[:8])
+                self._load_observed(run, spec)
+            self._spec_changed(self.controller.current_spec())
 
         def failed(error: Exception) -> None:
             self.progress.setVisible(False)
             self.status_text.setText("Operation failed")
             self.controller.mark_run_failed()
-            QMessageBox.warning(self, "DynamisScience", f"{type(error).__name__}: {error}")
+            self.workbench.show_toast(f"{type(error).__name__}: {error}")
 
         self.status_text.setText("Running qualified scientific analysis")
         self.progress.setVisible(True)
-        self.runner.submit(lambda: self.service.execute_analysis_isolated(study_id, payload), ok, failed)
+        run_analysis(self.service, study_id, spec, self.runner, finish, failed)
+
+    def _load_observed(self, run: dict[str, Any], spec) -> None:
+        """Add the observed layer (snapshot rows) to a mixed-model trajectory figure."""
+        if spec.kind != "mixed_model" or not run.get("snapshot_id"):
+            return
+        snapshot_id, table = run["snapshot_id"], spec.table
+
+        def read() -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            while True:
+                page = self.service.read_table_page(snapshot_id, table, len(rows), 500)
+                rows += page["rows"]
+                if not page["rows"] or len(rows) >= int(page["total_rows"]):
+                    return rows
+
+        def show(rows: list[dict[str, Any]]) -> None:
+            if self.results_doc.run is run:  # still the visible result
+                stale = self.results_doc.stale
+                self.results_doc.show_run(run, self.results_doc.spec, rows)
+                self.results_doc.mark_stale(stale)
+                self._sync_result_actions()
+
+        self.runner.submit(read, show, lambda _error: None)  # the observed layer is optional
+
+    def _spec_changed(self, spec) -> None:
+        self.results_doc.check_spec(spec)
+        self._sync_result_actions()
+
+    def _sync_result_actions(self) -> None:
+        doc = self.results_doc
+        self.workbench.action_promote.setEnabled(doc.promotable)
+        self.workbench.action_add_to_report.setEnabled(doc.promotable)
+        self.workbench.action_export.setEnabled(bool(doc.run))
+
+    def _set_record_view(self, record: bool) -> None:
+        self.results_stack.setCurrentIndex(1 if record else 0)
+        if self.action_study_record.isChecked() != record:
+            self.action_study_record.setChecked(record)
+
+    def _reset_results(self, record: bool = False) -> None:
+        """Dataset or study switch: no result, spec or run state outlives its data."""
+        self.results_doc.clear()
+        self.controller.reset()
+        self._sync_result_actions()
+        self._set_record_view(record)
+
+    def _export_results(self, path: str | None = None) -> None:
+        if path is None:
+            path, selected = QFileDialog.getSaveFileName(
+                self, "Export figures", "", "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)")
+            if not path:
+                return
+            if not path.lower().endswith((".png", ".pdf", ".svg")):
+                path += "." + selected.split("*.")[1].rstrip(")")
+        try:
+            written = self.results_doc.export(path)
+        except (ValueError, OSError) as error:
+            self.workbench.show_toast(str(error))
+            return
+        self.workbench.show_toast(f"Exported {len(written)} figure(s)")
+
+    def _evidence_promoted(self, outcome: dict[str, Any]) -> None:
+        run = self.results_doc.run or {}
+        self.research._evidence_promoted(run.get("study_id", ""), outcome)
+        self.workbench.show_toast("Promoted to evidence")
+
+    def _report_cited(self, result: dict[str, Any]) -> None:
+        run = self.results_doc.run or {}
+        self.research._report_cited(run.get("study_id", ""), result)
 
     def show_performance_page(self, page: str) -> None:
         self._ensure_performance()
@@ -755,6 +850,7 @@ class MainWindow(QMainWindow):
             self.current_project = None
             self.current_study_id = None
             self.current_study = {}
+            self._reset_results(record=True)
             self.controller.set_source("")
             self.data_pane.clear()
             self.workspace.setCurrentWidget(self.welcome)
@@ -779,6 +875,7 @@ class MainWindow(QMainWindow):
         self.current_study = {}
         self.current_snapshot_id = None
         self.context.setText(project.get("title", project_id))
+        self._reset_results(record=True)
         self.controller.set_source("RESEARCH PROJECT")
         self.data_pane.clear()
         self.research.select_project(project)
@@ -811,6 +908,7 @@ class MainWindow(QMainWindow):
         else:
             badge = f"SYNTHETIC FIXTURE · {snapshot.get('id', 'unknown snapshot')}"
         self.context.setText(detail.get("study", {}).get("title") or study_id)
+        self._reset_results()
         real = bool(detail.get("real_data") or snapshot.get("real_data"))
         self.controller.set_source(badge, "real" if real else "synthetic", study_id)
         snapshot_id = self.current_snapshot_id
@@ -845,6 +943,7 @@ class MainWindow(QMainWindow):
             badge = f"SYNTHETIC FIXTURE · {snapshot_id}"
         if license_id:
             badge = f"{badge}  ·  {license_id}"
+        self._reset_results(record=True)
         self.controller.set_source(badge, "real" if detail.get("real_data") else "synthetic")
         self.data_pane.set_dataset(snapshot_id, detail)
         self.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))

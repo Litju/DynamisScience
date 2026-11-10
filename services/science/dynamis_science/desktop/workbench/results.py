@@ -12,7 +12,6 @@ Integration (main window / controller)::
     shell.set_results_widget(doc)
     run_analysis(service, spec.study_id, spec, runner, lambda run: doc.show_run(run, spec))
     doc.check_spec(current_spec)          # dims dependent blocks when the hash differs
-    doc.rerun_requested.connect(controller_run)
     shell.action_promote.triggered.connect(doc.promote)
     shell.action_add_to_report.triggered.connect(doc.add_to_report)
     shell.set_provenance(**doc.provenance_args())
@@ -219,34 +218,9 @@ class ResultBlock(QFrame):
         self.footer.show()
 
 
-def _stylesheet(t: dict[str, str]) -> str:
-    # shortcut: scoped here because theme.py is owned elsewhere; move these rules into
-    # theme._STYLESHEET when the workbench is integrated.
-    mono = theme.MONO
-    return f"""
-QWidget#ResultsCanvas {{ background: {t['window']}; }}
-QFrame#ResultBlock {{ background: {t['base']}; border: 1px solid {t['line']}; border-radius: 10px; }}
-QLabel#BlockTitle {{ color: {t['text']}; font-size: 16px; font-weight: 600; }}
-QLabel#BlockSubtitle {{ color: {t['muted']}; font-family: "{mono}"; font-size: 12px; }}
-QLabel#BlockHeading {{ color: {t['text']}; font-size: 13px; font-weight: 600; padding-top: 4px; }}
-QLabel#BlockText {{ color: {t['text']}; }}
-QLabel#BlockNote {{ color: {t['dim_text']}; font-style: italic; font-size: 12px; }}
-QFrame#BlockFooter {{ border: 0; border-top: 1px dashed {t['line2']}; }}
-QLabel#FooterText {{ color: {t['dim_text']}; font-size: 11px; }}
-QPushButton#PromoteButton {{ background: transparent; border: 0; color: {t['accent_text']}; padding: 2px 4px; }}
-QPushButton#PromoteButton:hover {{ text-decoration: underline; }}
-QPushButton#PromoteButton:disabled {{ color: {t['faint']}; }}
-QFrame#SupersededBar {{ background: {t['bad_chip']}; border: 1px solid {t['bad_edge']}; border-radius: 8px; }}
-QFrame#SupersededBar QLabel {{ color: {t['text']}; }}
-QPushButton#RerunButton {{ background: {t['accent']}; color: {t['on_accent']}; border: 0; border-radius: 6px;
-    padding: 6px 14px; font-weight: 600; }}
-"""
-
-
 class ResultsDocument(QScrollArea):
     """Vertical stack of result blocks for one run."""
 
-    rerun_requested = Signal()
     evidence_promoted = Signal(dict)
     report_cited = Signal(dict)
     action_failed = Signal(str)
@@ -278,25 +252,13 @@ class ResultsDocument(QScrollArea):
         bar.setContentsMargins(14, 10, 14, 10)
         self.superseded_label = _label("", "SupersededText", rich=True)
         bar.addWidget(self.superseded_label)
-        self.stale_bar = QFrame()
-        self.stale_bar.setObjectName("StaleBar")
-        stale = QHBoxLayout(self.stale_bar)
-        stale.setContentsMargins(14, 8, 10, 8)
-        stale.addWidget(_label("<b>Specification changed.</b> These results are for the previous specification.",
-                               "StaleText", rich=True), 1)
-        self.rerun_button = QPushButton("▶  Rerun · Ctrl ⏎")
-        self.rerun_button.setObjectName("RerunButton")
-        self.rerun_button.clicked.connect(self.rerun_requested)
-        stale.addWidget(self.rerun_button)
         self.empty = _label("Run an analysis to see results here.", "PaneEmpty")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        for widget in (self.stale_bar, self.superseded_bar, self.empty):
+        for widget in (self.superseded_bar, self.empty):
             self.column.addWidget(widget)
         self.column.addStretch(1)
-        self.stale_bar.hide()
         self.superseded_bar.hide()
         self.setWidget(canvas)
-        self.setStyleSheet(_stylesheet(theme.tokens()))
 
     # -- public API ---------------------------------------------------------
     def clear(self) -> None:
@@ -367,7 +329,6 @@ class ResultsDocument(QScrollArea):
 
     def mark_stale(self, stale: bool) -> None:
         self.stale = bool(stale) and bool(self.blocks)
-        self.stale_bar.setVisible(self.stale)
         for block in self.blocks:
             if block.dependent and self.stale:
                 effect = QGraphicsOpacityEffect(block)
@@ -639,7 +600,6 @@ class ResultsDocument(QScrollArea):
         super().changeEvent(event)
         if event.type() == QEvent.Type.PaletteChange and theme.current_theme() != self._theme:
             self._theme = theme.current_theme()
-            self.setStyleSheet(_stylesheet(theme.tokens()))
             if self.run is not None:
                 stale = self.stale
                 self.show_run(self.run, self.spec, self.observed)
