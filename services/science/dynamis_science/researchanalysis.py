@@ -151,7 +151,9 @@ def _individual_change(snapshot_id: str, metric: dict[str, Any], cohort_ids: lis
         raise researchstore.ResearchValidation("Fewer than three complete pairs; individual change is not estimable")
     changes = np.array([item["change"] for item in values], dtype=float)
     change_sd = float(np.std(changes, ddof=1)) if len(changes) > 1 else None
-    typical_error = change_sd / math.sqrt(2) if change_sd else None
+    # Change SD / sqrt(2) is measurement error only between repeated same-session trials;
+    # across occasions it also contains true individual response, so it is not reported.
+    typical_error = change_sd / math.sqrt(2) if change_sd and axis == "trial_number" else None
     for item in values:
         item["standardized_change"] = item["change"] / change_sd if change_sd else None
         item["exceeds_typical_error"] = abs(item["change"]) > typical_error if typical_error else None
@@ -170,7 +172,7 @@ def _individual_change(snapshot_id: str, metric: dict[str, Any], cohort_ids: lis
         "change_sd": change_sd,
         "standardized_change": median / change_sd if change_sd else None,
         "typical_error": typical_error,
-        "typical_error_note": "Cohort change SD / √2 is context for individual change, not a same-session measurement-error estimate.",
+        "typical_error_note": "Typical error = change SD / √2 between repeated same-session trials." if typical_error is not None else "Not estimable: the compared observations are separate occasions, so their change SD includes true individual response.",
         "missing": missing,
         "limitations": [
             "Descriptive; no causal individual response is inferred.",

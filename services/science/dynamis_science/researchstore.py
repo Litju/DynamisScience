@@ -115,7 +115,7 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-U-CHANGE": {
         "id": "METH-U-CHANGE",
         "name": "Individual change with measurement-error context",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "QUAL-U-CHANGE", "reference": "Deterministic recomputation", "basis": "Descriptive change and cohort change SD; not a causal individual response."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
         "required_tables": ["cmj_occasions", "cmj_trials"],
@@ -184,6 +184,10 @@ SUPERSEDED_METHOD_VERSIONS: dict[tuple[str, str], dict[str, str]] = {
     ("METH-REAL-TREND", "1.0.0"): {
         "affects": "DIAGNOSTICS_AND_FIGURE_INTERVALS",
         "reason": "Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.",
+    },
+    ("METH-U-CHANGE", "1.0.0"): {
+        "affects": "INTERPRETATION",
+        "reason": "Typical error was change SD / sqrt(2) across separate occasions, which includes true individual response; exceeds_typical_error flags were not measurement-error comparisons.",
     },
     ("METH-REAL-DESC", "1.0.0"): {
         "affects": "INTERVALS",

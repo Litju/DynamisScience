@@ -300,6 +300,9 @@ def test_individual_change_reports_baseline_current_and_typical_error(dataset: d
     result = _individual_change(_trials(), "concentric_impulse_n_s_kg")
     assert result["n_subjects"] == 28
     assert result["typical_error"] > 0
+    # Measurement error from repeated baseline trials, not the change SD across the block.
+    assert result["typical_error"] == pytest.approx(_reliability(_trials(), "concentric_impulse_n_s_kg")["typical_error"], rel=1e-12)
+    assert result["typical_error"] != pytest.approx(result["change_sd"] / math.sqrt(2), rel=1e-3)
     assert len(result["athletes"]) == 28
     for athlete in result["athletes"]:
         assert athlete["baseline"] > 0 and athlete["post"] > 0

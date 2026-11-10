@@ -545,7 +545,9 @@ def _individual_change(trial_rows: list[dict[str, Any]], outcome: str) -> dict[s
         changes.append({"subject_id": subject_id, "baseline": base, "post": follow, "change": follow - base, "percent_change": (follow - base) / max(abs(base), 1e-9) * 100})
     values = np.array([row["change"] for row in changes], dtype=float)
     sd = float(np.std(values, ddof=1)) if len(values) > 1 else 1.0
-    typical_error = float(sd / math.sqrt(2))
+    # Measurement error comes from the repeated baseline-week trials, not from the change
+    # SD across the training block (which also contains true individual response).
+    typical_error = _safe_float(_reliability(trial_rows, outcome).get("typical_error"))
     for row in changes:
         row["standardized_change"] = row["change"] / sd if sd else None
         row["exceeds_typical_error"] = bool(abs(row["change"]) > typical_error)

@@ -401,6 +401,20 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert requalified["QUAL-REAL-RELIABILITY"]["dynamis_run"] == current_reliability["id"]
     assert requalified["QUAL-REAL-RELIABILITY"]["status"] == "QUALIFIED"
     assert list((realanalysis.artifact_dir().parent / "qualification" / "history").glob("real_qualification-*.json"))
+    # Typical error from change SD / sqrt(2) only between same-session trials, never across occasions.
+    from dynamis_science import researchanalysis
+
+    def metric_for(snapshot_id, column):
+        return next(item for item in researchstore.dataset_metrics(snapshot_id) if item["column"] == column)
+
+    mendeley_id = mendeley["snapshot_id"]
+    across = researchanalysis._individual_change(mendeley_id, metric_for(mendeley_id, "cmj_height_cm"), sorted({row["subject_id"] for row in realstore.read_table(mendeley_id, "cmj_occasions").iter_rows(named=True)}), {}, 1, 4)
+    assert across["typical_error"] is None and all(item["exceeds_typical_error"] is None for item in across["athletes"])
+    assert across["typical_error_note"].startswith("Not estimable")
+    movesmart_id = movesmart["snapshot_id"]
+    walking_ids = sorted({row["subject_id"] for row in service.list_signal_trials(movesmart_id, activity="Walking")})
+    within = researchanalysis._individual_change(movesmart_id, metric_for(movesmart_id, "fz_peak_n"), walking_ids, {"activity": "Walking"}, 1, 2)
+    assert within["axis"] == "trial_number" and within["typical_error"] == pytest.approx(within["change_sd"] / 2**0.5)
     # Repeated trials are averaged within athlete: the interval's n is athletes, never trials.
     activity_summary = realanalysis.explore(realstore.STUDY_MOVESMART, "MET-REAL-FZ-PEAK", None)["summary"]
     walking = next(item for item in activity_summary if item["activity"] == "Walking")
