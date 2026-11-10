@@ -31,6 +31,11 @@ _UNIT_SUFFIXES = (
 )
 
 
+# display decimals per unit (design E4: cm and kg to 0.1, seconds to 0.01); unknown units: 2
+UNIT_DECIMALS = {"cm": 1, "kg": 1, "years": 1, "g": 1, "N s": 1, "s": 2, "m": 2, "m/s": 2, "N/kg": 2,
+                 "kg/kg": 2, "N": 0, "Hz": 0}
+
+
 def is_missing(value: Any) -> bool:
     return value is None or (isinstance(value, float) and math.isnan(value))
 
@@ -270,6 +275,9 @@ class ByAthleteModel(QAbstractTableModel):
                 cells[(row.get(subject), row.get(occasion))] = None if is_missing(v) else v
             offset += len(page["rows"])
         self.truncated = total is not None and offset < total
+        self.unit = _unit_for(value)
+        floats = any(isinstance(v, float) for v in cells.values())
+        self.decimals = UNIT_DECIMALS.get(self.unit, 2) if floats else 0
         self._athletes = sorted({a for a, _ in cells}, key=str)
         self._occasions = sorted({o for _, o in cells}, key=lambda o: (str(type(o)), o))
         self._cells = cells
@@ -295,7 +303,13 @@ class ByAthleteModel(QAbstractTableModel):
         if role == SortRole:
             return v
         if role == Qt.ItemDataRole.DisplayRole:
-            return MISSING_TEXT if v is None else (f"{v:.6g}" if isinstance(v, float) else str(v))
+            return MISSING_TEXT if v is None else self.format(v)
         if role == Qt.ItemDataRole.TextAlignmentRole:
             return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         return None
+
+    def format(self, value: Any, signed: bool = False) -> str:
+        """``value`` at the variable's display precision (``signed``: always show + or -)."""
+        if not isinstance(value, (int, float)):
+            return str(value)
+        return f"{value:{'+' if signed else ''},.{self.decimals}f}"

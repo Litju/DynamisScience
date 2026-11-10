@@ -189,9 +189,11 @@ class PivotTrendModel(QAbstractTableModel):
             return section + 1
         if section == 0:
             return "Athlete"
+        unit = f"\n{self.source.unit}" if self.source.unit else ""
         if section <= self._n:  # the occasion value alone; the column set is the occasion variable
-            return str(self.source.headerData(section - 1, Qt.Orientation.Horizontal)).removeprefix(f"{self.source.occasion} ")
-        return "Δ" if section == self._n + 1 else "Trend"
+            return str(self.source.headerData(section - 1, Qt.Orientation.Horizontal)).removeprefix(
+                f"{self.source.occasion} ") + unit
+        return "Δ" + unit if section == self._n + 1 else "Trend"
 
     def _delta(self, row: int) -> float | None:
         values = self._values(row)
@@ -223,7 +225,7 @@ class PivotTrendModel(QAbstractTableModel):
             if role == SortRole:
                 return delta
             if role == Qt.ItemDataRole.DisplayRole:
-                return MISSING_TEXT if delta is None else f"{delta:+.3g}"
+                return MISSING_TEXT if delta is None else self.source.format(delta, signed=True)
             if role == Qt.ItemDataRole.TextAlignmentRole:
                 return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             return None
@@ -519,6 +521,12 @@ class DataPane(QWidget):
         pivot = self._pivot_columns()
         value = self.value_combo.currentText()
         if pivot is None or not value or not self.snapshot_id:
+            # never leave the previous table's pivot (or a blank grid) standing without a reason
+            self._by_athlete_key = None
+            self.athlete_view.setModel(None)
+            self.athlete_note.setText(
+                f"By athlete needs a subject and an occasion column; {self.table or 'this table'} has "
+                + ("no numeric variable." if pivot else "no occasion column.") + " Use Variables or Rows.")
             return
         key = (self.snapshot_id, self.table, value)
         if key == self._by_athlete_key:

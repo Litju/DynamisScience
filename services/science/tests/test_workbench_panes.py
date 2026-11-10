@@ -66,6 +66,20 @@ def test_views_models_and_missing_marks(wb):
     assert model.data(model.index(row, 5), dm.MissingRole) is False  # delta uses occasions 1 and 4, both present
     # trend carries None for the gap, never an imputed number
     assert model.data(model.index(row, model.trend_column), 0x100 + 10)[1] is None
+    # values and delta at the unit's precision (cm: 0.1), unit under the header
+    assert model.data(model.index(row, 1)) == "34.0" and model.data(model.index(row, 5)) == "+3.0"
+    assert model.headerData(5, Qt.Orientation.Horizontal) == "Δ\ncm"
+
+
+def test_by_athlete_without_occasion_explains_instead_of_blank(wb):
+    _, data, _, _ = wb
+    data.set_view("By athlete")
+    assert data.athlete_view.model() is not None
+    data.table = "signal_trials"
+    data._variables_model = dm.VariablesModel([dm.Variable("subject_id", "identifier", "", 1, 0, 0, "complete"),
+                                               dm.Variable("force_file_count", "numerical", "", 1, 0, 0, "complete")])
+    data.set_view("By athlete")
+    assert data.athlete_view.model() is None and "no occasion column" in data.athlete_note.text()
 
 
 def test_header_click_selects_variable(wb):
