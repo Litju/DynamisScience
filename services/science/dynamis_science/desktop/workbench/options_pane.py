@@ -62,7 +62,7 @@ class RoleBox(QListWidget):
     def __init__(self, placeholder: str, parent=None) -> None:
         super().__init__(parent)
         self.placeholder = placeholder
-        self._hover = False
+        self.setObjectName("RoleBox")
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -72,8 +72,7 @@ class RoleBox(QListWidget):
 
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasFormat(VARIABLE_MIME):
-            self._hover = True
-            self.viewport().update()
+            self._set_hover(True)
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -81,12 +80,10 @@ class RoleBox(QListWidget):
     dragMoveEvent = dragEnterEvent
 
     def dragLeaveEvent(self, event) -> None:
-        self._hover = False
-        self.viewport().update()
+        self._set_hover(False)
 
     def dropEvent(self, event) -> None:
-        self._hover = False
-        self.viewport().update()
+        self._set_hover(False)
         names = variables_from_mime(event.mimeData())
         if names:
             event.acceptProposedAction()
@@ -107,20 +104,18 @@ class RoleBox(QListWidget):
         super().focusInEvent(event)
         self.focused.emit()
 
+    def _set_hover(self, hover: bool) -> None:
+        self.setProperty("dropHover", hover)
+        theme.repolish(self)
+
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
-        painter = QPainter(self.viewport())
-        t = theme.tokens()
-        if self.count() == 0:
-            painter.setPen(QColor(t["dim_text"]))
+        if self.count() == 0:  # placeholder text has no stylesheet equivalent
+            painter = QPainter(self.viewport())
+            painter.setPen(QColor(theme.tokens()["dim_text"]))
             painter.drawText(self.viewport().rect().adjusted(10, 0, -10, 0),
                              int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), self.placeholder)
-        if self._hover or self.hasFocus():
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setPen(QPen(QColor(t["accent"]), 2 if self._hover else 1.4,
-                                Qt.PenStyle.DashLine if self._hover else Qt.PenStyle.SolidLine))
-            painter.drawRoundedRect(QRectF(self.viewport().rect()).adjusted(1, 1, -1, -1), 6, 6)
-        painter.end()
+            painter.end()
 
 
 class _RoleItemDelegate(QStyledItemDelegate):

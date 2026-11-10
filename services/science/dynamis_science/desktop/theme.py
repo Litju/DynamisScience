@@ -271,6 +271,27 @@ QFrame#Segmented { background: $alt; border: 1px solid $line2; border-radius: 7p
 QFrame#Segmented QPushButton { background: transparent; border: 1px solid transparent; border-radius: 5px;
     color: $dim_text; padding: 3px 10px; min-height: 16px; }
 QFrame#Segmented QPushButton:checked { background: $base; color: $text; border-color: $line; }
+QListWidget#RoleBox { background: $base; border: 1px solid $line2; border-radius: 6px; outline: 0; }
+QListWidget#RoleBox:focus { border: 1.5px solid $accent; }
+QListWidget#RoleBox[dropHover="true"] { border: 1.5px dashed $accent; background: $accent_tint; }
+QListWidget#RoleBox::item { min-height: 0; padding: 0; border-radius: 4px; }
+QListWidget#RoleBox::item:selected { background: $accent_tint; }
+
+/* ---- results document ---- */
+QWidget#ResultsCanvas { background: $window; }
+QFrame#ResultBlock { background: $base; border: 1px solid $line; border-radius: 10px; }
+QLabel#BlockTitle { color: $text; font-size: 16px; font-weight: 600; }
+QLabel#BlockSubtitle { color: $muted; font-family: "$mono"; font-size: 12px; }
+QLabel#BlockHeading { color: $text; font-size: 13px; font-weight: 600; padding-top: 4px; }
+QLabel#BlockText { color: $text; }
+QLabel#BlockNote { color: $dim_text; font-style: italic; font-size: 12px; }
+QFrame#BlockFooter { border: 0; border-top: 1px dashed $line2; }
+QLabel#FooterText { color: $dim_text; font-size: 11px; }
+QPushButton#PromoteButton { background: transparent; border: 0; color: $accent_text; padding: 2px 4px; }
+QPushButton#PromoteButton:hover { text-decoration: underline; }
+QPushButton#PromoteButton:disabled { color: $faint; }
+QFrame#SupersededBar { background: $bad_chip; border: 1px solid $bad_edge; border-radius: 8px; }
+QFrame#SupersededBar QLabel { color: $text; }
 QFrame#WorkbenchPane { background: $window; border: 1px solid $line; border-radius: 10px; }
 QFrame#WorkbenchPane[focused="true"] { border-color: $accent; }
 QFrame#PaneHeader { background: $base; border: 0; border-bottom: 1px solid $line;

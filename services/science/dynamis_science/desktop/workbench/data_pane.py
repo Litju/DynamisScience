@@ -126,7 +126,7 @@ class SparklineDelegate(MissingDelegate):
         opt = self._draw_background(painter, option, index)
         present = [v for v in values if v is not None]
         t = theme.tokens()
-        r = opt.rect.adjusted(8, 6, -8, -6)
+        r = opt.rect.adjusted(10, 7, -10, -7)  # room for the missing-value ring (radius 3.5)
         if not present or r.width() < 4 or r.height() < 4:
             return
         lo, hi = min(present), max(present)
@@ -534,7 +534,7 @@ class DataPane(QWidget):
         self.athlete_view.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self.athlete_view.setItemDelegateForColumn(model.trend_column, SparklineDelegate(self.athlete_view))
         for col in range(model.columnCount()):
-            self.athlete_view.setColumnWidth(col, 66 if col == 0 else 58 if col <= model.trend_column - 2 else 56)
+            self.athlete_view.setColumnWidth(col, 66 if col == 0 else 58 if col <= model.trend_column - 2 else 60 if col < model.trend_column else 96)
         total = int(next(t for t in self._detail["tables"] if t["name"] == self.table)["rows"])
         cells = source.rowCount() * source.columnCount()
         note = f"{source.rowCount()} subjects × {source.columnCount()} occasions"
