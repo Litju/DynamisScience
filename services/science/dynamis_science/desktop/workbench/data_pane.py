@@ -562,7 +562,7 @@ class DataPane(QWidget):
         proxy.setSourceModel(self._variables_model)
         self.variables_view.setModel(proxy)
         self.variables_view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)  # natural order
-        for col, width in enumerate((160, 70, 44, 34, 62, 78, 76, 120, 130)):
+        for col, width in enumerate((160, 70, 44, 34, 62, 78, 76, 160, 130)):
             self.variables_view.setColumnWidth(col, width)
         header = self.variables_view.horizontalHeader()
         for logical, visual in ((7, 2), (8, 3)):  # Role and Distribution follow Type; the model keeps them last

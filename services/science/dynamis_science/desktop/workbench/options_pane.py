@@ -68,6 +68,7 @@ FIXED_INFO = {
 class RoleBox(QListWidget):
     """Small list of assigned variables: accepts drops, Delete removes the selected one."""
 
+    PLACEHOLDER_FLAGS = int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter | Qt.TextFlag.TextWordWrap)
     dropped = Signal(list)
     remove_requested = Signal(str)
     focused = Signal()
@@ -126,8 +127,7 @@ class RoleBox(QListWidget):
         if self.count() == 0:  # placeholder text has no stylesheet equivalent
             painter = QPainter(self.viewport())
             painter.setPen(QColor(theme.tokens()["dim_text"]))
-            painter.drawText(self.viewport().rect().adjusted(10, 0, -10, 0),
-                             int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), self.placeholder)
+            painter.drawText(self.viewport().rect().adjusted(10, 0, -10, 0), self.PLACEHOLDER_FLAGS, self.placeholder)
             painter.end()
 
 
@@ -169,8 +169,9 @@ class RoleSlot(QFrame):
         self.caption.setWordWrap(True)
         self.box = RoleBox(placeholder)
         self.box.setAccessibleName(f"{rule.label} role")
-        self.box.setToolTip(f"{rule.label}: drop a variable or press Assign; Delete removes the selected one")
-        self.box.setFixedHeight(36 if rule.max in (0, 1) else 76)
+        self.box.setToolTip(f"{rule.label}: {placeholder}" if rule.max == 0
+                            else f"{rule.label}: drop a variable or press Assign; Delete removes the selected one")
+        self.box.setFixedHeight(36 if rule.max == 1 else 58 if rule.max == 0 else 76)  # unavailable roles wrap to three lines
         self._layout = QVBoxLayout(self)
         self._layout.setSpacing(3)
         self._layout.addWidget(self.caption)
@@ -416,6 +417,13 @@ class OptionsPane(QWidget):
             note.setObjectName("PaneContext")
             note.setWordWrap(True)
             self.options_layout.addWidget(note)
+        # focus model (03-layout): variables -> assign -> role boxes -> options; widgets built later than the
+        # Results pane would otherwise be visited after it
+        chain = [self.var_list, self.assign_button, *(s.box for s in self.slots.values())]
+        for section in self.form.findChildren(_Collapsible):
+            chain += [section.toggle, *(w for w in self._option_widgets.values() if section.body.isAncestorOf(w))]
+        for before, after in zip(chain, chain[1:]):
+            QWidget.setTabOrder(before, after)
 
     def _section(self, title: str, fields, info) -> QWidget:
         body = QWidget()

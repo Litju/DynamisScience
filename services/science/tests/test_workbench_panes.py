@@ -227,6 +227,39 @@ def test_descriptives_options_are_checkboxes_bound_to_the_spec(wb):
     assert "at least one statistic" in options.issues_text()
 
 
+def test_role_placeholders_wrap_instead_of_truncating(wb):
+    from PySide6.QtGui import QFontMetrics
+
+    shell, _, options, _ = wb
+    shell.select_analysis("mixed_models")
+    options.resize(320, 700)
+    options.show()
+    QApplication.processEvents()
+    for role, slot in options.slots.items():
+        view = slot.box.viewport()
+        need = QFontMetrics(slot.box.font()).boundingRect(
+            0, 0, view.width() - 20, 1000, slot.box.PLACEHOLDER_FLAGS, slot.box.placeholder)
+        assert need.height() <= view.height(), (role, need.height(), view.height())
+    assert "Not available in the qualified engine" in options.slots["covariates"].box.toolTip()
+
+
+def test_tab_order_follows_variables_assign_roles_options(wb):
+    from dynamis_science.desktop.workbench.data_pane import _Collapsible
+
+    shell, data, options, _ = wb
+    shell.select_analysis("descriptives")  # roles + checkbox options
+    chain, widget = [], options.assign_button.nextInFocusChain()
+    while widget is not options.var_list and len(chain) < 60:
+        if widget.focusPolicy() & Qt.FocusPolicy.TabFocus:
+            chain.append(widget)
+        widget = widget.nextInFocusChain()
+    inside = [w for w in chain if options.isAncestorOf(w)]
+    expected = [s.box for s in options.slots.values()]
+    for section in options.form.findChildren(_Collapsible):
+        expected += [section.toggle, *(w for w in options._option_widgets.values() if section.body.isAncestorOf(w))]
+    assert inside[: len(expected)] == expected  # nothing from the Results pane in between
+
+
 def test_variables_view_shows_role_and_distribution(wb):
     from dynamis_science.desktop.workbench.data_models import HistRole
 
