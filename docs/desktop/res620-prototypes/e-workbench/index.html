@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E · Analysis Workbench</title>
+<link rel="stylesheet" href="../common.css"><script src="../common.js"></script>
+<style>
+  /* Dark theme: warm graphite, desaturated accents. Light theme comes from common.css. */
+  [data-theme="dark"] {
+    --desk: #0B0C0E; --window: #15171A; --base: #1C1F23; --alt: #191B1F; --chrome: #121416; --dock: #17191C;
+    --line: #2A2E33; --line2: #383D44; --hover: #24282D;
+    --text: #E7E4DE; --muted: #C2BEB7; --dim: #96928B; --faint: #66635E;
+    --accent: #6DB39C; --accent-tint: #1F2E29; --hi: #1F2E29; --link: #6DB39C;
+    --obs: #D8D4CD; --mod: #8DA9EA; --hyp: #D9A55B; --real: #7FB3C0; --synth: #B79AD6; --ok: #79C29A; --warn: #D9A55B; --bad: #E5867A;
+    --shadow: 0 1px 0 #ffffff08 inset, 0 10px 30px #0008; --lift: 0 1px 0 #ffffff0a inset, 0 3px 10px #0007;
+  }
+  :root { --shadow: 0 1px 0 #ffffff inset, 0 1px 2px #3b30201a, 0 8px 24px #3b302014; --lift: 0 1px 0 #ffffff inset, 0 1px 1px #3b30201f, 0 3px 8px #3b302014; }
+  [data-theme="dark"] .k-obs { background: #2A2D31; } [data-theme="dark"] .k-mod { background: color-mix(in srgb, var(--mod) 16%, transparent); }
+  [data-theme="dark"] .s-qual { background: color-mix(in srgb, var(--ok) 15%, transparent); } [data-theme="dark"] .s-desc { background: #2A2D31; }
+  [data-theme="dark"] .s-expl { background: color-mix(in srgb, var(--warn) 12%, transparent); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+  [data-theme="dark"] .p-real, [data-theme="dark"] .p-synth, [data-theme="dark"] .s-frozen, [data-theme="dark"] .s-unav { background: transparent; }
+  [data-theme="dark"] .proto-banner { background: #221C12; color: #C9A86A; border-color: #3A2F1C; } [data-theme="dark"] .proto-banner b, [data-theme="dark"] .proto-banner a { color: #E2C389; }
+  [data-theme="dark"] .tb.primary { background: var(--accent); color: #0F1A16; }
+  [data-theme="dark"] .note { color: var(--text); background: color-mix(in srgb, var(--warn) 12%, transparent); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+  [data-theme="dark"] .note.info { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+  [data-theme="dark"] .plot svg [fill="#2B2E33"] { fill: var(--obs); } [data-theme="dark"] .plot svg [stroke="#2B2E3322"] { stroke: #D8D4CD26; }
+  [data-theme="dark"] .plot svg text { fill: var(--dim); } [data-theme="dark"] .plot svg [stroke="#EEEAE3"] { stroke: #24282D; } [data-theme="dark"] .plot svg [stroke="#D8D2C7"] { stroke: var(--line2); }
+  [data-theme="dark"] .plot svg [fill="#2F59B0"] { fill: var(--mod); } [data-theme="dark"] .plot svg [stroke="#2F59B0"] { stroke: var(--mod); } [data-theme="dark"] .plot svg [fill="#2F59B022"] { fill: #8DA9EA2a; }
+  [data-theme="dark"] .apa th, [data-theme="dark"] .apa tr:last-child td { border-color: var(--muted); }
+
+  body { font-size: 12.5px; }
+  .win { background: var(--desk); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+  /* ribbon */
+  .ribbon { display: flex; align-items: stretch; gap: 2px; padding: 5px 10px; background: var(--window); border-bottom: 1px solid var(--line); }
+  .rb { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 9px 4px; border-radius: 8px; color: var(--muted); cursor: pointer; min-width: 62px; font-size: 11.5px; border: 1px solid transparent; transition: transform .12s, box-shadow .12s, background .12s; background: none; font-family: inherit; }
+  .rb:hover { background: var(--base); color: var(--text); box-shadow: var(--lift); transform: translateY(-1px); }
+  .rb:active { transform: translateY(0); box-shadow: none; }
+  .rb.on { background: var(--base); color: var(--text); border-color: var(--line2); box-shadow: var(--lift); }
+  .rb.on svg { color: var(--accent); }
+  .rb svg { width: 22px; height: 22px; }
+  .rsep { width: 1px; background: var(--line); margin: 6px 6px; }
+  .rib-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .cmdk { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line2); background: var(--base); border-radius: 8px; padding: 5px 10px; color: var(--faint); min-width: 200px; cursor: pointer; box-shadow: var(--lift); white-space: nowrap; }
+  .cmdk .kbd { margin-left: auto; }
+  .runstate { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); font-size: 11.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--base); white-space: nowrap; }
+  .runstate i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent); }
+  .runstate.stale i { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); animation: pulse 1.4s infinite; }
+  .runstate.running i { background: var(--mod); animation: pulse .6s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  /* panes with depth */
+  .panes { flex: 1; display: grid; grid-template-columns: var(--c1, 1.12fr) 8px var(--c2, 320px) 8px var(--c3, 1.15fr); padding: 8px; min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--window); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
+  .split { cursor: col-resize; display: grid; place-items: center; }
+  .split::after { content: ""; width: 3px; height: 34px; border-radius: 2px; background: var(--line2); opacity: 0; transition: opacity .15s; }
+  .split:hover::after, .split.drag::after { opacity: 1; }
+  .phead { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); min-height: 42px; }
+  .phead b { font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+  .phead .r { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 7px; overflow: hidden; background: var(--alt); padding: 2px; gap: 2px; }
+  .seg span { padding: 2px 9px; color: var(--dim); cursor: pointer; font-size: 11.5px; border-radius: 5px; white-space: nowrap; }
+  .seg span.on { background: var(--base); color: var(--text); box-shadow: var(--lift); }
+  /* readable data views */
+  .grid { overflow: auto; flex: 1; background: var(--base); }
+  .grid table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; width: 100%; }
+  .grid th, .grid td { border-bottom: 1px solid var(--line); padding: 5px 7px; }
+  .grid table { font-size: 12px; } .grid td.num { font-size: 12px; }
+  #gmethod { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+  .rblock { overflow-x: auto; } .apa th, .apa td { padding-left: 9px !important; padding-right: 9px !important; }
+  #dsfoot { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+  .grid thead th { position: sticky; top: 0; background: var(--alt); z-index: 1; cursor: pointer; }
+  .grid thead th:hover { background: var(--hover); }
+  .grid th.lh { font: 600 12px var(--sans); color: var(--text); text-transform: none; letter-spacing: 0; padding: 9px 10px; white-space: nowrap; vertical-align: bottom; }
+  .grid th.lh .u { display: block; font: 400 10px var(--mono); color: var(--faint); margin-top: 1px; }
+  .grid td.rn, .grid th.rn { color: var(--faint); text-align: right; background: var(--alt); position: sticky; left: 0; width: 30px; font: 11px var(--mono); cursor: default; }
+  .grid td.num { font: 12.5px var(--mono); text-align: right; }
+  .grid th.num { text-align: right; }
+  .grid td.na { color: var(--bad); text-align: right; }
+  .grid td.pos { color: var(--ok); } .grid td.neg { color: var(--bad); }
+  .grid tbody tr:hover td { background: var(--hover); }
+  .grid .colsel { background: color-mix(in srgb, var(--accent) 9%, var(--base)) !important; }
+  .grid thead th.colsel { box-shadow: inset 0 -2px 0 var(--accent); }
+  .grid.vars td { padding: 8px 10px; vertical-align: middle; } .grid.vars tr:hover td { cursor: pointer; }
+  .mbar { display: inline-block; width: 46px; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; vertical-align: middle; } .mbar i { display: block; height: 100%; background: var(--bad); }
+  .ico { width: 14px; height: 14px; display: inline-grid; place-items: center; border-radius: 3px; font: 600 9px var(--sans); color: #fff; flex: none; }
+  .ico.c { background: #6D7178; } .ico.o { background: #8B6FB3; } .ico.n { background: #2F7DA0; } .ico.id { background: #9A8F80; }
+  /* options */
+  .opts { overflow: auto; flex: 1; }
+  .osec { border-bottom: 1px solid var(--line); }
+  .osec > .t { display: flex; align-items: center; gap: 6px; padding: 9px 14px; font-weight: 600; cursor: pointer; user-select: none; }
+  .osec > .t:hover { background: var(--hover); }
+  .osec > .t .chev { color: var(--faint); font-size: 9px; width: 10px; transition: transform .15s; }
+  .osec.closed > .t .chev { transform: rotate(-90deg); }
+  .osec.closed > .b { display: none; }
+  .osec > .b { padding: 2px 14px 12px; }
+  .assign { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  .vlist { border: 1px solid var(--line2); border-radius: 8px; background: var(--base); min-height: 170px; padding: 4px; }
+  .v { display: flex; gap: 6px; align-items: center; padding: 4px 7px; border-radius: 6px; cursor: grab; user-select: none; border: 1px solid transparent; }
+  .v:hover { background: var(--hover); }
+  .v.sel { background: var(--accent-tint); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+  .v.used { color: var(--faint); }
+  .v.used::after { content: "•"; margin-left: auto; color: var(--accent); }
+  .v.dragging { opacity: .4; }
+  .targets { display: flex; flex-direction: column; gap: 8px; }
+  .targets label { font-size: 11px; color: var(--dim); display: flex; margin-bottom: 3px; gap: 6px; }
+  .targets label .rule { margin-left: auto; color: var(--faint); white-space: nowrap; }
+  .tbox { border: 1px solid var(--line2); border-radius: 8px; background: var(--base); min-height: 32px; padding: 3px; display: flex; flex-direction: column; gap: 2px; transition: box-shadow .12s, border-color .12s, background .12s; }
+  .tbox:empty::before { content: "Drop a variable"; color: var(--faint); font-size: 11px; padding: 5px 8px; }
+  .tbox.over { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .tbox.reject { border-color: var(--bad); animation: shake .3s; }
+  @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  .tok { display: flex; gap: 6px; align-items: center; padding: 3px 7px; border-radius: 6px; background: var(--alt); box-shadow: var(--lift); }
+  .tok .x { margin-left: auto; color: var(--faint); cursor: pointer; padding: 0 3px; border-radius: 3px; }
+  .tok .x:hover { color: var(--bad); background: var(--hover); }
+  .toast { position: fixed; left: 50%; bottom: 48px; transform: translate(-50%, 20px); opacity: 0; background: var(--text); color: var(--window); padding: 8px 14px; border-radius: 8px; font-size: 12px; transition: all .2s; pointer-events: none; z-index: 50; box-shadow: 0 10px 30px #0004; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .cb { display: flex; gap: 8px; align-items: center; padding: 4px 4px; cursor: pointer; border-radius: 5px; user-select: none; }
+  .cb:hover { background: var(--hover); }
+  .cb i { width: 15px; height: 15px; border: 1px solid var(--line2); border-radius: 4px; display: inline-grid; place-items: center; background: var(--base); font-style: normal; font-size: 10px; flex: none; color: transparent; transition: all .12s; }
+  .cb.on i { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .cb .hint { margin-left: auto; }
+  .cb.dis { cursor: not-allowed; opacity: .55; }
+  .sel-row { display: grid; grid-template-columns: 100px 1fr; gap: 6px 10px; align-items: center; }
+  .dd { border: 1px solid var(--line2); border-radius: 6px; padding: 3px 8px; background: var(--base); display: flex; cursor: pointer; white-space: nowrap; } .dd::after { content: "▾"; margin-left: auto; padding-left: 8px; color: var(--faint); }
+  .fsel { border: 1px solid var(--line2); border-radius: 6px; padding: 4px 8px; background: var(--base); color: var(--text); font: inherit; }
+  /* results document */
+  .results { overflow: auto; flex: 1; background: var(--alt); padding: 14px 16px 30px; position: relative; }
+  .rblock { background: var(--base); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px 14px; margin-bottom: 14px; box-shadow: var(--lift); transition: opacity .2s, filter .2s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .rblock.hide { display: none; }
+  .stale-on .rblock.dep-spec { opacity: .45; filter: grayscale(.6); }
+  .rtitle { font-size: 15.5px; font-weight: 600; letter-spacing: -.2px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .rtitle .tools { margin-left: auto; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+  .rblock:hover .rtitle .tools { opacity: 1; }
+  .rsub { color: var(--dim); margin: 2px 0 10px; }
+  .apa { border-collapse: collapse; width: auto; min-width: 70%; font-size: 12.5px; margin: 8px 0 4px; }
+  .apa caption { text-align: left; font-weight: 600; padding-bottom: 6px; font-size: 12.5px; }
+  .apa th { font: 600 11.5px var(--sans); color: var(--text); text-transform: none; letter-spacing: 0; background: transparent; border-top: 1.5px solid var(--text); border-bottom: 1px solid var(--text); padding: 5px 12px; white-space: nowrap; }
+  .apa td { border: 0; padding: 4px 12px; background: transparent !important; }
+  .apa tbody tr:hover td { background: var(--hover) !important; }
+  .apa tr:last-child td { border-bottom: 1.5px solid var(--text); }
+  .apa td.num { font-family: var(--sans); font-variant-numeric: tabular-nums; text-align: right; }
+  .apa th.num { text-align: right; }
+  .apa .mod { color: var(--mod); font-weight: 600; }
+  .tnote { color: var(--dim); font-size: 11.5px; font-style: italic; max-width: 680px; }
+  .rfoot { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); color: var(--faint); font-size: 11px; flex-wrap: wrap; }
+  .rfoot .act { margin-left: auto; color: var(--accent); cursor: pointer; font-weight: 600; }
+  .rfoot .act.done { color: var(--ok); }
+  .figs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .figs .plot.hide { display: none; }
+  .stalebar { display: none; position: sticky; top: -14px; z-index: 3; margin: -14px -16px 12px; padding: 9px 16px; background: color-mix(in srgb, var(--warn) 14%, var(--base)); border-bottom: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); color: var(--text); align-items: center; gap: 10px; }
+  .stale-on .stalebar { display: flex; }
+  .stalebar .tb { margin-left: auto; }
+  .noresult { display: none; } .noresult.on { display: block; }
+  /* 3D */
+  .stage3d { position: relative; border-radius: 8px; overflow: hidden; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--mod) 7%, var(--base)), var(--base)); border: 1px solid var(--line); cursor: grab; }
+  .stage3d:active { cursor: grabbing; }
+  .stage3d canvas { display: block; width: 100%; height: 400px; }
+  .stage3d .hud { position: absolute; left: 10px; top: 8px; display: flex; gap: 6px; }
+  .stage3d .hud2 { position: absolute; right: 10px; top: 8px; display: flex; gap: 4px; }
+  .stage3d .help { position: absolute; left: 10px; bottom: 8px; color: var(--faint); font-size: 11px; }
+  .tip3d { position: absolute; pointer-events: none; background: var(--text); color: var(--window); font-size: 11.5px; padding: 5px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -130%); display: none; box-shadow: 0 6px 18px #0004; }
+  .mini { border: 1px solid var(--line2); background: var(--base); color: var(--muted); border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 11px; cursor: pointer; box-shadow: var(--lift); }
+  .mini.on { color: var(--text); border-color: var(--accent); }
+  /* syntax */
+  .syntax { border-top: 1px solid var(--line); background: var(--chrome); font: 12px var(--mono); padding: 8px 14px; color: var(--muted); display: flex; gap: 10px; align-items: flex-start; }
+  .syntax .k { color: var(--accent); } .syntax .s { color: var(--mod); } .syntax .c { color: var(--faint); }
+  .syntax .lbl { font: 600 10.5px var(--sans); color: var(--faint); text-transform: uppercase; letter-spacing: .5px; padding-top: 2px; min-width: 56px; }
+  .syntax .copy { margin-left: auto; font-family: var(--sans); }
+  .an { flex-direction: column; flex: 1; min-height: 0; }
+  /* outline + palette overlays */
+  .pop { position: absolute; z-index: 20; background: var(--base); border: 1px solid var(--line2); border-radius: 10px; box-shadow: 0 16px 40px #0003; padding: 6px; display: none; min-width: 220px; }
+  .pop.on { display: block; }
+  .pop div { padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; gap: 8px; }
+  .pop div:hover { background: var(--hover); }
+  .palette-bg { position: fixed; inset: 0; background: #0005; backdrop-filter: blur(2px); display: none; z-index: 40; }
+  .palette-bg.on { display: block; }
+  .palette { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); width: 560px; background: var(--base); border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 30px 80px #0006; overflow: hidden; }
+  .palette input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 14px 16px; font: 15px var(--sans); color: var(--text); outline: none; }
+  .palette .items { max-height: 340px; overflow: auto; padding: 6px; }
+  .palette .it { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+  .palette .it.on { background: var(--accent-tint); }
+  .palette .it .g { margin-left: auto; color: var(--faint); font-size: 11px; }
+  .palette .foot { border-top: 1px solid var(--line); padding: 6px 12px; color: var(--faint); font-size: 11px; display: flex; gap: 14px; }
+</style></head>
+<body data-theme="light">
+<div class="proto-banner"><b>Design prototype E: Analysis Workbench (interactive).</b> This is a picture of a native Qt window, not implemented. Recorded estimates come from RES-619 receipts; anything marked ILLUSTRATIVE DATA is computed live on prototype values. <a href="../index.html">All directions</a></div>
+<div class="win" id="win">
+  <div class="titlebar"><span class="mark">D</span>DynamisScience: Sprint priming &amp; CMJ.dsproj<span class="caps"><span>–</span><span>□</span><span>✕</span></span></div>
+  <div class="menubar"><span>File</span><span>Edit</span><span>Data</span><span>Analyses</span><span>Results</span><span>Evidence</span><span>View</span><span>Help</span></div>
+  <div class="ribbon">
+    <button class="rb" data-an="desc" title="Descriptives"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Descriptives</button>
+    <button class="rb" data-an="ttest" title="T-Tests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 18c3 0 4-10 6-10s3 10 6 10M13 18c2 0 3-6 4-6s2 6 4 6"/></svg>T-Tests</button>
+    <button class="rb" data-an="anova" title="ANOVA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="8" width="4" height="10"/><rect x="10" y="5" width="4" height="13"/><rect x="17" y="10" width="4" height="8"/></svg>ANOVA</button>
+    <button class="rb" data-an="reg" title="Regression"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 20 21 5"/><circle cx="6" cy="16" r="1"/><circle cx="10" cy="14" r="1"/><circle cx="13" cy="10" r="1"/><circle cx="18" cy="8" r="1"/></svg>Regression</button>
+    <button class="rb on" data-an="lmm" title="Mixed Models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 18 21 9M3 14 21 6M3 21 21 13"/></svg>Mixed Models</button>
+    <button class="rb" data-an="icc" title="Reliability"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg>Reliability</button>
+    <button class="rb" data-an="freq" title="Frequencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4zM4 10h16M10 4v16"/></svg>Frequencies</button>
+    <div class="rsep"></div>
+    <button class="rb" data-an="signals" title="Signals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Signals</button>
+    <button class="rb" data-an="change" title="Athlete change"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="7" r="3"/><path d="M5 21c1-4 4-6 7-6s6 2 7 6"/></svg>Athlete change</button>
+    <div class="rib-right">
+      <div class="cmdk" id="openPalette">Search commands…<span class="kbd">Ctrl K</span></div>
+      <span class="runstate" id="runstate"><i></i><span>Results up to date</span></span>
+      <div class="seg" id="theme"><span class="on" data-t="light">Light</span><span data-t="dark">Dark</span></div>
+    </div>
+  </div>
+
+  <div class="panes" id="panes">
+    <!-- DATA -->
+    <section class="pane">
+      <div class="phead"><b>Data</b><span class="dd" style="min-width:120px" id="dsname">mendeley_cmj</span><span class="chip p-real">REAL</span>
+        <div class="r"><div class="seg" id="dview"><span class="on" data-v="wide">By athlete</span><span data-v="vars">Variables</span><span data-v="long">Rows</span></div></div></div>
+      <div class="grid"><table id="grid"></table></div>
+      <div class="statusbar" style="border-top:1px solid var(--line)" id="dsfoot"></div>
+    </section>
+    <div class="split" data-split="1"></div>
+
+    <!-- OPTIONS -->
+    <section class="pane">
+      <div class="screen an on" id="an-lmm" data-screen-group="opt">
+        <div class="phead"><b>Linear Mixed Model</b><span class="chip s-qual">QUALIFIED</span><div class="r faint">TREND 1.1.0</div></div>
+        <div class="opts">
+          <div class="osec"><div class="b" style="padding-top:12px">
+            <div class="assign">
+              <div><div class="targets"><label>Variables <span class="rule">drag →</span></label></div><div class="vlist" id="vlist"></div></div>
+              <div class="targets">
+                <div><label>Dependent variable <span class="rule">1 numeric</span></label><div class="tbox" data-slot="dep"></div></div>
+                <div><label>Covariates <span class="rule">numeric</span></label><div class="tbox" data-slot="cov"></div></div>
+                <div><label>Factors <span class="rule">categorical</span></label><div class="tbox" data-slot="fac"></div></div>
+                <div><label>Cluster variable <span class="rule">1 id</span></label><div class="tbox" data-slot="clu"></div></div>
+              </div>
+            </div>
+          </div></div>
+          <div class="osec"><div class="t"><span class="chev">▾</span>Model</div><div class="b">
+            <div class="sel-row"><span class="muted">Random effects</span><span class="dd">Intercept | cluster</span><span class="muted">Estimation</span><span class="dd">REML</span><span class="muted">Intervals</span><span class="dd" title="Profile-likelihood intervals are not implemented in the qualified method">Wald 95% (profile n/a)</span></div></div></div>
+          <div class="osec"><div class="t"><span class="chev">▾</span>Assumption checks</div><div class="b">
+            <div class="cb on" data-show="fig-resid"><i>✓</i>Residuals vs fitted<span class="hint chip s-qual">CONDITIONAL</span></div>
+            <div class="cb on" data-show="fig-qq"><i>✓</i>Q–Q plot of residuals<span class="hint chip s-expl">EXPLORATORY</span></div>
+            <div class="cb" data-show="fig-re"><i>✓</i>Random-effect distribution<span class="hint chip s-expl">REVIEW</span></div>
+            <div class="cb dis" title="Not available for this method"><i>✓</i>Influence (Cook's distance)<span class="hint chip s-unav">N/A</span></div></div></div>
+          <div class="osec"><div class="t"><span class="chev">▾</span>Plots</div><div class="b">
+            <div class="cb on" data-show="blk-means"><i>✓</i>Estimated means by occasion</div>
+            <div class="cb on" data-show="blk-3d"><i>✓</i>3D trajectories (athlete × occasion)</div></div></div>
+          <div class="osec closed"><div class="t"><span class="chev">▾</span>Estimated marginal means</div><div class="b muted">Contrast Pre → Post 24h · α 0.05</div></div>
+          <div class="osec closed"><div class="t"><span class="chev">▾</span>Save</div><div class="b"><div class="cb"><i>✓</i>Residuals to new column</div><div class="cb"><i>✓</i>Predictions to new column</div></div></div>
+        </div>
+      </div>
+      <div class="screen an" id="an-gen" data-screen-group="opt">
+        <div class="phead"><b id="gtitle"></b><span id="gstatus"></span><div class="r faint" id="gmethod"></div></div>
+        <div class="opts" id="gopts"></div>
+      </div>
+      <div class="screen an" id="an-icc" data-screen-group="opt">
+        <div class="phead"><b>Reliability · ICC</b><span class="chip s-qual">QUALIFIED</span><div class="r faint">RELIABILITY 1.1.0</div></div>
+        <div class="opts"><div class="osec"><div class="b" style="padding-top:12px">
+          <div class="targets"><div><label>Measure</label><div class="tbox"><div class="tok"><span class="ico n">N</span>peak_fz <span class="faint">N</span></div></div></div>
+          <div><label>Subject</label><div class="tbox"><div class="tok"><span class="ico id">ID</span>participant</div></div></div>
+          <div><label>Trial</label><div class="tbox"><div class="tok"><span class="ico o">O</span>trial (≤ 8)</div></div></div>
+          <div><label>Filter</label><div class="tbox"><div class="tok">activity = Walking</div></div></div></div></div></div>
+          <div class="osec"><div class="t"><span class="chev">▾</span>Model</div><div class="b"><div class="sel-row"><span class="muted">ICC form</span><span class="dd">ICC(3,1) consistency</span><span class="muted">Typical error</span><span class="dd">two-way √MSE</span><span class="muted">MDC</span><span class="dd">95%</span></div></div></div>
+        </div>
+      </div>
+    </section>
+    <div class="split" data-split="2"></div>
+
+    <!-- RESULTS -->
+    <section class="pane" style="position:relative">
+      <div class="phead"><b>Results</b><div class="r"><button class="tb" id="outlineBtn">Outline ▾</button><button class="tb">Export…</button><button class="tb primary">Add to report</button></div></div>
+      <div class="pop" id="outline" style="right:180px;top:40px"></div>
+      <div class="screen an on" id="res-lmm" data-screen-group="res">
+        <div class="results" id="results">
+          <div class="stalebar"><span>⚠</span><span><b>Specification changed.</b> <span class="muted">These results are for the previous specification.</span></span><button class="tb primary" id="runBtn" style="white-space:nowrap" title="Ctrl+Enter">▶ Run · Ctrl ↵</button></div>
+          <div class="rblock noresult" id="blk-norun"><div class="rtitle">No recorded run for this specification</div><p class="muted" style="margin:8px 0 0">In the app, Run sends this specification to the qualified worker and the result appears here. This prototype only holds the recorded run RUN-REAL-0005. Restore its specification to see it again.</p><div style="margin-top:10px"><button class="tb" id="restoreBtn">Restore recorded specification</button></div></div>
+          <div class="rblock dep-spec" id="blk-model">
+            <div class="rtitle">Linear Mixed Model <span class="chip k-mod">MOD</span><span class="chip p-real">REAL</span><span class="tools"><button class="mini">Copy table</button><button class="mini">Duplicate</button></span></div>
+            <div class="rsub mono" style="font-size:12px" id="formula">cmj_height ~ occasion_index + (1 | athlete_id)</div>
+            <table class="apa"><caption>Model information</caption><thead><tr><th>Estimation</th><th class="num">Observations</th><th class="num">Clusters</th><th class="num">Log-likelihood</th></tr></thead>
+              <tbody><tr><td>REML</td><td class="num">80</td><td class="num">21</td><td class="num">−208.31</td></tr></tbody></table>
+            <table class="apa" style="margin-top:14px"><caption>Fixed effects</caption><thead><tr><th>Term</th><th class="num">Estimate</th><th class="num">SE</th><th class="num">95% CI</th><th class="num">z</th><th class="num">p</th></tr></thead>
+              <tbody><tr title="SE and z derived from the reported Wald interval"><td>occasion_index</td><td class="num mod">0.998</td><td class="num">0.192</td><td class="num">0.622 – 1.375</td><td class="num">5.20</td><td class="num">&lt; .001</td></tr></tbody></table>
+            <div class="tnote">Note. Wald intervals. SE and z are derived from the reported Wald interval. With 21 clusters the interval may be too narrow. Estimand under independent review (RES-619).</div>
+            <div class="rfoot"><span class="chip s-qual">QUALIFIED</span><span>RUN-REAL-0005 · digest 519fe130 · reproduced</span><span class="act" id="promote">Promote to evidence</span></div>
+          </div>
+          <div class="rblock dep-spec" id="blk-checks">
+            <div class="rtitle">Assumption checks</div>
+            <div class="figs">
+              <div class="plot" id="fig-resid"><div data-plot="residFitted"></div><div class="cap">Conditional Pearson residuals vs fitted</div></div>
+              <div class="plot" id="fig-qq"><div data-plot="qq"></div><div class="cap"><span class="chip s-expl">EXPLORATORY</span> Marginal residual / conditional SD</div></div>
+              <div class="plot hide" id="fig-re"><div data-plot="ranef"></div><div class="cap"><span class="chip s-expl">REVIEW</span> Predicted athlete intercepts. Normality not formally assessed.</div></div>
+            </div>
+          </div>
+          <div class="rblock dep-spec" id="blk-means">
+            <div class="rtitle">Estimated means by occasion</div>
+            <div class="plot" style="max-width:620px;margin-top:8px"><div data-plot="trend spaghetti"></div><div class="cap legend"><span><span class="chip k-obs">OBS</span> individual athletes</span><span><span class="chip k-mod">MOD</span> fixed-effect mean ± 95% CI</span></div></div>
+          </div>
+          <div class="rblock dep-spec" id="blk-3d">
+            <div class="rtitle">3D trajectories <span class="chip k-obs">OBS</span><span class="chip k-mod">MOD</span></div>
+            <div class="rsub">Athlete × occasion × CMJ height. Points are observed jumps; the surface is the fixed-effect mean plus each athlete's predicted intercept.</div>
+            <div class="stage3d" id="stage3d"><canvas id="c3d"></canvas>
+              <div class="hud"><button class="mini on" data-l="pts">Observed</button><button class="mini on" data-l="surf">Model surface</button><button class="mini" data-l="lines">Athlete lines</button></div>
+              <div class="hud2"><button class="mini" data-view="front">Front</button><button class="mini" data-view="side">Side</button><button class="mini on" data-view="iso">3D</button></div>
+              <div class="help">Drag to rotate · scroll to zoom · hover a point</div>
+              <div class="tip3d" id="tip3d"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="screen an" id="res-gen" data-screen-group="res"><div class="results" id="gresults"></div></div>
+      <div class="screen an" id="res-icc" data-screen-group="res">
+        <div class="results">
+          <div class="rblock">
+            <div class="rtitle">Reliability <span class="chip k-mod">MOD</span><span class="chip p-real">REAL</span></div>
+            <div class="rsub">peak_fz · MoveSmart · Walking · 10 participants · ≤ 8 trials</div>
+            <table class="apa"><caption>Intraclass correlation</caption><thead><tr><th>Form</th><th class="num">ICC</th><th class="num">95% CI</th><th class="num">Typical error</th><th class="num">MDC95</th></tr></thead>
+              <tbody><tr><td>ICC(3,1) consistency</td><td class="num mod">0.889</td><td class="num">0.745 – 0.969</td><td class="num">75.78 N</td><td class="num">210.05 N</td></tr></tbody></table>
+            <div class="tnote">Note. Typical error from same-session trials only. Across-occasion error is not estimable with these data.</div>
+            <div class="rfoot"><span class="chip s-qual">QUALIFIED</span><span>RUN-REAL-0004 · digest e0eedb0e · reproduced</span><span class="act">Promote to evidence</span></div>
+          </div>
+          <div class="rblock"><div class="rtitle">Trials by participant</div><div class="plot" style="max-width:420px;margin-top:8px"><div data-plot="icc"></div><div class="cap legend"><span><span class="chip k-obs">OBS</span> trial values</span></div></div></div>
+        </div>
+      </div>
+      <div class="syntax"><span class="lbl">Syntax</span><span id="syn"></span><button class="mini copy" id="copySyn">Copy</button></div>
+    </section>
+  </div>
+  <div class="statusbar"><span>Data root D:\datasets\DynamisScience</span><span><span class="chip p-real">REAL</span> STD-REAL-101</span><span>9 analyses · 1 evidence item · report v4 frozen</span><span class="r">SQLite ok</span></div>
+</div>
+<div class="palette-bg" id="palbg"><div class="palette"><input id="palin" placeholder="Type a command, analysis or variable…" autocomplete="off"><div class="items" id="palitems"></div><div class="foot"><span>↑↓ move</span><span>↵ run</span><span>Esc close</span></div></div></div>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+<script src="analyses.js"></script>
+<script src="export-svg.js"></script>
+</body></html>

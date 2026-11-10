@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · Performance Laboratory</title>
+<link rel="stylesheet" href="../common.css"><script src="../common.js"></script>
+<style>
+  .rooms { display: flex; gap: 0; background: var(--chrome); border-bottom: 1px solid var(--line); padding: 8px 12px; align-items: center; }
+  .room { padding: 8px 18px; border: 1px solid var(--line2); color: var(--muted); cursor: pointer; display: flex; flex-direction: column; min-width: 190px; }
+  .room + .room { border-left: 0; }
+  .room small { color: var(--faint); font-size: 10px; }
+  .room.on[data-go="r-lab"] { background: #2F59B01c; border-color: #2F59B099; color: var(--text); box-shadow: inset 0 -3px 0 var(--mod); }
+  .room.on[data-go="r-floor"] { background: #1F6B5A14; border-color: #1F6B5A88; color: var(--text); box-shadow: inset 0 -3px 0 var(--lime); }
+  .room.on[data-go="r-scen"] { background: repeating-linear-gradient(135deg, #B7791F22 0 4px, transparent 4px 8px); border-color: #B7791F99; color: var(--text); box-shadow: inset 0 -3px 0 var(--hyp); }
+  .ctx { display: flex; gap: 18px; align-items: center; padding: 6px 14px; background: var(--alt); border-bottom: 1px solid var(--line); font-size: 12px; }
+  .ctx b { color: var(--text); font-weight: 600; } .ctx span { color: var(--dim); }
+  .room-body { flex: 1; flex-direction: column; min-height: 0; }
+  .lab-frame { border-top: 3px solid var(--mod); }
+  .floor-frame { border-top: 3px solid var(--lime); }
+  .scen-frame { border-top: 3px solid var(--hyp); background: repeating-linear-gradient(135deg, #B7791F07 0 10px, transparent 10px 20px); position: relative; }
+  .scen-frame::after { content: "HYPOTHETICAL · NOT EVIDENCE"; position: absolute; right: 24px; bottom: 18px; font: 28px var(--mono); color: #B7791F1f; letter-spacing: 4px; pointer-events: none; }
+  .instruments { display: grid; grid-template-columns: 300px 1fr 360px; gap: 10px; padding: 12px; flex: 1; min-height: 0; overflow: auto; }
+  .inst { background: var(--base); border: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  .inst > .hd { padding: 6px 10px; border-bottom: 1px solid var(--line); font: 10px var(--mono); letter-spacing: 1px; color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  .inst > .bd { padding: 10px; overflow: auto; }
+  .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .readout div { background: var(--alt); border: 1px solid var(--line); padding: 8px; }
+  .readout b { display: block; font: 18px var(--mono); color: var(--mod); }
+  .readout small { color: var(--dim); }
+  .floor { display: grid; grid-template-columns: 1.1fr 1fr; gap: 10px; padding: 12px; overflow: auto; flex: 1; }
+  .shelf { border-top: 1px solid var(--line); background: var(--dock); }
+  .shelf .items { display: flex; gap: 8px; padding: 8px 12px; overflow-x: auto; }
+  .ev { background: var(--base); border: 1px solid var(--line2); padding: 6px 10px; min-width: 240px; font-size: 11px; }
+  .ev b { font-family: var(--mono); }
+  .slider { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .slider .track { flex: 1; height: 4px; background: var(--line2); position: relative; }
+  .slider .track i { position: absolute; top: -5px; width: 12px; height: 14px; background: var(--hyp); border-radius: 2px; }
+</style></head>
+<body>
+<div class="proto-banner"><b>Design prototype C: Dual-Mode Performance Laboratory.</b> This is a picture of a native Qt window, not implemented. The estimates come from RES-619 receipts; the plotted points are illustrative. <a href="../index.html">All directions</a></div>
+<div class="win">
+  <div class="titlebar"><span class="mark">D</span>DynamisScience Performance Laboratory<span class="caps"><span>–</span><span>□</span><span>✕</span></span></div>
+  <div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Lab</span><span>Floor</span><span>Bench</span><span>Evidence</span><span>Window</span><span>Help</span></div>
+  <div class="rooms">
+    <div class="room on" data-go="r-lab" data-group="room"><span>◧ Research Lab</span><small>modeling · diagnostics · evidence</small></div>
+    <div class="room" data-go="r-floor" data-group="room"><span>◨ Performance Floor</span><small>today · athletes · tests</small></div>
+    <div class="room" data-go="r-scen" data-group="room"><span>◩ Scenario Bench</span><small>what-if · hypothetical only</small></div>
+    <span style="margin-left:auto" class="muted">Evidence shelf <span class="kbd">F9</span></span>
+  </div>
+
+  <!-- LAB -->
+  <div class="room-body screen on lab-frame" id="r-lab" data-screen-group="room">
+    <div class="ctx"><span>Study</span><b>STD-REAL-101 Sprint priming &amp; CMJ</b><span>Data</span><b>DS-REAL-MENDELEY</b> <span class="chip p-real">REAL</span><span>Cohort</span><b>v2 · N=21</b><span>Plan</span><b>v2</b> <span class="chip s-frozen">FROZEN</span><span style="margin-left:auto">Run</span><b class="mono">RUN-REAL-0005</b> <span class="chip s-qual">QUALIFIED</span></div>
+    <div class="instruments">
+      <div class="inst"><div class="hd">SETUP</div><div class="bd">
+        <h3 style="margin-top:0">Outcome</h3><div class="slot"><span class="var">cmj_height<span class="t">cm</span></span></div>
+        <h3>Change over</h3><div class="slot"><span class="var">occasion</span></div>
+        <h3>Repeated within</h3><div class="slot"><span class="var">athlete_id</span></div>
+        <h3>Contrast</h3><span class="input" style="display:block">Pre → Post 24h · α 0.05</span>
+        <div class="formula" style="margin-top:10px;font-size:11px">cmj_height ~ occasion + (1 | athlete_id)</div>
+        <div style="margin-top:10px;display:flex;gap:6px"><button class="tb primary">▶ Run</button><button class="tb">Fork</button></div></div></div>
+      <div class="inst"><div class="hd">RESULT <span class="chip k-mod">MOD</span></div><div class="bd">
+        <div class="readout"><div><small>Slope / occasion</small><b>0.998 cm</b><small class="mono">Wald 0.622–1.375</small></div><div><small>Log-likelihood</small><b>−208.31</b><small>REML</small></div></div>
+        <div class="plot" style="margin-top:10px"><div data-plot="trend spaghetti"></div><div class="cap legend"><span><span class="chip k-obs">OBS</span> athletes</span><span><span class="chip k-mod">MOD</span> mean ± 95% CI</span></div></div></div></div>
+      <div class="inst"><div class="hd">DIAGNOSTICS</div><div class="bd">
+        <div class="plot"><div data-plot="qq"></div><div class="cap"><span class="chip s-expl">EXPLORATORY</span> marginal residual / conditional SD</div></div>
+        <table style="margin-top:8px"><tr><td>Resid spread</td><td><span class="chip s-qual">CHECKED</span></td></tr><tr><td>Intercept normality</td><td><span class="chip s-expl">REVIEW</span></td></tr><tr><td>Profile CI</td><td><span class="chip s-unav">UNAVAILABLE</span></td></tr></table>
+        <button class="tb" style="margin-top:8px">Promote to shelf ▸</button></div></div>
+    </div>
+  </div>
+
+  <!-- FLOOR -->
+  <div class="room-body screen floor-frame" id="r-floor" data-screen-group="room">
+    <div class="ctx"><span>Squad</span><b>DS-SYNTH-001 football</b> <span class="chip p-synth">SYNTHETIC</span><span>Session</span><b>Tue 2026-11-10 · MD-4</b><span>Test</span><b>Walking peak Fz</b><span style="margin-left:auto">Noise threshold from</span><b class="mono">RUN-REAL-0004</b> <span class="chip s-qual">QUALIFIED</span></div>
+    <div class="floor">
+      <div class="inst"><div class="hd">TODAY · ROSTER</div><div class="bd"><table>
+        <tr><th>Athlete</th><th>Last test</th><th class="num">Δ Fz (N)</th><th>vs MDC95</th><th>Note</th></tr>
+        <tr><td>A01</td><td>today</td><td class="num">+242</td><td><span class="chip k-obs">BEYOND</span></td><td class="muted">check footwear</td></tr>
+        <tr><td>A02</td><td>today</td><td class="num">−58</td><td><span class="chip s-desc">WITHIN</span></td><td></td></tr>
+        <tr><td>A03</td><td>yesterday</td><td class="num">+91</td><td><span class="chip s-desc">WITHIN</span></td><td></td></tr>
+        <tr><td>A04</td><td>today</td><td class="num">−231</td><td><span class="chip k-obs">BEYOND</span></td><td class="muted">return-to-play</td></tr>
+        <tr><td>A05</td><td>n/a</td><td class="num">n/a</td><td><span class="chip s-unav">NO TEST</span></td><td></td></tr></table>
+        <div class="note" style="margin-top:10px">Synthetic squad: demonstration only. "Beyond" means the change exceeds ±210 N (MDC95). It is not a readiness or injury judgment.</div></div></div>
+      <div class="inst"><div class="hd">CHANGE VS NOISE</div><div class="bd"><div class="plot"><div data-plot="changeVsMdc"></div></div>
+        <h3>Athlete 360 · A01</h3><div class="readout"><div><small>Load 7d</small><b style="color:var(--obs)">2 940 AU</b><small>observed</small></div><div><small>Wellness</small><b style="color:var(--obs)">3.6 / 5</b><small>observed</small></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- SCENARIO -->
+  <div class="room-body screen scen-frame" id="r-scen" data-screen-group="room">
+    <div class="ctx"><span>Forked from</span><b>RUN-REAL-0005</b> <span class="chip s-qual">QUALIFIED</span><span>Scenario</span><b>SCN-draft-01</b> <span class="chip k-hyp">HYP</span><span style="margin-left:auto;color:var(--hyp)">Locked until RES-590 delivers a qualified model. Shown for layout only.</span></div>
+    <div class="instruments" style="grid-template-columns:300px minmax(0, 860px)">
+      <div class="inst"><div class="hd">ASSUMPTIONS <span class="chip k-hyp">HYP</span></div><div class="bd">
+        <div class="muted">Every value here is an assumption, not data.</div>
+        <h3>Extra priming sessions / wk</h3><div class="slider"><span class="mono">0</span><div class="track"><i style="left:40%"></i></div><span class="mono">3</span></div>
+        <h3>Assumed effect carry-over</h3><div class="slider"><span class="mono">0%</span><div class="track"><i style="left:60%"></i></div><span class="mono">100%</span></div>
+        <div class="note" style="margin-top:12px">Scenario outputs cannot be promoted to evidence or cited in a research report.</div></div></div>
+      <div class="inst"><div class="hd">BASELINE VS SCENARIO</div><div class="bd"><div class="plot"><div data-plot="trend scenario"></div><div class="cap legend"><span><span class="chip k-obs">OBS</span> observed</span><span><span class="chip k-mod">MOD</span> fitted baseline</span><span><span class="chip k-hyp">HYP</span> scenario projection</span></div></div></div></div>
+    </div>
+  </div>
+
+  <div class="shelf"><div class="dock-title">Evidence shelf · shared by all rooms</div><div class="items">
+    <div class="ev"><b>EVID-U-0002</b> <span class="chip s-qual">CURRENT</span> <span class="chip k-mod">MOD</span><br>CMJ +0.998 cm/occasion (0.622–1.375)</div>
+    <div class="ev"><b>RUN-REAL-0004</b> <span class="chip s-qual">QUALIFIED</span> <span class="chip k-mod">MOD</span><br>ICC(3,1) 0.889 (0.745–0.969) · MDC95 210 N</div>
+    <div class="ev" style="opacity:.6"><b>EVID-U-0001</b> <span class="chip s-sup">SUPERSEDED</span><br>method 1.0.0</div></div></div>
+  <div class="statusbar"><span>Data root D:\datasets\DynamisScience</span><span>Room: changes with the selection</span><span class="r">SQLite ok</span></div>
+</div>
+</body></html>

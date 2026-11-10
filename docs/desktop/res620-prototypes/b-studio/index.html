@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · Guided Research Studio</title>
+<link rel="stylesheet" href="../common.css"><script src="../common.js"></script>
+<style>
+  body { font-size: 13px; }
+  .rail { width: 230px; background: var(--dock); border-right: 1px solid var(--line); padding: 12px 0; display: flex; flex-direction: column; }
+  .rail .study { padding: 0 16px 12px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .rail .study b { display: block; font-size: 13px; }
+  .stage { display: flex; gap: 10px; align-items: center; padding: 7px 16px; cursor: pointer; color: var(--muted); border-left: 3px solid transparent; position: relative; }
+  .stage:hover { background: var(--hover); }
+  .stage.on { background: var(--hi); color: var(--text); border-left-color: var(--link); }
+  .stage .n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; font: 11px var(--mono); flex: none; background: var(--base); }
+  .stage.done .n { border-color: #2E7D4F99; color: var(--ok); }
+  .stage.warn .n { border-color: #B7791F99; color: var(--warn); }
+  .stage.locked { color: var(--faint); cursor: default; }
+  .stage small { display: block; color: var(--faint); font-size: 11px; }
+  .gate { width: 290px; background: var(--dock); border-left: 1px solid var(--line); padding: 14px 16px; overflow: auto; }
+  .gate h3:first-child { margin-top: 0; }
+  .page { padding: 22px 28px; max-width: 980px; }
+  h1 { font-size: 20px; } .sub { font-size: 13px; }
+  .eyebrow { font: 11px var(--mono); color: var(--link); letter-spacing: 1px; margin-bottom: 4px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: var(--base); border: 1px solid var(--line); padding: 14px; cursor: pointer; }
+  .card:hover { border-color: var(--line2); }
+  .card .q { color: var(--muted); margin: 6px 0 10px; }
+  .progress { display: flex; gap: 3px; margin: 8px 0; } .progress i { flex: 1; height: 4px; background: var(--line); } .progress i.d { background: var(--ok); } .progress i.w { background: var(--warn); }
+  .ack { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); background: var(--base); margin-bottom: 8px; }
+  .ack .plot { width: 300px; flex: none; }
+  .btn { background: #1F6B5A18; border: 1px solid #1F6B5A88; color: var(--link); padding: 7px 14px; font: inherit; cursor: pointer; }
+  .btn.ghost { background: transparent; border-color: var(--line2); color: var(--muted); }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .footer { display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--line); padding: 10px 28px; background: var(--chrome); }
+  textarea.input { width: 100%; min-height: 70px; resize: vertical; }
+  .stagepage { flex-direction: column; flex: 1; min-height: 0; }
+</style></head>
+<body>
+<div class="proto-banner"><b>Design prototype B: Guided Research Studio.</b> This is a picture of a native Qt window, not implemented. The estimates come from RES-619 receipts; the plotted points are illustrative. <a href="../index.html">All directions</a></div>
+<div class="win">
+  <div class="titlebar"><span class="mark">D</span>DynamisScience: Sprint priming &amp; CMJ<span class="caps"><span>–</span><span>□</span><span>✕</span></span></div>
+  <div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Study</span><span>Window</span><span>Help</span><span style="margin-left:auto" class="faint">Mode:</span><span data-go="m-research" data-group="mode" class="on">Research</span><span data-go="m-perf" data-group="mode">Performance OS</span></div>
+
+  <div class="body screen on" id="m-research" data-screen-group="mode">
+    <div class="rail">
+      <div class="study"><span class="faint" style="font-size:11px;cursor:pointer" data-go="s0">◂ All studies</span><b>Sprint priming &amp; CMJ</b><span class="chip p-real">REAL</span> <span class="faint">STD-REAL-101</span></div>
+      <div class="stage done" data-go="s1"><span class="n">✓</span><span>Design<small>question &amp; protocol</small></span></div>
+      <div class="stage done" data-go="s2"><span class="n">✓</span><span>Data<small>DS-REAL-MENDELEY</small></span></div>
+      <div class="stage done" data-go="s3"><span class="n">✓</span><span>Cohort<small>v2 · N=21</small></span></div>
+      <div class="stage done" data-go="s4"><span class="n">✓</span><span>Model<small>plan v2 frozen</small></span></div>
+      <div class="stage warn on" data-go="s5"><span class="n">5</span><span>Diagnostics<small>2 of 4 acknowledged</small></span></div>
+      <div class="stage" data-go="s6"><span class="n">6</span><span>Interpret<small>limitations</small></span></div>
+      <div class="stage" data-go="s7"><span class="n">7</span><span>Evidence<small>promote &amp; lineage</small></span></div>
+      <div class="stage" data-go="s8"><span class="n">8</span><span>Report<small>v4 frozen</small></span></div>
+      <div class="stage locked"><span class="n">⌧</span><span>Scenarios <span class="chip k-hyp">HYP</span><small>locked until RES-590</small></span></div>
+      <div style="margin-top:auto;padding:12px 16px" class="faint">Run history <span class="kbd">Ctrl+H</span> · Compare runs <span class="kbd">Ctrl+D</span></div>
+    </div>
+
+    <div class="center">
+      <!-- S0 STUDY BROWSER -->
+      <div class="screen stagepage" id="s0" data-screen-group="main"><div class="page" style="max-width:none">
+        <div class="eyebrow">PROJECT · PRJ-REAL-001 APPLIED CMJ RESEARCH</div><h1>Studies</h1><div class="sub">Each card shows how far the study has progressed, and its last frozen report.</div>
+        <div class="cards">
+          <div class="card" data-go="s5"><span class="chip p-real">REAL</span> <span class="chip s-frozen">REPORT v4 FROZEN</span><h2 style="margin:8px 0 0">Sprint priming &amp; CMJ</h2><div class="q">Does sprint priming change CMJ height over 24 h?</div><div class="progress"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="w"></i><i></i><i></i><i></i></div><span class="faint">Stage 5 · Diagnostics · 1 evidence item</span></div>
+          <div class="card"><span class="chip p-real">REAL</span> <span class="chip s-draft">NO REPORT</span><h2 style="margin:8px 0 0">Walking peak-force reliability</h2><div class="q">How repeatable is peak Fz across walking trials?</div><div class="progress"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="w"></i><i></i><i></i></div><span class="faint">Stage 6 · Interpret · ICC(3,1) 0.889</span></div>
+          <div class="card"><span class="chip p-synth">SYNTHETIC</span> <span class="chip s-desc">DEMO</span><h2 style="margin:8px 0 0">DS-SYNTH-001 demonstration</h2><div class="q">Regression fixture. It makes no empirical claims.</div><div class="progress"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><i></i><i></i><i></i></div><span class="faint">Stage 3 · Cohort</span></div>
+          <div class="card" style="display:grid;place-items:center;color:var(--faint);border-style:dashed">＋ New study</div>
+        </div></div></div>
+
+      <!-- S1 -->
+      <div class="screen stagepage" id="s1" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 1 · DESIGN</div><h1>Question and protocol</h1>
+        <div class="field" style="margin-top:12px"><label>Question</label><span class="input">Does a sprint priming protocol change CMJ height across the following 24 h?</span><label>Primary outcome</label><span class="input">CMJ height (cm)</span><label>Design</label><span class="input">Repeated measures · 4 occasions (Pre, Post 0, Post 10m, Post 24h)</span><label>Estimand</label><span class="input">Mean change per occasion <span class="chip s-expl">UNDER REVIEW</span></span></div></div></div>
+
+      <!-- S2 DATA -->
+      <div class="screen stagepage" id="s2" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 2 · DATA</div><h1>Dataset snapshot</h1><div class="sub">Choose an admitted snapshot. Provenance and rights are checked before you can continue.</div>
+        <div class="panel"><div class="row"><div class="grow"><b>DS-REAL-MENDELEY-2C44490E08AD</b> <span class="chip p-real">REAL</span> <span class="chip k-obs">OBS</span><div class="muted" style="margin-top:4px">Holmberg et al. (2025) · 21 athletes · 4 occasions · 82 CMJ observations · derived scalars only</div></div><span class="chip s-qual">ADMITTED · QC PASSED</span></div></div>
+        <div class="grid2" style="margin-top:10px"><div class="panel"><h3 style="margin-top:0">Rights (from the publisher manifest)</h3>CC BY 4.0 · attribution required · DOI 10.17632/6p99569x66.1</div><div class="panel"><h3 style="margin-top:0">Known limitations</h3><span class="muted">No raw force traces. Sprint has 21 rows only.</span></div></div>
+        <div class="panel"><h3 style="margin-top:0">Preview</h3><table><tr><th>athlete_id</th><th>occasion</th><th class="num">cmj_height (cm)</th></tr><tr><td>A01</td><td>Pre</td><td class="num">illustr.</td></tr><tr><td>A01</td><td>Post 0</td><td class="num">illustr.</td></tr><tr><td>A01</td><td>Post 10m</td><td class="num">illustr.</td></tr></table></div></div></div>
+
+      <!-- S3 -->
+      <div class="screen stagepage" id="s3" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 3 · COHORT</div><h1>Who is included</h1>
+        <div class="panel"><div class="check ok"><span class="b">✓</span>Include athletes with ≥ 2 occasions <span class="muted" style="margin-left:auto">21 of 21</span></div><div class="check ok"><span class="b">✓</span>Exclude missing CMJ height <span class="muted" style="margin-left:auto">−2 observations</span></div></div>
+        <div class="panel" style="font-size:15px">N = <b>21</b> athletes · n = <b>80</b> observations · cohort <b>v2</b> <span class="chip s-frozen">SAVED</span></div></div></div>
+
+      <!-- S4 MODEL -->
+      <div class="screen stagepage" id="s4" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 4 · MODEL</div><h1>Specify the model</h1><div class="sub">Linear mixed-effects change model (METH-REAL-TREND 1.1.0, <span class="chip s-qual">QUALIFIED</span>)</div>
+        <div class="row"><div class="panel" style="width:180px"><h3 style="margin-top:0">Variables</h3><div class="var" style="margin:4px 0">athlete_id</div><div class="var" style="margin:4px 0">occasion</div><div class="var" style="margin:4px 0">cmj_height</div><div class="var" style="margin:4px 0">sprint_20m</div></div>
+          <div class="grow panel"><div class="field"><label>What you measure</label><div class="slot"><span class="var">cmj_height<span class="t">cm</span></span></div><label>What changes</label><div class="slot"><span class="var">occasion</span></div><label>Repeated within</label><div class="slot"><span class="var">athlete_id</span></div><label>Compare</label><span class="input">Pre → Post 24h · α 0.05</span></div></div></div>
+        <h3>In plain language</h3><div class="panel">We estimate how CMJ height changes from one occasion to the next. Each athlete keeps their own baseline (random intercept).</div>
+        <div class="formula">cmj_height ~ occasion + (1 | athlete_id)</div>
+        <div class="note" style="margin-top:10px">Freezing makes this plan immutable. Later edits create a fork (v3) and never overwrite v2.</div></div></div>
+
+      <!-- S5 DIAGNOSTICS -->
+      <div class="screen stagepage on" id="s5" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 5 · DIAGNOSTICS · RUN-REAL-0005</div><h1>Check the model before you trust it</h1>
+        <div class="sub">Acknowledge each check. Exploratory or unavailable checks become limitations automatically.</div>
+        <div class="ack"><div class="plot"><div data-plot="residFitted"></div></div><div class="grow"><h2 style="margin-top:0">Residual spread <span class="chip s-qual">CONDITIONAL_PEARSON</span></h2><div class="muted">No funnel shape is visible. The spread looks even across fitted values.</div><div class="check ok" style="border:0"><span class="b">✓</span>Acknowledged by owner · 10:44</div></div></div>
+        <div class="ack"><div class="plot"><div data-plot="qq"></div></div><div class="grow"><h2 style="margin-top:0">Residual normality <span class="chip s-expl">EXPLORATORY</span></h2><div class="muted">This plot uses <b>marginal residuals divided by the conditional SD</b>. It is not a conditional-residual diagnostic. Treat it as a rough check only.</div><div class="check ok" style="border:0"><span class="b">✓</span>Acknowledged and added to limitations</div></div></div>
+        <div class="ack"><div class="plot"><div data-plot="ranef"></div></div><div class="grow"><h2 style="margin-top:0">Athlete intercepts <span class="chip s-expl">NEEDS REVIEW</span></h2><div class="muted">Random-intercept normality has not been formally assessed (RES-619 open item).</div><div class="check wait" style="border:0"><span class="b">!</span><button class="btn ghost">Acknowledge as limitation</button></div></div></div>
+        <div class="ack"><div class="grow"><h2 style="margin-top:0">Interval method <span class="chip s-unav">PROFILE UNAVAILABLE</span></h2><div class="muted">Wald 95% intervals are reported. With 21 athletes they may be too narrow.</div><div class="check wait" style="border:0"><span class="b">!</span><button class="btn ghost">Acknowledge as limitation</button></div></div></div>
+      </div><div class="footer"><button class="btn ghost" data-go="s4">◂ Model</button><button class="btn" disabled>Continue to Interpret ▸</button></div></div>
+
+      <!-- S6 -->
+      <div class="screen stagepage" id="s6" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 6 · INTERPRET</div><h1>What the result means, and does not</h1>
+        <div class="row"><div class="panel"><h3 style="margin-top:0">Estimate <span class="chip k-mod">MOD</span></h3><div class="est">0.998 cm / occasion</div><div class="ci">95% Wald 0.622 – 1.375</div></div><div class="panel grow"><h3 style="margin-top:0">Interpretation (author)</h3><textarea class="input">CMJ height rose by about 1 cm per occasion after sprint priming in this sample.</textarea></div></div>
+        <h3>Limitations (from diagnostics, editable)</h3><div class="panel"><div class="check"><span class="b">•</span>Q–Q check is exploratory (marginal residual / conditional SD).</div><div class="check"><span class="b">•</span>Wald intervals; profile likelihood unavailable.</div><div class="check"><span class="b">•</span>Single dataset; not generalised beyond these 21 athletes.</div></div></div></div>
+
+      <!-- S7 EVIDENCE -->
+      <div class="screen stagepage" id="s7" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 7 · EVIDENCE</div><h1>Promote to evidence</h1>
+        <div class="panel" style="border-color:#2F59B055"><div class="row"><div class="grow"><b>EVID-U-0002</b> · TREND 1.1.0 <span class="chip s-qual">CURRENT</span> <span class="chip k-mod">MOD</span> <span class="chip p-real">REAL</span><div style="margin-top:8px">CMJ height increased by <b style="color:var(--mod)">0.998 cm per occasion</b> (95% Wald 0.622–1.375), 21 athletes.</div><div class="muted" style="margin-top:4px">3 limitations attached · supersedes EVID-U-0001 (1.0.0)</div></div></div></div>
+        <h3>Where it came from</h3>
+        <div class="panel mono" style="font-size:12px;line-height:2">DS-REAL-MENDELEY <span class="faint">→</span> Cohort v2 <span class="faint">→</span> Plan v2 <span class="chip s-frozen">FROZEN</span> <span class="faint">→</span> RUN-U-0002 <span class="faint">519fe130…</span> <span class="faint">→</span> EVID-U-0002 <span class="faint">→</span> Report v4</div></div></div>
+
+      <!-- S8 REPORT -->
+      <div class="screen stagepage" id="s8" data-screen-group="main"><div class="page"><div class="eyebrow">STAGE 8 · REPORT</div><h1>Report STUDY-U-60C639BA</h1>
+        <div class="note info">v4 <span class="chip s-frozen">FROZEN</span> · hash 1bfb70eb9d70… · cites only CURRENT evidence. Historical v2 still exports with a superseded-evidence banner.</div>
+        <div class="row" style="margin-top:12px"><div class="panel" style="width:220px"><h3 style="margin-top:0">Outline</h3><div class="check ok"><span class="b">✓</span>Question</div><div class="check ok"><span class="b">✓</span>Data &amp; rights</div><div class="check ok"><span class="b">✓</span>Result · EVID-U-0002</div><div class="check ok"><span class="b">✓</span>Limitations</div></div>
+          <div class="grow panel"><h2 style="margin-top:0">Result</h2>Slope 0.998 cm/occasion (95% Wald 0.622–1.375) <span class="chip k-mod">MOD</span><div class="plot" style="margin-top:8px"><div data-plot="trend"></div></div></div></div>
+        <div style="margin-top:10px;display:flex;gap:8px"><button class="btn">Export PDF</button><button class="btn ghost">PNG</button><button class="btn ghost">SVG</button><button class="btn ghost">HTML</button></div></div></div>
+    </div>
+
+    <div class="gate">
+      <h3>Ready to continue?</h3>
+      <div class="check ok"><span class="b">✓</span>Run finished and reproduced (digest match)</div>
+      <div class="check ok"><span class="b">✓</span>Residual spread acknowledged</div>
+      <div class="check ok"><span class="b">✓</span>Q–Q acknowledged as exploratory</div>
+      <div class="check wait"><span class="b">!</span>Athlete intercepts: acknowledge</div>
+      <div class="check wait"><span class="b">!</span>Interval method: acknowledge</div>
+      <h3>This run</h3>
+      <div class="kv" style="display:grid;grid-template-columns:80px 1fr;gap:4px 8px;font-size:12px"><span class="muted">Run</span><span class="mono">RUN-REAL-0005</span><span class="muted">Method</span><span>TREND 1.1.0 <span class="chip s-qual">QUALIFIED</span></span><span class="muted">Data</span><span><span class="chip p-real">REAL</span> Mendeley</span><span class="muted">Estimate</span><span class="mono" style="color:var(--mod)">0.998 cm</span></div>
+      <h3>Claim kinds</h3><div style="display:grid;gap:6px"><span><span class="chip k-obs">OBS</span> <span class="muted">observed</span></span><span><span class="chip k-mod">MOD</span> <span class="muted">modeled ± interval</span></span><span><span class="chip k-hyp">HYP</span> <span class="muted">scenario (locked)</span></span></div>
+    </div>
+  </div>
+
+  <div class="body screen" id="m-perf" data-screen-group="mode">
+    <div class="rail"><div class="study"><b>Performance OS</b><span class="chip p-synth">SYNTHETIC</span></div><div class="stage on"><span class="n">T</span>Today</div><div class="stage"><span class="n">A</span>Athlete 360</div><div class="stage"><span class="n">P</span>Plan</div><div class="stage"><span class="n">M</span>Monitor</div><div class="stage"><span class="n">X</span>Test</div><div class="stage"><span class="n">R</span>Report</div></div>
+    <div class="center"><div class="page"><div class="eyebrow">TODAY · 2026-11-10</div><h1>Who changed beyond the noise?</h1><div class="sub">Change against the modeled ±MDC95 from the reliability study. This is a separate mode, so it cannot be confused with research evidence.</div>
+      <div class="plot"><div data-plot="changeVsMdc"></div></div></div></div>
+  </div>
+
+  <div class="statusbar"><span>Data root D:\datasets\DynamisScience</span><span><span class="chip p-real">REAL</span> STD-REAL-101</span><span>Stage 5 of 8</span><span class="r">SQLite ok</span></div>
+</div>
+</body></html>

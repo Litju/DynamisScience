@@ -1,6 +1,11 @@
 {
   "version": "0.0.1",
   "configurations": [
+    { "name": "res620-a-ide", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8601", "--bind", "127.0.0.1", "--directory", "docs/desktop/res620-prototypes"], "port": 8601 },
+    { "name": "res620-b-studio", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8602", "--bind", "127.0.0.1", "--directory", "docs/desktop/res620-prototypes"], "port": 8602 },
+    { "name": "res620-d-evidence", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8604", "--bind", "127.0.0.1", "--directory", "docs/desktop/res620-prototypes"], "port": 8604 },
+    { "name": "res620-e-workbench", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8605", "--bind", "127.0.0.1", "--directory", "docs/desktop/res620-prototypes"], "port": 8605 },
+    { "name": "res620-c-lab", "runtimeExecutable": "python", "runtimeArgs": ["-m", "http.server", "8603", "--bind", "127.0.0.1", "--directory", "docs/desktop/res620-prototypes"], "port": 8603 },
     {
       "name": "science",
       "runtimeExecutable": "uv",

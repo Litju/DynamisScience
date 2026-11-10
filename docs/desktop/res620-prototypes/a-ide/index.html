@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Scientific IDE</title>
+<link rel="stylesheet" href="../common.css"><script src="../common.js"></script>
+<style>
+  .explorer { width: 270px; } .props { width: 250px; }
+  .bottom { height: 190px; }
+  .vars { width: 190px; }
+  .lineage { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+  .node { border: 1px solid var(--line2); background: var(--alt); padding: 6px 8px; min-width: 120px; }
+  .node b { display: block; font: 11px var(--mono); }
+  .arrow { color: var(--faint); padding: 0 6px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 3px 8px; padding: 8px 10px; font-size: 11px; }
+  .kv dt { color: var(--dim); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+  .doc { flex-direction: column; flex: 1; min-height: 0; }
+  .subtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .subtabs .tab { border: 0; padding: 5px 10px; }
+</style></head>
+<body>
+<div class="proto-banner"><b>Design prototype A: Scientific IDE.</b> This is a picture of a native Qt window, not implemented. The estimates come from RES-619 receipts; the plotted points are illustrative. <a href="../index.html">All directions</a></div>
+<div class="win">
+  <div class="titlebar"><span class="mark">D</span>DynamisScience: PRJ-REAL-001 / STD-REAL-101 Sprint priming &amp; CMJ<span class="caps"><span>–</span><span>□</span><span>✕</span></span></div>
+  <div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Study</span><span>Data</span><span>Analysis</span><span>Run</span><span>Evidence</span><span>Report</span><span>Tools</span><span>Window</span><span>Help</span></div>
+  <div class="toolbar">
+    <button class="tb">New plan</button><button class="tb">Fork plan</button><button class="tb primary">Freeze plan</button><button class="tb primary">▶ Run</button>
+    <span class="sep"></span><button class="tb">Promote to evidence</button><button class="tb">Export…</button>
+    <span class="sep"></span><span class="muted">Perspective</span>
+    <button class="tb on" data-go="p-research" data-group="persp">Research</button><button class="tb" data-go="p-perf" data-group="persp">Performance OS</button>
+    <span style="margin-left:auto" class="muted">Search objects <span class="kbd">Ctrl+K</span></span>
+  </div>
+
+  <!-- RESEARCH PERSPECTIVE -->
+  <div class="body screen on" id="p-research" data-screen-group="persp">
+    <div class="dock explorer">
+      <div class="dock-title">Project explorer<span class="x">⧉ ✕</span></div>
+      <div class="scroll tree">
+        <div><span class="tw">▾</span>PRJ-REAL-001 Applied CMJ research</div>
+        <div class="i1"><span class="tw">▾</span>STD-REAL-101 Sprint priming &amp; CMJ<span class="meta chip s-frozen">ACTIVE</span></div>
+        <div class="i2"><span class="tw">▾</span>Datasets</div>
+        <div class="i3" data-go="d-data"><span class="tw"></span>DS-REAL-MENDELEY-2C44…<span class="meta chip p-real">REAL</span></div>
+        <div class="i3"><span class="tw"></span>DS-REAL-MOVESMART-8052…<span class="meta chip p-real">REAL</span></div>
+        <div class="i2"><span class="tw">▾</span>Cohorts</div>
+        <div class="i3"><span class="tw"></span>All athletes · v2 · N=21</div>
+        <div class="i2"><span class="tw">▾</span>Analysis plans</div>
+        <div class="i3 sel" data-go="d-plan"><span class="tw">▾</span>CMJ change model · v3<span class="meta chip s-draft">DRAFT</span></div>
+        <div class="i3"><span class="tw">▾</span>CMJ change model · v2<span class="meta chip s-frozen">FROZEN</span></div>
+        <div class="i4" data-go="d-run"><span class="tw"></span>RUN-REAL-0005<span class="meta chip s-qual">QUALIFIED</span></div>
+        <div class="i4"><span class="tw"></span>RUN-REAL-0002<span class="meta chip s-sup">SUPERSEDED</span></div>
+        <div class="i3"><span class="tw">▸</span>Peak-force reliability · v1<span class="meta chip s-frozen">FROZEN</span></div>
+        <div class="i2"><span class="tw">▾</span>Evidence</div>
+        <div class="i3" data-go="d-evid"><span class="tw"></span>EVID-U-0002 TREND<span class="meta chip s-qual">CURRENT</span></div>
+        <div class="i3"><span class="tw"></span>EVID-U-0001 TREND<span class="meta chip s-sup">SUPERSEDED</span></div>
+        <div class="i2"><span class="tw">▾</span>Reports</div>
+        <div class="i3" data-go="d-report"><span class="tw"></span>STUDY-U-60C639BA · v4<span class="meta chip s-frozen">FROZEN</span></div>
+        <div class="i2 faint"><span class="tw">▸</span>Scenarios · locked until RES-590<span class="meta chip k-hyp">HYP</span></div>
+        <div class="i1 faint"><span class="tw">▸</span>DS-SYNTH-001 demo study<span class="meta chip p-synth">SYNTHETIC</span></div>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="tabs">
+        <div class="tab" data-go="d-data">DS-REAL-MENDELEY<span class="x">✕</span></div>
+        <div class="tab on" data-go="d-plan">Plan · CMJ change v3*<span class="x">✕</span></div>
+        <div class="tab" data-go="d-run">RUN-REAL-0005<span class="x">✕</span></div>
+        <div class="tab" data-go="d-evid">EVID-U-0002 lineage<span class="x">✕</span></div>
+        <div class="tab" data-go="d-report">Report v4<span class="x">✕</span></div>
+      </div>
+
+      <!-- DATASET -->
+      <div class="screen doc" id="d-data" data-screen-group="main"><div class="page">
+        <h1>DS-REAL-MENDELEY-2C44490E08AD <span class="chip p-real">REAL</span> <span class="chip k-obs">OBS</span></h1>
+        <div class="sub">Holmberg et al. (2025), DOI 10.17632/6p99569x66.1 · CC BY 4.0 (from the admission manifest) · 21 athletes · 4 occasions · 82 CMJ observations · derived summary scalars only</div>
+        <div class="row"><div class="grow panel"><h3>Schema</h3><table><tr><th>Column</th><th>Type</th><th>Unit</th><th class="num">Missing</th></tr>
+          <tr><td>athlete_id</td><td>str</td><td>n/a</td><td class="num">0</td></tr><tr><td>occasion</td><td>cat(4)</td><td>n/a</td><td class="num">0</td></tr>
+          <tr><td>cmj_height</td><td>f64</td><td>cm</td><td class="num">2</td></tr><tr><td>sprint_20m</td><td>f64</td><td>s</td><td class="num">61</td></tr></table></div>
+          <div class="panel" style="width:280px"><h3>Rights &amp; admission</h3><div class="kv" style="padding:0"><dt>License</dt><dd>CC BY 4.0</dd><dt>Source</dt><dd>publisher manifest</dd><dt>Admitted</dt><dd>QC passed</dd><dt>Snapshot hash</dt><dd class="mono">2c44490e08ad…</dd></div></div></div>
+        <h2>Cohort: All athletes v2</h2><div class="panel"><span class="muted">Inclusion</span> all athletes with ≥2 occasions · <span class="muted">Exclusion</span> none · <b>N = 21</b>, 80 of 82 observations usable (2 missing CMJ height)</div>
+      </div></div>
+
+      <!-- PLAN -->
+      <div class="screen doc on" id="d-plan" data-screen-group="main"><div class="page">
+        <h1>CMJ change model · v3 <span class="chip s-draft">DRAFT</span> <span class="faint" style="font-size:12px">forked from v2 (FROZEN)</span></h1>
+        <div class="sub">Method METH-REAL-TREND 1.1.0 · Linear mixed-effects change model · cohort All athletes v2 · snapshot DS-REAL-MENDELEY</div>
+        <div class="row">
+          <div class="panel vars"><h3>Variables</h3>
+            <div class="var" style="margin:3px 0">athlete_id<span class="t">id</span></div><div class="var" style="margin:3px 0">occasion<span class="t">cat</span></div>
+            <div class="var" style="margin:3px 0">cmj_height<span class="t">cm</span></div><div class="var" style="margin:3px 0">sprint_20m<span class="t">s</span></div>
+            <div class="var" style="margin:3px 0">sex<span class="t">cat</span></div></div>
+          <div class="grow">
+            <div class="panel"><h3 style="margin-top:0">Model roles</h3>
+              <div class="field"><label>Outcome</label><div class="slot"><span class="var">cmj_height<span class="t">cm</span></span></div>
+                <label>Fixed effects</label><div class="slot"><span class="var">occasion<span class="t">cat</span></span></div>
+                <label>Grouping (random)</label><div class="slot"><span class="var">athlete_id<span class="t">intercept</span></span></div>
+                <label>Covariates</label><div class="slot"><span class="faint">drag a variable here</span></div></div></div>
+            <div class="panel"><h3 style="margin-top:0">Parameters</h3><div class="field">
+              <label>Reference occasion</label><span class="input">Pre (1)</span><label>Contrast occasion</label><span class="input">Post 24h (4)</span>
+              <label>α</label><span class="input">0.05</span><label>Interval</label><span class="input">Wald (profile unavailable)</span></div></div>
+            <div class="formula">cmj_height ~ occasion + (1 | athlete_id)   ·  REML  ·  N=21, n=80</div>
+          </div>
+          <div class="panel" style="width:230px"><h3>Changes vs v2</h3>
+            <div class="check"><span class="b">±</span><span>Contrast occasion: <span class="mono">Post 0 → Post 24h</span></span></div>
+            <div class="check"><span class="b">=</span><span class="muted">Outcome, roles, cohort unchanged</span></div>
+            <h3>Before freezing</h3>
+            <div class="check ok"><span class="b">✓</span>Snapshot admitted, rights recorded</div>
+            <div class="check ok"><span class="b">✓</span>Cohort resolved (N=21)</div>
+            <div class="check wait"><span class="b">!</span>Rationale for the new contrast is empty</div>
+          </div>
+        </div>
+      </div></div>
+
+      <!-- RUN -->
+      <div class="screen doc" id="d-run" data-screen-group="main"><div class="page">
+        <h1>RUN-REAL-0005 <span class="chip k-mod">MOD</span> <span class="chip s-qual">QUALIFIED</span> <span class="chip p-real">REAL</span></h1>
+        <div class="sub">TREND 1.1.0 · plan v2 (FROZEN) · digest <span class="mono">519fe1309a9ace7c</span> · reproduced by installed-package worker</div>
+        <div class="subtabs"><div class="tab" data-go="r-res" data-group="run">Result</div><div class="tab on" data-go="r-diag" data-group="run">Diagnostics</div><div class="tab" data-go="r-fig" data-group="run">Figure</div></div>
+        <div class="screen" id="r-res" data-screen-group="run" style="flex-direction:column">
+          <div class="row"><div class="panel"><h3 style="margin-top:0">Slope per occasion</h3><div class="est">0.998 cm</div><div class="ci">95% Wald 0.622 – 1.375</div></div>
+          <div class="panel"><h3 style="margin-top:0">Log-likelihood</h3><div class="est">−208.31</div><div class="ci">REML</div></div>
+          <div class="panel grow"><h3 style="margin-top:0">Limitations (computed)</h3><div class="muted">Wald intervals with 21 groups may be anti-conservative. Random-intercept normality is not formally tested. Open independent-review items from RES-619: estimand choice, Wald vs profile, normality.</div></div></div>
+        </div>
+        <div class="screen on" id="r-diag" data-screen-group="run" style="flex-direction:column">
+          <div class="grid2">
+            <div class="plot"><div data-plot="residFitted"></div><div class="cap">Conditional Pearson residuals vs fitted <span class="chip s-qual">CONDITIONAL_PEARSON</span></div></div>
+            <div class="plot"><div data-plot="qq"></div><div class="cap">Marginal residual / conditional SD. <span class="chip s-expl">EXPLORATORY</span> Not a conditional-residual diagnostic.</div></div>
+            <div class="plot"><div data-plot="ranef"></div><div class="cap">Predicted athlete intercepts <span class="chip s-desc">DESCRIPTIVE</span></div></div>
+            <div class="panel"><h3 style="margin-top:0">Assumptions</h3><table><tr><th>Assumption</th><th>Check</th><th>State</th></tr>
+              <tr><td>Residual homoscedasticity</td><td>resid vs fitted</td><td><span class="chip s-qual">CHECKED</span></td></tr>
+              <tr><td>Residual normality</td><td>Q–Q (marginal)</td><td><span class="chip s-expl">EXPLORATORY</span></td></tr>
+              <tr><td>Random-intercept normality</td><td>histogram only</td><td><span class="chip s-expl">REVIEW</span></td></tr>
+              <tr><td>Independence across athletes</td><td>design</td><td><span class="chip s-desc">ASSUMED</span></td></tr>
+              <tr><td>Profile-likelihood CI</td><td>n/a</td><td><span class="chip s-unav">UNAVAILABLE</span></td></tr></table></div>
+          </div>
+        </div>
+        <div class="screen" id="r-fig" data-screen-group="run" style="flex-direction:column">
+          <div class="plot"><div data-plot="trend spaghetti"></div><div class="cap legend"><span><span class="chip k-obs">OBS</span> athlete observations</span><span><span class="chip k-mod">MOD</span> fixed-effect mean ± 95% Wald</span></div></div>
+        </div>
+      </div></div>
+
+      <!-- EVIDENCE -->
+      <div class="screen doc" id="d-evid" data-screen-group="main"><div class="page">
+        <h1>EVID-U-0002 · TREND 1.1.0 <span class="chip s-qual">CURRENT</span> <span class="chip k-mod">MOD</span></h1>
+        <div class="sub">Promoted from RUN-U-0002 · supersedes EVID-U-0001 (method 1.0.0)</div>
+        <h3>Lineage</h3>
+        <div class="lineage panel">
+          <div class="node"><span class="chip p-real">REAL</span><b>DS-REAL-MENDELEY</b><span class="muted">snapshot · CC BY 4.0</span></div><span class="arrow">→</span>
+          <div class="node"><b>Cohort v2</b><span class="muted">N=21</span></div><span class="arrow">→</span>
+          <div class="node"><span class="chip s-frozen">FROZEN</span><b>Plan v2</b><span class="muted">TREND 1.1.0</span></div><span class="arrow">→</span>
+          <div class="node"><span class="chip s-qual">QUALIFIED</span><b>RUN-U-0002</b><span class="muted">519fe130…</span></div><span class="arrow">→</span>
+          <div class="node"><span class="chip s-qual">CURRENT</span><b>EVID-U-0002</b><span class="muted">promoted</span></div><span class="arrow">→</span>
+          <div class="node"><span class="chip s-frozen">FROZEN</span><b>Report v4</b><span class="muted">cites 1 item</span></div>
+        </div>
+        <h3>Claim as promoted</h3>
+        <div class="panel">CMJ height increased by <b class="mono" style="color:var(--mod)">0.998 cm per occasion</b> <span class="ci">(95% Wald 0.622–1.375)</span> across Pre → Post 24h in 21 athletes. <span class="muted">Limitations recorded: Wald intervals; random-intercept normality unreviewed; single dataset, not generalised.</span></div>
+      </div></div>
+
+      <!-- REPORT -->
+      <div class="screen doc" id="d-report" data-screen-group="main"><div class="page">
+        <div class="note info">Frozen version v4 · content hash <span class="mono">1bfb70eb9d70…</span> · read-only · exports carry provenance</div>
+        <h1 style="margin-top:12px">Sprint priming and countermovement jump height</h1>
+        <div class="sub">STUDY-U-60C639BA · v4 <span class="chip s-frozen">FROZEN</span> · 2026-11-10</div>
+        <h2>1 · Question</h2><div class="muted">Does a sprint priming protocol change CMJ height across the following 24 h?</div>
+        <h2>2 · Data</h2><div class="muted">DS-REAL-MENDELEY <span class="chip p-real">REAL</span> <span class="chip k-obs">OBS</span>, 21 athletes, 4 occasions.</div>
+        <h2>3 · Result</h2><div>Slope 0.998 cm/occasion (95% Wald 0.622–1.375) <span class="chip k-mod">MOD</span> <span class="chip s-qual">EVID-U-0002</span></div>
+        <div class="plot" style="max-width:560px;margin-top:8px"><div data-plot="trend"></div></div>
+        <h2>4 · Limitations</h2><div class="muted">Wald intervals; marginal Q–Q diagnostic is exploratory; random-intercept normality not formally assessed.</div>
+        <div style="margin-top:14px"><button class="tb primary">Export PDF</button><button class="tb">PNG</button><button class="tb">SVG</button><button class="tb">HTML</button><button class="tb">Compare versions…</button></div>
+      </div></div>
+
+      <!-- BOTTOM DOCK -->
+      <div class="dock bottom bottom">
+        <div class="tabs"><div class="tab on" data-go="b-out" data-group="bot">Output tree</div><div class="tab" data-go="b-hist" data-group="bot">Run history</div><div class="tab" data-go="b-log" data-group="bot">Log</div></div>
+        <div class="screen on scroll tree" id="b-out" data-screen-group="bot" style="flex-direction:column">
+          <div><span class="tw">▾</span>RUN-REAL-0005 · TREND 1.1.0<span class="meta chip s-qual">QUALIFIED</span></div>
+          <div class="i1"><span class="tw">▾</span>Tables</div><div class="i2">Fixed effects (estimate, SE, Wald CI)</div><div class="i2">Variance components</div>
+          <div class="i1"><span class="tw">▾</span>Diagnostics</div><div class="i2">Resid vs fitted <span class="meta chip s-qual">CONDITIONAL</span></div><div class="i2">Q–Q marginal <span class="meta chip s-expl">EXPLORATORY</span></div>
+          <div class="i1"><span class="tw">▸</span>Figures (PNG · PDF · SVG)</div><div class="i1"><span class="tw">▸</span>Computed limitations</div>
+        </div>
+        <div class="screen scroll" id="b-hist" data-screen-group="bot" style="flex-direction:column"><table>
+          <tr><th>Run</th><th>Plan</th><th>Method</th><th class="num">Slope</th><th>95% CI</th><th>Status</th></tr>
+          <tr><td class="mono">RUN-REAL-0005</td><td>v2</td><td>TREND 1.1.0</td><td class="num">0.998</td><td class="mono">0.622–1.375</td><td><span class="chip s-qual">CURRENT</span></td></tr>
+          <tr><td class="mono">RUN-REAL-0002</td><td>v2</td><td>TREND 1.0.0</td><td class="num">n/a</td><td class="mono">n/a</td><td><span class="chip s-sup">SUPERSEDED</span></td></tr></table></div>
+        <div class="screen scroll mono" id="b-log" data-screen-group="bot" style="flex-direction:column;padding:6px 10px;color:var(--dim)">10:15:36 backup research-res619-20261110T101536Z.sqlite3 integrity ok<br>10:16:02 RUN-REAL-0005 started (worker)<br>10:16:09 RUN-REAL-0005 digest 519fe1309a9ace7c · QUALIFIED</div>
+      </div>
+    </div>
+
+    <div class="dock right props">
+      <div class="dock-title">Properties<span class="x">⧉ ✕</span></div>
+      <dl class="kv"><dt>Object</dt><dd>Analysis plan</dd><dt>ID</dt><dd class="mono">PLAN-…-v3</dd><dt>State</dt><dd><span class="chip s-draft">DRAFT</span></dd><dt>Parent</dt><dd>v2 (FROZEN)</dd><dt>Method</dt><dd>TREND 1.1.0</dd><dt>Snapshot</dt><dd>DS-REAL-MENDELEY</dd><dt>Provenance</dt><dd><span class="chip p-real">REAL</span></dd><dt>Cohort</dt><dd>All athletes v2 · N=21</dd><dt>Author</dt><dd>owner</dd><dt>Modified</dt><dd>2026-11-10 10:42</dd></dl>
+      <div class="dock-title">Claim kinds</div>
+      <div style="padding:8px 10px;display:grid;gap:6px"><span><span class="chip k-obs">OBS</span> <span class="muted">observed data</span></span><span><span class="chip k-mod">MOD</span> <span class="muted">model estimate ± interval</span></span><span><span class="chip k-hyp">HYP</span> <span class="muted">scenario, never evidence</span></span></div>
+      <div style="padding:8px 10px" class="faint">View ▸ Advanced shows raw JSON</div>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE OS PERSPECTIVE -->
+  <div class="body screen" id="p-perf" data-screen-group="persp">
+    <div class="dock explorer"><div class="dock-title">Squad</div><div class="scroll tree">
+      <div class="sel">Today · 2026-11-10</div><div>Athlete 360</div><div>Plan</div><div>Monitor</div><div>Test</div><div>Match &amp; Pose</div><div>Report</div></div></div>
+    <div class="center"><div class="page">
+      <h1>Test · Walking peak Fz change <span class="chip p-synth">SYNTHETIC</span></h1>
+      <div class="sub">Change is judged against the modeled MDC95 from RUN-REAL-0004 (ICC(3,1) 0.889, TE 75.78 N). No readiness traffic lights.</div>
+      <div class="plot"><div data-plot="changeVsMdc"></div><div class="cap legend"><span><span class="chip k-obs">OBS</span> change per athlete</span><span><span class="chip k-mod">MOD</span> ±MDC95 noise band</span></div></div>
+    </div></div>
+  </div>
+
+  <div class="statusbar"><span>Data root D:\datasets\DynamisScience</span><span><span class="chip p-real">REAL</span> STD-REAL-101</span><span>Selection: Plan v3 (DRAFT)</span><span class="r">SQLite ok · 1366×768 target</span></div>
+</div>
+</body></html>
