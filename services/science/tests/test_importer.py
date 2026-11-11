@@ -36,6 +36,24 @@ def _ready(path: Path, **constants):
     return importer.edit_mapping(plan, {}, {"session_id": "S1", "sampling_hz": 1000, **constants})
 
 
+def test_pending_import_keeps_verified_original_without_admission(service, tmp_path):
+    original = _file(tmp_path, "pending.csv", HEADER + ROWS)
+    plan = importer.prepare_import(original)["files"][0]
+    staged_path = Path(plan["path"])
+    assert staged_path != original and staged_path.read_bytes() == original.read_bytes()
+    original.unlink()
+    assert importer._sha256(staged_path) == plan["raw_sha256"]
+    assert not admission.list_admitted_snapshots()
+
+
+def test_pending_copy_is_checked_on_reuse(service, tmp_path):
+    original = _file(tmp_path, "pending.csv", HEADER + ROWS)
+    plan = importer.prepare_import(original)["files"][0]
+    Path(plan["path"]).write_text("damaged", encoding="utf-8")
+    with pytest.raises(importer.ImportBlocked, match="integrity check"):
+        importer.prepare_import(original)
+
+
 def test_detects_headers_units_and_family(tmp_path):
     plan = importer.probe_file(_file(tmp_path, "a.csv", HEADER + ROWS))
     cols = plan["mapping"]["columns"]

@@ -343,6 +343,30 @@ def probe(path: str | os.PathLike[str]) -> dict[str, Any]:
     return probe_folder(target) if target.is_dir() else {"kind": "file", "path": str(target), "files": [probe_file(target)], "skipped": []}
 
 
+def prepare_import(path: str | os.PathLike[str]) -> dict[str, Any]:
+    """Keep checksum-verified originals while an import waits for essential information."""
+    result = probe(path)
+    for plan in result["files"]:
+        if "raw_sha256" not in plan:
+            continue
+        original = Path(plan["path"])
+        target = paths()["sources"] / "pending" / plan["raw_sha256"] / original.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            temporary = target.with_name(target.name + "." + uuid.uuid4().hex + ".tmp")
+            try:
+                shutil.copyfile(original, temporary)
+                if _sha256(temporary) != plan["raw_sha256"]:
+                    raise ImportBlocked("The file changed while it was being read. Choose it again.")
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        if _sha256(target) != plan["raw_sha256"]:
+            raise ImportBlocked("The staged copy failed its integrity check. Choose the original again.")
+        plan["original_path"], plan["path"] = plan["path"], str(target)
+    return result
+
+
 def edit_mapping(plan: dict[str, Any], edits: dict[str, dict[str, Any] | None], constants: dict[str, Any] | None = None) -> dict[str, Any]:
     """Apply researcher edits: {canonical: {"source","unit"} | None}. Edited entries are marked origin=user."""
     columns = dict(plan["mapping"]["columns"])
