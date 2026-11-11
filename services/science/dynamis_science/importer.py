@@ -593,7 +593,7 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
                 normalized = normalized.with_columns(*(pl.lit(v).alias(k) for k, v in (("instrument_id", instrument_id), ("protocol_id", protocol_id))
                                                        if k not in normalized.columns))
                 # Saved JSON mappings reorder keys; column order must not change the batch identity.
-                normalized = normalized.select(sorted(normalized.columns))
+                normalized = normalized.select([name for name in COLUMNS if name in normalized.columns])
                 normalized.write_parquet(normalized_path, compression="zstd")
                 for previous in _receipts():
                     if (previous["raw_sha256"], previous["source_id"], previous["family"]) != (raw_sha, src["id"], family):
