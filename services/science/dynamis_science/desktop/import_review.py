@@ -118,6 +118,19 @@ class ImportReviewDialog(QDialog):
         top.addWidget(self.file_button)
         top.addWidget(self.folder_button)
         root.addLayout(top)
+        self.drop = QLabel("Drop a CSV or Parquet file or folder here")
+        self.drop.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.drop.setMinimumHeight(56)
+        self.drop.setObjectName("DropZone")
+        self.drop.setStyleSheet("#DropZone { border: 2px dashed palette(mid); border-radius: 8px; padding: 10px; }")
+        self.drop.setAccessibleName("Drop zone")
+        self.summary = QLabel()
+        self.summary.setWordWrap(True)
+        self.summary.setTextFormat(Qt.TextFormat.RichText)
+        self.summary.setAccessibleName("Import summary")
+        self.summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        root.addWidget(self.drop)
+        root.addWidget(self.summary)
 
         split = QSplitter(Qt.Orientation.Horizontal)
         left = QSplitter(Qt.Orientation.Vertical)
@@ -178,7 +191,13 @@ class ImportReviewDialog(QDialog):
         vertical.addWidget(self.verdict)
         vertical.setStretchFactor(0, 3)
         vertical.setStretchFactor(1, 2)
-        root.addWidget(vertical, 1)
+        self.details = QWidget()  # everything the researcher can inspect or change; closed unless attention is needed
+        details_layout = QVBoxLayout(self.details)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        details_layout.addWidget(vertical, 1)
+        self.details.setVisible(False)
+        root.addWidget(self.details, 1)
+        root.addStretch(0)
 
         buttons = QHBoxLayout()
         self.qc_button = QPushButton("Run &QC")
@@ -186,7 +205,6 @@ class ImportReviewDialog(QDialog):
         self.preset_button = QPushButton("Save &preset…")
         self.quarantine_button = QPushButton("Qua&rantine")
         self.admit_button = QPushButton("&Admit")
-        self.admit_button.setDefault(True)
         close = QPushButton("Close")
         self.qc_button.clicked.connect(self._run_qc)
         self.edit_button.clicked.connect(self._edit_mapping)
@@ -198,10 +216,23 @@ class ImportReviewDialog(QDialog):
             buttons.addWidget(button)
         buttons.addStretch(1)
         buttons.addWidget(self.admit_button)
-        buttons.addWidget(close)
-        root.addLayout(buttons)
+        details_layout.addLayout(buttons)
+        bottom = QHBoxLayout()
+        self.details_button = QPushButton("&Details")
+        self.details_button.setCheckable(True)
+        self.details_button.toggled.connect(self.details.setVisible)
+        self.import_button = QPushButton("&Import")
+        self.import_button.setDefault(True)
+        self.import_button.setEnabled(False)
+        self.import_button.clicked.connect(self._import)
+        bottom.addWidget(self.details_button)
+        bottom.addStretch(1)
+        bottom.addWidget(self.import_button)
+        bottom.addWidget(close)
+        root.addLayout(bottom)
         self.setTabOrder(self.file_button, self.folder_button)
         self._update_buttons()
+        self._update_summary()
 
     # ---- input
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
@@ -262,14 +293,22 @@ class ImportReviewDialog(QDialog):
                 item["plan"] = dict(item["plan"], mapping=preset["mapping"], ambiguities=[], preset=preset["id"])
                 importer._refresh_state(item["plan"])
         first = next((i["preset"] for i in self.items if i["preset"]), None)
-        if first:
-            self._fill_form(first["context"].get("fields", {}))
+        profile = first["context"] if first else importer.last_profile()
+        if profile:  # a saved preset, else the source profile used last: the form is filled, not asked
+            self._fill_form(profile.get("fields", {}))
+        self.items = [dict(i, plan=self._plan_with_constants(i["plan"])) for i in self.items]
         self._fill_files()
         if self.items:
             self.files.selectRow(0)
             self._show(0)  # currentCellChanged does not fire when row 0 was already current
-        if first and self._form_errors() == []:  # saved preset + complete form: QC runs, the researcher still presses Admit
-            self._run_qc()
+        self._open_details(False)
+        if self._form_errors() == [] and any(i["plan"]["state"] == "READY" for i in self.items):
+            self._run_qc()  # nothing is missing: QC runs now, Import is the one click left
+        else:
+            if self.items and self._form_errors():
+                self.summary.setText(self.summary.text() + "<br><i>First import from this source: confirm who it belongs to "
+                                     "and which instrument produced it once; it is remembered.</i>")
+            self._attention()
 
     # ---- display
     def _fill_files(self) -> None:
@@ -358,6 +397,71 @@ class ImportReviewDialog(QDialog):
 
     def _message(self, text: str) -> None:
         self.verdict.setHtml(text)
+        self._open_details()
+
+    def _open_details(self, show: bool = True) -> None:
+        self.details_button.setChecked(show)
+
+    def _attention(self) -> None:
+        """Open the details only when something needs the researcher: missing facts, drift, or a file that cannot be imported."""
+        needs = any(not i["decision"] and (i["plan"]["state"] in ("REVIEW", "UNSUPPORTED") or (i["staged"] and not i["staged"]["eligible"]))
+                    for i in self.items)
+        if needs or self._form_errors():
+            self._open_details()
+
+    @staticmethod
+    def _reasons(rq: dict[str, Any]) -> str:
+        return html.escape(", ".join(f"{k}: {v}" for k, v in rq["reasons"].items()))
+
+    def _update_summary(self) -> None:
+        t, esc = theme.tokens(), html.escape
+        if not self.items:
+            self.summary.setText("Nothing loaded yet. DynamisScience detects the format, columns, units and identifiers, "
+                                 "checks every row, and adds the clean rows to your dataset.")
+            self.import_button.setEnabled(False)
+            return
+        lines = []
+        for item in self.items:
+            plan, staged, name = item["plan"], item["staged"], esc(item["plan"]["name"])
+            decision = item["decision"] or ""
+            if plan["state"] == "UNSUPPORTED":
+                lines.append(f"<span style='color:{t['bad']}'>✗</span> <b>{name}</b> — {esc(plan['reason'])}")
+            elif decision.startswith("ADMITTED"):
+                rq = staged["receipt"]["row_quarantine"]
+                note = f"; {rq['count']} row(s) quarantined ({self._reasons(rq)})" if rq["count"] else ""
+                lines.append(f"<span style='color:{t['ok']}'>✓</span> <b>{name}</b> — imported {staged['receipt']['normalized_rows']:,} rows{note}")
+            elif decision == "QUARANTINED":
+                lines.append(f"<span style='color:{t['warn']}'>⚠</span> <b>{name}</b> — quarantined; no data was added")
+            elif staged:
+                rq = staged["receipt"]["row_quarantine"]
+                if staged["eligible"]:
+                    note = f"; {rq['count']} row(s) will be quarantined ({self._reasons(rq)})" if rq["count"] else ""
+                    lines.append(f"<span style='color:{t['ok']}'>✓</span> <b>{name}</b> — {staged['receipt']['normalized_rows']:,} rows ready{note}")
+                else:
+                    why = (staged["quality"]["errors"] or staged["quality"]["warnings"] or
+                           (["duplicate content"] if staged["duplicate_of"] else ["source rights are not verified"]))[0]
+                    lines.append(f"<span style='color:{t['bad']}'>✗</span> <b>{name}</b> — cannot be imported: {esc(str(why))}")
+            else:
+                need = "; ".join(plan["needs"] + plan["ambiguities"])
+                family = esc(str(plan["mapping"].get("family") or "unrecognised"))
+                lines.append(f"• <b>{name}</b> — {plan['rows']:,} rows · {family}"
+                             + (f" · <span style='color:{t['warn']}'>needs: {esc(need)}</span>" if need else ""))
+        if any(i["plan"].get("session_from_filename") and i["plan"]["state"] != "UNSUPPORTED" for i in self.items):
+            lines.append("<i>The file has no session column: each file is treated as one session, named after the file. "
+                         "Type a Session ID in Details to change it.</i>")
+        if any(i["staged"] and i["staged"]["synthetic_only"] for i in self.items):
+            lines.append("<i>SYNTHETIC_ONLY test fixture: not real measurements, not eligible as scientific evidence.</i>")
+        self.summary.setText("<br>".join(lines))
+        pending = [i for i in self.items if not i["decision"] and i["plan"]["state"] != "UNSUPPORTED" and (i["staged"] is None or i["staged"]["eligible"])]
+        self.import_button.setEnabled(bool(pending))
+        self.import_button.setText(f"&Import {len(pending)} files" if len(pending) > 1 else "&Import")
+
+    def _import(self) -> None:
+        """The one explicit click: QC if it has not run, then add every eligible file as an immutable batch."""
+        if any(i["staged"] is None and not i["decision"] and i["plan"]["state"] != "UNSUPPORTED" for i in self.items):
+            self._run_qc(then=self._admit)
+        else:
+            self._admit()
 
     def _update_buttons(self) -> None:
         item = self._current()
@@ -368,6 +472,7 @@ class ImportReviewDialog(QDialog):
         self.preset_button.setEnabled(bool(staged))
         self.quarantine_button.setEnabled(bool(staged) and not done)
         self.admit_button.setEnabled(any(i["staged"] and i["staged"]["eligible"] and not i["decision"] for i in self.items))
+        self._update_summary()
 
     # ---- form
     def _fields(self) -> dict[str, Any]:
@@ -409,11 +514,15 @@ class ImportReviewDialog(QDialog):
 
     def _plan_with_constants(self, plan: dict[str, Any]) -> dict[str, Any]:
         merged = {**plan["mapping"].get("constants", {}), **self._constants()}
-        updated = dict(plan, mapping=dict(plan["mapping"], constants=merged))
+        derived = False
+        if plan["state"] != "UNSUPPORTED" and "session_id" not in plan["mapping"]["columns"] and not str(merged.get("session_id", "")).strip():
+            merged["session_id"] = Path(plan["name"]).stem  # one file, one session, unless you say otherwise; shown in the summary
+            derived = True
+        updated = dict(plan, mapping=dict(plan["mapping"], constants=merged), session_from_filename=derived)
         importer._refresh_state(updated)
         return updated
 
-    def _run_qc(self) -> None:
+    def _run_qc(self, then: Any = None) -> None:
         missing = self._form_errors()
         if missing:
             self._message("<b>Complete before QC:</b> " + html.escape(", ".join(missing)))
@@ -447,6 +556,10 @@ class ImportReviewDialog(QDialog):
             self._show(self.files.currentRow())
             if errors:
                 self._message("<b>QC could not run.</b><br>" + "<br>".join(map(html.escape, errors)))
+            elif then and any(i["staged"] and i["staged"]["eligible"] and not i["decision"] for i in self.items):
+                then()
+            else:
+                self._attention()
 
         self._run(work, done, "Normalizing and running quality control")
 
@@ -472,6 +585,7 @@ class ImportReviewDialog(QDialog):
             self._fill_files()
             self._update_buttons()
             self._show(self.files.currentRow())
+            self._attention()
 
         self._run(work, done, "Admitting validated snapshots")
 
