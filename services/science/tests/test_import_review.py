@@ -121,9 +121,9 @@ def test_one_click_flow_first_import_then_every_later_file(dialog, tmp_path):
         edit.clear()
     dialog.load(str(_file(tmp_path, "b.csv", HEADER + "B1,T7,41,70,1500\n")))
     assert not dialog.details_button.isChecked()
-    assert dialog.edits["manufacturer"].text() == "Fixture" and "1 rows ready" in dialog.summary.text()
+    assert dialog.edits["manufacturer"].text() == "Fixture" and "1 row ready" in dialog.summary.text()
     dialog.import_button.click()
-    assert "imported 1 rows" in dialog.summary.text() and len(dialog.admitted) == 2
+    assert "imported 1 row" in dialog.summary.text() and len(dialog.admitted) == 2
     assert len(dialog.service.logical_datasets()) == 1 and dialog.service.logical_datasets()[0]["row_counts"] == {"cmj_trials": 3}
 
 
@@ -134,7 +134,7 @@ def test_import_click_runs_qc_itself_and_reports_quarantined_rows(dialog, tmp_pa
     dialog.import_button.setEnabled(True)
     dialog.import_button.click()  # QC, then add: no separate steps
     summary = dialog.summary.text()
-    assert "imported 1 rows" in summary and "1 row(s) quarantined" in summary and "implausible jump_height_cm" in summary
+    assert "imported 1 row" in summary and "1 row(s) quarantined" in summary and "implausible jump_height_cm" in summary
 
 
 def test_unimportable_file_opens_details_and_disables_import(dialog, tmp_path):

@@ -220,7 +220,7 @@ class ImportReviewDialog(QDialog):
         bottom = QHBoxLayout()
         self.details_button = QPushButton("&Details")
         self.details_button.setCheckable(True)
-        self.details_button.toggled.connect(self.details.setVisible)
+        self.details_button.toggled.connect(self._toggle_details)
         self.import_button = QPushButton("&Import")
         self.import_button.setDefault(True)
         self.import_button.setEnabled(False)
@@ -399,6 +399,13 @@ class ImportReviewDialog(QDialog):
         self.verdict.setHtml(text)
         self._open_details()
 
+    def _toggle_details(self, shown: bool) -> None:
+        """Details closed is a compact one-line screen; open gives the full review."""
+        self.details.setVisible(shown)
+        screen = QGuiApplication.primaryScreen()
+        height = int(screen.availableGeometry().height() * 0.9) if screen else 700
+        self.resize(self.width(), min(760, height) if shown else max(self.minimumSizeHint().height(), 230))
+
     def _open_details(self, show: bool = True) -> None:
         self.details_button.setChecked(show)
 
@@ -408,6 +415,10 @@ class ImportReviewDialog(QDialog):
                     for i in self.items)
         if needs or self._form_errors():
             self._open_details()
+
+    @staticmethod
+    def _rows(n: int) -> str:
+        return f"{n:,} row" + ("" if n == 1 else "s")
 
     @staticmethod
     def _reasons(rq: dict[str, Any]) -> str:
@@ -429,14 +440,14 @@ class ImportReviewDialog(QDialog):
             elif decision.startswith("ADMITTED"):
                 rq = staged["receipt"]["row_quarantine"]
                 note = f"; {rq['count']} row(s) quarantined ({self._reasons(rq)})" if rq["count"] else ""
-                lines.append(f"<span style='color:{t['ok']}'>✓</span> <b>{name}</b> — imported {staged['receipt']['normalized_rows']:,} rows{note}")
+                lines.append(f"<span style='color:{t['ok']}'>✓</span> <b>{name}</b> — imported {self._rows(staged['receipt']['normalized_rows'])}{note}")
             elif decision == "QUARANTINED":
                 lines.append(f"<span style='color:{t['warn']}'>⚠</span> <b>{name}</b> — quarantined; no data was added")
             elif staged:
                 rq = staged["receipt"]["row_quarantine"]
                 if staged["eligible"]:
                     note = f"; {rq['count']} row(s) will be quarantined ({self._reasons(rq)})" if rq["count"] else ""
-                    lines.append(f"<span style='color:{t['ok']}'>✓</span> <b>{name}</b> — {staged['receipt']['normalized_rows']:,} rows ready{note}")
+                    lines.append(f"<span style='color:{t['ok']}'>✓</span> <b>{name}</b> — {self._rows(staged['receipt']['normalized_rows'])} ready{note}")
                 else:
                     why = (staged["quality"]["errors"] or staged["quality"]["warnings"] or
                            (["duplicate content"] if staged["duplicate_of"] else ["source rights are not verified"]))[0]
@@ -444,7 +455,7 @@ class ImportReviewDialog(QDialog):
             else:
                 need = "; ".join(plan["needs"] + plan["ambiguities"])
                 family = esc(str(plan["mapping"].get("family") or "unrecognised"))
-                lines.append(f"• <b>{name}</b> — {plan['rows']:,} rows · {family}"
+                lines.append(f"• <b>{name}</b> — {self._rows(plan['rows'])} · {family}"
                              + (f" · <span style='color:{t['warn']}'>needs: {esc(need)}</span>" if need else ""))
         if any(i["plan"].get("session_from_filename") and i["plan"]["state"] != "UNSUPPORTED" for i in self.items):
             lines.append("<i>The file has no session column: each file is treated as one session, named after the file. "

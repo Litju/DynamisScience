@@ -471,6 +471,6 @@ class DataWorkspaceDialog(QDialog):
         self.inspector.setHtml("<br>".join(parts))
 
     def _analyze(self) -> None:
-        if self.snapshot_id:
+        if self.snapshot_id and not self.snapshot_id.startswith("LOGICAL:"):  # analysis binds to one immutable batch
             self.on_analyze(self.snapshot_id)
             self.accept()

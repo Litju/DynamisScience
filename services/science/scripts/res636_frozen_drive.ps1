@@ -62,7 +62,7 @@ try {
   Shot 'start'
   Load-File 'cmj_valid.csv'
   Shot 'preset-qc'            # saved preset applied, QC already run
-  Keys '%a' 4                  # Admit (Alt+A)
+  Keys '%i' 4                  # Import (Alt+I): the one click
   Shot 'admitted'
   Keys '{ESC}' 2
   Load-File 'cmj_invalid.csv'
@@ -72,11 +72,11 @@ try {
   Keys '{ESC}' 2
   Load-File 'trace.csv'
   Shot 'trace-qc'
-  Keys '%a' 5
+  Keys '%i' 5
   Shot 'trace-admitted'
   Keys '{ESC}' 2
   Keys '^d' 5                  # Data workspace
-  Keys '{TAB}{DOWN}' 4         # focus the catalogue, choose the sample-level recording
+  Keys '{TAB}{DOWN}{DOWN}{DOWN}{DOWN}' 4   # catalogue: dataset, logical, batch, logical, batch (force-time recording)
   Shot 'workspace-table'
   Keys '%c' 3; Shot 'workspace-columns'
   Keys '%r' 5; Shot 'workspace-traces'
@@ -87,7 +87,7 @@ try {
   Stop-App
   Start-App                    # restart on the same root
   Keys '^d' 5
-  Keys '{TAB}{DOWN}' 4
+  Keys '{TAB}{DOWN}{DOWN}{DOWN}{DOWN}' 4
   Shot 'after-restart'
 }
 finally { Stop-App }
