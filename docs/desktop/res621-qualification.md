@@ -25,8 +25,10 @@ This is a partial engineering record, not product acceptance. RES-613 remains th
 | `8f158fd` | Route admitted synthetic fixture reads to their own snapshot and do not depend on the bundled fixture. | Admission, authoring and dialog: 19 passed offscreen, including exact source-row checks. |
 | `7acb969` | Identify the statistic represented by report intervals, including historical final-point intervals. | Lifecycle and authoring: 13 passed; offline synthetic report rendered and compared with its run. |
 | `82de2f5` | Capture frozen research context and use it when exporting; warn for legacy versions without captured context. | Lifecycle, authoring and result checks: 23 passed. |
+| `e0a2bd3` | Render ICC as dimensionless and retain the force unit for typical error. | Lifecycle, authoring and result checks: 24 passed. |
+| `e3e9a37` | Allow GUI regression fixtures to use an explicitly selected disposable research copy. | Three Mendeley/MoveSmart checks passed using a verified copy. |
 
-All tests above used pytest temporary data roots. An intermediate full suite at `38e4c2b` was interrupted for the Run-button repair; it is not a passing receipt.
+Tests mutated pytest temporary roots. Earlier runs also opened the operational database with SQLite's read-only online-backup API; in WAL mode that may touch its shared-memory index. A complete before/after hash of the private root was not captured. Subsequent real-snapshot GUI regressions can use the independently verified disposable copy instead. Intermediate full runs interrupted for further fixes are not passing receipts.
 
 Full source regression at `af97919db1945b8705839ca7639f6afd351add1d`: `QT_QPA_PLATFORM=offscreen uv run pytest`, **174 passed in 208.83 s**. This is an automated source result, not installed-app or on-screen qualification. At that point the only pre-existing tracked modification remained the generator manifest, with the same SHA-256 as above; this report was untracked.
 
@@ -34,9 +36,10 @@ Full source regression at `af97919db1945b8705839ca7639f6afd351add1d`: `QT_QPA_PL
 
 - **P1 — valid synthetic admission remains unproved.** Existing QC requires `CALIBRATED` even for a fixture-only source; the earlier `SIMULATED` instrument was correctly quarantined. The repository's ignored test fixtures contain a `CALIBRATED` test label but no independent physical calibration evidence. No physical calibration is claimed here; a defensible synthetic admission demonstration remains necessary.
 - **Admission units require operator qualification.** The changed code checks and converts its supported mass, time and distance units and compares them with protocol metadata; unsupported units are rejected. This is not a claim that arbitrary units or all measurement fields are supported.
-- An independently rendered synthetic HTML report was inspected in headless Edge over loopback HTTP. Its recorded change `0.07616275000000017` and final-point mean interval `1.734291839839779–1.8654102315887926` match the source run. The first viewport was inspected; this is not the complete installed report journey or a general report qualification.
+- An independently rendered synthetic HTML report was inspected in headless Edge over loopback HTTP ([first viewport](res621-evidence/synthetic-report-offline.png)). Its recorded change `0.07616275000000017` and final-point mean interval `1.734291839839779–1.8654102315887926` match the source run. A later newly frozen version remained byte-identical when the study title changed. This is not the complete installed report journey or a general report qualification.
 - The requested valid and invalid native admission demonstrations, study authoring and reopening, scientific comparisons, evidence/report journey, figure inspection, accessibility checks and source-matched installer workflow have not been completed in this campaign.
 - Historical source records and snapshots were not rewritten. The new source-binding rule does not repair any pre-existing incorrectly associated artifact. Concurrent admission and interrupted snapshot creation still require assessment.
+- An existing DynamisScience installation has the same Inno Setup identity; a normal installer test could replace its uninstall registration or close the running app. Installed-app qualification needs isolation that preserves it.
 - The prior RES-620 evidence records compact 3D, high-DPI hardware and load-sensitive journey-test limitations; they have not been requalified here. The checkbox change has only offscreen visual evidence so far.
 
 No current installer hash or installed-workflow receipt is claimed. Do not close RES-621 on this record.
