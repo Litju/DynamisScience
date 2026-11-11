@@ -69,6 +69,9 @@ def run_method_state(run: dict[str, Any]) -> dict[str, Any]:
         return {"kind": "superseded", "label": "superseded", "promotable": False, "record": record,
                 "reason": f"Computed with {run.get('method_id')} {status.get('computed_with')}, superseded by "
                           f"{status.get('current_version')}: {status.get('reason', '')}"}
+    if status.get("state") != "CURRENT":
+        return {"kind": "not_qualified", "label": "unverified method", "promotable": False, "record": record,
+                "reason": status.get("reason", "Method version is not verified.")}
     if run.get("status") != "COMPLETED" or (run.get("result") or {}).get("status") == "INSUFFICIENT_DATA":
         return {"kind": "unavailable", "label": "no result", "promotable": False, "record": record,
                 "reason": (run.get("result") or {}).get("message") or "The run produced no estimable result."}

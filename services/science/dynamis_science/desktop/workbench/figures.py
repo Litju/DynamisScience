@@ -79,6 +79,9 @@ def _finish(figure: Figure, run: dict[str, Any], t: dict[str, str]) -> Figure:
             " · audit only, not current evidence",
             color=t["bad"], fontsize=8, fontweight="bold",
         )
+    elif status.get("state") == "UNVERIFIED":
+        figure.suptitle("UNVERIFIED METHOD VERSION · audit only, not current evidence",
+                        color=t["bad"], fontsize=8, fontweight="bold")
     figure._dynamis_metadata = {"DynamisScience provenance": json.dumps(provenance(run), sort_keys=True, default=str)}
     figure._dynamis_footer = provenance_footer(run)
     return figure

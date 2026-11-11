@@ -201,15 +201,21 @@ SUPERSEDED_METHOD_VERSIONS: dict[tuple[str, str], dict[str, str]] = {
 
 
 def method_status(run: dict[str, Any]) -> dict[str, Any]:
-    """CURRENT or SUPERSEDED for the implementation version that produced ``run``."""
+    """Identify current, superseded, and unverified implementation versions."""
     method_id = str(run.get("method_id") or "")
     spec = (run.get("execution") or {}).get("analysis_spec") or {}
-    # Runs before RES-619 recorded only the registered spec version, which was always 1.0.0.
-    computed_with = str(run.get("method_version") or spec.get("method_version") or "1.0.0")
-    current = METHODS.get(method_id, {}).get("version")
+    # Older runs may record the implementation version in the registered spec.
+    recorded = run.get("method_version") or spec.get("method_version")
+    computed_with = str(recorded) if recorded else "not recorded"
+    method = METHODS.get(method_id, {})
+    current = method.get("version")
     superseded = SUPERSEDED_METHOD_VERSIONS.get((method_id, computed_with))
     if superseded:
         return {"state": "SUPERSEDED", "computed_with": computed_with, "current_version": current, **superseded}
+    if (not recorded or not current or computed_with != current
+            or method.get("qualification", {}).get("status") not in {"QUALIFIED", "QUALIFIED_DESCRIPTIVE"}):
+        return {"state": "UNVERIFIED", "computed_with": computed_with, "current_version": current,
+                "reason": "The method or its recorded version is not currently qualified."}
     return {"state": "CURRENT", "computed_with": computed_with, "current_version": current}
 
 
@@ -220,6 +226,8 @@ def ensure_current(run: dict[str, Any], action: str) -> None:
             f"{run.get('id')} was computed with {run.get('method_id')} {status['computed_with']}, superseded by "
             f"{status['current_version']} ({status['reason']}) It cannot be used to {action}; re-run the analysis."
         )
+    if status["state"] != "CURRENT":
+        raise ResearchValidation(f"{run.get('id')} has an unverified method or version and cannot be used to {action}; re-run a qualified method.")
 
 
 REJECTED_METHODS = {
@@ -2924,6 +2932,11 @@ def export_html(entity_id: str, version: int | None = None) -> str:
     if legacy_context:
         warning_html += ('<div class="warning" role="alert"><strong>Historical context incomplete.</strong> '
                          'This version did not capture all study and source details; displayed context may reflect later changes.</div>')
+    unverified = [key for key, value in statuses.items() if value["state"] not in {"CURRENT", "SUPERSEDED"}]
+    if unverified:
+        warning_html += ('<div class="warning" role="alert"><strong>Unverified method version.</strong> '
+                         + html.escape(", ".join(unverified))
+                         + ' is shown for audit only and is not currently qualified evidence.</div>')
     manifest = {
         "report_id": payload.get("id"),
         "study_id": entity_id,

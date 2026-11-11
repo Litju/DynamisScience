@@ -329,6 +329,16 @@ def test_reliability_evidence_uses_dimensionless_icc(monkeypatch):
     assert historical == "dimensionless (recorded unit: N; corrected for display)"
 
 
+@pytest.mark.parametrize("method,version", [("METH-REAL-TREND", "9.9.9"),
+                                            ("METH-UNKNOWN", "1.0.0"),
+                                            ("METH-REAL-TREND", None)])
+def test_unknown_method_versions_cannot_be_promoted(method, version):
+    run = {"id": "RUN-UNKNOWN", "method_id": method, "method_version": version}
+    assert researchstore.method_status(run)["state"] == "UNVERIFIED"
+    with pytest.raises(researchstore.ResearchValidation, match="unverified"):
+        researchstore.ensure_current(run, "promote new evidence")
+
+
 def test_legacy_frozen_report_warns_when_context_was_not_saved(root):
     project = researchstore.create_project("Legacy report project")
     detail = _study(project["id"])
