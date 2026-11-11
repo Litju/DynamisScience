@@ -806,7 +806,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
         "schema_version": SCHEMA_VERSION,
         "admitted_at": _now(),
         "provenance_manifest_id": manifest_id,
-        **_synthetic_semantics(rights_status),
+        **(_synthetic_semantics(rights_status) if snapshot_id else {}),
     }
     records = _load_list(_artifact_path("admission_records.json"))
     records = [r for r in records if r.get("source_artifact_id") != artifact_id or r.get("measurement_family") != family]

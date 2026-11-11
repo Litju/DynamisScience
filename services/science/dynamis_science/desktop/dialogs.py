@@ -555,6 +555,9 @@ class DatasetAdmissionDialog(QDialog):
         self.mass_unit = QLineEdit("kg")
         self.time_unit = QLineEdit("s")
         self.distance_unit = QLineEdit("cm")
+        self.privacy.currentTextChanged.connect(  # a test fixture has no physical calibration; never imply one
+            lambda text: self.calibration.setText("SIMULATED") if text == "TEST_FIXTURE" and self.calibration.text() == "UNKNOWN" else None
+        )
         self.family.currentIndexChanged.connect(
             lambda: self.distance_unit.setText("cm" if self.family.currentData() == "CMJ_FORCE_PLATFORM" else "m")
         )
@@ -717,7 +720,9 @@ class DatasetAdmissionDialog(QDialog):
     def _admission_recorded(self, record: dict[str, Any]) -> None:
         self.admit_button.setEnabled(False)
         self.quarantine_button.setEnabled(False)
-        self.summary.setPlainText(self._quality_summary() + f"\n\nAdmission record: {record['id']}")
+        note = ("\nSYNTHETIC_ONLY test fixture: simulated instrument, no physical calibration, "
+                "no empirical validity, not eligible as real scientific evidence.") if record.get("admission_class") else ""
+        self.summary.setPlainText(self._quality_summary() + f"\n\nAdmission record: {record['id']}{note}")
         self.on_admitted(record)
         if record.get("dataset_snapshot_id"):
             self.accept()

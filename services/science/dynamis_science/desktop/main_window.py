@@ -589,7 +589,7 @@ class MainWindow(QMainWindow):
             self.controller.mark_run_failed()
             self.workbench.show_toast(f"{type(error).__name__}: {error}")
 
-        self.status_text.setText("Running qualified scientific analysis")
+        self.status_text.setText("Running qualified scientific analysis (cannot be cancelled; the window stays usable)")
         self.progress.setVisible(True)
         run_analysis(self.service, study_id, spec, self.runner, finish, failed)
 
