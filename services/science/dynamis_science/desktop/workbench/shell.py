@@ -262,6 +262,11 @@ class WorkbenchShell(QWidget):
         options.set_content(self._empty("Choose an analysis in the ribbon."))
 
         results.header_layout.addStretch(1)
+        self.run_button = QPushButton("Run")
+        self.run_button.setAccessibleName("Run analysis")
+        self.run_button.setToolTip("Run the configured analysis (Ctrl+Enter)")
+        self.run_button.clicked.connect(self.action_run.trigger)
+        results.header_layout.addWidget(self.run_button)
         for action, primary in ((self.action_export, False), (self.action_add_to_report, True)):
             button = QPushButton(action.text())
             button.setAccessibleName(action.text().rstrip("…"))
