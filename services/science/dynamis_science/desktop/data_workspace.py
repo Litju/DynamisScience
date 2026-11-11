@@ -230,7 +230,7 @@ class DataWorkspaceDialog(QDialog):
     # ---- catalogue
     def open(self, snapshot_id: str | None = None) -> None:
         self._wanted = snapshot_id
-        self._guard(self.service.list_datasets, self._catalogue_loaded, "Loading dataset catalogue")
+        self._guard(self.service.list_workspace, self._catalogue_loaded, "Loading dataset catalogue")
 
     def _guard(self, work: Callable[[], Any], done: Callable[[Any], None], label: str) -> None:
         def guarded() -> Any:
@@ -262,7 +262,13 @@ class DataWorkspaceDialog(QDialog):
             kind = "REAL" if item.get("real_data") else "SYNTHETIC"
             rows = sum(item.get("row_counts", {}).values())
             source = (item.get("source") or {}).get("name") or ""
-            text = f"{source or item.get('label') or item['id']}\n{item.get('label') or ''}\n{kind} · {rows:,} rows · {item['id']}"
+            entry_kind = item.get("kind", "dataset")
+            if entry_kind == "logical":
+                text = f"{item['label']}\n{len(item['batches'])} batch(es) · {kind} · {rows:,} rows"
+            elif entry_kind == "batch":
+                text = f"      ↳ {item['label']} · {rows:,} rows\n      {item['id']}"
+            else:
+                text = f"{source or item.get('label') or item['id']}\n{item.get('label') or ''}\n{kind} · {rows:,} rows · {item['id']}"
             if needle and needle not in (text + " ".join(item.get("tables", []))).lower():
                 continue
             entry = QListWidgetItem(text)
@@ -276,13 +282,16 @@ class DataWorkspaceDialog(QDialog):
         sid = self.catalogue.item(row).data(Qt.ItemDataRole.UserRole)
         dataset = next(d for d in self.datasets if d["id"] == sid)
         self.snapshot_id = sid
-        self.analyze_button.setEnabled(True)
-        self.status.setText(f"{dataset.get('label') or sid} — {len(dataset.get('tables', []))} table(s)")
+        logical = dataset.get("kind") == "logical"
+        self.analyze_button.setEnabled(not logical)
+        self.status.setText(
+            f"{dataset.get('label') or sid} — {len(dataset.get('tables', []))} table(s)"
+            + ("; analysis binds to one immutable batch, so choose a batch below to analyze it" if logical else ""))
         self.table_picker.blockSignals(True)
         self.table_picker.clear()
         self.table_picker.addItems(dataset.get("tables", []))
         self.table_picker.blockSignals(False)
-        has_signals = bool(SIGNAL_TABLES & set(dataset.get("tables", [])))
+        has_signals = bool(SIGNAL_TABLES & set(dataset.get("tables", []))) and not logical
         self.signals_note.setVisible(not has_signals)
         if self.signals is not None:
             self.signals.setVisible(has_signals)
@@ -423,6 +432,17 @@ class DataWorkspaceDialog(QDialog):
         t, esc = theme.tokens(), html.escape
         quality, record, source = info.get("quality") or {}, info.get("admission") or {}, info.get("source") or {}
         kind = "REAL DATA" if info["real_data"] else "SYNTHETIC"
+        if info.get("logical"):
+            parts = [f"<h3>{esc(info['label'])}</h3>", "<b>Logical dataset</b>: the union of its immutable import batches "
+                     "(every row carries its batch_id). New files add a batch; nothing is overwritten."]
+            for number, batch in enumerate(info["batches"], 1):
+                q = batch.get("quality") or {}
+                names = ", ".join(r["raw_filename"] for r in batch.get("receipts", []))
+                counts = ", ".join(f"{k} {v:,}" for k, v in batch.get("row_counts", {}).items())
+                parts.append(f"<b>Batch {number}</b> {esc(batch['id'])} · {esc(str(q.get('status', '')))} · {esc(counts)} · {esc(names)}")
+            parts.append("<b>Rights</b> " + esc(str(info["source"].get("rights_status", ""))))
+            self.inspector.setHtml("<br>".join(parts))
+            return
         parts = [f"<h3>{esc(str(info.get('label') or info['id']))}</h3>",
                  f"<b>{kind}</b> · {esc(info['id'])}" + (f" · <b>{esc(info['admission_class'])}</b>" if info.get("admission_class") else "")]
         if info.get("admission_class"):

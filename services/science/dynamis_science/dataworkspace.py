@@ -22,13 +22,24 @@ _FORBIDDEN = re.compile(
     r"truncate|merge|replace|grant|execute|explain|show|use|describe)\b|;|--|/\*|['\"][^'\"]*[\\/.][^'\"]*['\"]", re.I)
 
 
+Source = "Path | list[tuple[str, Path]]"
+
+
+def _scan(source: Any) -> pl.LazyFrame:
+    """One Parquet file, or the lazy union of a logical dataset's batches (each row tagged with its batch_id)."""
+    if isinstance(source, (str, Path)):
+        return pl.scan_parquet(source)
+    return pl.concat([pl.scan_parquet(path).with_columns(pl.lit(batch).alias("batch_id")) for batch, path in source],
+                     how="diagonal_relaxed")
+
+
 def unit_of(column: str) -> str:
     """Unit from the canonical column-name suffix (admitted tables are normalized to these units)."""
     return next((unit for suffix, unit in UNIT_SUFFIXES if column.endswith(suffix)), "")
 
 
-def profile(path: Path) -> dict[str, Any]:
-    lazy = pl.scan_parquet(path)
+def profile(path: Any) -> dict[str, Any]:
+    lazy = _scan(path)
     schema = lazy.collect_schema()
     aggs: list[pl.Expr] = [pl.len().alias("__rows")]
     for name, dtype in schema.items():
@@ -104,11 +115,11 @@ def _condition(schema: pl.Schema, flt: dict[str, Any]) -> pl.Expr:
             ">": col > target, ">=": col >= target}[op].fill_null(False)
 
 
-def page(path: Path, offset: int = 0, limit: int = 200, filters: list[dict[str, Any]] | None = None,
+def page(path: Any, offset: int = 0, limit: int = 200, filters: list[dict[str, Any]] | None = None,
          sort: str | None = None, descending: bool = False, columns: list[str] | None = None) -> dict[str, Any]:
     if offset < 0 or not 1 <= limit <= MAX_PAGE:
         raise ValueError(f"offset must be non-negative and limit between 1 and {MAX_PAGE}.")
-    lazy = pl.scan_parquet(path)
+    lazy = _scan(path)
     schema = lazy.collect_schema()
     for flt in filters or []:
         lazy = lazy.filter(_condition(schema, flt))
@@ -124,7 +135,7 @@ def page(path: Path, offset: int = 0, limit: int = 200, filters: list[dict[str, 
     return {"columns": chosen, "rows": frame.rows(), "total_rows": total, "offset": offset, "limit": limit}
 
 
-def query(tables: dict[str, Path], sql: str, limit: int = 1000) -> dict[str, Any]:
+def query(tables: dict[str, Any], sql: str, limit: int = 1000) -> dict[str, Any]:
     """Bounded read-only SELECT over the snapshot's tables (Polars SQL; no files, no writes)."""
     text = sql.strip()
     if not 1 <= limit <= MAX_QUERY_ROWS:
@@ -133,7 +144,7 @@ def query(tables: dict[str, Path], sql: str, limit: int = 1000) -> dict[str, Any
         raise ValueError("Only SELECT queries are allowed.")
     if _FORBIDDEN.search(text):
         raise ValueError("The query uses a statement, function or path that is not allowed in the read-only workspace.")
-    context = pl.SQLContext({name: pl.scan_parquet(path) for name, path in tables.items()})
+    context = pl.SQLContext({name: _scan(path) for name, path in tables.items()})
     try:
         frame = context.execute(text, eager=False).head(limit + 1).collect()
     except Exception as error:

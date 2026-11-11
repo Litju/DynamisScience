@@ -141,3 +141,31 @@ def test_dialog_browse_filter_query_inspect_and_continue_into_analysis(service, 
 def Qt_UserRole():
     from PySide6.QtCore import Qt
     return Qt.ItemDataRole.UserRole
+
+
+def test_logical_dataset_unions_batches_per_source(service, tmp_path, qtbot):
+    ctx = importer.build_context(FIXTURE)
+    ids = [importer.admit(importer.stage(importer.edit_mapping(importer.probe_file(_file(tmp_path, f"b{i}.csv", HEADER + f"A{i},T{i},4{i},80,1800\n")), {}, {"session_id": "S1", "sampling_hz": 1000}), ctx))["dataset_snapshot_id"] for i in (1, 2)]
+    other = importer.build_context({**FIXTURE, "source_name": "Other lab"})
+    importer.admit(importer.stage(importer.edit_mapping(importer.probe_file(_file(tmp_path, "o.csv", HEADER + "Z1,T1,41,80,1800\n")), {}, {"session_id": "S1", "sampling_hz": 1000}), other))
+    logical = [g for g in service.logical_datasets()]
+    assert len(logical) == 2  # one per source profile
+    group = next(g for g in logical if len(g["batches"]) == 2)
+    assert group["row_counts"] == {"cmj_trials": 2} and [b["id"] for b in group["batches"]] == ids
+    page = service.query_table(group["id"], "cmj_trials")
+    assert page["total_rows"] == 2 and "batch_id" in page["columns"]
+    assert {r[page["columns"].index("batch_id")] for r in page["rows"]} == set(ids)
+    result = service.run_readonly_query(group["id"], "SELECT batch_id, COUNT(*) AS n FROM cmj_trials GROUP BY batch_id ORDER BY batch_id")
+    assert [r[1] for r in result["rows"]] == [1, 1]
+    assert service.dataset_inspector(group["id"])["batches"][0]["receipts"]
+    # a new file of the same source grows the logical dataset; earlier batches are untouched
+    importer.admit(importer.stage(importer.edit_mapping(importer.probe_file(_file(tmp_path, "b3.csv", HEADER + "A3,T3,43,80,1800\n")), {}, {"session_id": "S1", "sampling_hz": 1000}), ctx))
+    assert next(g for g in service.logical_datasets() if g["id"] == group["id"])["row_counts"] == {"cmj_trials": 3}
+    dialog = DataWorkspaceDialog(service, lambda op, done, label="": done(op()), lambda sid: None)
+    qtbot.addWidget(dialog)
+    dialog.open(group["id"])
+    assert dialog.snapshot_id == group["id"] and not dialog.analyze_button.isEnabled()
+    assert dialog.rows_model.rowCount() == 3 and "Logical dataset" in dialog.inspector.toPlainText()
+    batch_row = next(i for i in range(dialog.catalogue.count()) if dialog.catalogue.item(i).data(0x0100) == ids[0])
+    dialog.catalogue.setCurrentRow(batch_row)
+    assert dialog.analyze_button.isEnabled()

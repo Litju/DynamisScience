@@ -865,8 +865,59 @@ class DynamisAppService:
         }
 
     # ---- Data Workspace (read-only access to admitted tables)
-    def _workspace_tables(self, snapshot_id: str) -> dict[str, Path]:
+    FAMILY_LABEL = {"CMJ_FORCE_PLATFORM": "CMJ trials", "SPRINT_TIMING": "Sprint timing", "RAW_FORCE_TIME": "Force-time recordings"}
+
+    def logical_datasets(self) -> list[dict[str, Any]]:
+        """One logical dataset per source profile and measurement family: the union of its immutable import batches."""
         self.ensure_initialized()
+        groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        for item in admission.list_admitted_snapshots():
+            snapshot = admission.get_admitted_snapshot(item["id"])
+            artifact = admission.get_source_artifact(item.get("source_artifact_id", ""))
+            if snapshot and artifact:
+                groups.setdefault((artifact["source_id"], snapshot["measurement_family"]), []).append(snapshot)
+        result = []
+        for (source_id, family), batches in sorted(groups.items()):
+            batches.sort(key=lambda b: (b.get("admission") or {}).get("admitted_at", ""))
+            source = batches[0]["source"]
+            totals: dict[str, int] = {}
+            for batch in batches:
+                for table, count in batch["row_counts"].items():
+                    totals[table] = totals.get(table, 0) + count
+            result.append({
+                "id": f"LOGICAL:{source_id}:{family}", "label": f"{source['name']} — {self.FAMILY_LABEL.get(family, family)}",
+                "source": source, "family": family, "kind": "logical", "synthetic": all(b["synthetic"] for b in batches),
+                "real_data": any(b["real_data"] for b in batches), "row_counts": totals, "tables": sorted(totals),
+                "batches": [{"id": b["id"], "rows": sum(b["row_counts"].values()), "tables": b["row_counts"],
+                             "status": (b.get("admission") or {}).get("status"), "admitted_at": (b.get("admission") or {}).get("admitted_at")}
+                            for b in batches]})
+        return result
+
+    def list_workspace(self) -> list[dict[str, Any]]:
+        """Catalogue for the Data workspace: logical datasets (with their batches) and the non-admitted datasets."""
+        logical = self.logical_datasets()
+        batch_ids = {b["id"] for group in logical for b in group["batches"]}
+        entries = [dict(d, kind="dataset") for d in self.list_datasets() if d["id"] not in batch_ids]
+        for group in logical:
+            entries.append(group)
+            for number, batch in enumerate(group["batches"], 1):
+                entries.append({"id": batch["id"], "kind": "batch", "parent": group["id"], "source": group["source"],
+                                "label": f"Batch {number} of {len(group['batches'])}", "synthetic": group["synthetic"],
+                                "real_data": group["real_data"], "row_counts": batch["tables"], "tables": sorted(batch["tables"])})
+        return entries
+
+    def _workspace_tables(self, snapshot_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        if snapshot_id.startswith("LOGICAL:"):
+            group = next((g for g in self.logical_datasets() if g["id"] == snapshot_id), None)
+            if group is None:
+                raise researchstore.ResearchNotFound(f"Dataset {snapshot_id} not found")
+            union: dict[str, list[tuple[str, Path]]] = {}
+            for batch in group["batches"]:
+                directory = paths()["admitted"] / batch["id"]
+                for table in batch["tables"]:
+                    union.setdefault(table, []).append((batch["id"], directory / f"{table}.parquet"))
+            return union
         snapshot = researchstore.get_snapshot(snapshot_id)
         if snapshot is None:
             raise researchstore.ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
@@ -894,6 +945,16 @@ class DynamisAppService:
     def dataset_inspector(self, snapshot_id: str) -> dict[str, Any]:
         """Rights, QC, exclusions, instruments, provenance and import receipts for one snapshot."""
         self.ensure_initialized()
+        if snapshot_id.startswith("LOGICAL:"):
+            group = next((g for g in self.logical_datasets() if g["id"] == snapshot_id), None)
+            if group is None:
+                raise researchstore.ResearchNotFound(f"Dataset {snapshot_id} not found")
+            batches = [self.dataset_inspector(b["id"]) for b in group["batches"]]
+            return {"id": snapshot_id, "label": group["label"], "logical": True, "synthetic": group["synthetic"],
+                    "real_data": group["real_data"], "source": group["source"], "row_counts": group["row_counts"],
+                    "batches": batches, "admission": {}, "quality": None, "provenance": {}, "checksums": {},
+                    "receipts": [r for b in batches for r in b["receipts"]], "admission_class": None,
+                    "used_by_studies": sorted({u for b in batches for u in b["used_by_studies"]})}
         snapshot = researchstore.get_snapshot(snapshot_id)
         if snapshot is None:
             raise researchstore.ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
