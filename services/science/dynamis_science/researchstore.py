@@ -2910,8 +2910,17 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         "generated_at": generated_at,
         "limitations": limitations,
     }
+    def interval_text(item: dict[str, Any]) -> str:
+        interval = item.get("interval")
+        if not interval:
+            return "—"
+        label = interval.get("kind") or "Interval"
+        if item.get("uncertainty_label") == "95% CI half-width at the final point":
+            label = "Student-t 95% CI for final-point mean (not the change)"
+        return f"{label}: {interval.get('low')} – {interval.get('high')}"
+
     rows = "".join(
-        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(str(item.get('unit', '')))}</td><td>{html.escape(str(item.get('interval', {}).get('low') if item.get('interval') else ''))} – {html.escape(str(item.get('interval', {}).get('high') if item.get('interval') else ''))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
+        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(str(item.get('unit', '')))}</td><td>{html.escape(interval_text(item))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
         for item in evidence
     )
     figure_html = "".join(
@@ -2967,7 +2976,7 @@ pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid 
 <p>{html.escape(detail['plan']['primary_estimand'])}</p>
 <p class="meta">{html.escape(str(detail['plan'].get('method_id') or ''))} · {html.escape(detail['plan']['status'])} · {html.escape(str(detail['plan'].get('parameters', {})))}</p>
 <h2>4. Results</h2>
-{'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>95% interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
+{'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>Interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
 {figure_html}
 {narrative}
 <h2>5. Limitations</h2><ul>{limitation_html}</ul>
