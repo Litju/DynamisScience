@@ -27,7 +27,7 @@ from . import admission, traces
 from .contracts import utc_now
 from .data_root import paths
 
-ADAPTER_VERSION = "dynamis-import@0.1.0"
+ADAPTER_VERSION = "dynamis-import@0.1.1"
 MAX_FILES = 100
 MAX_FILE_BYTES = 256 * 1024 * 1024  # trial-level summary tables are read whole, so they are capped
 MAX_TRACE_BYTES = 4 * 1024 * 1024 * 1024  # sample-level recordings are streamed; still an explicit limit
@@ -592,7 +592,23 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
                 protocol_id = (_unique(normalized.lazy(), "protocol_id", "protocols") if "protocol_id" in normalized.columns else None)                     or "PROT-IMP-" + _digest(ctx_p["name"], ctx_p["version"], family, sampling)
                 normalized = normalized.with_columns(*(pl.lit(v).alias(k) for k, v in (("instrument_id", instrument_id), ("protocol_id", protocol_id))
                                                        if k not in normalized.columns))
+                # Saved JSON mappings reorder keys; column order must not change the batch identity.
+                normalized = normalized.select(sorted(normalized.columns))
                 normalized.write_parquet(normalized_path, compression="zstd")
+                for previous in _receipts():
+                    if (previous["raw_sha256"], previous["source_id"], previous["family"]) != (raw_sha, src["id"], family):
+                        continue
+                    artifact = admission.get_source_artifact(previous["source_artifact_id"])
+                    if not artifact:
+                        continue
+                    stored = Path(artifact["stored_path"])
+                    if _sha256(stored) != artifact["content_hash_sha256"]:
+                        raise ImportBlocked("A previously stored import failed its integrity check.")
+                    prior = pl.read_parquet(stored)
+                    if set(prior.columns) == set(normalized.columns) and prior.select(normalized.columns).equals(normalized):
+                        # Keep legacy byte identities too, only when every canonical value still matches.
+                        shutil.copyfile(stored, normalized_path)
+                        break
                 facts = {}
         except ImportBlocked:
             raise

@@ -236,6 +236,35 @@ def test_new_service_reopens_durable_import(dialog, tmp_path):
     assert reopened.query_table(dialog.snapshot_id, "cmj_trials")["total_rows"] == 2
 
 
+@pytest.mark.parametrize("legacy_order", [False, True])
+def test_first_admission_then_reloaded_profile_does_not_duplicate_batch(dialog, tmp_path, qtbot, monkeypatch, legacy_order):
+    import polars as pl
+    path = _file(tmp_path, "first.csv", HEADER + ROWS)
+    dialog.load(str(path))
+    _fill(dialog)
+    write = pl.DataFrame.write_parquet
+
+    def legacy_write(frame, target, *args, **kwargs):
+        if str(target).endswith(".normalized.parquet"):
+            order = ["subject_id", "trial_id", "jump_height_cm", "body_mass_kg", "peak_force_n",
+                     "session_id", "sampling_hz", "instrument_id", "protocol_id"]
+            frame = frame.select(order)
+        return write(frame, target, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        if legacy_order:
+            patch.setattr(pl.DataFrame, "write_parquet", legacy_write)
+        dialog._continue_import()
+    assert dialog.state == "ready"
+    first_snapshot = dialog.snapshot_id
+    reopened = ImportReviewDialog(dialog.service, lambda op, done, label: done(op()), lambda record: None)
+    qtbot.addWidget(reopened)
+    reopened.load(str(path))
+    assert reopened.state == "ready" and reopened.snapshot_id == first_snapshot
+    assert len(admission.list_admitted_snapshots()) == 1
+    assert len(dialog.service.logical_datasets()[0]["batches"]) == 1
+
+
 def test_main_window_open_dataset_navigates_to_selected_workspace(dialog, tmp_path, qtbot, monkeypatch):
     from dynamis_science.desktop.data_workspace import DataWorkspaceDialog
     from dynamis_science.desktop.main_window import MainWindow
