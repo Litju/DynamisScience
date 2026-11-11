@@ -781,6 +781,8 @@ class DynamisAppService:
         names = _table_names(snapshot)
         if "signal_trials" in names:
             table = "signal_trials"
+        elif "trace_index" in names:
+            table = "trace_index"
         elif "force_traces" in names:
             table = "cmj_trials"
         else:
@@ -812,15 +814,21 @@ class DynamisAppService:
         if frame.is_empty():
             raise researchstore.ResearchNotFound(f"Trial {trial_id} not found")
         time_column = next((name for name in ("time_s", "timestamp_ms", "sample") if name in frame.columns), None)
+        channels = [c for c in ("force_z_n", "force_combined_n", "force_left_n", "force_right_n") if c in frame.columns]
         signal_column = next(
             (name for name in ("force_z_n", "fz_n", "vertical_force_n", "fz", "magnitude_g") if name in frame.columns),
             next((name for name in frame.columns if name not in {"trial_id", "time_s", "plate", "sample"}), None),
         )
         if time_column is None or signal_column is None:
             raise researchstore.ResearchValidation(f"Trial {trial_id} has no plottable time series")
-        groups = frame.partition_by("plate", maintain_order=True) if "plate" in frame.columns else [frame]
+        if "plate" in frame.columns:
+            plan = [(str(g["plate"][0]), g, signal_column) for g in frame.partition_by("plate", maintain_order=True)]
+        elif len(channels) > 1:  # sample-level recordings with several force channels: one series per channel
+            plan = [(c.replace("force_", "").replace("_n", ""), frame, c) for c in channels]
+        else:
+            plan = [(signal_column, frame, signal_column)]
         series = []
-        for group in groups:
+        for label, group, signal_column in plan:
             samples = group.sort(time_column).select(time_column, signal_column).to_dicts()
             if len(samples) > max_points:
                 bucket_count = max_points // 2
@@ -840,7 +848,7 @@ class DynamisAppService:
                 samples = reduced
             series.append(
                 {
-                    "label": str(group["plate"][0]) if "plate" in group.columns else signal_column,
+                    "label": label,
                     "time_column": time_column,
                     "value_column": signal_column,
                     "rows": samples,

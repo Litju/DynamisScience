@@ -88,12 +88,13 @@ def _write_json(path: Path, value: Any) -> None:
 
 def _safe_column_values(artifact: dict[str, Any], column: str) -> list[str]:
     try:
-        frame = _read_frame(artifact)
+        path = Path(artifact["stored_path"])
+        lazy = pl.scan_parquet(path) if artifact["format"] == "PARQUET" else pl.scan_csv(path)
+        if column not in lazy.collect_schema().names():
+            return []
+        return sorted(str(v) for v in lazy.select(column).unique().collect()[column].to_list())
     except Exception:
         return []
-    if column not in frame.columns:
-        return []
-    return sorted(set(str(v) for v in frame[column].to_list()))
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -732,6 +733,11 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
     elif family == "SPRINT_TIMING":
         assessment = validate_sprint(artifact, metadata)
         family_name = "SPRINT_TIMING"
+    elif family == "RAW_FORCE_TIME":
+        from . import traces
+
+        assessment = traces.validate_trace(artifact, metadata)
+        family_name = family
     else:
         raise ValueError(f"Unsupported measurement family: {family}")
 
@@ -742,17 +748,20 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
     normalization_rules: list[str] = []
     qc_operations = ["schema_validation", "unit_check", "duplicate_check", "range_check", "instrument_check", "protocol_check"]
     if status in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}:
-        if family == "CMJ_FORCE_PLATFORM":
-            frame = harmonize_cmj(artifact, metadata)
-            table_name = "cmj_trials"
-        else:
-            frame = harmonize_sprint(artifact, metadata)
-            table_name = "sprint_trials"
         snapshot_id = _snapshot_id(artifact, family)
         snapshot_dir = _admitted_dir() / snapshot_id
         snapshot_dir.mkdir(parents=True, exist_ok=False)
-        out_path = snapshot_dir / f"{table_name}.parquet"
-        frame.write_parquet(out_path, compression="zstd")
+        if family == "RAW_FORCE_TIME":  # sample-level grain: streamed, never loaded whole
+            written = traces.write_snapshot(artifact, metadata, snapshot_dir)
+            table_name, row_count, hashes = traces.TRIALS, written["rows"][traces.TRIALS], written["hashes"]
+            tables = {name: {"file": f"{name}.parquet", "rows": rows} for name, rows in written["rows"].items()}
+        else:
+            frame = harmonize_cmj(artifact, metadata) if family == "CMJ_FORCE_PLATFORM" else harmonize_sprint(artifact, metadata)
+            table_name = "cmj_trials" if family == "CMJ_FORCE_PLATFORM" else "sprint_trials"
+            out_path = snapshot_dir / f"{table_name}.parquet"
+            frame.write_parquet(out_path, compression="zstd")
+            row_count, hashes = frame.height, {f"{table_name}.parquet": hashlib.sha256(out_path.read_bytes()).hexdigest()}
+            tables = {table_name: {"file": f"{table_name}.parquet", "rows": row_count}}
         normalization_rules = ["canonical mass units", "canonical time units", "canonical distance units", "provenance columns"]
         # manifest
         manifest_id = "PM-" + hashlib.sha256(snapshot_id.encode()).hexdigest()[:12].upper()
@@ -760,13 +769,13 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "id": manifest_id,
             "snapshot_id": snapshot_id,
             "source_artifact_ids": [artifact_id],
-            "content_hashes": {f"{table_name}.parquet": hashlib.sha256(out_path.read_bytes()).hexdigest()},
+            "content_hashes": hashes,
             "data_rights_status": rights_status,
             "parser_version": PARSER_VERSION,
             "normalization_rules": normalization_rules,
             "qc_operations": qc_operations,
             "exclusion_criteria": assessment.get("rejected_record_ids", []) + assessment.get("quarantined_record_ids", []),
-            "instrument_metadata": [get_instrument(iid) for iid in sorted(set(str(v) for v in _read_frame(artifact)["instrument_id"].to_list())) if get_instrument(iid)],
+            "instrument_metadata": [get_instrument(iid) for iid in _safe_column_values(artifact, "instrument_id") if get_instrument(iid)],
             "metric_definitions": [],
             "algorithm_versions": {"admission": PARSER_VERSION},
             "schema_version": SCHEMA_VERSION,
@@ -778,8 +787,9 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "label": f"Admitted {family} snapshot",
             "source_artifact_id": artifact_id,
             "measurement_family": family,
-            "row_count": frame.height,
+            "row_count": row_count,
             "table": table_name,
+            "tables": tables,
             "path": str(snapshot_dir),
             "rights_status": rights_status,
             "admission_status": status,
@@ -850,9 +860,10 @@ def get_admitted_snapshot(snapshot_id: str) -> dict[str, Any] | None:
         return None
     directory = _admitted_dir() / snapshot["id"]
     table = snapshot.get("table", "")
-    if table not in {"cmj_trials", "sprint_trials"}:
+    if table not in {"cmj_trials", "sprint_trials", "trace_index"}:
         return None
-    if not (directory / f"{table}.parquet").is_file():
+    tables = snapshot.get("tables") or {table: {"file": f"{table}.parquet", "rows": snapshot.get("row_count", 0)}}
+    if not all((directory / f"{name}.parquet").is_file() for name in tables):
         return None
     artifact = get_source_artifact(snapshot.get("source_artifact_id", ""))
     source = get_source(artifact.get("source_id", "")) if artifact else None
@@ -880,8 +891,8 @@ def get_admitted_snapshot(snapshot_id: str) -> dict[str, Any] | None:
         "real_data": snapshot.get("rights_status") != "FIXTURE_ONLY",
         "synthetic": snapshot.get("rights_status") == "FIXTURE_ONLY",
         "admitted_source": True,
-        "tables": {table: {"file": f"{table}.parquet", "rows": snapshot.get("row_count", 0)}},
-        "row_counts": {table: snapshot.get("row_count", 0)},
+        "tables": tables,
+        "row_counts": {name: info["rows"] for name, info in tables.items()},
         "checksums": provenance.get("content_hashes", {}),
         "admission": admission_record,
         "provenance": provenance,

@@ -14,19 +14,24 @@ import hashlib
 import io
 import os
 import re
+import codecs
 import shutil
+import uuid
 from pathlib import Path
 from typing import Any
 
 import polars as pl
+import pyarrow.parquet as pq
 
-from . import admission
+from . import admission, traces
 from .contracts import utc_now
 from .data_root import paths
 
 ADAPTER_VERSION = "dynamis-import@0.1.0"
 MAX_FILES = 100
-MAX_FILE_BYTES = 256 * 1024 * 1024
+MAX_FILE_BYTES = 256 * 1024 * 1024  # trial-level summary tables are read whole, so they are capped
+MAX_TRACE_BYTES = 4 * 1024 * 1024 * 1024  # sample-level recordings are streamed; still an explicit limit
+SCHEMA_ROWS = 10_000  # rows used to infer column types
 PREVIEW_ROWS = 8
 SUFFIXES = {".csv": "CSV", ".parquet": "PARQUET", ".pq": "PARQUET"}
 ADMITTABLE = {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
@@ -42,6 +47,7 @@ _CM = {"cm": 1.0, "m": 100.0, "mm": 0.1, "in": 2.54}
 _M = {"m": 1.0, "cm": 0.01, "mm": 0.001}
 _S = {"s": 1.0, "ms": 0.001}
 _N = {"n": 1.0, "kn": 1000.0}
+_FORCE = {"n": 1.0, "kn": 1000.0, "lbf": 4.4482216152605}
 _ONE = {"": 1.0}
 _ID = None
 COLUMNS: dict[str, tuple[str, dict[str, float] | None, tuple[str, ...]]] = {
@@ -61,6 +67,11 @@ COLUMNS: dict[str, tuple[str, dict[str, float] | None, tuple[str, ...]]] = {
     "peak_force_n": ("CMJ", _N, ("peak_force",)),
     "peak_power_w_kg": ("CMJ", {"w/kg": 1.0}, ("peak_power",)),
     "rsi_mod": ("CMJ", {"m/s": 1.0, "": 1.0}, ("rsi_modified", "rsimod")),
+    "sample_index": ("ANY", _ONE, ("sample", "sample_number", "frame", "index")),
+    "force_z_n": ("TRACE", _FORCE, ("force", "vertical_force", "total_force", "fz", "force_z")),
+    "force_left_n": ("TRACE", _FORCE, ("left_force", "leftforce", "force_left", "fz_left")),
+    "force_right_n": ("TRACE", _FORCE, ("right_force", "rightforce", "force_right", "fz_right")),
+    "force_combined_n": ("TRACE", _FORCE, ("combined_force", "combinedforce", "force_combined")),
     "distance_m": ("SPRINT", _M, ("distance", "sprint_distance")),
     "time_s": ("SPRINT", _S, ("time", "sprint_time", "split_time")),
 }
@@ -68,10 +79,10 @@ _ALIAS = {alias: name for name, (_, _, aliases) in COLUMNS.items() for alias in 
 _UNIT_SYNONYMS = {"sec": "s", "secs": "s", "second": "s", "seconds": "s", "milliseconds": "ms", "centimeters": "cm",
                   "centimetres": "cm", "meters": "m", "metres": "m", "kilograms": "kg", "grams": "g", "pounds": "lb",
                   "lbs": "lb", "newton": "n", "newtons": "n", "hertz": "hz", "nsperkg": "ns/kg", "ns/kg": "ns/kg"}
-FAMILIES = {"CMJ": "CMJ_FORCE_PLATFORM", "SPRINT": "SPRINT_TIMING"}
+FAMILIES = {"CMJ": "CMJ_FORCE_PLATFORM", "SPRINT": "SPRINT_TIMING", "TRACE": traces.FAMILY}
 CANONICAL_UNITS = {"CMJ_FORCE_PLATFORM": {"body_mass": "kg", "time": "s", "distance": "cm"},
-                   "SPRINT_TIMING": {"time": "s", "distance": "m"}}
-CONSTANT_FIELDS = ("session_id", "sampling_hz", "coordinate_system")  # researcher-supplied, never invented
+                   "SPRINT_TIMING": {"time": "s", "distance": "m"}, traces.FAMILY: {"force": "N", "time": "s"}}
+CONSTANT_FIELDS = ("session_id", "sampling_hz", "coordinate_system", "subject_id", "trial_id")  # researcher-supplied, never invented
 
 
 def _unit_key(unit: str) -> str:
@@ -93,8 +104,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def read_table(path: Path) -> tuple[pl.DataFrame, dict[str, Any]]:
-    """Read a CSV (UTF-8/BOM, common delimiters) or Parquet file; raise ImportBlocked when unreadable."""
+def open_table(path: Path) -> tuple[pl.LazyFrame, dict[str, Any]]:
+    """A lazy, streaming view of a CSV (UTF-8/BOM, common delimiters) or Parquet file; ImportBlocked when unreadable.
+
+    Only the first 64 KiB is read here (delimiter, header, encoding); data are scanned lazily by the caller.
+    """
     kind = SUFFIXES.get(path.suffix.lower())
     if kind is None:
         raise ImportBlocked(f"Unsupported format '{path.suffix}'. Supported: CSV, Parquet.")
@@ -102,20 +116,19 @@ def read_table(path: Path) -> tuple[pl.DataFrame, dict[str, Any]]:
         raise ImportBlocked("The file is empty.")
     try:
         if kind == "PARQUET":
-            return pl.read_parquet(path), {"format": kind}
-        text = path.read_bytes().decode("utf-8-sig")
-        sample = text[:8192]
+            return pl.scan_parquet(path), {"format": kind}
+        with path.open("rb") as handle:
+            head = handle.read(65536)
+        text = codecs.getincrementaldecoder("utf-8-sig")().decode(head, final=False)  # tolerant of a cut multibyte tail
         try:
-            delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+            delimiter = csv.Sniffer().sniff(text[:8192], delimiters=",;	|").delimiter
         except csv.Error:
             delimiter = ","
         header = next(csv.reader(io.StringIO(text), delimiter=delimiter), [])
         duplicates = sorted({h for h in header if header.count(h) > 1})
         if duplicates:
             raise ImportBlocked(f"Duplicate column names: {', '.join(duplicates)}.")
-        frame = pl.read_csv(io.StringIO(text), separator=delimiter, infer_schema_length=1000)
-        frame = frame.filter(~pl.all_horizontal(pl.all().is_null()))  # blank lines carry no record
-        return frame, {"format": kind, "delimiter": delimiter}
+        return pl.scan_csv(path, separator=delimiter, infer_schema_length=SCHEMA_ROWS), {"format": kind, "delimiter": delimiter}
     except ImportBlocked:
         raise
     except UnicodeDecodeError as error:
@@ -124,8 +137,12 @@ def read_table(path: Path) -> tuple[pl.DataFrame, dict[str, Any]]:
         raise ImportBlocked(f"The file could not be parsed ({type(error).__name__}).") from error
 
 
-def schema_fingerprint(frame: pl.DataFrame) -> str:
-    layout = [(name, "numeric" if dtype.is_numeric() else str(dtype)) for name, dtype in frame.schema.items()]
+def _records(lazy: pl.LazyFrame) -> pl.LazyFrame:
+    return lazy.filter(~pl.all_horizontal(pl.all().is_null()))  # blank lines carry no record
+
+
+def schema_fingerprint(schema: pl.Schema) -> str:
+    layout = [(name, "numeric" if dtype.is_numeric() else str(dtype)) for name, dtype in schema.items()]
     return hashlib.sha256(repr(layout).encode()).hexdigest()[:16]
 
 
@@ -143,7 +160,7 @@ def propose_generic(frame: pl.DataFrame) -> tuple[dict[str, Any], list[str]]:
         if name is None:
             continue
         _, units, _ = COLUMNS[name]
-        exact = header == name
+        exact = header.lower() == name
         unit = None
         confidence = 1.0 if exact else 0.8
         if units is None:
@@ -155,7 +172,7 @@ def propose_generic(frame: pl.DataFrame) -> tuple[dict[str, Any], list[str]]:
             if unit not in units:
                 ambiguities.append(f"'{header}': unit '{bracket}' is not supported for {name}; choose a supported unit.")
                 unit, confidence = None, 0.3
-        elif name in ("rsi_mod", "week"):
+        elif name in ("rsi_mod", "week", "sample_index"):
             unit = ""
         else:
             ambiguities.append(f"'{header}': the unit is not stated; choose one for {name}.")
@@ -176,11 +193,12 @@ def _canonical_unit(name: str) -> str:
 
 
 def detect_family(columns: dict[str, Any]) -> str | None:
-    cmj = sum(COLUMNS[c][0] == "CMJ" for c in columns)
-    sprint = sum(COLUMNS[c][0] == "SPRINT" for c in columns)
-    if cmj and sprint == 2:
+    count = {g: sum(COLUMNS[c][0] == g for c in columns) for g in ("CMJ", "SPRINT", "TRACE")}
+    if count["TRACE"]:
+        return None if count["CMJ"] else FAMILIES["TRACE"]  # trace channels with scalar metrics: researcher decides
+    if count["CMJ"] and count["SPRINT"] == 2:
         return None  # both families plausible: the researcher decides
-    return FAMILIES["CMJ"] if cmj else FAMILIES["SPRINT"] if sprint == 2 else None
+    return FAMILIES["CMJ"] if count["CMJ"] else FAMILIES["SPRINT"] if count["SPRINT"] == 2 else None
 
 
 def outstanding(mapping: dict[str, Any]) -> list[str]:
@@ -188,9 +206,16 @@ def outstanding(mapping: dict[str, Any]) -> list[str]:
     columns, constants, family = mapping["columns"], mapping.get("constants", {}), mapping.get("family")
     if family is None:
         return ["measurement family not recognised; map at least one measurement column"]
-    need = ["subject_id", "trial_id"] + (["distance_m", "time_s"] if family == "SPRINT_TIMING" else [])
-    missing = [f"{n} column" for n in need if n not in columns]
-    if "session_id" not in columns and not str(constants.get("session_id", "")).strip():
+    supplied = lambda key: bool(str(constants.get(key, "")).strip())  # noqa: E731
+    if family == traces.FAMILY:
+        missing = [f"{k} (a column, or one value you supply for a single-trace file)" for k in ("subject_id", "trial_id")
+                   if k not in columns and not supplied(k)]
+        if "time_s" not in columns and not ("sample_index" in columns and ("sampling_hz" in columns or supplied("sampling_hz"))):
+            missing.append("time: a time column, or sample_index with a sampling_hz you supply (never assumed)")
+    else:
+        need = ["subject_id", "trial_id"] + (["distance_m", "time_s"] if family == "SPRINT_TIMING" else [])
+        missing = [f"{n} column" for n in need if n not in columns]
+    if "session_id" not in columns and not supplied("session_id"):
         missing.append("session_id (column or a value you supply)")
     if family == "CMJ_FORCE_PLATFORM":
         if "sampling_hz" not in columns and not constants.get("sampling_hz"):
@@ -202,6 +227,7 @@ def outstanding(mapping: dict[str, Any]) -> list[str]:
 
 # ---------------------------------------------------------------- Probe
 def probe_file(path: str | os.PathLike[str]) -> dict[str, Any]:
+    """Bounded probe: schema from the first rows, row count by a streaming scan, preview of 8 rows."""
     path = Path(path)
     plan: dict[str, Any] = {"path": str(path), "name": path.name, "state": "UNSUPPORTED", "ambiguities": [], "warnings": []}
     try:
@@ -209,42 +235,36 @@ def probe_file(path: str | os.PathLike[str]) -> dict[str, Any]:
         if not resolved.is_file():
             raise ImportBlocked("Not a regular file.")
         size = resolved.stat().st_size
-        if size > MAX_FILE_BYTES:
-            raise ImportBlocked(f"File is larger than the {MAX_FILE_BYTES // (1 << 20)} MiB import limit.")
-        frame, info = read_table(resolved)
+        if size > MAX_TRACE_BYTES:
+            raise ImportBlocked(f"File is larger than the {MAX_TRACE_BYTES >> 30} GiB import limit; split it.")
+        lazy, info = open_table(resolved)
+        records = _records(lazy)
+        schema = lazy.collect_schema()
+        preview = records.head(PREVIEW_ROWS).collect()
+        rows = int(records.select(pl.len()).collect().item())
     except (ImportBlocked, OSError) as error:
         plan["reason"] = str(error)
         return plan
-    trace = force_trace_reason(frame.columns)
-    columns, ambiguities = ({}, []) if trace else propose_generic(frame)
+    except Exception as error:
+        plan["reason"] = f"The file could not be parsed ({type(error).__name__})."
+        return plan
+    columns, ambiguities = propose_generic(pl.DataFrame(schema=schema))
     mapping = {"family": detect_family(columns), "columns": columns, "constants": {}}
     plan.update(
         info,
-        raw_sha256=_sha256(resolved), size_bytes=size, rows=frame.height,
-        columns=[{"name": n, "dtype": str(d)} for n, d in frame.schema.items()],
-        schema_fingerprint=schema_fingerprint(frame), adapter="generic", mapping=mapping,
+        raw_sha256=_sha256(resolved), size_bytes=size, rows=rows,
+        columns=[{"name": n, "dtype": str(d)} for n, d in schema.items()],
+        schema_fingerprint=schema_fingerprint(schema), adapter="generic", mapping=mapping,
         ambiguities=ambiguities,
-        preview={"columns": frame.columns, "rows": [[("" if v is None else str(v)) for v in row] for row in frame.head(PREVIEW_ROWS).rows()]},
+        preview={"columns": preview.columns, "rows": [[("" if v is None else str(v)) for v in row] for row in preview.rows()]},
     )
     _refresh_state(plan)
-    if trace:
-        plan.update(state="UNSUPPORTED", reason=trace, adapter="force-time-unverified")
+    if mapping["family"] != traces.FAMILY and size > MAX_FILE_BYTES:
+        plan.update(state="UNSUPPORTED", reason=f"Trial-level tables above {MAX_FILE_BYTES >> 20} MiB are not imported; "
+                    "only sample-level recordings are streamed.")
+    elif mapping["family"] == traces.FAMILY and rows > traces.MAX_ROWS:
+        plan.update(state="UNSUPPORTED", reason=f"More than {traces.MAX_ROWS:,} samples; split the recording.")
     return plan
-
-
-def force_trace_reason(headers: list[str]) -> str | None:
-    """Raw force-time exports (time + left/right force, e.g. VALD ForceDecks or Hawkin) are recognised but NOT imported.
-
-    VALD documents 'Time (s)', 'Left Force (N)', 'Right Force (N)' and Hawkin documents a time/left/right/combined layout,
-    but neither publishes exact headers, summary-block layout, zeroing or orientation, and no authorized sample has been
-    verified. Importing would mean assuming sampling, zeroing, sign and calibration, so the file is held for review instead.
-    """
-    keys = [re.sub(r"[^a-z]+", " ", h.lower()) for h in headers]
-    if any(k.strip().startswith("time") for k in keys) and any("left" in k and "force" in k for k in keys)             and any("right" in k and "force" in k for k in keys):
-        return ("This looks like a raw force-time export (time, left force, right force). Importing raw force traces "
-                "is not enabled: the vendor layout is not verified against an authorized sample, and sampling rate, "
-                "zeroing, force orientation and calibration cannot be assumed.")
-    return None
 
 
 def _refresh_state(plan: dict[str, Any]) -> None:
@@ -325,13 +345,66 @@ def normalize(frame: pl.DataFrame, mapping: dict[str, Any]) -> pl.DataFrame:
     return frame.select(list(out.values()))
 
 
-def _single(frame: pl.DataFrame, column: str, what: str) -> str | None:
-    if column not in frame.columns:
-        return None
-    values = sorted({str(v) for v in frame[column].drop_nulls().to_list()})
+def _unique(lazy: pl.LazyFrame, column: str, what: str) -> str | None:
+    """The single value of a column (as text); several values mean the file must be split, never merged."""
+    values = sorted(str(v) for v in lazy.select(pl.col(column).cast(pl.Utf8)).unique().head(5).collect()[column].drop_nulls().to_list())
     if len(values) > 1:
         raise ImportBlocked(f"The file contains several {what} ({', '.join(values[:4])}); split it so each file has one.")
     return values[0] if values else None
+
+
+def _text(mapping: dict[str, Any], name: str) -> pl.Expr:
+    entry = mapping["columns"].get(name)
+    if entry:
+        return pl.col(entry["source"]).cast(pl.Utf8).str.strip_chars().replace("", None).alias(name)
+    return pl.lit(str(mapping.get("constants", {}).get(name, "")).strip()).alias(name)
+
+
+def _normalize_trace(lazy: pl.LazyFrame, mapping: dict[str, Any], context: dict[str, Any]) -> tuple[pl.LazyFrame, dict[str, Any]]:
+    """Lazy normalization of a sample-level recording. Returns the stream and the facts needed for registration."""
+    columns, constants = mapping["columns"], mapping.get("constants", {})
+    missing = outstanding(mapping)
+    if missing:
+        raise ImportBlocked("Mapping is incomplete: " + "; ".join(missing))
+    # sampling: declared (a value you supplied or a file column), else estimated from the timestamps and labelled so
+    hz: float | None = None
+    source = "declared"
+    if "sampling_hz" in columns:
+        value = _unique(lazy, columns["sampling_hz"]["source"], "sampling rates")
+        hz = float(value) if value else None
+    elif str(constants.get("sampling_hz", "")).strip():
+        hz = float(constants["sampling_hz"])
+    if hz is not None and hz <= 0:
+        raise ImportBlocked("The sampling rate must be positive.")
+    exprs: dict[str, pl.Expr] = {name: _text(mapping, name) for name in ("subject_id", "session_id", "trial_id")}
+    if "sample_index" in columns:
+        exprs["sample_index"] = pl.col(columns["sample_index"]["source"]).cast(pl.Int64).alias("sample_index")
+    if "time_s" in columns:
+        entry = columns["time_s"]
+        exprs["time_s"] = (pl.col(entry["source"]).cast(pl.Float64) * _S[entry["unit"]]).alias("time_s")
+        time_base = "explicit_time_column"
+        if hz is None:
+            diffs = lazy.select(exprs["time_s"]).head(10001).collect()["time_s"].diff().drop_nulls()
+            positive = diffs.filter(diffs > 0)
+            if positive.is_empty():
+                raise ImportBlocked("The sampling rate cannot be estimated from the timestamps; enter it.")
+            hz, source = round(1.0 / float(positive.median()), 6), "estimated_from_timestamps"
+    else:
+        exprs["time_s"] = (pl.col(columns["sample_index"]["source"]).cast(pl.Float64) / hz).alias("time_s")
+        time_base = "sample_index/sampling_hz"
+    exprs["sampling_hz"] = pl.lit(float(hz)).alias("sampling_hz")
+    for name in traces.CHANNELS:
+        if name in columns:
+            exprs[name] = (pl.col(columns[name]["source"]).cast(pl.Float64) * _FORCE[columns[name]["unit"]]).alias(name)
+    ctx_i, ctx_p = context["instrument"], context["protocol"]
+    instrument_id = (_unique(lazy, columns["instrument_id"]["source"], "instruments") if "instrument_id" in columns else None)         or "INST-IMP-" + _digest(ctx_i["manufacturer"], ctx_i["model"], ctx_i["serial_number"], ctx_i["calibration_status"],
+                                 ctx_i["calibration_date"], traces.FAMILY)
+    protocol_id = (_unique(lazy, columns["protocol_id"]["source"], "protocols") if "protocol_id" in columns else None)         or "PROT-IMP-" + _digest(ctx_p["name"], ctx_p["version"], traces.FAMILY, hz)
+    exprs["instrument_id"] = pl.lit(instrument_id).alias("instrument_id")
+    exprs["protocol_id"] = pl.lit(protocol_id).alias("protocol_id")
+    facts = {"sampling_hz": hz, "sampling_source": source, "time_base": time_base,
+             "instrument_id": instrument_id, "protocol_id": protocol_id}
+    return lazy.select(list(exprs.values())), facts
 
 
 # ---------------------------------------------------------------- Context (source / instrument / protocol)
@@ -389,7 +462,10 @@ def list_receipts() -> list[dict[str, Any]]:
 
 
 def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: str = "") -> dict[str, Any]:
-    """Normalize one file and run the existing QC. Registers/ingests but does not admit."""
+    """Normalize one file and run the existing QC. Registers/ingests but does not admit.
+
+    Trial-level tables are normalized in memory (size-capped); sample-level recordings are streamed to Parquet.
+    """
     if plan["state"] == "UNSUPPORTED":
         raise ImportBlocked(plan.get("reason", "Unsupported file."))
     if plan["state"] != "READY":
@@ -398,57 +474,77 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
     raw_sha = _sha256(path)
     if raw_sha != plan["raw_sha256"]:
         raise ImportBlocked("The file changed after it was reviewed; probe it again.")
-    frame, _ = read_table(path)
-    mapping = plan["mapping"]
-    if schema_fingerprint(frame) != plan["schema_fingerprint"]:
-        raise ImportBlocked("The file schema changed after it was reviewed.")
-    family = mapping["family"]
-    # ids come from the file when present (one per file), otherwise derive from the entered instrument/protocol
+    mapping, family = plan["mapping"], plan["mapping"]["family"]
     ctx_i, ctx_p, src = context["instrument"], context["protocol"], context["source"]
-    normalized = normalize(frame, mapping)
-    sampling = _single(normalized, "sampling_hz", "sampling rates")
-    units = CANONICAL_UNITS[family]
-    instrument_id = _single(normalized, "instrument_id", "instruments") or "INST-IMP-" + _digest(
-        ctx_i["manufacturer"], ctx_i["model"], ctx_i["serial_number"], ctx_i["calibration_status"],
-        ctx_i["calibration_date"], family)
-    protocol_id = _single(normalized, "protocol_id", "protocols") or "PROT-IMP-" + _digest(
-        ctx_p["name"], ctx_p["version"], family, sampling)
-    normalized = normalized.with_columns(
-        *(pl.lit(v).alias(k) for k, v in (("instrument_id", instrument_id), ("protocol_id", protocol_id)) if k not in normalized.columns))
-    metadata: dict[str, Any] = {"units": units, "instrument_default": instrument_id, "protocol_default": protocol_id,
-                                "import": {"adapter": plan["adapter"], "adapter_version": ADAPTER_VERSION,
-                                           "raw_sha256": raw_sha, "schema_fingerprint": plan["schema_fingerprint"]}}
-    constants = mapping.get("constants", {})
-    if constants.get("coordinate_system"):
-        metadata["coordinate_system"] = constants["coordinate_system"]
+    lazy, _ = open_table(path)
+    lazy = _records(lazy)
+    if schema_fingerprint(lazy.collect_schema()) != plan["schema_fingerprint"]:
+        raise ImportBlocked("The file schema changed after it was reviewed.")
+    work = paths()["tmp"] / f"import-{uuid.uuid4().hex}"
+    work.mkdir(parents=True)
+    try:
+        name = f"{path.stem}.normalized.parquet"
+        normalized_path = work / name
+        units = CANONICAL_UNITS[family]
+        try:
+            if family == traces.FAMILY:
+                stream, facts = _normalize_trace(lazy, mapping, context)
+                stream.sink_parquet(normalized_path, compression="zstd")
+                sampling, instrument_id, protocol_id = facts["sampling_hz"], facts["instrument_id"], facts["protocol_id"]
+            else:
+                if plan["size_bytes"] > MAX_FILE_BYTES:
+                    raise ImportBlocked("Trial-level table exceeds the size limit.")
+                normalized = normalize(lazy.collect(), mapping)
+                sampling = _unique(normalized.lazy(), "sampling_hz", "sampling rates") if "sampling_hz" in normalized.columns else None
+                instrument_id = _unique(normalized.lazy(), "instrument_id", "instruments") if "instrument_id" in normalized.columns else None
+                instrument_id = instrument_id or "INST-IMP-" + _digest(ctx_i["manufacturer"], ctx_i["model"], ctx_i["serial_number"],
+                                                                    ctx_i["calibration_status"], ctx_i["calibration_date"], family)
+                protocol_id = (_unique(normalized.lazy(), "protocol_id", "protocols") if "protocol_id" in normalized.columns else None)                     or "PROT-IMP-" + _digest(ctx_p["name"], ctx_p["version"], family, sampling)
+                normalized = normalized.with_columns(*(pl.lit(v).alias(k) for k, v in (("instrument_id", instrument_id), ("protocol_id", protocol_id))
+                                                       if k not in normalized.columns))
+                normalized.write_parquet(normalized_path, compression="zstd")
+                facts = {}
+        except ImportBlocked:
+            raise
+        except Exception as error:
+            raise ImportBlocked(f"The data could not be normalized ({type(error).__name__}); check that mapped columns hold numbers.") from error
+        metadata: dict[str, Any] = {"units": units, "instrument_default": instrument_id, "protocol_default": protocol_id,
+                                    "import": {"adapter": plan["adapter"], "adapter_version": ADAPTER_VERSION,
+                                               "raw_sha256": raw_sha, "schema_fingerprint": plan["schema_fingerprint"]}}
+        if family == traces.FAMILY:
+            metadata.update(sampling_hz=facts["sampling_hz"], sampling_source=facts["sampling_source"], time_base=facts["time_base"])
+        constants = mapping.get("constants", {})
+        if constants.get("coordinate_system"):
+            metadata["coordinate_system"] = constants["coordinate_system"]
 
-    source = _ensure("Source", admission.get_source(src["id"]), src,
-                     ("name", "publisher", "dataset_identity", "version", "license_or_agreement",
-                      "redistribution_restrictions", "privacy_status"), admission.register_source)
-    if source.get("rights_status") == "UNVERIFIED" and rights_reviewed_by:
-        admission.verify_rights(src["id"], rights_reviewed_by)
-    _ensure("Instrument", admission.get_instrument(instrument_id),
-            {"id": instrument_id, "measurement_family": family, **ctx_i, "sampling_capabilities_hz": [float(sampling)] if sampling else []},
-            ("measurement_family", "manufacturer", "model", "serial_number", "calibration_status"), admission.register_instrument)
-    _ensure("Protocol", admission.get_protocol(protocol_id),
-            {"id": protocol_id, "measurement_family": family, "name": ctx_p["name"], "version": ctx_p["version"],
-             "sampling_hz": float(sampling or 1),  # sprint timing has no sampling rate; 1 is a placeholder the QC never reads
-             "units": units, "coordinate_convention": ctx_p["coordinate_convention"]},
-            ("measurement_family", "name", "version", "units"), admission.register_protocol)
+        source = _ensure("Source", admission.get_source(src["id"]), src,
+                         ("name", "publisher", "dataset_identity", "version", "license_or_agreement",
+                          "redistribution_restrictions", "privacy_status"), admission.register_source)
+        if source.get("rights_status") == "UNVERIFIED" and rights_reviewed_by:
+            admission.verify_rights(src["id"], rights_reviewed_by)
+        _ensure("Instrument", admission.get_instrument(instrument_id),
+                {"id": instrument_id, "measurement_family": family, **ctx_i, "sampling_capabilities_hz": [float(sampling)] if sampling else []},
+                ("measurement_family", "manufacturer", "model", "serial_number", "calibration_status"), admission.register_instrument)
+        _ensure("Protocol", admission.get_protocol(protocol_id),
+                {"id": protocol_id, "measurement_family": family, "name": ctx_p["name"], "version": ctx_p["version"],
+                 "sampling_hz": float(sampling or 1),  # sprint timing has no sampling rate; 1 is a placeholder the QC never reads
+                 "units": units, "coordinate_convention": ctx_p["coordinate_convention"]},
+                ("measurement_family", "name", "version", "units"), admission.register_protocol)
 
-    buffer = io.BytesIO()
-    normalized.write_parquet(buffer, compression="zstd")
-    data = buffer.getvalue()
-    name = f"{path.stem}.normalized.parquet"
-    duplicate_of = next((a["id"] for a in admission.list_source_artifacts() if a["source_id"] == src["id"]
-                         and a["content_hash_sha256"] == hashlib.sha256(data).hexdigest() and a["original_filename"] != name), None)
-    artifact = admission.ingest_source_artifact(src["id"], name, data, "one_click_import")
+        content_sha = _sha256(normalized_path)
+        duplicate_of = next((a["id"] for a in admission.list_source_artifacts() if a["source_id"] == src["id"]
+                             and a["content_hash_sha256"] == content_sha and a["original_filename"] != name), None)
+        artifact = admission.ingest_source_file(src["id"], normalized_path, "one_click_import")
+        normalized_rows = pq.ParquetFile(normalized_path).metadata.num_rows
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
     raw_dir = paths()["sources"] / src["id"] / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
     raw_copy = raw_dir / f"{raw_sha[:12]}-{path.name}"
     if not raw_copy.exists():
         shutil.copyfile(path, raw_copy)
-    validate = admission.validate_cmj if family == "CMJ_FORCE_PLATFORM" else admission.validate_sprint
+    validate = {"CMJ_FORCE_PLATFORM": admission.validate_cmj, "SPRINT_TIMING": admission.validate_sprint,
+                traces.FAMILY: traces.validate_trace}[family]
     quality = validate(artifact, metadata)
     rights = (admission.get_source(src["id"]) or {}).get("rights_status", "UNVERIFIED")
     eligible = quality["status"] in ADMITTABLE and rights in {"VERIFIED", "FIXTURE_ONLY"} and duplicate_of is None
@@ -458,8 +554,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
         "schema_fingerprint": plan["schema_fingerprint"], "columns": plan["columns"], "adapter": plan["adapter"],
         "adapter_version": ADAPTER_VERSION, "mapping": mapping, "family": family, "admission_metadata": metadata,
         "source_id": src["id"], "source_artifact_id": artifact["id"], "quality_assessment_id": quality["id"],
-        "normalized_rows": normalized.height, "dropped_columns": [c["name"] for c in plan["columns"] if c["name"] not in
-                                                                   {e["source"] for e in mapping["columns"].values()}],
+        "normalized_rows": normalized_rows, "dropped_columns": [c["name"] for c in plan["columns"] if c["name"] not in
+                                                                 {e["source"] for e in mapping["columns"].values()}],
     }
     previous = next((r for r in _receipts() if r["id"] == receipt["id"]), None)
     receipt.update(created_at=previous["created_at"] if previous else utc_now(), decision=previous["decision"] if previous else "STAGED")
