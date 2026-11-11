@@ -178,7 +178,7 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
 
 
 def _isolated_real_root(tmp_path: Path) -> Path:
-    source_root = Path(r"D:\datasets\DynamisScience")
+    source_root = Path(os.environ.get("DYNAMISSCIENCE_TEST_SOURCE_ROOT", r"D:\datasets\DynamisScience"))
     source_snapshots = source_root / "snapshots"
     snapshot_paths = sorted(source_snapshots.glob("DS-REAL-*")) if source_snapshots.is_dir() else []
     admissions = source_root / "manifests" / "admissions.json"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import shutil
 import sqlite3
 from pathlib import Path
@@ -19,7 +20,7 @@ from dynamis_science.desktop import theme
 from dynamis_science.desktop.workbench import descriptive, interactive
 from dynamis_science.desktop.workbench.signals_view import SignalsView
 
-PRIVATE = Path(r"D:\datasets\DynamisScience")
+PRIVATE = Path(os.environ.get("DYNAMISSCIENCE_TEST_SOURCE_ROOT", r"D:\datasets\DynamisScience"))
 
 
 @pytest.fixture(scope="module")

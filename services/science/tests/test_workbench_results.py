@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 from pathlib import Path
@@ -24,7 +25,7 @@ from dynamis_science.desktop.workbench.results import (  # noqa: E402
 )
 from dynamis_science.desktop.workbench.spec import AnalysisSpec  # noqa: E402
 
-PRIVATE = Path(r"D:\datasets\DynamisScience")
+PRIVATE = Path(os.environ.get("DYNAMISSCIENCE_TEST_SOURCE_ROOT", r"D:\datasets\DynamisScience"))
 
 
 @pytest.fixture(scope="module")
