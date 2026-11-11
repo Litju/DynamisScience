@@ -361,3 +361,56 @@ def test_qualification_records_are_native_python_calls(service):
     assert statuses["QUAL-CMJ-METRICS"] == "QUALIFIED"
     assert statuses["QUAL-RELIABILITY"] == "QUALIFIED"
     assert statuses["QUAL-LONGITUDINAL"] == "PARTIALLY_QUALIFIED"
+
+
+def _register_simulated_instrument(service: DynamisAppService) -> None:
+    service.register_admission_instrument(
+        {
+            "id": "INST-FP-1",
+            "measurement_family": "CMJ_FORCE_PLATFORM",
+            "manufacturer": "Fixture",
+            "model": "FP",
+            "serial_number": "1",
+            "calibration_status": "SIMULATED",
+            "sampling_capabilities_hz": [1000.0],
+        }
+    )
+
+
+def test_fixture_source_with_simulated_instrument_is_admitted_synthetic_only(service, tmp_path):
+    _register_fixture_source(service)
+    _register_simulated_instrument(service)
+    service.register_admission_protocol(
+        {"id": "PROT-FP-1", "measurement_family": "CMJ_FORCE_PLATFORM", "name": "Fixture CMJ", "version": "1.0",
+         "sampling_hz": 1000.0, "units": {"body_mass": "kg", "time": "s", "distance": "cm"},
+         "coordinate_convention": "vertical z up", "processing_method": "trapezoidal"}
+    )
+    artifact = _ingest(service, tmp_path, "cmj.csv", _cmj_csv().encode())
+    metadata = {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}}
+    record = service.admit_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", metadata)
+    assert record["status"] == "ADMITTED"
+    assert record["admission_class"] == "SYNTHETIC_ONLY"
+    assert record["calibration"] == "SIMULATED/NOT_APPLICABLE_TO_TEST_FIXTURE"
+    assert record["empirical_validity"] is False and record["evidence_eligible"] is False
+    assert service.admit_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", metadata) == record
+
+
+def test_simulated_instrument_is_still_quarantined_for_real_sources(service, tmp_path):
+    service.register_admission_source(
+        {"id": "SRC-FIXTURE", "name": "Real-claim source", "publisher": "Lab", "dataset_identity": "x",
+         "version": "1", "acquisition_method": "upload", "license_or_agreement": "agreement",
+         "redistribution_restrictions": "none", "permitted_uses": ["research"]}
+    )
+    service.verify_source_rights("SRC-FIXTURE", "test")
+    _register_simulated_instrument(service)
+    service.register_admission_protocol(
+        {"id": "PROT-FP-1", "measurement_family": "CMJ_FORCE_PLATFORM", "name": "P", "version": "1.0",
+         "sampling_hz": 1000.0, "units": {"body_mass": "kg", "time": "s", "distance": "cm"},
+         "coordinate_convention": "vertical z up", "processing_method": "trapezoidal"}
+    )
+    artifact = _ingest(service, tmp_path, "cmj.csv", _cmj_csv().encode())
+    result = service.validate_source_artifact(
+        artifact["id"], "CMJ_FORCE_PLATFORM", {"units": {"body_mass": "kg", "time": "s", "distance": "cm"}}
+    )
+    assert result["status"] == "QUARANTINED"
+    assert any("SIMULATED" in w for w in result["warnings"])

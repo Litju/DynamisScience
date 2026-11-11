@@ -391,6 +391,18 @@ def _identifier_errors(frame: pl.DataFrame) -> list[str]:
             if any(value is None or not str(value).strip() for value in frame[column].to_list())]
 
 
+def _calibration_warnings(artifact: dict[str, Any], instrument_ids: list[str]) -> list[str]:
+    """Real-data QC requires CALIBRATED; a FIXTURE_ONLY source may use a SIMULATED instrument (synthetic-only admission, no physical calibration claimed)."""
+    fixture = (get_source(artifact["source_id"]) or {}).get("rights_status") == "FIXTURE_ONLY"
+    out = []
+    for iid in instrument_ids:
+        inst = get_instrument(iid)
+        status = inst.get("calibration_status") if inst else "CALIBRATED"
+        if status != "CALIBRATED" and not (fixture and status == "SIMULATED"):
+            out.append(f"instrument {iid} calibration is {status}")
+    return out
+
+
 def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -479,10 +491,7 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     if unknown_protocols:
         warnings.append(f"unrecognized protocol: {unknown_protocols}")
     # calibration
-    for iid in instrument_ids:
-        inst = get_instrument(iid)
-        if inst is not None and inst.get("calibration_status") != "CALIBRATED":
-            warnings.append(f"instrument {iid} calibration is {inst.get('calibration_status')}")
+    warnings.extend(_calibration_warnings(artifact, instrument_ids))
     # implausible values
     for column, (low, high) in CMJ_RANGES.items():
         if column in columns:
@@ -570,10 +579,7 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
     unknown_protocols = [pid for pid in protocol_ids if get_protocol(pid) is None]
     if unknown_protocols:
         warnings.append(f"unrecognized protocol: {unknown_protocols}")
-    for iid in instrument_ids:
-        inst = get_instrument(iid)
-        if inst is not None and inst.get("calibration_status") != "CALIBRATED":
-            warnings.append(f"instrument {iid} calibration is {inst.get('calibration_status')}")
+    warnings.extend(_calibration_warnings(artifact, instrument_ids))
     for column, (low, high) in SPRINT_RANGES.items():
         if column in columns:
             bad = frame.filter((pl.col(column) < low) | (pl.col(column) > high))
@@ -660,6 +666,13 @@ def harmonize_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> pl.D
         frame = frame.with_columns((pl.col("time_s") * _unit_conversion(1.0, time_unit, "s", "time")).alias("time_s"))
     frame = frame.with_columns(pl.lit(artifact["id"]).alias("source_artifact_id"))
     return frame
+
+
+def _synthetic_semantics(rights_status: str) -> dict[str, Any]:
+    if rights_status != "FIXTURE_ONLY":
+        return {}
+    return {"admission_class": "SYNTHETIC_ONLY", "calibration": "SIMULATED/NOT_APPLICABLE_TO_TEST_FIXTURE",
+            "empirical_validity": False, "evidence_eligible": False}
 
 
 def _snapshot_id(artifact: dict[str, Any], family: str) -> str:
@@ -771,6 +784,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "rights_status": rights_status,
             "admission_status": status,
             "admission_metadata": metadata,
+            **_synthetic_semantics(rights_status),
         })
     record = {
         "id": "AR-" + hashlib.sha256(f"{artifact_id}:{family}".encode()).hexdigest()[:12].upper(),
@@ -792,6 +806,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
         "schema_version": SCHEMA_VERSION,
         "admitted_at": _now(),
         "provenance_manifest_id": manifest_id,
+        **_synthetic_semantics(rights_status),
     }
     records = _load_list(_artifact_path("admission_records.json"))
     records = [r for r in records if r.get("source_artifact_id") != artifact_id or r.get("measurement_family") != family]
