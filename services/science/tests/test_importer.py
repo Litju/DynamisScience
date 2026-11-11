@@ -204,3 +204,9 @@ def test_file_changed_after_review_is_refused(service, tmp_path):
 def test_blank_lines_are_not_records(tmp_path):
     plan = importer.probe_file(_file(tmp_path, "blank.csv", HEADER + ROWS + "\n\n"))
     assert plan["rows"] == 2
+
+
+def test_preset_of_another_family_is_not_reported_as_drift(service, tmp_path):
+    importer.save_preset("CMJ", _ready(_file(tmp_path, "c.csv", HEADER + ROWS)), importer.build_context(FIXTURE))
+    trace = importer.probe_file(_file(tmp_path, "t.csv", "Athlete,Trial,Time (s),Force (N)\nA,1,0.0,700\nA,1,0.001,701\n"))
+    assert importer.schema_drift(trace) is None

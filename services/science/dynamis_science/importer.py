@@ -632,6 +632,8 @@ def schema_drift(plan: dict[str, Any]) -> dict[str, Any] | None:
     best = None
     for preset in _presets():
         used = {e["source"] for e in preset["mapping"]["columns"].values()}
+        if preset["mapping"].get("family") != plan.get("mapping", {}).get("family"):
+            continue  # a preset for another measurement family is unrelated, not drifted
         if used and len(used & have) >= max(1, len(used) // 2) and preset["schema_fingerprint"] != plan["schema_fingerprint"]:
             best = {"preset": preset["id"], "missing_columns": sorted(used - have), "preset_name": preset["name"]}
     return best

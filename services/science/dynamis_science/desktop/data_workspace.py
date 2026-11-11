@@ -6,7 +6,7 @@ import html
 import json
 from typing import Any, Callable
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QPlainTextEdit,
     QPushButton, QSplitter, QTableView, QTabWidget, QTextBrowser, QToolButton, QVBoxLayout, QWidget,
@@ -262,7 +262,7 @@ class DataWorkspaceDialog(QDialog):
             kind = "REAL" if item.get("real_data") else "SYNTHETIC"
             rows = sum(item.get("row_counts", {}).values())
             source = (item.get("source") or {}).get("name") or ""
-            text = f"{item.get('label') or item['id']}\n{source + ' · ' if source else ''}{kind} · {rows:,} rows · {item['id']}"
+            text = f"{source or item.get('label') or item['id']}\n{item.get('label') or ''}\n{kind} · {rows:,} rows · {item['id']}"
             if needle and needle not in (text + " ".join(item.get("tables", []))).lower():
                 continue
             entry = QListWidgetItem(text)
@@ -288,6 +288,7 @@ class DataWorkspaceDialog(QDialog):
             self.signals.setVisible(has_signals)
             if has_signals:
                 self.signals.set_snapshot(sid)
+                self._first_trial(sid, 20)
         self.query_text.setPlainText(EXAMPLE.format(table=(dataset.get("tables") or ["table"])[0]))
         self.query_hint.setText("Read-only SELECT over: " + ", ".join(dataset.get("tables", [])) +
                                 ". No writes, files or scripts.")
@@ -385,6 +386,17 @@ class DataWorkspaceDialog(QDialog):
                 self.signals_layout.addWidget(self.signals)
             self.signals.setVisible(True)
             self.signals.set_snapshot(self.snapshot_id)
+            self._first_trial(self.snapshot_id, 20)
+
+    def _first_trial(self, snapshot_id: str, attempts: int) -> None:
+        """Show the first recording once the trial list has loaded, so the tab is never an empty plot."""
+        view = self.signals
+        if view is None or snapshot_id != self.snapshot_id or view.waveform is not None:
+            return
+        if view.trial_list.count():
+            view.show_trial(view.trial_list.item(0).data(Qt.ItemDataRole.UserRole))
+        elif attempts:
+            QTimer.singleShot(150, lambda: self._first_trial(snapshot_id, attempts - 1))
 
     def _run_query(self) -> None:
         sid, sql = self.snapshot_id, self.query_text.toPlainText()

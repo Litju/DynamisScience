@@ -170,13 +170,15 @@ class ImportReviewDialog(QDialog):
         right_layout.addWidget(scroll, 1)
         split.addWidget(right)
         split.setSizes([620, 420])
-        root.addWidget(split, 1)
-
         self.verdict = QTextBrowser()
         self.verdict.setAccessibleName("Detection, QC verdict, warnings and provenance")
-        self.verdict.setMinimumHeight(120)
-        self.verdict.setMaximumHeight(210)
-        root.addWidget(self.verdict)
+        self.verdict.setMinimumHeight(80)
+        vertical = QSplitter(Qt.Orientation.Vertical)  # the researcher can trade preview space for verdict space
+        vertical.addWidget(split)
+        vertical.addWidget(self.verdict)
+        vertical.setStretchFactor(0, 3)
+        vertical.setStretchFactor(1, 2)
+        root.addWidget(vertical, 1)
 
         buttons = QHBoxLayout()
         self.qc_button = QPushButton("Run &QC")

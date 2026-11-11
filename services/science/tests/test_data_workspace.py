@@ -133,7 +133,7 @@ def test_dialog_browse_filter_query_inspect_and_continue_into_analysis(service, 
     dialog.search.clear()
     dialog.catalogue.setCurrentRow([dialog.catalogue.item(i).data(Qt_UserRole()) for i in range(dialog.catalogue.count())].index(trace))
     dialog.tabs.setCurrentIndex(2)
-    assert dialog.signals is not None and dialog.signals.isVisible() is not None
+    assert dialog.signals is not None and dialog.signals.waveform["sample_count"] == 600  # first recording is plotted, not an empty tab
     dialog._analyze()
     assert chosen == [trace]
 
