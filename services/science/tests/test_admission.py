@@ -133,6 +133,12 @@ def test_admission_valid_csv(service, tmp_path):
         / "cmj_trials.parquet"
     ).exists()
     assert (paths()["artifacts"] / "admission_records.json").exists()
+    service.synthetic_available = False
+    snapshot_id = admitted["dataset_snapshot_id"]
+    assert any(item["id"] == snapshot_id for item in service.list_datasets())
+    assert service.get_dataset_detail(snapshot_id)["tables"][0]["rows"] == 2
+    page = service.read_table_page(snapshot_id, "cmj_trials")
+    assert [row["subject_id"] for row in page["rows"]] == ["SUB-1", "SUB-2"]
 
 
 def test_identical_files_from_distinct_sources_keep_their_provenance(service, tmp_path):

@@ -385,7 +385,7 @@ class DynamisAppService:
         return [
             item
             for item in researchstore.dataset_catalogue()
-            if not item.get("synthetic") or self.synthetic_available
+            if item.get("id") != SNAPSHOT_ID or self.synthetic_available
         ]
 
     def get_dataset_detail(self, snapshot_id: str) -> dict[str, Any]:
@@ -397,7 +397,7 @@ class DynamisAppService:
         snapshot = researchstore.get_snapshot(snapshot_id)
         if snapshot is None:
             raise researchstore.ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
-        if snapshot.get("synthetic") and not self.synthetic_available:
+        if snapshot_id == SNAPSHOT_ID and not self.synthetic_available:
             raise researchstore.ResearchNotFound("The synthetic regression fixture is unavailable")
         tables = []
         for name in _table_names(snapshot):
@@ -425,7 +425,7 @@ class DynamisAppService:
         snapshot = researchstore.get_snapshot(snapshot_id)
         if snapshot is None:
             raise researchstore.ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
-        if snapshot.get("synthetic") and not self.synthetic_available:
+        if snapshot_id == SNAPSHOT_ID and not self.synthetic_available:
             raise researchstore.ResearchNotFound("The synthetic regression fixture is unavailable")
         if table_name not in _table_names(snapshot):
             raise researchstore.ResearchNotFound(
@@ -1034,10 +1034,10 @@ def _table_names(snapshot: dict[str, Any]) -> list[str]:
 
 
 def _table_path(snapshot_id: str, table_name: str, snapshot: dict[str, Any]) -> Path:
-    if snapshot.get("synthetic"):
-        path = PARQUET_DIR / f"{table_name}.parquet"
-    elif snapshot.get("admitted_source"):
+    if snapshot.get("admitted_source"):
         path = paths()["admitted"] / snapshot_id / f"{table_name}.parquet"
+    elif snapshot.get("synthetic"):
+        path = PARQUET_DIR / f"{table_name}.parquet"
     else:
         path = realstore.snapshots_dir() / snapshot_id / f"{table_name}.parquet"
     if not path.is_file():
