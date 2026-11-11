@@ -1,51 +1,38 @@
-# RES-636 qualification — one-click scientific import
+# RES-636 qualification — vendor-neutral scientific data workspace and one-click import
 
-Engineering record, not product acceptance. RES-613 remains the owner acceptance gate. **RES-636 is not complete:** the vendor-adapter acceptance item is blocked (see Gate 5).
+Engineering record, not product acceptance (RES-613 remains the owner gate). Source commit of the packaged application: `9d0f1a2899eba28ad80e8ad1701419a19dd7c0b0` (branch `codex/res-621-research-workflow`, local, unpushed).
 
-## What was built
+## What exists (VERIFIED unless marked)
 
-`dynamis_science/importer.py` is a thin front end over the existing `admission.py` (unchanged). Flow: probe (CSV UTF-8/BOM with delimiter sniffing, Parquet, bounded non-recursive folders) → propose mapping from headers and bracketed units with confidence and explicit ambiguity → deterministic normalization to canonical names and units → get-or-create source/instrument/protocol (a registered record is never silently changed) → ingest the normalized Parquet as a source artifact → existing QC → existing admit and snapshot. `desktop/import_review.py` is the single review screen (Research → Import data…, Ctrl+I; drag and drop). The raw file is kept unchanged with an import receipt (raw SHA-256, schema fingerprint, mapping, ignored columns).
+**Canonical data model.** Two grains over the existing SQLite + Parquet storage, no new database:
+- Trial-level (`CMJ_FORCE_PLATFORM`, `SPRINT_TIMING`): Subject → Session → Trial → Measurement (canonical column, canonical unit). Table `cmj_trials` / `sprint_trials`.
+- Sample-level (`RAW_FORCE_TIME`, `dynamis_science/traces.py`): Subject → Session → Trial → Trace → sample (`time_s`, optional `sample_index`) → channel (`force_z_n`, `force_left_n`, `force_right_n`, `force_combined_n`, newtons). Tables `force_signals` (samples) and `trace_index` (one row per trace: sample count, time origin, duration, declared and implied sampling rate and its source, channels, instrument, protocol). A trial id repeats across samples; the unique key is subject/session/trial/time. A trial id shared by two subjects or sessions is rejected, never merged.
+- Raw versus derived: no derived metric is computed by import; vendor-computed and locally derived values are not mixed (no vendor adapter exists).
 
-Never invented: subject and trial identity, session, sampling rate, calibration, rights, force orientation. Session and sampling rate come from the file or the researcher. Unsupported or unstated units are review items. TEST_FIXTURE data are admitted only as SYNTHETIC_ONLY; real claims still need verified rights and a CALIBRATED instrument.
+**Import (`importer.py`, `desktop/import_review.py`).** Formats: CSV (UTF-8/BOM; comma, semicolon, tab, pipe), Parquet; single files and bounded non-recursive folders (≤100 files, symlinks skipped). Pipeline: detect → propose mapping with confidence and ambiguity → deterministic unit conversion → per-row QC → existing admission QC → immutable snapshot (batch). Units: kg/g/lb, cm/m/mm/in, s/ms, N/kN/lbf, Hz, N·s/kg, W/kg; an unstated or unsupported unit is a question, never a guess.
+- **Per-row QC flags:** rows with a missing identifier, a duplicated trial id or an implausible value are quarantined individually with a reason (`quarantine/<receipt>/rows.parquet`); clean rows continue to the unchanged admission QC. Sample-level files are judged per file (see limits).
+- **Source profile and presets:** after the first admission the mapping and source/instrument/protocol context are remembered (identity values such as session/subject/trial are not). The same schema is then one click; any header or type change is drift and is reviewed. A file with no session column is one session named after the file, stated in the summary.
+- **Logical dataset per source profile:** the union of that source's immutable batches (each row tagged `batch_id`), shown in the Data workspace; a new file adds a batch, earlier batches are never touched; analysis binds to one batch.
+- **Never invented:** calibration, rights, units, sampling rate (estimated from timestamps only when absent, labelled `estimated_from_timestamps` with a warning), force orientation/zeroing (warning when unspecified). TEST_FIXTURE stays `SYNTHETIC_ONLY`; real data needs verified rights and a CALIBRATED instrument or is quarantined (tested for trace data too).
 
-Adapter contract (module functions, no registry): `probe_file` (detect) → `propose_generic` / `edit_mapping` (propose) → `normalize` → `stage` (existing QC) → `admit` / `quarantine`.
+**Streaming and limits.** Probe reads the first 64 KiB plus a streaming row count; sample-level normalization is `scan → sink_parquet`; QC iterates Parquet batches of 500,000 rows holding O(traces) state; snapshot is a streamed copy. Limits: 4 GiB file, 100,000,000 samples per recording (explicit rejections); trial-level tables are read whole and capped at 256 MiB.
 
-## Commits (local, unpushed)
+**Data workspace (`desktop/data_workspace.py`, Research → Data workspace, Ctrl+D).** Catalogue of logical datasets, batches and existing datasets with search; paged (200 rows) table with sorting, column chooser and filters (contains, comparisons, empty); column profile (type, unit from canonical name, missingness, range); Traces tab using the existing signals view (first recording plotted); read-only SQL (Polars SQL; only SELECT; writes, files, paths, comments and multiple statements are refused; 10,000-row cap); Quality and lineage (rights, QC verdict, exclusions, instrument, import receipt with raw SHA-256, content hashes, parser version, studies); "Analyze this dataset" opens the selected batch in the research workbench.
 
-| Commit | Change |
-| --- | --- |
-| `b29af8a` | Importer core and tests (detection, mapping, units, presets, staged admission, folder bounds, duplicates). |
-| `92db733` | Native review screen, menu entry, raw force-time hold, Qt tests. |
-| `1b56305` | QC-versus-admission wording, walkthrough script, screenshots. |
-| this commit | Blank CSV lines are not records; this record and the frozen-app screenshots. |
+## Evidence
 
-## Gate results
+- Source regression at `9d0f1a2`: **256 passed in 215.75 s** (offscreen; Mendeley/MoveSmart/GUI fixtures read a checksum-identical disposable copy via `DYNAMISSCIENCE_TEST_SOURCE_ROOT`; 1929 files, content hashes identical to the original). Includes the qualified MixedLM/ICC reference tests; no estimator, optimizer or qualification criterion was changed. Earlier suite runs without the variable read the operational root; they changed only `research/research.db-shm` (SQLite shared-memory index, mtime 10:30) between two recorded fingerprints.
+- Real Windows Qt walkthrough, source application, disposable root (`scripts/res636_final_walkthrough.py`, driven through Qt calls): `docs/desktop/res636-evidence/final/` (100%, 1366×720 usable) and `final-150/` (QT_SCALE_FACTOR=1.5, 911×480 logical, the 1366×768 at 150% case): first import asks once; second file one click; mixed file partial import; invalid file blocked; Parquet; folder; trace; workspace table/filter/columns/query/inspector/traces/samples; analysis selection; restart with the datasets, presets and receipts persisted.
+- **Frozen portable `--onedir`, built from `9d0f1a2`** (`build_windows.ps1 -TestIdentity`, tree dirty only by the owner's manifest): `DynamisScience.exe` 31,374,313 bytes SHA-256 `554601D8D5A9784D71B700636085A18013F04DF7AA43192BABDA9574F98F39E9`; test installer `DynamisScience-RES621Test-Setup-x64.exe` 142,853,068 bytes SHA-256 `12C01DD731CC7B6AFF0306E3E834FD68B2A36A225C9EF6BE375AC7A1477F7FD0` (built, not installed; separate test AppId). Driven with real keyboard input on a disposable root (`res636_frozen_prep.py`, `res636_frozen_drive.ps1`, screenshots `frozen-final/`, application window only): saved-preset CSV → "3 rows ready" → Import → imported; invalid file → rejected, quarantined; force-time CSV → Import; Data workspace; trace plotted; Analyze opens the batch in the workbench; restart shows the data. Preparation of the two presets and input files used the source code against the same root (the frozen app only reused them).
+- Preservation: `generator_manifest.json` SHA-256 `835398DA594421BC9F04647992B0E9CEFD5DC844FD931D1964896B2E164A2587` unchanged and uncommitted. Operational root `D:\datasets\DynamisScience` metadata fingerprint (path, size, mtime) `497DC7A07D2B7E56B10DE99FA2DEF303A586F7395912AB3E3ECF8D45B4D431FC` before the disposable copy and identical afterwards; no run since used it as a data root. This is a metadata fingerprint, not a byte-for-byte hash baseline.
 
-| Gate | Result |
-| --- | --- |
-| 1 Detection | CSV/Parquet/folder implemented and tested. Unknown or ambiguous input yields a review state with the reason. |
-| 2 Normalization | Units: kg/g/lb, cm/m/mm/in, s/ms, N/kN, Hz, N·s/kg, W/kg. Existing QC reused; no second ETL. |
-| 3 Presets | Versioned, keyed to a schema fingerprint of names and dtypes. Same fingerprint reuses mapping and context and QC runs automatically; Admit stays an explicit click. Any header or dtype change (including a unit in a header) is drift and is reviewed. Rights are never reused from a preset: an unverified source needs a fresh rights review. |
-| 4 Review screen | Preview, mapping decisions, detection, QC verdict, warnings, provenance and storage outcome; Admit, Edit mapping, Quarantine, Save preset. Fits a 910×512 logical desktop (1366×768 at 150%); controls have accessible names. |
-| 5 Vendor interoperability | **BLOCKED.** See below. |
-| 6 Verification | See below. |
+## Not verified / limits
 
-### Gate 5 — vendor adapter
-
-VALD's support pages (read 2026-11-11) document a ForceDecks Windows raw export containing summary information, "Raw Time (s)", "Left Force (N)" and "Right Force (N)", written as a per-athlete CSV. They do not publish the exact CSV headers, the summary-block layout, the sampling rate, zeroing or orientation. Hawkin documents a time / left / right / combined force layout at 1000 Hz with no exact headers or units, and no sample rows. No authorized or sanitized sample exists in the repository, and admission has no raw-trace family. Raw force-time files are therefore recognised and held (UNSUPPORTED with the reason; tested) rather than mapped, and **no vendor compatibility is claimed**. Vendor-computed versus DynamisScience-derived metrics are not yet separated because no vendor adapter exists. To proceed: an authorized ForceDecks or Hawkin export (raw and results) and a decision on a raw-trace admission family.
-
-### Gate 6 — evidence
-
-- Importer and review tests: 24 passed. Full source regression at `1b56305`: **212 passed in 207 s** (offscreen, temporary roots). The blank-line fix postdates that run; the 24 importer/Qt tests were re-run after it.
-- Native walkthrough (`scripts/res636_walkthrough.py`, real `MainWindow` on the Windows platform, disposable root, screenshots and `receipt.json` in `res636-evidence/`): unknown file review; QC verdict SYNTHETIC_ONLY; admit; preset save; repeat import with preset (QC already run); schema drift; invalid file REJECTED then quarantined with no snapshot; folder; raw force-time held; admitted snapshots visible in the existing workbench catalogue (units cm, kg, N, Hz; SYNTHETIC chip) and readable through `read_table_page`.
-- Duplicate protection: renamed copy of identical content is not admitted again; identical file re-import is idempotent; same basename in different sources gives distinct snapshots.
-- Packaged app: `build_windows.ps1 -TestIdentity` built from source `1b56305162a9a681cba90918dbab9fc1d931aa05` (tree dirty only by the owner's manifest). `DynamisScience.exe` SHA-256 `F957B7608B7B7B0035B4C1E35237529269A7ED6FCE3107B1BBE56F60F742DEBD`; test installer `DynamisScience-RES621Test-Setup-x64.exe` SHA-256 `AD69BCAA7DA7DAA8A25576A5B6F5C6F9FA32ADF7E1EA0910EF1CAD12FFED9CCE` (142,807,530 bytes; not installed). The frozen executable was started with a disposable `--data-root`, Research → Import data opened with Ctrl+I, and a CSV was loaded through the native file dialog (`frozen-*.png`). The frozen run showed a trailing blank line counted as a record; fixed afterwards in source, so the shipped package predates that fix. **The frozen app was not driven through QC, Admit or Quarantine**; those are verified from source only.
-
-### Data preservation
-
-- `data/synthetic/generator_manifest.json` SHA-256 `835398DA594421BC9F04647992B0E9CEFD5DC844FD931D1964896B2E164A2587` before and after; still uncommitted.
-- Operational private root `D:\datasets\DynamisScience`: never configured as a data root by any run here (tests refuse an inherited root; the walkthrough and frozen run used new temporary roots, deleted afterwards). Metadata fingerprint taken after the work (1929 files; SHA-256 over path, size and mtime) `AF914E72BB4A1A192854B82405E8FFEDC71912DC9243AD73A26204DC0F459413`. No "before" fingerprint exists, so this is not proof of non-modification.
-
-## Known limits
-
-Trial identifiers must be unique per file (admission rejects repeats), so exports that number trials per athlete need a composite identifier. Folders are non-recursive with at most 100 files of 256 MiB; files are read whole into memory (no streaming). Cancel is not offered during QC. Staging registers source, instrument and protocol and stores the source artifact before the researcher presses Admit (as the existing admission dialog does). Windows only.
+- **No vendor adapter and no vendor compatibility claim.** VALD documents "Raw Time (s)", "Left Force (N)", "Right Force (N)" only; Hawkin documents a time/left/right/combined layout at 1000 Hz. Files with plausible names import through the generic mapping, which says nothing about vendor header variants. Hawkin/hawkinR-style `time_s,force_left_N,…` headers are matched generically.
+- The frozen run covers the keyboard journey above; the installer was not run. The import window opens tall even with details closed (cosmetic, left as is). Only 100% display scaling was tried on the frozen build; 150% was tested on the source application only. Other DPI/hardware not tested.
+- Sample-level QC is per file (a file with any rejected trace is not admitted); per-row flags apply to trial-level tables only. Duplicate sample times are rejected, not repaired.
+- Trace snapshots are browsed, queried and plotted; scalar analyses cannot run on them (no derived metrics are computed); the qualified methods bind to `signal_trials`/`cmj_*` tables and are untouched.
+- A logical dataset is browse/query/inspect only; analysis opens one batch. Combining batches into one analysis snapshot is not built.
+- Trial identifiers must be unique per file (export numbering per athlete needs a composite id). Excel, JSON, Arrow and C3D are not supported. Read-only SQL is a keyword filter over Polars SQL, not a sandbox proof. Query/page calls have row caps but no wall-clock timeout.
+- Cancel is not offered during import. Windows only.
+- Earlier packaged-app screenshots (`frozen-01/02`) showed a user desktop and were removed from the tree; they remain in commit `b023d41` history (not rewritten).

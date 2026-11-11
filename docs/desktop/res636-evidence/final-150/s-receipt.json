@@ -1,0 +1,186 @@
+{
+  "steps": [
+    {
+      "screenshot": "s01-first-import-asks-once.png",
+      "sha256": "1f525c822749601872e8e736ad054c4d2457af0f698bd1886a0c1841ed6d87fa",
+      "note": "first file from a new source: details open, the source is asked once"
+    },
+    {
+      "screenshot": "s02-first-import-done.png",
+      "sha256": "d5cafd7f2d3759611555037b649119205c6518afaa7f44106da3d236ac4429ff",
+      "note": "one Import click: QC then batch added; summary says what happened"
+    },
+    {
+      "screenshot": "s03-second-file-one-click.png",
+      "sha256": "fd43b3b5167d4f0f7b78d54b9d8a30624dcb187ee4f234737804f6bace9db11b",
+      "note": "same schema: nothing asked, QC already ran, Import is the only action"
+    },
+    {
+      "screenshot": "s04-second-file-imported.png",
+      "sha256": "c72ed890eb839061940ae3aabb266f9281a423d8c4004d48cb40e7dd2f82f730",
+      "note": "second file imported into the same logical dataset"
+    },
+    {
+      "screenshot": "s05-mixed-rows.png",
+      "sha256": "d5784f598c852ba6aa3bcaff4fd0dd01425ce162dc064f1f670ebb078cfcea2b",
+      "note": "per-row QC: clean rows ready, bad rows will be quarantined with reasons"
+    },
+    {
+      "screenshot": "s06-mixed-rows-imported.png",
+      "sha256": "6c21abc9fd5a7913863d1709994d9ab3cc16f3cc07c2bef29e2c40620c662bf6",
+      "note": "partial import: good rows added, flagged rows kept in quarantine"
+    },
+    {
+      "screenshot": "s07-invalid.png",
+      "sha256": "460e6ad61b050dccb1fe308c4559334ca853021f17959ac1acb0cf696556c2a3",
+      "note": "nothing importable: reason shown, Import disabled, details open"
+    },
+    {
+      "screenshot": "s08-parquet.png",
+      "sha256": "833fd36f2518b05ef61250ace7d98feb4e7d5202eaa02a157fdcd2411fa4a6df",
+      "note": "Parquet file imported in one click"
+    },
+    {
+      "screenshot": "s09-folder.png",
+      "sha256": "8cf457e398635031a9be1384700df0d16991599ac6252730f9437f364e64af7b",
+      "note": "folder: all files imported with one click"
+    },
+    {
+      "screenshot": "s10-trace.png",
+      "sha256": "3eee62aea02563b54ae0f2d93b58119e0370e8ce9312c7431c6ca7d875ce7b15",
+      "note": "sample-level recording (repeated trial ids across samples) imported"
+    },
+    {
+      "screenshot": "s11-workspace-table.png",
+      "sha256": "454333b404a6dd99e5b2ed4bb55e3f12c6cdd4c6ea18df0cc10762c88d94f87a",
+      "note": "dataset catalogue and paged table with units"
+    },
+    {
+      "screenshot": "s12-workspace-filter.png",
+      "sha256": "17ff94df57dad5ca10a060a192b6f883659f52c984d7d8e8836a101aca11e980",
+      "note": "filter peak_force_n >= 1700 applied (rows and total updated)"
+    },
+    {
+      "screenshot": "s13-workspace-columns.png",
+      "sha256": "d65925f9f0d0eb66007f809c6a0849658cf3d272d1a8a970ec5a8ad493e7adf5",
+      "note": "column types, units, missingness"
+    },
+    {
+      "screenshot": "s14-workspace-query.png",
+      "sha256": "c9ad2beea5f7cef2278caa26ea620887f29ff3ea1ea41df855cb509f0e4e24b2",
+      "note": "read-only SELECT result"
+    },
+    {
+      "screenshot": "s15-workspace-inspector.png",
+      "sha256": "fefac544bdb5f0b654855644ef753340b8960e84b76a941bca61dbd406cf88fd",
+      "note": "rights, QC, exclusions, instrument, provenance, import receipt"
+    },
+    {
+      "screenshot": "s16-workspace-traces.png",
+      "sha256": "82cd0653bdb08b3d77f05fe9a3ab5a7938e670245e6705a5371e0e6146bb2981",
+      "note": "raw force-time recording plotted"
+    },
+    {
+      "screenshot": "s17-workspace-samples.png",
+      "sha256": "7d6ffa5036daf22eeeb1805605ff263bf745d944520bc874a188bb796d8094bb",
+      "note": "sample-level table: repeated trial ids across samples"
+    },
+    {
+      "screenshot": "s18-analysis-selected.png",
+      "sha256": "388d7227159ad7bc69a793a055f0239be7f720b3d92b8184d89c12b1bbb1d7ac",
+      "note": "dataset selected into the research workbench"
+    },
+    {
+      "screenshot": "s19-after-restart.png",
+      "sha256": "d6b3a9389a63be136d86e934070d61ffc1b8e4559480f90bbeecb4600bfb8670",
+      "note": "after restart: catalogue and datasets persisted"
+    }
+  ],
+  "scale": "1.5",
+  "logical_screen": "911x480",
+  "admitted": {
+    "DS-ADMITTED-15BCE6433060": "RAW_FORCE_TIME",
+    "DS-ADMITTED-1654EDC14576": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-3E6AE034D7D9": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-4289E49BA3A9": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-4F2106A97CA3": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-4FBFFAD3D018": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-64F30C9E7599": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-708649A6EDCC": "CMJ_FORCE_PLATFORM"
+  },
+  "filtered_rows": 3,
+  "drop_rejected": "Only SELECT queries are allowed.",
+  "sample_rows_total": 2000,
+  "analysis_snapshot": "DS-ADMITTED-4FBFFAD3D018",
+  "persisted_after_restart": true,
+  "presets_after_restart": [
+    "Walkthrough fixture lab \u00b7 CMJ_FORCE_PLATFORM \u00b7 8a0df6",
+    "Walkthrough fixture lab \u00b7 CMJ_FORCE_PLATFORM \u00b7 c3c426",
+    "Walkthrough fixture lab \u00b7 RAW_FORCE_TIME \u00b7 ed7f93"
+  ],
+  "import_receipts": [
+    {
+      "id": "IR-5BE1D3466004",
+      "raw_filename": "cmj_a.csv",
+      "raw_sha256": "8778b914bd5876385bda602210cb7f0cf5dcbf9c3a8d5bf5a8e50fe757159ae6",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-CF19686683B8",
+      "raw_filename": "cmj_b.csv",
+      "raw_sha256": "bfe141734c2fd7ae76e7d9ffe8298b5bd4da47f8b2904b2c5423d3a792479af5",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-285D05C301A1",
+      "raw_filename": "cmj_mixed.csv",
+      "raw_sha256": "0df2c1d5e77d4287879bd8508c312638d933b92726922a62fe040e7303b5e46f",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-C4E05A2364AA",
+      "raw_filename": "bad.csv",
+      "raw_sha256": "8962b9481de9e553696c76540c52e401f52ff9fe0435121ee694f4c6ab318fa1",
+      "decision": "QUARANTINED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-E64DA9633D32",
+      "raw_filename": "cmj_parquet.parquet",
+      "raw_sha256": "28451e1edfdbba83cc4daf0dc12561e5b52291aa4f521242ebd7c0e3615e8111",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-3AD39AAF8C20",
+      "raw_filename": "f0.csv",
+      "raw_sha256": "51c11c56085727144d023724ed24a52610b8b8505921a749bc3ec308ed23aaec",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-10FBB5A93CCB",
+      "raw_filename": "f1.csv",
+      "raw_sha256": "d9471b64a77c063a0637f40825ac0a6734bd64906d2bafee8166cf34a8924858",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-0893D8155FC1",
+      "raw_filename": "f2.csv",
+      "raw_sha256": "de2d650c7e3849a01d63f69de79f0804ce6abb946936087ac451e8da5e82310d",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-896106BB89E9",
+      "raw_filename": "traces.csv",
+      "raw_sha256": "4a5e9cdc180d507c6cccb417160aa21cbdb6c25b735a78937ad2b10b894213dc",
+      "decision": "ADMITTED_WITH_WARNINGS",
+      "family": "RAW_FORCE_TIME"
+    }
+  ]
+}
