@@ -81,7 +81,7 @@ try {
   Keys '%c' 3; Shot 'workspace-columns'
   Keys '%r' 5; Shot 'workspace-traces'
   Keys '%q' 2; Keys '%s' 4; Shot 'workspace-query'
-  Keys '%l' 3; Shot 'workspace-inspector'
+  Keys '%p' 3; Shot 'workspace-inspector'
   Keys '%a' 8                  # Analyze this dataset
   Shot 'analysis-selected'
   Stop-App

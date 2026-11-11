@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -938,6 +939,83 @@ class DynamisAppService:
         if table not in tables:
             raise researchstore.ResearchNotFound(f"Table {table} not found")
         return dataworkspace.page(tables[table], offset, limit, filters, sort, descending, columns)
+
+    DERIVE_METHOD = "DS-DERIVE-1.0: peak = max, mean = arithmetic mean, impulse = trapezoidal integral of force over time"
+
+    def compare_trial(self, snapshot_id: str, trial_id: str) -> dict[str, Any]:
+        """Raw-derived versus recorded values for one trace, labelled by origin.
+
+        Derived values are computed now from the raw samples (not stored, not a vendor value); recorded values are read
+        from trial-level tables admitted from the same source with the same subject and trial id.
+        """
+        import numpy as np
+
+        tables = self._workspace_tables(snapshot_id)
+        if "force_signals" not in tables:
+            raise researchstore.ResearchNotFound("This dataset has no raw force-time samples")
+        frame = pl.scan_parquet(tables["force_signals"]).filter(pl.col("trial_id") == trial_id).sort("time_s").collect()
+        if frame.is_empty():
+            raise researchstore.ResearchNotFound(f"Trial {trial_id} not found")
+        names = frame.columns
+        channels = [c for c in ("force_z_n", "force_combined_n") if c in names][:1] or \
+                   [c for c in ("force_left_n", "force_right_n") if c in names]
+        total = frame.select(pl.sum_horizontal(channels).alias("f"))["f"].to_numpy()
+        time = frame["time_s"].to_numpy()
+        derived = {"peak_force_n": float(np.nanmax(total)), "mean_force_n": float(np.nanmean(total)),
+                   "duration_s": float(time[-1] - time[0]), "impulse_n_s": float(np.trapezoid(total, time)),
+                   "samples": int(frame.height)}
+        subject = frame["subject_id"][0]
+        source_id = (admission.get_source_artifact((admission.get_admitted_snapshot(snapshot_id) or {}).get("source_artifact_id", "")) or {}).get("source_id")
+        recorded: dict[str, Any] = {}
+        for item in admission.list_admitted_snapshots():
+            snap = admission.get_admitted_snapshot(item["id"])
+            artifact = admission.get_source_artifact(item.get("source_artifact_id", ""))
+            if not snap or not artifact or artifact["source_id"] != source_id or snap["measurement_family"] == "RAW_FORCE_TIME":
+                continue
+            table = pl.read_parquet(Path(snap["path"]) / f"{snap['table']}.parquet")
+            rows = table.filter((pl.col("trial_id") == trial_id) & (pl.col("subject_id") == subject)) if {"trial_id", "subject_id"} <= set(table.columns) else table.clear()
+            if rows.height and "peak_force_n" in rows.columns and rows["peak_force_n"][0] is not None:
+                recorded["peak_force_n"] = (float(rows["peak_force_n"][0]), item["id"])
+        labels = [("peak_force_n", "Peak force", "N"), ("mean_force_n", "Mean force", "N"),
+                  ("impulse_n_s", "Impulse", "N·s"), ("duration_s", "Duration", "s")]
+        rows_out = []
+        for key, label, unit in labels:
+            rec = recorded.get(key)
+            rows_out.append({"metric": label, "unit": unit, "recorded": rec[0] if rec else None,
+                             "recorded_from": rec[1] if rec else None, "derived": derived[key],
+                             "difference": derived[key] - rec[0] if rec else None})
+        return {"snapshot_id": snapshot_id, "trial_id": trial_id, "subject_id": subject, "channels": channels,
+                "samples": derived["samples"], "method": self.DERIVE_METHOD, "rows": rows_out}
+
+    def list_saved_queries(self) -> list[dict[str, Any]]:
+        """The latest version of each saved read-only query."""
+        self.ensure_initialized()
+        latest: dict[str, dict[str, Any]] = {}
+        for item in admission._load_list(paths()["artifacts"] / "saved_queries.json"):
+            latest[item["name"]] = item
+        return sorted(latest.values(), key=lambda q: q["name"].lower())
+
+    def save_query(self, name: str, sql: str) -> dict[str, Any]:
+        """Save a SELECT under a name; saving the same name again adds a version (earlier ones are kept)."""
+        self.ensure_initialized()
+        name = name.strip()
+        if not name:
+            raise ValueError("A saved query needs a name.")
+        text = dataworkspace.check_sql(sql)
+        path = paths()["artifacts"] / "saved_queries.json"
+        items = admission._load_list(path)
+        version = 1 + sum(1 for q in items if q["name"] == name)
+        item = {"name": name, "sql": text, "version": version, "saved_at": datetime.now(timezone.utc).isoformat()}
+        admission._save_list(path, items + [item])
+        return item
+
+    def delete_saved_query(self, name: str) -> int:
+        self.ensure_initialized()
+        path = paths()["artifacts"] / "saved_queries.json"
+        items = admission._load_list(path)
+        kept = [q for q in items if q["name"] != name]
+        admission._save_list(path, kept)
+        return len(items) - len(kept)
 
     def run_readonly_query(self, snapshot_id: str, sql: str, limit: int = 1000) -> dict[str, Any]:
         return dataworkspace.query(self._workspace_tables(snapshot_id), sql, limit)

@@ -9,7 +9,7 @@ from typing import Any, Callable
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QPlainTextEdit,
-    QPushButton, QSplitter, QTableView, QTabWidget, QTextBrowser, QToolButton, QVBoxLayout, QWidget,
+    QInputDialog, QPushButton, QSplitter, QTableView, QTabWidget, QTextBrowser, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .. import dataworkspace
@@ -103,11 +103,12 @@ class DataWorkspaceDialog(QDialog):
         split.addWidget(left)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._table_tab(), "&Table")
+        self.tabs.addTab(self._table_tab(), "&Data")
         self.tabs.addTab(self._columns_tab(), "&Columns")
         self.tabs.addTab(self._signals_tab(), "T&races")
+        self.tabs.addTab(self._compare_tab(), "Co&mpare")
         self.tabs.addTab(self._query_tab(), "&Query")
-        self.tabs.addTab(self._inspector_tab(), "Quality and &lineage")
+        self.tabs.addTab(self._inspector_tab(), "&Provenance")
         self.tabs.currentChanged.connect(self._tab_changed)
         split.addWidget(self.tabs)
         split.setSizes([260, 900])
@@ -162,7 +163,8 @@ class DataWorkspaceDialog(QDialog):
         flt.addWidget(add)
         flt.addWidget(clear)
         layout.addLayout(flt)
-        self.filter_list = QLabel("No filters")
+        self.filter_list = QLabel("")
+        self.filter_list.setVisible(False)
         self.filter_list.setAccessibleName("Active filters")
         layout.addWidget(self.filter_list)
         self.rows_model = RowsModel(self)
@@ -209,6 +211,20 @@ class DataWorkspaceDialog(QDialog):
         self.query_text.setMaximumHeight(110)
         run = QPushButton("Run &SQL")
         run.clicked.connect(self._run_query)
+        saved = QHBoxLayout()
+        self.saved_picker = QComboBox()
+        self.saved_picker.setAccessibleName("Saved queries")
+        self.saved_picker.setMinimumWidth(220)
+        self.saved_picker.activated.connect(self._load_saved)
+        save, delete = QPushButton("Sa&ve query…"), QPushButton("Delete")
+        save.clicked.connect(self._save_query)
+        delete.clicked.connect(self._delete_query)
+        saved.addWidget(QLabel("Saved"))
+        saved.addWidget(self.saved_picker)
+        saved.addWidget(save)
+        saved.addWidget(delete)
+        saved.addStretch(1)
+        layout.addLayout(saved)
         self.query_status = QLabel("")
         self.query_model = RowsModel(self)
         view = _view("Query result")
@@ -222,6 +238,97 @@ class DataWorkspaceDialog(QDialog):
         layout.addWidget(view, 1)
         return page
 
+    def _compare_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        self.compare_note = QLabel("Pick a raw force-time recording to compare derived values with recorded ones.")
+        self.compare_note.setWordWrap(True)
+        row = QHBoxLayout()
+        self.compare_trial = QComboBox()
+        self.compare_trial.setAccessibleName("Recording to compare")
+        self.compare_trial.activated.connect(lambda *_: self._compare())
+        row.addWidget(QLabel("Recording"))
+        row.addWidget(self.compare_trial, 1)
+        self.compare_model = RowsModel(self)
+        view = _view("Raw-derived versus recorded values")
+        view.setModel(self.compare_model)
+        layout.addLayout(row)
+        layout.addWidget(view, 1)
+        layout.addWidget(self.compare_note)
+        return page
+
+    def _fill_compare(self, snapshot_id: str) -> None:
+        self.compare_trial.clear()
+        self.compare_model.set_data([], [])
+        dataset = next((d for d in self.datasets if d["id"] == snapshot_id), {})
+        if dataset.get("kind") == "logical" or "force_signals" not in dataset.get("tables", []):
+            self.compare_note.setText("Compare needs a batch with raw force-time samples.")
+            return
+
+        def loaded(trials: list[dict[str, Any]]) -> None:
+            for trial in trials:
+                self.compare_trial.addItem(f"{trial['trial_id']} · {trial['subject_id']}", trial["trial_id"])
+            if trials:
+                self._compare()
+
+        self._guard(lambda: self.service.list_signal_trials(snapshot_id), loaded, "Listing recordings")
+
+    def _compare(self) -> None:
+        sid, trial = self.snapshot_id, self.compare_trial.currentData()
+        if not sid or trial is None:
+            return
+
+        def done(result: dict[str, Any]) -> None:
+            def number(v: Any) -> str:
+                return "—" if v is None else f"{v:,.4g}"
+
+            self.compare_model.set_data(
+                ["Metric", "Unit", "Recorded (from the source file)", "Derived (DynamisScience, from raw samples)", "Difference"],
+                [(r["metric"], r["unit"], number(r["recorded"]), number(r["derived"]), number(r["difference"])) for r in result["rows"]])
+            recorded = sorted({r["recorded_from"] for r in result["rows"] if r["recorded_from"]})
+            self.compare_note.setText(
+                f"Derived values are computed now from {result['samples']:,} raw samples ({', '.join(result['channels'])}) and are not "
+                f"stored: {result['method']}. Recorded values come from "
+                + (", ".join(recorded) if recorded else "no trial-level table for this trial; none is shown")
+                + ". A difference is information, not an error: the two may use different definitions or filtering.")
+
+        self._guard(lambda: self.service.compare_trial(sid, trial), done, "Comparing derived and recorded values")
+
+    def _refresh_saved(self, select: str | None = None) -> None:
+        def loaded(items: list[dict[str, Any]]) -> None:
+            self.saved_picker.clear()
+            self.saved_picker.addItem("Choose a saved query…", None)
+            for item in items:
+                self.saved_picker.addItem(f"{item['name']} (v{item['version']})", item)
+            if select:
+                self.saved_picker.setCurrentIndex(max(0, self.saved_picker.findText(select, Qt.MatchFlag.MatchStartsWith)))
+
+        self._guard(self.service.list_saved_queries, loaded, "Loading saved queries")
+
+    def _load_saved(self) -> None:
+        item = self.saved_picker.currentData()
+        if item:
+            self.query_text.setPlainText(item["sql"])
+
+    def _save_query(self) -> None:
+        name, ok = QInputDialog.getText(self, "Save query", "Name")
+        if not ok or not name.strip():
+            return
+        sql = self.query_text.toPlainText()
+
+        def done(item: dict[str, Any]) -> None:
+            self.query_status.setText(f"Saved '{item['name']}' (version {item['version']}).")
+            self._refresh_saved(item["name"])
+
+        self._guard(lambda: self.service.save_query(name, sql), done, "Saving query")
+
+    def _delete_query(self) -> None:
+        item = self.saved_picker.currentData()
+        if not item:
+            return
+        self._guard(lambda: self.service.delete_saved_query(item["name"]),
+                    lambda _: (self.query_status.setText(f"Deleted '{item['name']}'."), self._refresh_saved()), "Deleting query")
+
     def _inspector_tab(self) -> QWidget:
         self.inspector = QTextBrowser()
         self.inspector.setAccessibleName("Rights, QC, exclusions, instruments and lineage")
@@ -230,6 +337,7 @@ class DataWorkspaceDialog(QDialog):
     # ---- catalogue
     def open(self, snapshot_id: str | None = None) -> None:
         self._wanted = snapshot_id
+        self._refresh_saved()
         self._guard(self.service.list_workspace, self._catalogue_loaded, "Loading dataset catalogue")
 
     def _guard(self, work: Callable[[], Any], done: Callable[[Any], None], label: str) -> None:
@@ -264,14 +372,15 @@ class DataWorkspaceDialog(QDialog):
             source = (item.get("source") or {}).get("name") or ""
             entry_kind = item.get("kind", "dataset")
             if entry_kind == "logical":
-                text = f"{item['label']}\n{len(item['batches'])} batch(es) · {kind} · {rows:,} rows"
+                text = f"{item['label']} · {rows:,} rows"
             elif entry_kind == "batch":
-                text = f"      ↳ {item['label']} · {rows:,} rows\n      {item['id']}"
+                text = f"      {item['label']} · {rows:,} rows"
             else:
-                text = f"{source or item.get('label') or item['id']}\n{item.get('label') or ''}\n{kind} · {rows:,} rows · {item['id']}"
+                text = f"{source or item.get('label') or item['id']}" + ("" if item.get("real_data") else " (synthetic)")
             if needle and needle not in (text + " ".join(item.get("tables", []))).lower():
                 continue
             entry = QListWidgetItem(text)
+            entry.setToolTip(f"{item['id']}\n{kind} · {rows:,} rows")
             entry.setData(Qt.ItemDataRole.UserRole, item["id"])
             self.catalogue.addItem(entry)
         self.catalogue.blockSignals(False)
@@ -303,6 +412,7 @@ class DataWorkspaceDialog(QDialog):
                                 ". No writes, files or scripts.")
         self.query_model.set_data([], [])
         self._guard(lambda: self.service.dataset_inspector(sid), self._inspected, "Reading provenance")
+        self._fill_compare(sid)
         self._table_chosen()
 
     # ---- table
@@ -382,7 +492,8 @@ class DataWorkspaceDialog(QDialog):
 
     def _show_filters(self) -> None:
         self.filter_list.setText("Filters: " + "  AND  ".join(f"{f['column']} {f['op']} {f.get('value', '')}".strip()
-                                                              for f in self.filters) if self.filters else "No filters")
+                                                              for f in self.filters))
+        self.filter_list.setVisible(bool(self.filters))
 
     # ---- traces / query / inspector
     def _tab_changed(self, index: int) -> None:

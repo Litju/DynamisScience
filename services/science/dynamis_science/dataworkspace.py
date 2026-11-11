@@ -135,15 +135,21 @@ def page(path: Any, offset: int = 0, limit: int = 200, filters: list[dict[str, A
     return {"columns": chosen, "rows": frame.rows(), "total_rows": total, "offset": offset, "limit": limit}
 
 
-def query(tables: dict[str, Any], sql: str, limit: int = 1000) -> dict[str, Any]:
-    """Bounded read-only SELECT over the snapshot's tables (Polars SQL; no files, no writes)."""
+def check_sql(sql: str) -> str:
+    """The read-only gate shared by running and saving a query."""
     text = sql.strip()
-    if not 1 <= limit <= MAX_QUERY_ROWS:
-        raise ValueError(f"limit must be between 1 and {MAX_QUERY_ROWS}.")
     if not re.match(r"(select|with)\b", text, re.I):
         raise ValueError("Only SELECT queries are allowed.")
     if _FORBIDDEN.search(text):
         raise ValueError("The query uses a statement, function or path that is not allowed in the read-only workspace.")
+    return text
+
+
+def query(tables: dict[str, Any], sql: str, limit: int = 1000) -> dict[str, Any]:
+    """Bounded read-only SELECT over the snapshot's tables (Polars SQL; no files, no writes)."""
+    if not 1 <= limit <= MAX_QUERY_ROWS:
+        raise ValueError(f"limit must be between 1 and {MAX_QUERY_ROWS}.")
+    text = check_sql(sql)
     context = pl.SQLContext({name: _scan(path) for name, path in tables.items()})
     try:
         frame = context.execute(text, eager=False).head(limit + 1).collect()

@@ -169,3 +169,48 @@ def test_logical_dataset_unions_batches_per_source(service, tmp_path, qtbot):
     batch_row = next(i for i in range(dialog.catalogue.count()) if dialog.catalogue.item(i).data(0x0100) == ids[0])
     dialog.catalogue.setCurrentRow(batch_row)
     assert dialog.analyze_button.isEnabled()
+
+
+def test_saved_queries_are_versioned_readonly_and_persist(service, tmp_path):
+    first = service.save_query("Mean force", "SELECT AVG(peak_force_n) AS m FROM cmj_trials")
+    again = service.save_query("Mean force", "SELECT MAX(peak_force_n) AS m FROM cmj_trials")
+    assert (first["version"], again["version"]) == (1, 2)
+    assert [(q["name"], q["version"]) for q in service.list_saved_queries()] == [("Mean force", 2)]
+    for bad in ("DROP TABLE x", "SELECT * FROM read_csv('a.csv')", ""):
+        with pytest.raises(ValueError):
+            service.save_query("bad", bad)
+    with pytest.raises(ValueError):
+        service.save_query("  ", "SELECT 1")
+    reopened = DynamisAppService()
+    reopened.ensure_initialized()
+    assert reopened.list_saved_queries()[0]["sql"].startswith("SELECT MAX")
+    assert reopened.delete_saved_query("Mean force") == 2 and not reopened.list_saved_queries()
+
+
+def test_compare_labels_derived_and_recorded_values(service, tmp_path, qtbot, monkeypatch):
+    ctx = importer.build_context(FIXTURE)
+    trace_plan = importer.edit_mapping(importer.probe_file(_csv(tmp_path, "tr.csv", _two_traces(600))), {}, CONST)
+    trace_sid = importer.admit(importer.stage(trace_plan, ctx))["dataset_snapshot_id"]
+    cmj = _file(tmp_path, "cmj.csv", HEADER + "A1,T1,40,80,706\n")  # recorded peak force for the same subject and trial
+    importer.admit(importer.stage(importer.edit_mapping(importer.probe_file(cmj), {}, {"session_id": "S1", "sampling_hz": 1000}), ctx))
+    result = service.compare_trial(trace_sid, "T1")
+    rows = {r["metric"]: r for r in result["rows"]}
+    assert rows["Peak force"]["recorded"] == 706.0 and rows["Peak force"]["derived"] == 706.0 and rows["Peak force"]["difference"] == 0.0
+    assert rows["Mean force"]["recorded"] is None and rows["Mean force"]["derived"] == pytest.approx(703.0, abs=0.5)
+    assert rows["Duration"]["derived"] == pytest.approx(0.599) and rows["Impulse"]["derived"] == pytest.approx(703 * 0.599, rel=0.01)
+    assert result["samples"] == 600 and "DS-DERIVE-1.0" in result["method"] and result["channels"] == ["force_z_n"]
+    assert service.compare_trial(trace_sid, "T2")["rows"][0]["recorded"] is None  # no recorded value for T2
+    with pytest.raises(LookupError):
+        service.compare_trial(trace_sid, "nope")
+    dialog = DataWorkspaceDialog(service, lambda op, done, label="": done(op()), lambda sid: None)
+    qtbot.addWidget(dialog)
+    dialog.open(trace_sid)
+    assert dialog.compare_trial.count() == 2 and dialog.compare_model.rowCount() == 4
+    assert "not stored" in dialog.compare_note.text() and "706" in " ".join(str(c) for r in dialog.compare_model.rows for c in r)
+    dialog.query_text.setPlainText("SELECT COUNT(*) AS n FROM force_signals")
+    dialog.service.save_query("count", dialog.query_text.toPlainText())
+    dialog._refresh_saved("count")
+    dialog.query_text.clear()
+    dialog.saved_picker.setCurrentIndex(1)
+    dialog._load_saved()
+    assert "COUNT" in dialog.query_text.toPlainText()
