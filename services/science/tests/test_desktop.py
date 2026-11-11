@@ -1019,9 +1019,13 @@ def test_admission_dialog_preserves_sprint_coordinate_and_explains_quarantine(qt
     dialog = DatasetAdmissionDialog(None, None, lambda _record: None)
     qtbot.addWidget(dialog)
     dialog.family.setCurrentIndex(1)
+    dialog.instrument_id_input.setText("INST-FILE")
+    dialog.protocol_id_input.setText("PROT-FILE")
     dialog.file_path.setText(str(source_file))
     dialog.coordinate_system.setText("track lane")
-    _, _, protocol, file = dialog._payloads()
+    _, instrument, protocol, file = dialog._payloads()
+    assert instrument["id"] == file["metadata"]["instrument_default"] == "INST-FILE"
+    assert protocol["id"] == file["metadata"]["protocol_default"] == "PROT-FILE"
     assert protocol["coordinate_convention"] == "track lane"
     assert file["metadata"]["coordinate_system"] == "track lane"
     dialog._reviewed({"artifact": {}, "quality": {"status": "QUARANTINED",

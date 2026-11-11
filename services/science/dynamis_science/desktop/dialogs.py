@@ -544,6 +544,8 @@ class DatasetAdmissionDialog(QDialog):
         self.manufacturer = QLineEdit()
         self.instrument_model = QLineEdit()
         self.serial = QLineEdit()
+        self.instrument_id_input = QLineEdit(self.instrument_id)
+        self.protocol_id_input = QLineEdit(self.protocol_id)
         self.calibration = QLineEdit("UNKNOWN")
         self.protocol_name = QLineEdit()
         self.protocol_version = QLineEdit("1.0")
@@ -558,12 +560,12 @@ class DatasetAdmissionDialog(QDialog):
         )
         self.coordinate_system = QLineEdit()
         form.addRow("Measurement family", self.family)
-        form.addRow("Instrument ID", QLabel(self.instrument_id))
+        form.addRow("Instrument ID (match file)", self.instrument_id_input)
         form.addRow("Manufacturer", self.manufacturer)
         form.addRow("Model", self.instrument_model)
         form.addRow("Serial number", self.serial)
         form.addRow("Calibration status", self.calibration)
-        form.addRow("Protocol ID", QLabel(self.protocol_id))
+        form.addRow("Protocol ID (match file)", self.protocol_id_input)
         form.addRow("Protocol name", self.protocol_name)
         form.addRow("Protocol version", self.protocol_version)
         form.addRow("Sampling rate (Hz)", self.sampling)
@@ -615,7 +617,7 @@ class DatasetAdmissionDialog(QDialog):
             "rights_status": "FIXTURE_ONLY" if self.privacy.currentText() == "TEST_FIXTURE" else "UNVERIFIED",
         }
         instrument = {
-            "id": self.instrument_id,
+            "id": self.instrument_id_input.text().strip(),
             "measurement_family": self.family.currentData(),
             "manufacturer": self.manufacturer.text().strip(),
             "model": self.instrument_model.text().strip(),
@@ -623,7 +625,7 @@ class DatasetAdmissionDialog(QDialog):
             "calibration_status": self.calibration.text().strip() or "UNKNOWN",
         }
         protocol = {
-            "id": self.protocol_id,
+            "id": self.protocol_id_input.text().strip(),
             "measurement_family": self.family.currentData(),
             "name": self.protocol_name.text().strip(),
             "version": self.protocol_version.text().strip(),
@@ -637,8 +639,8 @@ class DatasetAdmissionDialog(QDialog):
         }
         metadata = {
             "units": protocol["units"],
-            "instrument_default": self.instrument_id,
-            "protocol_default": self.protocol_id,
+            "instrument_default": instrument["id"],
+            "protocol_default": protocol["id"],
         }
         if self.coordinate_system.text().strip():
             metadata["coordinate_system"] = self.coordinate_system.text().strip()
