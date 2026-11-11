@@ -108,7 +108,7 @@ class ImportReviewDialog(QDialog):
 
         root = QVBoxLayout(self)
         top = QHBoxLayout()
-        self.path_label = QLabel("Drop a CSV or Parquet file or folder here, or choose one.")
+        self.path_label = QLabel("Drop a data file or folder here (CSV, Excel, Parquet, Arrow, JSON), or choose one.")
         self.path_label.setWordWrap(True)
         self.path_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)  # long paths wrap, never widen the dialog
         self.file_button, self.folder_button = QPushButton("Choose file…"), QPushButton("Choose folder…")
@@ -118,7 +118,7 @@ class ImportReviewDialog(QDialog):
         top.addWidget(self.file_button)
         top.addWidget(self.folder_button)
         root.addLayout(top)
-        self.drop = QLabel("Drop a CSV or Parquet file or folder here")
+        self.drop = QLabel("Drop a data file or folder here (CSV, Excel, Parquet, Arrow, JSON)")
         self.drop.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop.setMinimumHeight(56)
         self.drop.setObjectName("DropZone")
@@ -245,7 +245,7 @@ class ImportReviewDialog(QDialog):
             self.load(urls[0].toLocalFile())
 
     def _choose_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Choose data file", "", "Data tables (*.csv *.parquet *.pq)")
+        path, _ = QFileDialog.getOpenFileName(self, "Choose data file", "", "Data tables (*.csv *.tsv *.txt *.parquet *.pq *.arrow *.feather *.xlsx *.json *.ndjson *.jsonl)")
         if path:
             self.load(path)
 
@@ -457,6 +457,7 @@ class ImportReviewDialog(QDialog):
                 family = esc(str(plan["mapping"].get("family") or "unrecognised"))
                 lines.append(f"• <b>{name}</b> — {self._rows(plan['rows'])} · {family}"
                              + (f" · <span style='color:{t['warn']}'>needs: {esc(need)}</span>" if need else ""))
+        lines += [f"<i>{esc(w)}</i>" for i in self.items for w in i["plan"].get("warnings", [])]
         if any(i["plan"].get("session_from_filename") and i["plan"]["state"] != "UNSUPPORTED" for i in self.items):
             lines.append("<i>The file has no session column: each file is treated as one session, named after the file. "
                          "Type a Session ID in Details to change it.</i>")

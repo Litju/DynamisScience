@@ -33,7 +33,11 @@ MAX_FILE_BYTES = 256 * 1024 * 1024  # trial-level summary tables are read whole,
 MAX_TRACE_BYTES = 4 * 1024 * 1024 * 1024  # sample-level recordings are streamed; still an explicit limit
 SCHEMA_ROWS = 10_000  # rows used to infer column types
 PREVIEW_ROWS = 8
-SUFFIXES = {".csv": "CSV", ".parquet": "PARQUET", ".pq": "PARQUET"}
+SUFFIXES = {".csv": "CSV", ".tsv": "CSV", ".txt": "CSV", ".parquet": "PARQUET", ".pq": "PARQUET",
+            ".arrow": "ARROW", ".feather": "ARROW", ".ipc": "ARROW", ".xlsx": "EXCEL", ".xlsm": "EXCEL",
+            ".json": "JSON", ".ndjson": "NDJSON", ".jsonl": "NDJSON"}
+# Google Sheets has no connector (no cloud): File > Download as .xlsx or .csv and import that file.
+MAX_EXCEL_ROWS = 1_048_576
 ADMITTABLE = {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
 
 
@@ -104,6 +108,44 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _converted(path: Path, kind: str) -> tuple[Path, dict[str, Any]]:
+    """Excel and JSON-array files are converted once to a Parquet cache under the data root (bounded by the file-size cap)."""
+    if path.stat().st_size > MAX_FILE_BYTES:
+        raise ImportBlocked(f"{kind.title()} files above {MAX_FILE_BYTES >> 20} MiB are not imported; export CSV or Parquet.")
+    key = hashlib.sha256(f"{path.resolve()}|{path.stat().st_size}|{path.stat().st_mtime_ns}".encode()).hexdigest()[:16]
+    cache = paths()["tmp"] / "converted"
+    cache.mkdir(parents=True, exist_ok=True)
+    target, info = cache / f"{key}.parquet", {"format": kind}
+    if kind == "EXCEL":
+        import openpyxl
+
+        workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)  # data_only: cached values, never formulas
+        try:
+            names = list(workbook.sheetnames)
+            for name in names:
+                rows = [r for r in workbook[name].iter_rows(values_only=True, max_row=MAX_EXCEL_ROWS) if any(v is not None for v in r)]
+                if rows:
+                    break
+            else:
+                raise ImportBlocked("The workbook has no data.")
+        finally:
+            workbook.close()
+        header = ["" if h is None else str(h).strip() for h in rows[0]]
+        if "" in header:
+            raise ImportBlocked("A column in the header row has no name.")
+        dupes = sorted({h for h in header if header.count(h) > 1})
+        if dupes:
+            raise ImportBlocked(f"Duplicate column names: {', '.join(dupes)}.")
+        info["sheet"] = name
+        info["warnings"] = [f"Workbook has {len(names)} sheets; the first sheet with data ('{name}') was read."] if len(names) > 1 else []
+        frame = pl.DataFrame([list(r) for r in rows[1:]], schema=header, orient="row", infer_schema_length=None)
+    else:  # a JSON array of records
+        frame = pl.read_json(path)
+    if not target.exists():
+        frame.write_parquet(target, compression="zstd")
+    return target, info
+
+
 def open_table(path: Path) -> tuple[pl.LazyFrame, dict[str, Any]]:
     """A lazy, streaming view of a CSV (UTF-8/BOM, common delimiters) or Parquet file; ImportBlocked when unreadable.
 
@@ -111,12 +153,19 @@ def open_table(path: Path) -> tuple[pl.LazyFrame, dict[str, Any]]:
     """
     kind = SUFFIXES.get(path.suffix.lower())
     if kind is None:
-        raise ImportBlocked(f"Unsupported format '{path.suffix}'. Supported: CSV, Parquet.")
+        raise ImportBlocked(f"Unsupported format '{path.suffix}'. Supported: CSV/TSV/TXT, Parquet, Arrow/Feather, Excel (.xlsx), JSON/NDJSON.")
     if path.stat().st_size == 0:
         raise ImportBlocked("The file is empty.")
     try:
         if kind == "PARQUET":
             return pl.scan_parquet(path), {"format": kind}
+        if kind == "ARROW":
+            return pl.scan_ipc(path), {"format": kind}
+        if kind == "NDJSON":
+            return pl.scan_ndjson(path, infer_schema_length=SCHEMA_ROWS), {"format": kind}
+        if kind in ("EXCEL", "JSON"):
+            cached, info = _converted(path, kind)
+            return pl.scan_parquet(cached), info
         with path.open("rb") as handle:
             head = handle.read(65536)
         text = codecs.getincrementaldecoder("utf-8-sig")().decode(head, final=False)  # tolerant of a cut multibyte tail
