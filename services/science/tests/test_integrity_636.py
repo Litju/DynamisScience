@@ -31,10 +31,10 @@ def test_changed_normalization_creates_a_new_snapshot_and_never_overwrites(servi
     before = {p.name: p.read_bytes() for p in snap.iterdir()}
     # the researcher now says body mass is kg, not g: different normalization of the same raw bytes
     edited = importer.edit_mapping(_plan(path), {"body_mass_kg": {"source": "Body Mass (kg)", "unit": "g"}})
-    second = importer.admit(importer.stage(edited, ctx))
-    assert second["dataset_snapshot_id"] != first["dataset_snapshot_id"]
-    mass = pl.read_parquet(Path(admission.get_admitted_snapshot(second["dataset_snapshot_id"])["path"]) / "cmj_trials.parquet")["body_mass_kg"]
-    assert mass.to_list() == pytest.approx([0.08, 0.075])
+    staged = importer.stage(edited, ctx)
+    assert staged["artifact"]["id"] != first["source_artifact_id"]  # different normalization is a different artifact
+    assert not staged["eligible"] and "implausible body_mass_kg" in " ".join(staged["quality"]["warnings"])  # 0.08 kg fails the range QC
+    assert importer.quarantine(staged)["admission_record"]["dataset_snapshot_id"] is None
     assert {p.name: p.read_bytes() for p in snap.iterdir()} == before  # the historical snapshot is untouched
 
 
