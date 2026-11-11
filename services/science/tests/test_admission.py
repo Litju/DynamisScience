@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from dynamis_science import qualification
+from dynamis_science import admission, qualification
 from dynamis_science.data_root import data_root, paths
 from dynamis_science.desktop.services import DynamisAppService
 
@@ -132,6 +132,22 @@ def test_admission_valid_csv(service, tmp_path):
         / "cmj_trials.parquet"
     ).exists()
     assert (paths()["artifacts"] / "admission_records.json").exists()
+
+
+def test_identical_files_from_distinct_sources_keep_their_provenance(service, tmp_path):
+    _register_fixture_source(service)
+    service.register_admission_source({
+        "id": "SRC-SECOND", "name": "Second source", "publisher": "Tests",
+        "dataset_identity": "second", "version": "1", "acquisition_method": "local",
+        "license_or_agreement": "Test only", "redistribution_restrictions": "No redistribution",
+    })
+    source_file = tmp_path / "same.csv"
+    source_file.write_text(_cmj_csv(), encoding="utf-8")
+    first = service.ingest_local_source_file("SRC-FIXTURE", source_file)
+    second = service.ingest_local_source_file("SRC-SECOND", source_file)
+    assert first["id"] != second["id"]
+    assert service.ingest_local_source_file("SRC-FIXTURE", source_file)["id"] == first["id"]
+    assert admission.get_source_artifact(second["id"])["source_id"] == "SRC-SECOND"
 
 
 @pytest.mark.parametrize(

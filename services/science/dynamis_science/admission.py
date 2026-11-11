@@ -285,8 +285,17 @@ def _ingest_source_stream(source_id: str, original_filename: str, content, acqui
                 content_hash.update(chunk)
                 artifact_hash.update(chunk)
                 size_bytes += len(chunk)
+        artifacts = _load_list(_artifact_path("admission_source_artifacts.json"))
+        existing = next((item for item in artifacts if item.get("source_id") == source_id
+                         and item.get("original_filename") == original_filename
+                         and item.get("content_hash_sha256") == content_hash.hexdigest()), None)
+        if existing:
+            return existing
+        artifact_hash.update(source_id.encode())
         artifact_hash.update(original_filename.encode())
         artifact_id = "SA-" + artifact_hash.hexdigest()[:12].upper()
+        if any(item.get("id") == artifact_id for item in artifacts):
+            raise ValueError("Source artifact identifier collision; the file was not ingested")
         stored_path = source_dir / f"{artifact_id}{suffix}"
         os.replace(temporary_path, stored_path)
     finally:
@@ -304,10 +313,8 @@ def _ingest_source_stream(source_id: str, original_filename: str, content, acqui
         "acquisition_method": acquisition_method,
         "rights_record_id": source_id,
     }
-    artifacts = _load_list(_artifact_path("admission_source_artifacts.json"))
-    if not any(item.get("id") == artifact_id for item in artifacts):
-        artifacts.append(artifact)
-        _save_list(_artifact_path("admission_source_artifacts.json"), artifacts)
+    artifacts.append(artifact)
+    _save_list(_artifact_path("admission_source_artifacts.json"), artifacts)
     return artifact
 
 
