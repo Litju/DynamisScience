@@ -15,7 +15,7 @@ from typing import Any
 import polars as pl
 import pyarrow.parquet as pq
 
-from .. import admission, realanalysis, realstore, researchanalysis, researchstore
+from .. import admission, dataworkspace, importer, realanalysis, realstore, researchanalysis, researchstore
 from ..data_root import DataRootConfigurationError, data_root, ensure_layout, paths
 from ..generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
@@ -862,6 +862,52 @@ class DynamisAppService:
             "sample_count": sum(len(item["rows"]) for item in series),
             "source_rows": frame.height,
             "source_rows_bounded": True,
+        }
+
+    # ---- Data Workspace (read-only access to admitted tables)
+    def _workspace_tables(self, snapshot_id: str) -> dict[str, Path]:
+        self.ensure_initialized()
+        snapshot = researchstore.get_snapshot(snapshot_id)
+        if snapshot is None:
+            raise researchstore.ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
+        if snapshot_id == SNAPSHOT_ID and not self.synthetic_available:
+            raise researchstore.ResearchNotFound("The synthetic regression fixture is unavailable")
+        return {name: _table_path(snapshot_id, name, snapshot) for name in _table_names(snapshot)}
+
+    def table_profile(self, snapshot_id: str, table: str) -> dict[str, Any]:
+        tables = self._workspace_tables(snapshot_id)
+        if table not in tables:
+            raise researchstore.ResearchNotFound(f"Table {table} not found")
+        return dataworkspace.profile(tables[table])
+
+    def query_table(self, snapshot_id: str, table: str, offset: int = 0, limit: int = 200,
+                    filters: list[dict[str, Any]] | None = None, sort: str | None = None,
+                    descending: bool = False, columns: list[str] | None = None) -> dict[str, Any]:
+        tables = self._workspace_tables(snapshot_id)
+        if table not in tables:
+            raise researchstore.ResearchNotFound(f"Table {table} not found")
+        return dataworkspace.page(tables[table], offset, limit, filters, sort, descending, columns)
+
+    def run_readonly_query(self, snapshot_id: str, sql: str, limit: int = 1000) -> dict[str, Any]:
+        return dataworkspace.query(self._workspace_tables(snapshot_id), sql, limit)
+
+    def dataset_inspector(self, snapshot_id: str) -> dict[str, Any]:
+        """Rights, QC, exclusions, instruments, provenance and import receipts for one snapshot."""
+        self.ensure_initialized()
+        snapshot = researchstore.get_snapshot(snapshot_id)
+        if snapshot is None:
+            raise researchstore.ResearchNotFound(f"Snapshot {snapshot_id} is not admitted")
+        record = snapshot.get("admission") or {}
+        quality = admission.get_quality(record.get("quality_assessment_id", "")) if record else None
+        artifact_id = record.get("source_artifact_id")
+        return {
+            "id": snapshot_id, "label": snapshot.get("label"), "synthetic": bool(snapshot.get("synthetic")),
+            "real_data": bool(snapshot.get("real_data")), "admission_class": snapshot.get("admission_class"),
+            "source": snapshot.get("source", {}), "admission": record, "quality": quality,
+            "provenance": snapshot.get("provenance", {}), "checksums": snapshot.get("checksums", {}),
+            "row_counts": snapshot.get("row_counts", {}),
+            "receipts": [r for r in importer.list_receipts() if artifact_id and r.get("source_artifact_id") == artifact_id],
+            "used_by_studies": next((d.get("used_by_studies", []) for d in researchstore.dataset_catalogue() if d["id"] == snapshot_id), []),
         }
 
     def performance_page_data(self, page: str) -> dict[str, Any]:

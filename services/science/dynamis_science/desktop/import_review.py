@@ -27,6 +27,7 @@ TEXT_FIELDS = (  # (key, label, required)
     ("manufacturer", "Instrument manufacturer", True), ("model", "Instrument model", True),
     ("serial_number", "Instrument serial number", True), ("calibration_status", "Calibration status", False),
     ("protocol_name", "Protocol name", True), ("protocol_version", "Protocol version", True),
+    ("subject_id", "Subject ID (single-trace file)", False), ("trial_id", "Trial ID (single-trace file)", False),
     ("session_id", "Session ID (if not in file)", False), ("sampling_hz", "Sampling rate Hz (if not in file)", False),
     ("coordinate_system", "Coordinate convention (sprint)", False),
 )
@@ -50,7 +51,8 @@ class MappingEditor(QDialog):
         names = [c["name"] for c in plan["columns"]]
         family = plan["mapping"].get("family")
         for target, (group, units, _) in importer.COLUMNS.items():
-            if group not in ("ANY", "CMJ" if family != "SPRINT_TIMING" else "SPRINT") and family:
+            wanted = {"CMJ_FORCE_PLATFORM": ("CMJ",), "SPRINT_TIMING": ("SPRINT",), importer.traces.FAMILY: ("TRACE",)}.get(family, ("CMJ",))
+            if group not in ("ANY", *wanted) and not (target == "time_s" and family == importer.traces.FAMILY):
                 continue
             source, unit = QComboBox(), QComboBox()
             source.addItem("— not mapped —", None)
@@ -177,11 +179,11 @@ class ImportReviewDialog(QDialog):
         root.addWidget(self.verdict)
 
         buttons = QHBoxLayout()
-        self.qc_button = QPushButton("Run QC")
-        self.edit_button = QPushButton("Edit mapping…")
-        self.preset_button = QPushButton("Save preset…")
-        self.quarantine_button = QPushButton("Quarantine")
-        self.admit_button = QPushButton("Admit")
+        self.qc_button = QPushButton("Run &QC")
+        self.edit_button = QPushButton("&Edit mapping…")
+        self.preset_button = QPushButton("Save &preset…")
+        self.quarantine_button = QPushButton("Qua&rantine")
+        self.admit_button = QPushButton("&Admit")
         self.admit_button.setDefault(True)
         close = QPushButton("Close")
         self.qc_button.clicked.connect(self._run_qc)
@@ -367,7 +369,7 @@ class ImportReviewDialog(QDialog):
 
     # ---- form
     def _fields(self) -> dict[str, Any]:
-        fields = {key: edit.text().strip() for key, edit in self.edits.items() if key not in ("session_id", "sampling_hz")}
+        fields = {key: edit.text().strip() for key, edit in self.edits.items() if key not in importer.CONSTANT_FIELDS}
         fields["privacy_status"] = self.privacy.currentData() or ""
         return fields
 
@@ -386,14 +388,7 @@ class ImportReviewDialog(QDialog):
         return missing
 
     def _constants(self) -> dict[str, Any]:
-        out = {}
-        if self.edits["session_id"].text().strip():
-            out["session_id"] = self.edits["session_id"].text().strip()
-        if self.edits["sampling_hz"].text().strip():
-            out["sampling_hz"] = self.edits["sampling_hz"].text().strip()
-        if self.edits["coordinate_system"].text().strip():
-            out["coordinate_system"] = self.edits["coordinate_system"].text().strip()
-        return out
+        return {k: self.edits[k].text().strip() for k in importer.CONSTANT_FIELDS if self.edits[k].text().strip()}
 
     # ---- actions
     def _edit_mapping(self) -> None:
