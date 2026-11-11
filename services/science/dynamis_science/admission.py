@@ -357,6 +357,32 @@ def _unit_conversion(value: float, unit: str, canonical: str, quantity: str) -> 
     raise ValueError(f"Cannot convert {quantity} from {unit} to {canonical}")
 
 
+def _metadata_errors(frame: pl.DataFrame, family: str, metadata: dict[str, Any]) -> list[str]:
+    errors = []
+    for instrument_id in sorted(set(str(v) for v in frame["instrument_id"].to_list())):
+        instrument = get_instrument(instrument_id)
+        if instrument and instrument.get("measurement_family") != family:
+            errors.append(f"instrument {instrument_id} belongs to a different measurement family")
+    for protocol_id in sorted(set(str(v) for v in frame["protocol_id"].to_list())):
+        protocol = get_protocol(protocol_id)
+        if not protocol:
+            continue
+        if protocol.get("measurement_family") != family:
+            errors.append(f"protocol {protocol_id} belongs to a different measurement family")
+        for unit, declared in metadata.get("units", {}).items():
+            recorded = protocol.get("units", {}).get(unit)
+            if recorded and str(recorded).strip().lower() != str(declared).strip().lower():
+                errors.append(f"protocol {protocol_id} {unit} unit differs from the input unit")
+        if "sampling_hz" in frame.columns:
+            values = frame.filter(pl.col("protocol_id") == protocol_id)["sampling_hz"].drop_nulls().unique().to_list()
+            try:
+                if any(float(value) != float(protocol["sampling_hz"]) for value in values):
+                    errors.append(f"protocol {protocol_id} sampling rate differs from the file")
+            except (TypeError, ValueError):
+                errors.append("invalid sampling frequency")
+    return errors
+
+
 def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -389,6 +415,7 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     if errors:
         return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
     frame = harmonize_cmj(artifact, metadata)
+    errors.extend(_metadata_errors(frame, "CMJ_FORCE_PLATFORM", metadata))
     if "mass_unit" not in metadata and "units" not in metadata:
         warnings.append("missing unit metadata; assuming canonical units")
     # We quarantine missing units rather than reject if not explicitly provided.
@@ -401,15 +428,22 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
         except Exception:
             pass
     if "week" in columns:
-        bad_weeks = [int(v) for v in frame["week"].to_list() if v is None or int(v) < 1 or int(v) > 52]
-        if bad_weeks:
+        try:
+            invalid_week = any(v is None or int(v) < 1 or int(v) > 52 for v in frame["week"].to_list())
+        except (TypeError, ValueError):
+            invalid_week = True
+        if invalid_week:
             errors.append("invalid week values")
     # sampling
     sampling_values = frame["sampling_hz"].unique().to_list() if "sampling_hz" in columns else []
     if "sampling_hz" not in columns:
         errors.append("missing sampling_hz column")
     else:
-        if any(v is None or float(v) <= 0 for v in sampling_values):
+        try:
+            invalid_sampling = any(v is None or float(v) <= 0 for v in sampling_values)
+        except (TypeError, ValueError):
+            invalid_sampling = True
+        if invalid_sampling:
             errors.append("invalid sampling frequency")
         if len(sampling_values) > 1:
             warnings.append("inconsistent sampling frequency across rows")
@@ -499,10 +533,15 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
     if errors:
         return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
     frame = harmonize_sprint(artifact, metadata)
+    errors.extend(_metadata_errors(frame, "SPRINT_TIMING", metadata))
     if frame["subject_id"].null_count() or frame["session_id"].null_count():
         errors.append("missing subject or session identifiers")
     if "sampling_hz" in columns:
-        if any(v is None or float(v) <= 0 for v in frame["sampling_hz"].unique().to_list()):
+        try:
+            invalid_sampling = any(v is None or float(v) <= 0 for v in frame["sampling_hz"].unique().to_list())
+        except (TypeError, ValueError):
+            invalid_sampling = True
+        if invalid_sampling:
             errors.append("invalid sampling frequency")
     if "trial_id" in columns:
         dupes = frame.group_by("trial_id").len().filter(pl.col("len") > 1)

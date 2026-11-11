@@ -38,7 +38,7 @@ def _register_fixture_source(service: DynamisAppService) -> None:
     service.verify_source_rights("SRC-FIXTURE", "test")
 
 
-def _register_instrument_protocol(service: DynamisAppService) -> None:
+def _register_instrument_protocol(service: DynamisAppService, units=None) -> None:
     service.register_admission_instrument(
         {
             "id": "INST-FP-1",
@@ -58,7 +58,7 @@ def _register_instrument_protocol(service: DynamisAppService) -> None:
             "name": "Fixture CMJ",
             "version": "1.0",
             "sampling_hz": 1000.0,
-            "units": {"body_mass": "kg", "time": "s", "distance": "cm"},
+            "units": units or {"body_mass": "kg", "time": "s", "distance": "cm"},
             "coordinate_convention": "vertical z up",
             "processing_method": "trapezoidal",
         }
@@ -153,7 +153,7 @@ def test_identical_files_from_distinct_sources_keep_their_provenance(service, tm
 
 def test_cmj_units_are_validated_and_normalized_before_range_checks(service, tmp_path):
     _register_fixture_source(service)
-    _register_instrument_protocol(service)
+    _register_instrument_protocol(service, {"body_mass": "g", "time": "ms", "distance": "m"})
     csv = ("subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,body_mass_kg,jump_height_cm,eccentric_braking_duration_s\n"
            "S1,A,T1,INST-FP-1,PROT-FP-1,1000,80000,0.4,200\n")
     artifact = _ingest(service, tmp_path, "units.csv", csv.encode())
@@ -166,6 +166,29 @@ def test_cmj_units_are_validated_and_normalized_before_range_checks(service, tmp
     assert frame["eccentric_braking_duration_s"][0] == pytest.approx(0.2)
     bad = service.validate_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", {"units": {"time": "fortnights"}})
     assert bad["status"] == "REJECTED" and "Cannot convert time" in bad["errors"][0]
+
+
+def test_protocol_units_and_sampling_must_match_file_and_input(service, tmp_path):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    artifact = _ingest(service, tmp_path, "mismatch.csv", _cmj_csv().replace(",1000,1,", ",500,1,").encode())
+    quality = service.validate_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM",
+        {"units": {"body_mass": "g", "time": "s", "distance": "cm"}})
+    assert quality["status"] == "REJECTED"
+    assert any("body_mass unit differs" in error for error in quality["errors"])
+    assert any("sampling rate differs" in error for error in quality["errors"])
+
+
+def test_invalid_week_and_sampling_are_reported(service, tmp_path):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    csv = ("subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,week\n"
+           "S1,A,T1,INST-FP-1,PROT-FP-1,invalid,\n")
+    artifact = _ingest(service, tmp_path, "bad-values.csv", csv.encode())
+    quality = service.validate_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", {})
+    assert quality["status"] == "REJECTED"
+    assert "invalid week values" in quality["errors"]
+    assert "invalid sampling frequency" in quality["errors"]
 
 
 @pytest.mark.parametrize(
@@ -289,7 +312,11 @@ def test_sprint_modality_is_admitted_with_its_own_contract(service, tmp_path):
         {"units": {"distance": "m", "time": "s"}, "coordinate_system": "track"},
     )
     assert result["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
-    scaled = _ingest(service, tmp_path, "sprint-scaled.csv", csv.replace(b"30,4.2", b"3000,4200"))
+    service.register_admission_protocol({"id": "PROT-SPRINT-CM", "measurement_family": "SPRINT_TIMING",
+        "name": "Sprint in cm and ms", "version": "1.0", "sampling_hz": 1000.0,
+        "units": {"distance": "cm", "time": "ms"}, "coordinate_convention": "track lane"})
+    scaled_csv = csv.replace(b"PROT-SPRINT-1", b"PROT-SPRINT-CM").replace(b"30,4.2", b"3000,4200")
+    scaled = _ingest(service, tmp_path, "sprint-scaled.csv", scaled_csv)
     scaled_result = service.admit_source_artifact(
         scaled["id"], "SPRINT_TIMING",
         {"units": {"distance": "cm", "time": "ms"}, "coordinate_system": "track"},
