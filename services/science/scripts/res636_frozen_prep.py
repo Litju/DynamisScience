@@ -33,3 +33,31 @@ for name, file in (("Frozen CMJ export", "cmj_valid.csv"), ("Frozen force-time e
     plan = importer.edit_mapping(importer.probe_file(work / "inputs" / file), {}, {"session_id": "S1", "sampling_hz": 1000})
     importer.save_preset(name, plan, importer.build_context(FIELDS))
 print(f"prepared {work}")
+
+# Spreadsheet fixtures for the approved progressive interface (all explicitly synthetic).
+from openpyxl import Workbook
+book = Workbook()
+book.active.append(["Athlete", "Trial", "Jump Height (cm)", "Body Mass (kg)", "Peak Force (N)"])
+book.active.append(["X1", "T1", 40, 80, 1800])
+book.active.append(["X2", "T2", 38, 75, 1700])
+for filename, subjects, heights in (
+    ("valid.xlsx", ("X1", "X2"), (40, 38)),
+    ("repeat.xlsx", ("Y1", "Y2"), (41, 39)),
+    ("partial.xlsx", ("Z1", "Z2"), (42, 400)),
+    ("invalid.xlsx", ("Q1", "Q2"), (450, 400)),
+):
+    for row, subject, height in zip((2, 3), subjects, heights):
+        book.active.cell(row, 1, subject)
+        book.active.cell(row, 3, height)
+    book.save(work / "inputs" / filename)
+plan = importer.edit_mapping(importer.probe_file(work / "inputs" / "valid.xlsx"), {},
+                               {"session_id": "fixture-file", "sampling_hz": "1000"})
+importer.save_preset("Authorized synthetic spreadsheet", plan, importer.build_context(FIELDS))
+# Different headers: the saved mapping must not be silently applied to this file.
+book.active.cell(1, 3, "Jump Height (m)")
+book.active.cell(2, 1, "M1")
+book.active.cell(3, 1, "M2")
+book.active.cell(2, 3, 0.4)
+book.active.cell(3, 3, 0.38)
+book.save(work / "inputs" / "needs_attention.xlsx")
+(work / "inputs" / "unsupported.bin").write_bytes(b"unsupported fixture")
