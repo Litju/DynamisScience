@@ -313,6 +313,22 @@ def test_frozen_report_version_is_stable(root):
     assert before == after
 
 
+def test_reliability_evidence_uses_dimensionless_icc(monkeypatch):
+    monkeypatch.setattr(researchanalysis, "_metric_label", lambda *_: {
+        "id": "force", "label": "Peak force", "unit": "N", "table": "signal_trials"})
+    monkeypatch.setattr(researchstore, "get_snapshot", lambda *_: {})
+    run = {"id": "RUN-1", "snapshot_id": "DS-1", "outcome_metric_id": "force",
+           "method_id": "METH-REAL-RELIABILITY", "analysis_spec_id": "SPEC-1", "cohort_id": "COHORT-1",
+           "result": {"status": "COMPUTED", "icc_3_1": 0.89, "icc_3_1_ci_low": 0.74,
+                      "icc_3_1_ci_high": 0.97, "mean_cv_percent": 5.0, "typical_error": 75.8,
+                      "activity": "Walking"}}
+    evidence = researchanalysis._evidence_profile(run, {"id": "STUDY-1"})["evidence"]
+    assert evidence["unit"] == "dimensionless"
+    assert "75.8 N" in evidence["interpretation"]
+    historical = researchstore._report_evidence_unit({"unit": "N"}, run)
+    assert historical == "dimensionless (recorded unit: N; corrected for display)"
+
+
 def test_legacy_frozen_report_warns_when_context_was_not_saved(root):
     project = researchstore.create_project("Legacy report project")
     detail = _study(project["id"])

@@ -2875,6 +2875,15 @@ def _svg_distribution(figure: dict[str, Any], width: int = 640, height: int = 18
     return f"<svg viewBox='0 0 {width} {height}' width='100%' role='img' aria-label='distribution'>{bars}</svg>"
 
 
+def _report_evidence_unit(item: dict[str, Any], run: dict[str, Any] | None) -> str:
+    unit = str(item.get("unit") or "")
+    if run and run.get("method_id") == "METH-REAL-RELIABILITY":
+        if unit and unit not in {"dimensionless", "ICC(3,1)"}:
+            return f"dimensionless (recorded unit: {unit}; corrected for display)"
+        return "dimensionless"
+    return unit
+
+
 def export_html(entity_id: str, version: int | None = None) -> str:
     payload = report_payload(entity_id)
     generated_at = _now()
@@ -2896,8 +2905,10 @@ def export_html(entity_id: str, version: int | None = None) -> str:
     figures = payload.get("figures", [])
     limitations = payload.get("limitations", payload.get("research", {}).get("limitations", []))
     statuses = {}
+    evidence_runs = {}
     for item in evidence:
         run = get_run(item.get("analysis_run_id") or "")
+        evidence_runs[item["id"]] = run
         statuses[item["id"]] = method_status(run) if run else {"state": "UNKNOWN"}
     superseded = {key: value for key, value in statuses.items() if value["state"] == "SUPERSEDED"}
     warning_html = (
@@ -2935,7 +2946,7 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         return f"{label}: {interval.get('low')} – {interval.get('high')}"
 
     rows = "".join(
-        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(str(item.get('unit', '')))}</td><td>{html.escape(interval_text(item))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
+        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(_report_evidence_unit(item, evidence_runs[item['id']]))}</td><td>{html.escape(interval_text(item))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
         for item in evidence
     )
     figure_html = "".join(
