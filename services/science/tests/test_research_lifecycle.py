@@ -382,3 +382,24 @@ def test_dataset_binding_is_snapshot_bound(root):
                 "min_metric_observations": 1,
             },
         )
+
+
+def test_failed_isolated_worker_leaves_no_run_or_evidence(tmp_path, monkeypatch):
+    from dynamis_science.desktop.services import DynamisAppService
+
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "root"))
+    service = DynamisAppService()
+    service.ensure_initialized()
+
+    def snapshot():
+        return {p.relative_to(service.root).as_posix(): p.stat().st_size
+                for p in service.root.rglob("*") if p.is_file() and p.suffix in {".json", ".parquet"}}
+
+    before = snapshot()
+    with pytest.raises(RuntimeError, match="persisted research study"):
+        service.execute_analysis_isolated(
+            "STUDY-DOES-NOT-EXIST",
+            {"method_id": "METH-REAL-TREND", "outcome_metric_id": "jump_height"},
+        )
+    assert snapshot() == before
+    assert not list((service.root / "tmp").glob("worker-*"))
