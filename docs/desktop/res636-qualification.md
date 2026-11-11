@@ -1,3 +1,59 @@
+# RES-636 — simplified native import qualification, 2026-11-11
+
+Current record; supersedes the older form-led UI description below. **Issue remains In Progress, not Done:** packaged OS cross-window drag/drop is unverified because the automation API rejects the cross-window endpoint. The source-matched portable picker journey passes at 100% light and 150% dark.
+
+## Implemented
+
+The native dialog progresses through **Import your data → Integrating your data… → Your data is ready → Open dataset**. Choosing or dropping starts the existing worker-based ETL immediately. Eligible authorized saved mappings finalize automatically. The initial surface has the drop zone, Choose file, supported formats and a smaller folder action. Source fields, mappings and QC tabs are optional Advanced controls.
+
+Real Extracting, Validating, Saving and Integrating stages use an indeterminate indicator. Ready follows admission, immutable batch creation and read-back through the actual workspace catalogue and dataset detail API. Open dataset selects that batch in Data Workspace. Partial results show imported/quarantined counts; rejected rows and reasons remain available. Invalid data is quarantined without an admitted snapshot. Missing source facts are requested individually; unprofiled or drifted data never silently inherits an unrelated last profile. Folder files retain their own authorized source context. Checksum-verified pending originals survive missing-information recovery. Advanced expansion is clamped to the available screen.
+
+A repeat-import defect found during native restart testing is fixed in import adapter **0.1.1**: JSON preset key ordering can no longer create a different batch for identical canonical data. New writes use the existing identifier-first canonical column order. Legacy byte identities are retained only after checking the stored artifact hash and equality of every canonical value for the same original checksum, source and family. QC and rights still run through the existing admission gate. Existing immutable batches are not rewritten. No scientific estimator, optimizer, qualification criterion, database architecture or ETL framework was changed. Pending original copies are retained; automatic pruning was not added.
+
+## Source and package
+
+Application source: **`9bd8816689cb075cf18d3d321b2067c0179376f0`**, branch `codex/res-621-research-workflow`. Validated local commits: `b7b5d2b` (staging), `f0452cb` (progressive UI and workspace handoff), `df7583d` (native qualification drivers), `09aaadd` (screen bounds), `8ef29b2` (repeat identity and legacy coverage), `9bd8816` (identifier-first compatibility). Any subsequent evidence-only commit leaves the application source unchanged. Nothing pushed, merged, reset or rewritten.
+
+Portable executable: `services/science/build/res604-20261111-130141-492a872b/dist/DynamisScience/DynamisScience.exe`. **Keep the adjacent `_internal` directory.**
+
+- EXE SHA-256: **`48294fc92448333da56c7c5bff129a98bb2f9edca15aa0f1316df085426e375f`**.
+- Bundle hash-manifest SHA-256: `ab92413739e7d3577abed11a5fdd64452d18870152075f0ca6b7b137069cfd38` (`final-bundle-hashes.json` in the build root).
+- PyInstaller 6.22.3, Python 3.12.13, Windows x64, onedir. Final EXE rebuilt using the original spec through EXE, with the existing COLLECT runtime retained. All **2,017 runtime/data files are byte-identical** to the first build; only the executable changed. Embedded modules were inspected for adapter 0.1.1, canonical-order/legacy-repeat logic and the screen-bounds fix.
+- Authoritative package receipt: `final-portable-receipt.json` in that build root. The earlier `packaging-measurements.json` and `df7583d` test installer are superseded. The installer was not installed and is not the deliverable. The registered installation was not used. Test data and settings were isolated under `D:/SWE_HOME/tmp/res636-qualified-portable/`.
+
+## Verification
+
+**Final full Python/Qt/science suite: 282 passed in 307.11 s**, including the complete scientific regressions. [Log](res636-evidence/simple-portable/regression.log). Fixture writes used `DYNAMISSCIENCE_FIXTURE_DIR=D:/SWE_HOME/tmp/res636-regression/fixtures`; private catalogue tests used a checksum-verified disposable copy via `DYNAMISSCIENCE_TEST_SOURCE_ROOT`. Focused import/format/trace/workspace/integrity checks: **93 passed** before the final full run.
+
+Coverage includes all progressive states, preparation/QC/save/catalogue failures and retry, real worker event-loop responsiveness, first admission followed by a reloaded profile (both current and legacy column ordering), per-file folder source context, screen/theme layout, and MainWindow navigation to the selected workspace. Generic formats, row/sample grain, rights, source integrity, immutable snapshots, read-only query, comparison and qualified scientific methods pass their existing regressions.
+
+Source Windows Qt walkthroughs at 100% light and 150% dark, from the application commit above, each assert spreadsheet → targeted recovery → ready → actual records → saved-profile drop → partial → invalid quarantine → unsupported → reopened batches. They use real widgets/workers and programmatic Qt actions, without injecting system keys. Screenshots and receipts: [source 100%](res636-evidence/simple-source/) and [source 150%](res636-evidence/simple-source-150/).
+
+The **final frozen executable** was separately driven through the actual Windows picker and controls on the 1366×768 desktop. Verified: genuine indeterminate ETL; eligible spreadsheet with no metadata form; durable ready; Open dataset selecting X1/X2 records; one admitted and one quarantined row; optional QC reasons with controls on-screen; invalid spreadsheet with two quarantined rows and no snapshot; unprofiled data safely staged, then explicit synthetic classification, source facts, reviewed metre-to-centimetre mapping and declared sampling rate followed by admission. A separate process restart at 150% dark reloaded the saved profile and imported the exact same recovered file without questions. **The same three batch IDs and five total records remained; no duplicate batch was created.** Open dataset selected the persisted M1/M2 records.
+
+Final frozen evidence: [receipt](res636-evidence/simple-portable/receipt.json), [database check](res636-evidence/simple-portable/database-check.json), [before restart](res636-evidence/simple-portable/before-restart.json), [after restart](res636-evidence/simple-portable/after-restart.json). All 14 PNGs have distinct verified hashes. Important images:
+
+- [Start](res636-evidence/simple-portable/01-import.png), [processing](res636-evidence/simple-portable/02-integrating.png), [ready](res636-evidence/simple-portable/03-ready.png), [actual records](res636-evidence/simple-portable/04-opened-records.png).
+- [Partial](res636-evidence/simple-portable/05-partial.png), [issues fit](res636-evidence/simple-portable/06-issues-fit.png), [invalid quarantine](res636-evidence/simple-portable/07-invalid-quarantine.png), [needs attention](res636-evidence/simple-portable/08-needs-attention.png), [recovered](res636-evidence/simple-portable/09-recovered-ready.png).
+- [Restart 150% dark](res636-evidence/simple-portable/10-restarted-150-dark.png), [import 150%](res636-evidence/simple-portable/11-import-150-dark.png), [processing 150%](res636-evidence/simple-portable/12-processing-150-dark.png), [same-file ready 150%](res636-evidence/simple-portable/13-ready-repeat-150-dark.png), [persisted records 150%](res636-evidence/simple-portable/14-records-after-restart-150-dark.png).
+
+## Remaining limits
+
+**Packaged OS drag/drop:** attempted with a dedicated Explorer window containing disposable files. The API rejected the endpoint as outside the source window before input. Qt drop-event tests and native source drop journeys pass; a real packaged cross-window drag is not claimed as verified. This remains an acceptance item, not a vendor-adapter dependency.
+
+The legacy advanced mapping editor at 150% and hard process termination during a packaged write were not exercised. Existing storage failure/integrity tests pass. No installer acceptance or vendor-specific certification is claimed or required for the generic importer.
+
+An early capture helper reused stale screenshot/window bindings. Its output was detected by identical image hashes; it was replaced with explicit current-state storage. **All delivery PNGs were recaptured from the final binary**, visually inspected and individually hashed. The earlier apparent 150% foreground failure was due to the stale window binding; the corrected final 150% run passed. No keys were sent following the rejected focus or drag checks.
+
+## Preservation and proof boundaries
+
+The owner's manifest remains uncommitted, SHA-256 **`835398da594421bc9f04647992b0e9cefd5dc844fd931d1964896b2e164a2587`**, equal to the starting hash. No operational root was selected as a writable application/test root. An initial aborted suite invocation used existing test defaults, which regenerate deterministic repository fixtures and open the private SQLite source with `mode=ro`; no session-start byte baseline existed for its bookkeeping. Completed suites used disposable fixture and source copies. All **21 private source/catalogue files** remain byte-identical to the subsequently recorded copy baseline. This does not claim a before/after baseline for the entire operational tree.
+
+---
+
+# Earlier implementation record (historical)
+
+
 # RES-636 qualification — vendor-neutral scientific data workspace and one-click import
 
 Engineering record, not product acceptance (RES-613 remains the owner gate). Scope is vendor-agnostic: no vendor-specific adapters. Source commit of the packaged application: `8d7f2589596b8c05b88e88178af881337c054e5e` (branch `codex/res-621-research-workflow`, local, unpushed).

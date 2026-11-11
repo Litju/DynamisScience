@@ -1,0 +1,53 @@
+{
+  "source_commit": "9bd8816689cb075cf18d3d321b2067c0179376f0",
+  "executable": "D:\\projects\\DynamisScience\\services\\science\\build\\res604-20261111-130141-492a872b\\dist\\DynamisScience\\DynamisScience.exe",
+  "executable_sha256": "48294fc92448333da56c7c5bff129a98bb2f9edca15aa0f1316df085426e375f",
+  "bundle_files": 2018,
+  "unchanged_runtime_files": 2017,
+  "bundle_manifest_sha256": "ab92413739e7d3577abed11a5fdd64452d18870152075f0ca6b7b137069cfd38",
+  "frozen_import_adapter": "dynamis-import@0.1.1",
+  "frozen_layout_fix_verified": true,
+  "full_suite": {
+    "passed": 282,
+    "seconds": 307.11,
+    "log": "D:/SWE_HOME/tmp/res636-delivery-regression.log"
+  },
+  "package_type": "PyInstaller onedir; EXE rebuilt from original spec through EXE; unchanged runtime retained",
+  "installer": "Superseded test installer was not installed and is not the deliverable",
+  "data_root": "D:\\SWE_HOME\\tmp\\res636-qualified-portable\\private",
+  "settings_file": "D:/SWE_HOME/tmp/res636-qualified-portable/settings.json",
+  "native_verified": [
+    "Excel picker",
+    "real indeterminate ETL",
+    "durable ready",
+    "Open dataset actual selected records",
+    "partial quarantine",
+    "invalid-file quarantine",
+    "targeted metadata and mapping recovery",
+    "process restart",
+    "same-file saved-profile reimport retains exact batch IDs",
+    "dark 150% import and reopened records"
+  ],
+  "native_limits": [
+    "Windows Explorer cross-window drag rejected by API bounds before input; Qt drop tests and source-native drop pass",
+    "Legacy advanced mapping editor at 150% not exercised",
+    "Hard process termination during a packaged write not exercised"
+  ],
+  "screenshots": {
+    "01-import.png": "57bd58d743185428a4bdd20a22a429c9e33a296e8b87f09f702101cb5512e4cc",
+    "02-integrating.png": "e5490b864d655110711f6d7ed7142cc979bf845b245c838edf371d09d9586649",
+    "03-ready.png": "9031abead37cc57abe4af1bc718447041bd6e26bf9897947e6d330aa0eb9cd0b",
+    "04-opened-records.png": "e15023a7746ba19f7abf285492c04bcdd2279dc9c31b11cf7f41bc4d497505f0",
+    "05-partial.png": "1a07940ab56f078e00c5210e1a44d6925a39eaa481c8250b7c388eba0d424958",
+    "06-issues-fit.png": "dcce8c9ae7d1198391d43293afa9c5d5e0d8575525fd18645d66f971c57a9513",
+    "07-invalid-quarantine.png": "dfdcd25921548c3bda62680ea11ff8cd73e78cf589ce690bbb81b782429c9b2b",
+    "08-needs-attention.png": "0510a76d1cf34a8f8c1c78677bf14f9f62e6a53d633985c4c8d540c7a83fac25",
+    "09-recovered-ready.png": "ac8a5ee8e2a8d6dfaa12c18a89baffb4cf4b92cf727f52081c869b6c99fa8b49",
+    "10-restarted-150-dark.png": "d8ef78dd832bb915b497597c7fb252d167d5a3f910e10c15265c7460620c9c5c",
+    "11-import-150-dark.png": "84264f88b58c1cc291921891b56e668c43638e5565117874e02b858b87c59245",
+    "12-processing-150-dark.png": "e8925becff9549d45e85d17f71216094dd52dda7e9087ece566ca9624ffcc619",
+    "13-ready-repeat-150-dark.png": "84adb96bc1596ac494eefc28df1646ded72418764b36526da48f82c0e4c4faed",
+    "14-records-after-restart-150-dark.png": "8fea3802ceb1e17fe2a259229586e88ddf39055e3d4fa6b6122ca5339ed8f1ed"
+  },
+  "manifest_sha256": "835398da594421bc9f04647992b0e9cefd5dc844fd931d1964896b2e164a2587"
+}

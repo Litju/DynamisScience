@@ -1,0 +1,266 @@
+{
+  "source": "9bd8816689cb075cf18d3d321b2067c0179376f0",
+  "data_root": "D:\\SWE_HOME\\tmp\\res636-simple-md0p8qox\\private",
+  "scale": "1",
+  "theme": "light",
+  "platform": "windows",
+  "steps": [
+    {
+      "name": "01-select",
+      "state": "select",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "extracting",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "02-specific-question",
+      "state": "attention",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "saving",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "integrating",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "03-ready",
+      "state": "ready",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "04-opened-records",
+      "state": null,
+      "size": [
+        1180,
+        700
+      ]
+    },
+    {
+      "name": "extracting",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "saving",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "integrating",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "05-drop-saved-profile",
+      "state": "ready",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "extracting",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "saving",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "integrating",
+      "state": "processing",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "06-partial",
+      "state": "partial",
+      "size": [
+        680,
+        400
+      ]
+    },
+    {
+      "name": "07-issues",
+      "state": "partial",
+      "size": [
+        680,
+        648
+      ]
+    },
+    {
+      "name": "extracting",
+      "state": "processing",
+      "size": [
+        680,
+        360
+      ]
+    },
+    {
+      "name": "08-invalid-quarantined",
+      "state": "failure",
+      "size": [
+        680,
+        360
+      ]
+    },
+    {
+      "name": "extracting",
+      "state": "processing",
+      "size": [
+        680,
+        360
+      ]
+    },
+    {
+      "name": "09-unsupported",
+      "state": "failure",
+      "size": [
+        680,
+        360
+      ]
+    },
+    {
+      "name": "10-reopened",
+      "state": null,
+      "size": [
+        1366,
+        720
+      ]
+    }
+  ],
+  "stages": [
+    "Extracting",
+    "Validating \u00b7 checking saved mappings",
+    "Validating \u00b7 normalizing and checking records",
+    "Saving \u00b7 writing validated records",
+    "Integrating \u00b7 checking dataset availability",
+    "Extracting",
+    "Validating \u00b7 checking saved mappings",
+    "Validating \u00b7 normalizing and checking records",
+    "Saving \u00b7 writing validated records",
+    "Integrating \u00b7 checking dataset availability",
+    "Extracting",
+    "Validating \u00b7 checking saved mappings",
+    "Validating \u00b7 normalizing and checking records",
+    "Saving \u00b7 writing validated records",
+    "Integrating \u00b7 checking dataset availability",
+    "Extracting",
+    "Validating \u00b7 checking saved mappings",
+    "Validating \u00b7 normalizing and checking records",
+    "Quarantining file",
+    "Extracting",
+    "Validating \u00b7 checking saved mappings"
+  ],
+  "snapshots": [
+    "DS-ADMITTED-4A3E57F45F96",
+    "DS-ADMITTED-5AD36C389201",
+    "DS-ADMITTED-B20BC63DA312"
+  ],
+  "receipts": [
+    {
+      "raw_filename": "first.xlsx",
+      "raw_sha256": "a23e79e5a85a2b8d0aa1eb4625809a3ce30bb23260257eed45629a7114f9a5a9",
+      "decision": "ADMITTED",
+      "row_quarantine": {
+        "count": 0,
+        "file": null,
+        "reasons": {}
+      }
+    },
+    {
+      "raw_filename": "repeat.xlsx",
+      "raw_sha256": "fe83956933caedb918cbeb6cfeff642007b17152b080f01eaa1a6fea073bb308",
+      "decision": "ADMITTED",
+      "row_quarantine": {
+        "count": 0,
+        "file": null,
+        "reasons": {}
+      }
+    },
+    {
+      "raw_filename": "partial.xlsx",
+      "raw_sha256": "1988d026a8d5bba7cc99e393528b31fe1c36dda49ac002a9ea5fdf6ec910a6a6",
+      "decision": "ADMITTED",
+      "row_quarantine": {
+        "count": 1,
+        "file": "D:\\SWE_HOME\\tmp\\res636-simple-md0p8qox\\private\\quarantine\\IR-E1EB7AEBF91E\\rows.parquet",
+        "reasons": {
+          "implausible jump_height_cm": 1
+        }
+      }
+    },
+    {
+      "raw_filename": "invalid.xlsx",
+      "raw_sha256": "7e1011c92fca3ec4930c13ee79c6667a742ccd8fa0294e92af06cddda4ca0b7a",
+      "decision": "QUARANTINED",
+      "row_quarantine": {
+        "count": 2,
+        "file": "D:\\SWE_HOME\\tmp\\res636-simple-md0p8qox\\private\\quarantine\\IR-8315A680B38A\\rows.parquet",
+        "reasons": {
+          "implausible jump_height_cm": 2
+        }
+      }
+    }
+  ],
+  "screenshot_sha256": {
+    "01-select.png": "533e2bca4bf2fccac99f95f76c2cf57929159cb4bc279282c15d83f6acc06b26",
+    "02-specific-question.png": "38b6b78932337bc2e174a031bedfc03c8a202b0ff2d796afe104a1f24515f347",
+    "03-ready.png": "957b228edf5e70e2d94c753eaa22621b7bc63d7a8ad666a5a00ec3aae1fe66d1",
+    "04-opened-records.png": "4456c6dfed1000b96f87467b3d4ed4e8ef883cc1017d59ab2aedc78f281878d0",
+    "05-drop-saved-profile.png": "43e3309e14c4eda8e6786cfea9931e52ba6d46b589c65daa75863379c6f29484",
+    "06-partial.png": "d00713eae12308d6f98fdef4be7ed50edf837ef614edd07b547ea685f39b1b48",
+    "07-issues.png": "65edeff2a2f79890263fdb9be2e47eaf2fb33fd9177216ac120fcb17a4a9a8af",
+    "08-invalid-quarantined.png": "fdc944d7a3377a208df305d8081005cb601f498be2ccd7bf99e3f17bc688eaff",
+    "09-unsupported.png": "c158e4c351b934bcea94d18a082dae57a96c1c2bb73d3b1779900384681a7e9a",
+    "10-reopened.png": "cf2e239168845e4573b52ea5e2dc7146880f26f6e2afa55c7a3d06cd1b391448",
+    "extracting.png": "ff2054d48753e9be3c3d11fa14e6c1c34ce60bf475b8cadddb7fb48127486d31",
+    "integrating.png": "418e892b8ddce2ed1eed6747ca071fd99a87e0eb772c2adadb59d684a2699219",
+    "saving.png": "bb8cb7baee77e571b3c71b2b69c6b960ae1c6742396f97bb629b6e38bf9197a8"
+  }
+}
