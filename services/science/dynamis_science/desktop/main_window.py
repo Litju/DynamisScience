@@ -599,7 +599,7 @@ class MainWindow(QMainWindow):
         from .workbench import descriptive
 
         snapshot, table = spec.snapshot_id, spec.table
-        provenance = {"source": "real" if snapshot.startswith("DS-REAL") else "synthetic",
+        provenance = {"source": "synthetic" if self.data_pane._detail.get("synthetic") else "real",
                       "snapshot_id": snapshot, "table": table}
         units = {v.name: v.unit for v in self.data_pane.variables() if v.unit}
         types = dict(spec.variable_types)

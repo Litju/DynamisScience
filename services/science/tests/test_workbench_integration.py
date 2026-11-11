@@ -141,6 +141,22 @@ def test_descriptive_kinds_render_blocks_and_never_promote(app, window):
     assert doc.stale and shell.run_label.text() == "Specification changed"
 
 
+def test_admitted_source_uses_recorded_provenance_for_descriptives(app, window, monkeypatch):
+    from dynamis_science.desktop.workbench import descriptive
+    import pandas as pd
+
+    _open_study(app, window, "STUDY-REAL-001")
+    window.workbench.select_analysis("descriptives")
+    window.options_pane.slots["outcome"].box.dropped.emit(["cmj_height_cm"])
+    spec = window.controller.current_spec()
+    spec.snapshot_id = window.data_pane.snapshot_id = "DS-ADMITTED-123456789ABC"
+    window.data_pane._detail["synthetic"] = False
+    monkeypatch.setattr(descriptive, "load_table", lambda *_: pd.DataFrame({"cmj_height_cm": [30., 32.]}))
+    window._run_descriptive(spec)
+    _pump(app, lambda: bool(window.results_doc.blocks) and not window.runner.active)
+    assert window.results_doc.blocks[0].provenance["source"] == "real"
+
+
 def test_mixed_model_trajectories_link_with_by_athlete(app, window):
     _open_study(app, window, "STUDY-REAL-001")
     _assign_mixed(window)

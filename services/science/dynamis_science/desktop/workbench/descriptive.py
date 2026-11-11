@@ -164,6 +164,9 @@ class DescriptiveBlock(ResultBlock):
         super().__init__(title, [("Observed", "obs")], provenance.get("source") or "real", subtitle)
         self.provenance = provenance
         self.syntax = syntax
+        if "quality_state" in frame:
+            flagged = int(frame["quality_state"].fillna("").ne("VALID").sum())
+            limits += f" All table rows are included; {flagged} are not marked VALID. No quality filter was applied."
         self.set_note(limits)
         self.set_footer(DESCRIPTIVE_STATE, "Not a recorded run · computed live with pandas · " + syntax,
                         f"Source {provenance.get('snapshot_id', '—')} · table {provenance.get('table', '—')} · "

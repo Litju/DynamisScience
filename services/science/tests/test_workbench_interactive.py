@@ -154,6 +154,10 @@ def test_descriptives_block_follows_statistic_and_plot_options(app):
     assert row.ci_low == pytest.approx(35 - 4.302653 * 5 / math.sqrt(3), rel=1e-5)
     default = descriptive.DescriptivesBlock(_frame(), ["height"], provenance={})  # no split: box plot of all rows
     assert "Box: median" in _texts(default) and "Min" not in _texts(default) and "95% CI" not in _texts(default)
+    flagged = _frame().assign(quality_state=["VALID", "EXCLUDED", "VALID", None, "VALID"])
+    block = descriptive.DescriptivesBlock(flagged, ["height"])
+    assert "2 are not marked VALID" in block.note.text()
+    assert "No quality filter was applied" in block.note.text()
 
 
 def test_frequencies_always_list_missing():
