@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QInputDialog,
-    QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem, QTextBrowser,
+    QLabel, QLineEdit, QPushButton, QScrollArea, QSizePolicy, QSplitter, QTabWidget, QTableWidget, QTableWidgetItem, QTextBrowser,
     QVBoxLayout, QWidget,
 )
 
@@ -21,8 +21,8 @@ from .services import DynamisAppService
 
 PRIVACY = ["DEIDENTIFIED", "PSEUDONYMOUS", "IDENTIFIABLE", "NOT_APPLICABLE", "TEST_FIXTURE"]
 TEXT_FIELDS = (  # (key, label, required)
-    ("source_name", "Source name", True), ("publisher", "Publisher / lab", True),
-    ("dataset_identity", "Dataset identity / DOI", True), ("license_or_agreement", "Licence or agreement", True),
+    ("source_name", "Source name", True), ("publisher", "Publisher / lab", False),
+    ("dataset_identity", "Dataset identity / DOI", False), ("license_or_agreement", "Licence or agreement", True),
     ("redistribution_restrictions", "Redistribution restrictions", True),
     ("manufacturer", "Instrument manufacturer", True), ("model", "Instrument model", True),
     ("serial_number", "Instrument serial number", True), ("calibration_status", "Calibration status", False),
@@ -132,8 +132,6 @@ class ImportReviewDialog(QDialog):
         root.addWidget(self.drop)
         root.addWidget(self.summary)
 
-        split = QSplitter(Qt.Orientation.Horizontal)
-        left = QSplitter(Qt.Orientation.Vertical)
         self.files = QTableWidget(0, 3)
         self.files.setHorizontalHeaderLabels(["File", "Detected", "Status"])
         self.files.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -149,52 +147,71 @@ class ImportReviewDialog(QDialog):
         self.mapping.setAccessibleName("Mapping decisions")
         self.mapping.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.mapping.horizontalHeader().setStretchLastSection(True)
+        data_page = QSplitter(Qt.Orientation.Vertical)
         for widget in (self.files, self.preview, self.mapping):
-            left.addWidget(widget)
-        left.setSizes([110, 200, 160])
-        split.addWidget(left)
+            data_page.addWidget(widget)
+        data_page.setSizes([90, 200, 160])
 
-        right = QWidget()
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        box = QGroupBox("Source and instrument — confirmed by you")
-        form = QFormLayout(box)
+        # Source page: the few facts that matter first, everything else under "More"
         self.privacy = QComboBox()
         self.privacy.addItem("Choose…", "")
         for item in PRIVACY:
             self.privacy.addItem(item, item)
         self.privacy.setAccessibleName("Privacy classification")
-        form.addRow("Data class", self.privacy)
         self.edits: dict[str, QLineEdit] = {}
         for key, label, _ in TEXT_FIELDS:
             edit = QLineEdit()
             edit.setAccessibleName(label)
             self.edits[key] = edit
-            form.addRow(label, edit)
         self.edits["protocol_version"].setText("1.0")
+        self.edits["publisher"].setPlaceholderText("defaults to the source name")
+        self.edits["dataset_identity"].setPlaceholderText("defaults to the source name")
         self.rights = QCheckBox("I reviewed the licence, permitted uses and redistribution terms.")
         self.reviewer = QLineEdit(getpass.getuser())
         self.reviewer.setAccessibleName("Rights verified by")
-        form.addRow(self.rights)
-        form.addRow("Rights verified by", self.reviewer)
+        source_page = QWidget()
+        source_layout = QVBoxLayout(source_page)
+        essentials = QFormLayout()
+        essentials.addRow("This data is", self.privacy)
+        for key in ("source_name", "license_or_agreement", "redistribution_restrictions", "manufacturer", "model",
+                    "serial_number", "calibration_status", "protocol_name"):
+            essentials.addRow(dict((k, lab) for k, lab, _ in TEXT_FIELDS)[key], self.edits[key])
+        self.rights_row = QWidget()
+        rights_layout = QFormLayout(self.rights_row)
+        rights_layout.setContentsMargins(0, 0, 0, 0)
+        rights_layout.addRow(self.rights)
+        rights_layout.addRow("Rights verified by", self.reviewer)
+        essentials.addRow(self.rights_row)
+        source_layout.addLayout(essentials)
+        self.more_button = QPushButton("More ▾")
+        self.more_button.setCheckable(True)
+        self.more_button.setFlat(True)
+        self.more = QWidget()
+        more_layout = QFormLayout(self.more)
+        for key in ("publisher", "dataset_identity", "protocol_version", "subject_id", "trial_id", "session_id", "sampling_hz",
+                    "coordinate_system"):
+            more_layout.addRow(dict((k, lab) for k, lab, _ in TEXT_FIELDS)[key], self.edits[key])
+        self.more.setVisible(False)
+        self.more_button.toggled.connect(lambda on: (self.more.setVisible(on), self.more_button.setText("Fewer ▴" if on else "More ▾")))
+        source_layout.addWidget(self.more_button, 0, Qt.AlignmentFlag.AlignLeft)
+        source_layout.addWidget(self.more)
+        source_layout.addStretch(1)
+        self.privacy.currentIndexChanged.connect(self._rights_visibility)
+        self._rights_visibility()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setWidget(box)
-        right_layout.addWidget(scroll, 1)
-        split.addWidget(right)
-        split.setSizes([620, 420])
+        scroll.setWidget(source_page)
+
         self.verdict = QTextBrowser()
         self.verdict.setAccessibleName("Detection, QC verdict, warnings and provenance")
-        self.verdict.setMinimumHeight(80)
-        vertical = QSplitter(Qt.Orientation.Vertical)  # the researcher can trade preview space for verdict space
-        vertical.addWidget(split)
-        vertical.addWidget(self.verdict)
-        vertical.setStretchFactor(0, 3)
-        vertical.setStretchFactor(1, 2)
+        self.detail_tabs = QTabWidget()
+        self.detail_tabs.addTab(scroll, "Source")
+        self.detail_tabs.addTab(data_page, "Data and mapping")
+        self.detail_tabs.addTab(self.verdict, "QC report")
         self.details = QWidget()  # everything the researcher can inspect or change; closed unless attention is needed
         details_layout = QVBoxLayout(self.details)
         details_layout.setContentsMargins(0, 0, 0, 0)
-        details_layout.addWidget(vertical, 1)
+        details_layout.addWidget(self.detail_tabs, 1)
         self.details.setVisible(False)
         root.addWidget(self.details, 1)
         root.addStretch(0)
@@ -399,6 +416,10 @@ class ImportReviewDialog(QDialog):
         self.verdict.setHtml(text)
         self._open_details()
 
+    def _rights_visibility(self) -> None:
+        """A test fixture has no rights to review; real data does."""
+        self.rights_row.setVisible(self.privacy.currentData() not in ("TEST_FIXTURE", ""))
+
     def _toggle_details(self, shown: bool) -> None:
         """Details closed is a compact one-line screen; open gives the full review."""
         self.details.setVisible(shown)
@@ -415,6 +436,12 @@ class ImportReviewDialog(QDialog):
                     for i in self.items)
         if needs or self._form_errors():
             self._open_details()
+            if self._form_errors():
+                self.detail_tabs.setCurrentIndex(0)
+            elif any(not i["decision"] and i["plan"]["state"] == "REVIEW" for i in self.items):
+                self.detail_tabs.setCurrentIndex(1)
+            else:
+                self.detail_tabs.setCurrentIndex(2)
 
     @staticmethod
     def _rows(n: int) -> str:
@@ -468,8 +495,15 @@ class ImportReviewDialog(QDialog):
         self.import_button.setEnabled(bool(pending))
         self.import_button.setText(f"&Import {len(pending)} files" if len(pending) > 1 else "&Import")
 
+    def _inputs(self) -> tuple:
+        return (tuple(sorted(self._fields().items())), tuple(sorted(self._constants().items())), self.rights.isChecked())
+
     def _import(self) -> None:
         """The one explicit click: QC if it has not run, then add every eligible file as an immutable batch."""
+        if getattr(self, "_staged_inputs", None) != self._inputs():  # the form changed after QC ran: its result is stale
+            for item in self.items:
+                if not item["decision"]:
+                    item["staged"] = None
         if any(i["staged"] is None and not i["decision"] and i["plan"]["state"] != "UNSUPPORTED" for i in self.items):
             self._run_qc(then=self._admit)
         else:
@@ -490,6 +524,8 @@ class ImportReviewDialog(QDialog):
     def _fields(self) -> dict[str, Any]:
         fields = {key: edit.text().strip() for key, edit in self.edits.items() if key not in importer.CONSTANT_FIELDS}
         fields["privacy_status"] = self.privacy.currentData() or ""
+        fields["publisher"] = fields.get("publisher") or fields.get("source_name", "")
+        fields["dataset_identity"] = fields.get("dataset_identity") or fields.get("source_name", "")
         return fields
 
     def _fill_form(self, fields: dict[str, Any]) -> None:
@@ -546,6 +582,7 @@ class ImportReviewDialog(QDialog):
             self._show(self.files.currentRow())
             return
         context = importer.build_context(self._fields())
+        self._staged_inputs = self._inputs()
         reviewer = self.reviewer.text().strip() if self.rights.isChecked() else ""
 
         def work() -> list[Any]:

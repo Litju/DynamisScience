@@ -144,3 +144,16 @@ def test_unimportable_file_opens_details_and_disables_import(dialog, tmp_path):
     dialog.import_button.click()
     assert "cannot be imported" in dialog.summary.text() and dialog.details_button.isChecked()
     assert not dialog.import_button.isEnabled() and not admission.list_admitted_snapshots()
+
+
+def test_editing_the_source_after_qc_reruns_qc_instead_of_importing_stale_results(dialog, tmp_path):
+    dialog.load(str(_file(tmp_path, "s.csv", HEADER + ROWS)))
+    _fill(dialog)
+    dialog.import_button.setEnabled(True)
+    dialog.qc_button.click()
+    first = dialog.items[0]["staged"]["receipt"]["source_id"]
+    dialog.edits["source_name"].setText("A different lab")  # changed after QC: the staged result no longer matches the form
+    dialog.import_button.click()
+    sources = {r["source_id"] for r in importer.list_receipts()}
+    assert dialog.items[0]["staged"]["receipt"]["source_id"] != first and len(sources) == 2
+    assert "imported 2 rows" in dialog.summary.text()

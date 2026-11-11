@@ -250,7 +250,7 @@ class DataWorkspaceDialog(QDialog):
         row.addWidget(QLabel("Recording"))
         row.addWidget(self.compare_trial, 1)
         self.compare_model = RowsModel(self)
-        view = _view("Raw-derived versus recorded values")
+        view = self.compare_view = _view("Raw-derived versus recorded values")
         view.setModel(self.compare_model)
         layout.addLayout(row)
         layout.addWidget(view, 1)
@@ -283,8 +283,9 @@ class DataWorkspaceDialog(QDialog):
                 return "—" if v is None else f"{v:,.4g}"
 
             self.compare_model.set_data(
-                ["Metric", "Unit", "Recorded (from the source file)", "Derived (DynamisScience, from raw samples)", "Difference"],
+                ["Metric", "Unit", "Recorded (source file)", "Derived (raw samples)", "Difference"],
                 [(r["metric"], r["unit"], number(r["recorded"]), number(r["derived"]), number(r["difference"])) for r in result["rows"]])
+            self.compare_view.resizeColumnsToContents()
             recorded = sorted({r["recorded_from"] for r in result["rows"] if r["recorded_from"]})
             self.compare_note.setText(
                 f"Derived values are computed now from {result['samples']:,} raw samples ({', '.join(result['channels'])}) and are not "
