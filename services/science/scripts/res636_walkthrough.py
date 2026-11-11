@@ -130,7 +130,7 @@ for i in range(3):
 load(folder)
 shot(dialog, "09-folder-import", "bounded folder import: one row per file")
 
-load(write("forcedecks_like.csv", "Time (s),Left Force (N),Right Force (N)\n0.000,400,410\n0.001,401,409\n"))
+load(write("force_time_trace.csv", "Time (s),Left Force (N),Right Force (N)\n0.000,400,410\n0.001,401,409\n"))
 shot(dialog, "10-raw-force-time-held", "raw force-time export recognised but not imported (vendor layout unverified)")
 
 dialog.close()

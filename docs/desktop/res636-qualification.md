@@ -1,6 +1,6 @@
 # RES-636 qualification — vendor-neutral scientific data workspace and one-click import
 
-Engineering record, not product acceptance (RES-613 remains the owner gate). Source commit of the packaged application: `9d0f1a2899eba28ad80e8ad1701419a19dd7c0b0` (branch `codex/res-621-research-workflow`, local, unpushed).
+Engineering record, not product acceptance (RES-613 remains the owner gate). Scope is vendor-agnostic: no vendor-specific adapters. Source commit of the packaged application: `9d0f1a2899eba28ad80e8ad1701419a19dd7c0b0` (branch `codex/res-621-research-workflow`, local, unpushed).
 
 ## What exists (VERIFIED unless marked)
 
@@ -28,7 +28,7 @@ Engineering record, not product acceptance (RES-613 remains the owner gate). Sou
 
 ## Not verified / limits
 
-- **No vendor adapter and no vendor compatibility claim.** VALD documents "Raw Time (s)", "Left Force (N)", "Right Force (N)" only; Hawkin documents a time/left/right/combined layout at 1000 Hz. Files with plausible names import through the generic mapping, which says nothing about vendor header variants. Hawkin/hawkinR-style `time_s,force_left_N,…` headers are matched generically.
+- **Vendor-agnostic by design.** There are no vendor adapters, SDKs or vendor-specific formats; any CSV/Parquet export that carries the needed columns imports through the generic mapping. No compatibility with any particular manufacturer is claimed or required.
 - The frozen run covers the keyboard journey above; the installer was not run. The import window opens tall even with details closed (cosmetic, left as is). Only 100% display scaling was tried on the frozen build; 150% was tested on the source application only. Other DPI/hardware not tested.
 - Sample-level QC is per file (a file with any rejected trace is not admitted); per-row flags apply to trial-level tables only. Duplicate sample times are rejected, not repaired.
 - Trace snapshots are browsed, queried and plotted; scalar analyses cannot run on them (no derived metrics are computed); the qualified methods bind to `signal_trials`/`cmj_*` tables and are untouched.
