@@ -553,6 +553,7 @@ class DatasetAdmissionDialog(QDialog):
         self.mass_unit = QLineEdit("kg")
         self.time_unit = QLineEdit("s")
         self.distance_unit = QLineEdit("m")
+        self.coordinate_system = QLineEdit()
         form.addRow("Measurement family", self.family)
         form.addRow("Instrument ID", QLabel(self.instrument_id))
         form.addRow("Manufacturer", self.manufacturer)
@@ -566,6 +567,7 @@ class DatasetAdmissionDialog(QDialog):
         form.addRow("Mass unit", self.mass_unit)
         form.addRow("Time unit", self.time_unit)
         form.addRow("Distance unit", self.distance_unit)
+        form.addRow("Coordinate convention (sprint)", self.coordinate_system)
         return page
 
     def _file_page(self) -> QWidget:
@@ -628,12 +630,15 @@ class DatasetAdmissionDialog(QDialog):
                 "time": self.time_unit.text().strip(),
                 "distance": self.distance_unit.text().strip(),
             },
+            "coordinate_convention": self.coordinate_system.text().strip() or "NOT_SPECIFIED",
         }
         metadata = {
             "units": protocol["units"],
             "instrument_default": self.instrument_id,
             "protocol_default": self.protocol_id,
         }
+        if self.coordinate_system.text().strip():
+            metadata["coordinate_system"] = self.coordinate_system.text().strip()
         return source, instrument, protocol, {"path": str(file_path.resolve()), "family": self.family.currentData(), "metadata": metadata}
 
     def _review(self) -> None:
@@ -675,7 +680,7 @@ class DatasetAdmissionDialog(QDialog):
         self.measurement_metadata = result["metadata"]
         self.tabs.setEnabled(False)
         status = self.quality["status"]
-        self.summary.setPlainText(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        self.summary.setPlainText(self._quality_summary())
         eligible = status in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
         self.admit_button.setEnabled(eligible)
         self.quarantine_button.setEnabled(not eligible)
@@ -707,10 +712,26 @@ class DatasetAdmissionDialog(QDialog):
     def _admission_recorded(self, record: dict[str, Any]) -> None:
         self.admit_button.setEnabled(False)
         self.quarantine_button.setEnabled(False)
-        self.summary.setPlainText(json.dumps(record, indent=2, ensure_ascii=False, default=str))
+        self.summary.setPlainText(self._quality_summary() + f"\n\nAdmission record: {record['id']}")
         self.on_admitted(record)
         if record.get("dataset_snapshot_id"):
             self.accept()
+
+    def _quality_summary(self) -> str:
+        quality = self.quality or {}
+        lines = [f"QC decision: {quality.get('status', 'unknown')}"]
+        counts = quality.get("counts", {})
+        if counts:
+            lines.append("  ·  ".join(f"{name}: {value}" for name, value in counts.items()))
+        for key, label in (("errors", "Errors"), ("warnings", "Warnings"),
+                           ("rejected_record_ids", "Rejected records"),
+                           ("quarantined_record_ids", "Quarantined records")):
+            values = quality.get(key, [])
+            if values:
+                lines.append(f"{label}: " + "; ".join(map(str, values)))
+        if not quality.get("errors") and not quality.get("warnings"):
+            lines.append("No QC errors or warnings.")
+        return "\n".join(lines)
 
 
 class AdmissionHistoryDialog(QDialog):

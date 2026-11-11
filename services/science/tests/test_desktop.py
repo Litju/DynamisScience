@@ -996,6 +996,7 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     qtbot.waitUntil(lambda: dialog.quality is not None or bool(errors), timeout=30000)
     assert not errors, errors
     assert dialog.quality["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
+    assert "QC decision: ADMITTED" in dialog.summary.toPlainText()
     dialog.admit_button.click()
     qtbot.waitUntil(
         lambda: any(item.get("dataset_snapshot_id") for item in service.list_admission_records()),
@@ -1010,6 +1011,25 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     assert any(item["id"] == record["dataset_snapshot_id"] for item in service.list_datasets())
     dialog.close()
     window.close()
+
+
+def test_admission_dialog_preserves_sprint_coordinate_and_explains_quarantine(qtbot, tmp_path):
+    source_file = tmp_path / "sprint.csv"
+    source_file.write_text("subject_id\nP01\n", encoding="utf-8")
+    dialog = DatasetAdmissionDialog(None, None, lambda _record: None)
+    qtbot.addWidget(dialog)
+    dialog.family.setCurrentIndex(1)
+    dialog.file_path.setText(str(source_file))
+    dialog.coordinate_system.setText("track lane")
+    _, _, protocol, file = dialog._payloads()
+    assert protocol["coordinate_convention"] == "track lane"
+    assert file["metadata"]["coordinate_system"] == "track lane"
+    dialog._reviewed({"artifact": {}, "quality": {"status": "QUARANTINED",
+        "warnings": ["instrument calibration is UNKNOWN"], "counts": {"rows": 1}},
+        "family": "SPRINT_TIMING", "metadata": file["metadata"]})
+    assert "instrument calibration is UNKNOWN" in dialog.summary.toPlainText()
+    dialog._admission_recorded({"id": "AR-TEST", "dataset_snapshot_id": None})
+    assert "instrument calibration is UNKNOWN" in dialog.summary.toPlainText()
 
 
 def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(
