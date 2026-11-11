@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import polars as pl
 
 from dynamis_science import admission, qualification
 from dynamis_science.data_root import data_root, paths
@@ -150,6 +151,23 @@ def test_identical_files_from_distinct_sources_keep_their_provenance(service, tm
     assert admission.get_source_artifact(second["id"])["source_id"] == "SRC-SECOND"
 
 
+def test_cmj_units_are_validated_and_normalized_before_range_checks(service, tmp_path):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    csv = ("subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz,body_mass_kg,jump_height_cm,eccentric_braking_duration_s\n"
+           "S1,A,T1,INST-FP-1,PROT-FP-1,1000,80000,0.4,200\n")
+    artifact = _ingest(service, tmp_path, "units.csv", csv.encode())
+    metadata = {"units": {"body_mass": "g", "time": "ms", "distance": "m"}}
+    result = service.admit_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", metadata)
+    assert result["status"] == "ADMITTED"
+    frame = pl.read_parquet(paths()["admitted"] / result["dataset_snapshot_id"] / "cmj_trials.parquet")
+    assert frame["body_mass_kg"][0] == pytest.approx(80)
+    assert frame["jump_height_cm"][0] == pytest.approx(40)
+    assert frame["eccentric_braking_duration_s"][0] == pytest.approx(0.2)
+    bad = service.validate_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", {"units": {"time": "fortnights"}})
+    assert bad["status"] == "REJECTED" and "Cannot convert time" in bad["errors"][0]
+
+
 @pytest.mark.parametrize(
     "filename,content,metadata",
     [
@@ -271,6 +289,17 @@ def test_sprint_modality_is_admitted_with_its_own_contract(service, tmp_path):
         {"units": {"distance": "m", "time": "s"}, "coordinate_system": "track"},
     )
     assert result["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
+    scaled = _ingest(service, tmp_path, "sprint-scaled.csv", csv.replace(b"30,4.2", b"3000,4200"))
+    scaled_result = service.admit_source_artifact(
+        scaled["id"], "SPRINT_TIMING",
+        {"units": {"distance": "cm", "time": "ms"}, "coordinate_system": "track"},
+    )
+    assert scaled_result["status"] == "ADMITTED"
+    frame = pl.read_parquet(paths()["admitted"] / scaled_result["dataset_snapshot_id"] / "sprint_trials.parquet")
+    assert frame["distance_m"][0] == pytest.approx(30)
+    assert frame["time_s"][0] == pytest.approx(4.2)
+    bad = service.validate_source_artifact(scaled["id"], "SPRINT_TIMING", {"units": {"distance": "yards"}})
+    assert bad["status"] == "REJECTED" and "Cannot convert distance" in bad["errors"][0]
 
 
 def test_qualification_records_are_native_python_calls(service):

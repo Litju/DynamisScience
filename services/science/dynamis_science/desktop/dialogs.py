@@ -552,7 +552,10 @@ class DatasetAdmissionDialog(QDialog):
         self.sampling.setValue(1000)
         self.mass_unit = QLineEdit("kg")
         self.time_unit = QLineEdit("s")
-        self.distance_unit = QLineEdit("m")
+        self.distance_unit = QLineEdit("cm")
+        self.family.currentIndexChanged.connect(
+            lambda: self.distance_unit.setText("cm" if self.family.currentData() == "CMJ_FORCE_PLATFORM" else "m")
+        )
         self.coordinate_system = QLineEdit()
         form.addRow("Measurement family", self.family)
         form.addRow("Instrument ID", QLabel(self.instrument_id))
@@ -564,9 +567,9 @@ class DatasetAdmissionDialog(QDialog):
         form.addRow("Protocol name", self.protocol_name)
         form.addRow("Protocol version", self.protocol_version)
         form.addRow("Sampling rate (Hz)", self.sampling)
-        form.addRow("Mass unit", self.mass_unit)
-        form.addRow("Time unit", self.time_unit)
-        form.addRow("Distance unit", self.distance_unit)
+        form.addRow("Input mass unit", self.mass_unit)
+        form.addRow("Input time unit", self.time_unit)
+        form.addRow("Input distance unit", self.distance_unit)
         form.addRow("Coordinate convention (sprint)", self.coordinate_system)
         return page
 

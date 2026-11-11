@@ -347,6 +347,7 @@ def _unit_conversion(value: float, unit: str, canonical: str, quantity: str) -> 
         ("s", "s"): 1.0,
         ("min", "s"): 60.0,
         ("cm", "m"): 0.01,
+        ("m", "cm"): 100.0,
         ("m", "m"): 1.0,
         ("n", "n"): 1.0,
     }
@@ -380,6 +381,14 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     mass_unit = str(units.get("body_mass", units.get("mass", "kg"))).lower()
     if mass_unit not in {"kg", "g"}:
         errors.append(f"unrecognized mass unit: {mass_unit}")
+    for key, canonical, quantity in (("time", "s", "time"), ("distance", "cm", "distance")):
+        try:
+            _unit_conversion(1.0, str(units.get(key, canonical)), canonical, quantity)
+        except ValueError as exc:
+            errors.append(str(exc))
+    if errors:
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    frame = harmonize_cmj(artifact, metadata)
     if "mass_unit" not in metadata and "units" not in metadata:
         warnings.append("missing unit metadata; assuming canonical units")
     # We quarantine missing units rather than reject if not explicitly provided.
@@ -481,6 +490,15 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
         errors.append(f"missing required columns: {', '.join(missing_required)}")
     if errors:
         return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    units = metadata.get("units", {})
+    for key, canonical in (("time", "s"), ("distance", "m")):
+        try:
+            _unit_conversion(1.0, str(units.get(key, canonical)), canonical, key)
+        except ValueError as exc:
+            errors.append(str(exc))
+    if errors:
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    frame = harmonize_sprint(artifact, metadata)
     if frame["subject_id"].null_count() or frame["session_id"].null_count():
         errors.append("missing subject or session identifiers")
     if "sampling_hz" in columns:
@@ -563,10 +581,13 @@ def harmonize_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> pl.Data
         frame = frame.with_columns((pl.col("body_mass_kg") * _unit_conversion(1.0, mass_unit, "kg", "mass")).alias("body_mass_kg"))
     # time unit conversion for duration columns
     time_unit = str(units.get("time", "s")).lower() or "s"
-    for col in ("eccentric_braking_duration_s",):
+    for col in ("eccentric_braking_duration_s", "time_s"):
         if col in frame.columns and time_unit != "s":
             frame = frame.with_columns((pl.col(col) * _unit_conversion(1.0, time_unit, "s", "time")).alias(col))
-    # distance unit conversion for jump height? keep cm canonical for metric
+    distance_unit = str(units.get("distance", "cm")).lower() or "cm"
+    for col in ("jump_height_cm", "countermovement_depth_cm"):
+        if col in frame.columns and distance_unit != "cm":
+            frame = frame.with_columns((pl.col(col) * _unit_conversion(1.0, distance_unit, "cm", "distance")).alias(col))
     # Add canonical provenance columns
     frame = frame.with_columns(
         pl.lit(artifact["id"]).alias("source_artifact_id"),
