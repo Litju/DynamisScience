@@ -407,6 +407,22 @@ def _normalize_trace(lazy: pl.LazyFrame, mapping: dict[str, Any], context: dict[
     return lazy.select(list(exprs.values())), facts
 
 
+def split_rows(frame: pl.DataFrame, family: str) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Row-level QC flags: (clean rows, flagged rows with a qc_flag reason).
+
+    Flagged rows are quarantined with their reason and the clean rows continue to the unchanged admission QC, so one
+    bad row no longer rejects a whole file. Every row sharing a duplicated trial id is flagged: which one is right is
+    not for the importer to guess.
+    """
+    ranges = admission.CMJ_RANGES if family == "CMJ_FORCE_PLATFORM" else admission.SPRINT_RANGES
+    reasons = [pl.when(pl.col(c).is_null()).then(pl.lit(f"missing {c}")) for c in ("subject_id", "session_id", "trial_id")]
+    reasons.append(pl.when(pl.col("trial_id").is_duplicated()).then(pl.lit("duplicate trial_id")))
+    reasons += [pl.when((pl.col(c) < lo) | (pl.col(c) > hi)).then(pl.lit(f"implausible {c}"))
+                for c, (lo, hi) in ranges.items() if c in frame.columns]
+    flagged = frame.with_columns(pl.coalesce(reasons).alias("qc_flag"))
+    return flagged.filter(pl.col("qc_flag").is_null()).drop("qc_flag"), flagged.filter(pl.col("qc_flag").is_not_null())
+
+
 # ---------------------------------------------------------------- Context (source / instrument / protocol)
 def _digest(*parts: Any) -> str:
     return hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()[:8].upper()
@@ -486,6 +502,7 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
         name = f"{path.stem}.normalized.parquet"
         normalized_path = work / name
         units = CANONICAL_UNITS[family]
+        bad_rows: pl.DataFrame | None = None  # rows that failed row-level QC (trial-level tables only)
         try:
             if family == traces.FAMILY:
                 stream, facts = _normalize_trace(lazy, mapping, context)
@@ -494,8 +511,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
             else:
                 if plan["size_bytes"] > MAX_FILE_BYTES:
                     raise ImportBlocked("Trial-level table exceeds the size limit.")
-                normalized = normalize(lazy.collect(), mapping)
-                sampling = _unique(normalized.lazy(), "sampling_hz", "sampling rates") if "sampling_hz" in normalized.columns else None
+                normalized, bad_rows = split_rows(normalize(lazy.collect(), mapping), family)
+                sampling =_unique(normalized.lazy(), "sampling_hz", "sampling rates") if "sampling_hz" in normalized.columns else None
                 instrument_id = _unique(normalized.lazy(), "instrument_id", "instruments") if "instrument_id" in normalized.columns else None
                 instrument_id = instrument_id or "INST-IMP-" + _digest(ctx_i["manufacturer"], ctx_i["model"], ctx_i["serial_number"],
                                                                     ctx_i["calibration_status"], ctx_i["calibration_date"], family)
@@ -510,7 +527,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
             raise ImportBlocked(f"The data could not be normalized ({type(error).__name__}); check that mapped columns hold numbers.") from error
         metadata: dict[str, Any] = {"units": units, "instrument_default": instrument_id, "protocol_default": protocol_id,
                                     "import": {"adapter": plan["adapter"], "adapter_version": ADAPTER_VERSION,
-                                               "raw_sha256": raw_sha, "schema_fingerprint": plan["schema_fingerprint"]}}
+                                               "raw_sha256": raw_sha, "schema_fingerprint": plan["schema_fingerprint"],
+                                               "rows_quarantined": 0 if bad_rows is None else bad_rows.height}}
         if family == traces.FAMILY:
             metadata.update(sampling_hz=facts["sampling_hz"], sampling_source=facts["sampling_source"], time_base=facts["time_base"])
         constants = mapping.get("constants", {})
@@ -557,12 +575,20 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
         "normalized_rows": normalized_rows, "dropped_columns": [c["name"] for c in plan["columns"] if c["name"] not in
                                                                  {e["source"] for e in mapping["columns"].values()}],
     }
+    row_quarantine = {"count": 0, "reasons": {}, "file": None}
+    if bad_rows is not None and bad_rows.height:  # kept with the reason; never silently dropped
+        hold = paths()["quarantine"] / receipt["id"]
+        hold.mkdir(parents=True, exist_ok=True)
+        bad_rows.write_parquet(hold / "rows.parquet", compression="zstd")
+        row_quarantine = {"count": bad_rows.height, "file": str(hold / "rows.parquet"),
+                          "reasons": dict(bad_rows["qc_flag"].value_counts().iter_rows())}
+    receipt["row_quarantine"] = row_quarantine
     previous = next((r for r in _receipts() if r["id"] == receipt["id"]), None)
     receipt.update(created_at=previous["created_at"] if previous else utc_now(), decision=previous["decision"] if previous else "STAGED")
     receipt["admission_record_id"] = previous.get("admission_record_id") if previous else None
     _save_receipt(receipt)
     return {"receipt": receipt, "artifact": artifact, "quality": quality, "rights_status": rights, "eligible": eligible,
-            "duplicate_of": duplicate_of, "synthetic_only": rights == "FIXTURE_ONLY"}
+            "duplicate_of": duplicate_of, "synthetic_only": rights == "FIXTURE_ONLY", "context": context}
 
 
 def expected_snapshot_id(staged: dict[str, Any]) -> str:
@@ -577,7 +603,33 @@ def admit(staged: dict[str, Any]) -> dict[str, Any]:
         raise ImportBlocked(f"This content duplicates source artifact {staged['duplicate_of']}; it was not admitted again.")
     record = admission.admit_artifact(receipt["source_artifact_id"], receipt["family"], receipt["admission_metadata"])
     _save_receipt(dict(receipt, decision=record["status"], admission_record_id=record["id"]))
+    if record.get("dataset_snapshot_id"):
+        remember(receipt, staged["context"])
     return record
+
+
+IDENTITY_CONSTANTS = ("session_id", "subject_id", "trial_id")  # never carried to another file by an automatic preset
+
+
+def remember(receipt: dict[str, Any], context: dict[str, Any]) -> dict[str, Any] | None:
+    """After a successful admission, keep the mapping and source context so the next file of this schema is one click.
+
+    Identity values you typed for one file (session, subject, trial) are not remembered: they would silently label the
+    next file. Instrument facts (sampling rate, coordinate convention) are remembered.
+    """
+    plan = {"state": "READY", "schema_fingerprint": receipt["schema_fingerprint"], "adapter": receipt["adapter"],
+            "mapping": dict(receipt["mapping"], constants={k: v for k, v in receipt["mapping"].get("constants", {}).items()
+                                                           if k not in IDENTITY_CONSTANTS})}
+    if match_preset(plan) is not None:
+        return None
+    name = f"{context['source']['name']} · {receipt['family']} · {receipt['schema_fingerprint'][:6]}"
+    return save_preset(name, plan, context)
+
+
+def last_profile() -> dict[str, Any] | None:
+    """The source/instrument/protocol context most recently used, to prefill a new schema."""
+    presets = _presets()
+    return presets[-1]["context"] if presets else None
 
 
 def quarantine(staged: dict[str, Any], reason: str = "") -> dict[str, Any]:

@@ -33,7 +33,7 @@ def test_changed_normalization_creates_a_new_snapshot_and_never_overwrites(servi
     edited = importer.edit_mapping(_plan(path), {"body_mass_kg": {"source": "Body Mass (kg)", "unit": "g"}})
     staged = importer.stage(edited, ctx)
     assert staged["artifact"]["id"] != first["source_artifact_id"]  # different normalization is a different artifact
-    assert not staged["eligible"] and "implausible body_mass_kg" in " ".join(staged["quality"]["warnings"])  # 0.08 kg fails the range QC
+    assert not staged["eligible"] and staged["receipt"]["row_quarantine"]["reasons"] == {"implausible body_mass_kg": 2}  # 0.08 kg fails the row range QC
     assert importer.quarantine(staged)["admission_record"]["dataset_snapshot_id"] is None
     assert {p.name: p.read_bytes() for p in snap.iterdir()} == before  # the historical snapshot is untouched
 

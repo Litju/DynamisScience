@@ -210,3 +210,30 @@ def test_preset_of_another_family_is_not_reported_as_drift(service, tmp_path):
     importer.save_preset("CMJ", _ready(_file(tmp_path, "c.csv", HEADER + ROWS)), importer.build_context(FIXTURE))
     trace = importer.probe_file(_file(tmp_path, "t.csv", "Athlete,Trial,Time (s),Force (N)\nA,1,0.0,700\nA,1,0.001,701\n"))
     assert importer.schema_drift(trace) is None
+
+
+def test_bad_rows_are_quarantined_individually_and_good_rows_import(service, tmp_path):
+    text = HEADER + "A1,T1,40,80,1800\nA2,T2,400,75,1700\nA3,T3,38,70,1600\nA4,T3,39,71,1650\n,T9,40,80,1800\n"
+    staged = importer.stage(_ready(_file(tmp_path, "mixed.csv", text)), importer.build_context(FIXTURE))
+    rq = staged["receipt"]["row_quarantine"]
+    assert staged["eligible"] and staged["receipt"]["normalized_rows"] == 1  # only A1 is clean
+    assert rq["count"] == 4 and rq["reasons"] == {"implausible jump_height_cm": 1, "duplicate trial_id": 2, "missing subject_id": 1}
+    held = pl.read_parquet(rq["file"])
+    assert held["qc_flag"].n_unique() == 3 and held.height == 4  # nothing silently dropped
+    record = importer.admit(staged)
+    snap = admission.get_admitted_snapshot(record["dataset_snapshot_id"])
+    assert snap["row_counts"] == {"cmj_trials": 1} and snap["admission_metadata"]["import"]["rows_quarantined"] == 4
+
+
+def test_first_admission_remembers_mapping_and_context_for_the_next_file(service, tmp_path):
+    ctx = importer.build_context(FIXTURE)
+    importer.admit(importer.stage(_ready(_file(tmp_path, "one.csv", HEADER + ROWS)), ctx))
+    presets = importer.list_presets()
+    assert len(presets) == 1 and "session_id" not in presets[0]["mapping"]["constants"]  # identity is not carried over
+    assert presets[0]["mapping"]["constants"]["sampling_hz"] == 1000
+    assert importer.last_profile()["fields"]["manufacturer"] == "Fixture"
+    nxt = importer.probe_file(_file(tmp_path, "two.csv", HEADER + "B1,T7,41,70,1500\n"))
+    preset = importer.match_preset(nxt)
+    assert preset and preset["context"]["fields"]["source_name"] == FIXTURE["source_name"]
+    again = importer.admit(importer.stage(_ready(_file(tmp_path, "one.csv", HEADER + ROWS)), ctx))
+    assert len(importer.list_presets()) == 1  # no duplicate preset on a repeat
