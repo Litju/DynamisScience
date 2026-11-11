@@ -55,6 +55,7 @@ from .lineage_dialog import LineageDialog
 from .performance_navigation import PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES
 from ..researchstore import ResearchConflict
 from .services import DynamisAppService
+from .import_review import ImportReviewDialog
 from .tasks import TaskRunner
 from .theme import apply_theme
 from .workbench.controller import WorkbenchController
@@ -209,7 +210,10 @@ class MainWindow(QMainWindow):
         self.action_new_monitoring.triggered.connect(lambda: self._new_research_object(True))
         self.action_edit = QAction("Edit selected project / study…", self)
         self.action_edit.triggered.connect(self._edit_current)
-        self.action_admit = QAction("Admit local dataset…", self)
+        self.action_import = QAction("Import data…", self)
+        self.action_import.setShortcut("Ctrl+I")
+        self.action_import.triggered.connect(self._open_import)
+        self.action_admit = QAction("Admit local dataset (manual)…", self)
         self.action_admit.triggered.connect(self._open_admission)
         self.action_admission_history = QAction("Admission and quarantine history…", self)
         self.action_admission_history.triggered.connect(self._open_admission_history)
@@ -232,6 +236,7 @@ class MainWindow(QMainWindow):
             self.action_new_study,
             self.action_new_monitoring,
             self.action_edit,
+            self.action_import,
             self.action_admit,
             self.action_admission_history,
             self.action_archive,
@@ -1337,6 +1342,9 @@ class MainWindow(QMainWindow):
                 lambda records: self._history_dialog("Analysis plan history", records),
                 "Loading plan history",
             )
+
+    def _open_import(self) -> None:
+        ImportReviewDialog(self.service, self.run_task, self._admission_saved, self).exec()
 
     def _open_admission(self) -> None:
         dialog = DatasetAdmissionDialog(

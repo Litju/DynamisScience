@@ -214,7 +214,8 @@ def probe_file(path: str | os.PathLike[str]) -> dict[str, Any]:
     except (ImportBlocked, OSError) as error:
         plan["reason"] = str(error)
         return plan
-    columns, ambiguities = propose_generic(frame)
+    trace = force_trace_reason(frame.columns)
+    columns, ambiguities = ({}, []) if trace else propose_generic(frame)
     mapping = {"family": detect_family(columns), "columns": columns, "constants": {}}
     plan.update(
         info,
@@ -225,7 +226,24 @@ def probe_file(path: str | os.PathLike[str]) -> dict[str, Any]:
         preview={"columns": frame.columns, "rows": [[("" if v is None else str(v)) for v in row] for row in frame.head(PREVIEW_ROWS).rows()]},
     )
     _refresh_state(plan)
+    if trace:
+        plan.update(state="UNSUPPORTED", reason=trace, adapter="force-time-unverified")
     return plan
+
+
+def force_trace_reason(headers: list[str]) -> str | None:
+    """Raw force-time exports (time + left/right force, e.g. VALD ForceDecks or Hawkin) are recognised but NOT imported.
+
+    VALD documents 'Time (s)', 'Left Force (N)', 'Right Force (N)' and Hawkin documents a time/left/right/combined layout,
+    but neither publishes exact headers, summary-block layout, zeroing or orientation, and no authorized sample has been
+    verified. Importing would mean assuming sampling, zeroing, sign and calibration, so the file is held for review instead.
+    """
+    keys = [re.sub(r"[^a-z]+", " ", h.lower()) for h in headers]
+    if any(k.strip().startswith("time") for k in keys) and any("left" in k and "force" in k for k in keys)             and any("right" in k and "force" in k for k in keys):
+        return ("This looks like a raw force-time export (time, left force, right force). Importing raw force traces "
+                "is not enabled: the vendor layout is not verified against an authorized sample, and sampling rate, "
+                "zeroing, force orientation and calibration cannot be assumed.")
+    return None
 
 
 def _refresh_state(plan: dict[str, Any]) -> None:
@@ -342,7 +360,7 @@ def build_context(fields: dict[str, Any]) -> dict[str, Any]:
                   "calibration_date": fields.get("calibration_date")}
     protocol = {"name": fields.get("protocol_name", ""), "version": fields.get("protocol_version", "1.0"),
                 "coordinate_convention": fields.get("coordinate_system") or "NOT_SPECIFIED"}
-    return {"source": source, "instrument": instrument, "protocol": protocol}
+    return {"source": source, "instrument": instrument, "protocol": protocol, "fields": dict(fields)}
 
 
 def _ensure(kind: str, existing: dict[str, Any] | None, payload: dict[str, Any], keys: tuple[str, ...], register) -> dict[str, Any]:
@@ -448,6 +466,11 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
     _save_receipt(receipt)
     return {"receipt": receipt, "artifact": artifact, "quality": quality, "rights_status": rights, "eligible": eligible,
             "duplicate_of": duplicate_of, "synthetic_only": rights == "FIXTURE_ONLY"}
+
+
+def expected_snapshot_id(staged: dict[str, Any]) -> str:
+    """The immutable snapshot identity admission will create (deterministic from artifact + family)."""
+    return admission._snapshot_id(staged["artifact"], staged["receipt"]["family"])
 
 
 def admit(staged: dict[str, Any]) -> dict[str, Any]:
