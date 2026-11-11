@@ -607,7 +607,7 @@ class DatasetAdmissionDialog(QDialog):
             "privacy_status": self.privacy.currentText(),
             "retention_limitations": self.retention.text().strip(),
             "derived_data_publishable": False,
-            "rights_status": "UNVERIFIED",
+            "rights_status": "FIXTURE_ONLY" if self.privacy.currentText() == "TEST_FIXTURE" else "UNVERIFIED",
         }
         instrument = {
             "id": self.instrument_id,
@@ -656,7 +656,7 @@ class DatasetAdmissionDialog(QDialog):
         def register_ingest_validate() -> dict[str, Any]:
             self.service.register_admission_source(source)
             rights = self.service.verify_source_rights(source["id"], verifier)
-            if rights["rights_status"] != "VERIFIED":
+            if rights["rights_status"] not in {"VERIFIED", "FIXTURE_ONLY"}:
                 raise ValueError(f"Source rights remain unverified: {rights['problems']}")
             self.service.register_admission_instrument(instrument)
             self.service.register_admission_protocol(protocol)

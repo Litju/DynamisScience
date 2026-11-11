@@ -95,6 +95,18 @@ def test_admission_rejects_source_ids_that_could_escape_storage(service, tmp_pat
     assert not (data_root() / "artifacts" / "admission_sources.json").exists()
 
 
+def test_fixture_rights_still_require_permitted_uses(service):
+    service.register_admission_source({
+        "id": "SRC-INCOMPLETE", "name": "Fixture", "publisher": "Tests",
+        "dataset_identity": "fixture", "version": "1", "acquisition_method": "synthetic",
+        "license_or_agreement": "Test only", "redistribution_restrictions": "No redistribution",
+        "rights_status": "FIXTURE_ONLY", "permitted_uses": [],
+    })
+    result = service.verify_source_rights("SRC-INCOMPLETE", "test")
+    assert result["rights_status"] == "UNVERIFIED"
+    assert "missing permitted uses" in result["problems"]
+
+
 def test_admission_valid_csv(service, tmp_path):
     _register_fixture_source(service)
     _register_instrument_protocol(service)

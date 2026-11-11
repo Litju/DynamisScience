@@ -983,6 +983,7 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     dialog.license.setText("Test-only license terms")
     dialog.permitted_uses.setText("research testing")
     dialog.restrictions.setPlainText("Local test data; do not redistribute")
+    dialog.privacy.setCurrentText("TEST_FIXTURE")
     dialog.rights_reviewed.setChecked(True)
     dialog.manufacturer.setText("Test")
     dialog.instrument_model.setText("Force plate")
@@ -1004,7 +1005,8 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     record = service.list_admission_records()[-1]
     assert record["dataset_snapshot_id"]
     admitted = service.get_dataset_detail(record["dataset_snapshot_id"])
-    assert admitted["source"]["rights_status"] == "VERIFIED"
+    assert admitted["source"]["rights_status"] == "FIXTURE_ONLY"
+    assert admitted["synthetic"] and not admitted["real_data"]
     assert any(item["id"] == record["dataset_snapshot_id"] for item in service.list_datasets())
     dialog.close()
     window.close()

@@ -172,10 +172,10 @@ def verify_rights(source_id: str, verifier: str = "system") -> dict[str, Any]:
     if source.get("rights_status") == "BLOCKED":
         problems.append("source is blocked")
     status = "VERIFIED" if not problems else "UNVERIFIED"
-    if source.get("rights_status") == "FIXTURE_ONLY":
+    if not problems and source.get("rights_status") == "FIXTURE_ONLY":
         status = "FIXTURE_ONLY"
     source["rights_status"] = status if status != "VERIFIED" else ("VERIFIED" if not problems else "UNVERIFIED")
-    if source["rights_status"] == "VERIFIED":
+    if source["rights_status"] in {"VERIFIED", "FIXTURE_ONLY"}:
         source["rights_verified_at"] = _now()
         source["rights_verified_by"] = verifier
     sources = [item if item.get("id") != source_id else source for item in _load_list(_artifact_path("admission_sources.json"))]
