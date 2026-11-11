@@ -114,6 +114,7 @@ def read_table(path: Path) -> tuple[pl.DataFrame, dict[str, Any]]:
         if duplicates:
             raise ImportBlocked(f"Duplicate column names: {', '.join(duplicates)}.")
         frame = pl.read_csv(io.StringIO(text), separator=delimiter, infer_schema_length=1000)
+        frame = frame.filter(~pl.all_horizontal(pl.all().is_null()))  # blank lines carry no record
         return frame, {"format": kind, "delimiter": delimiter}
     except ImportBlocked:
         raise

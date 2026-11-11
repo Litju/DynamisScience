@@ -208,3 +208,8 @@ def test_raw_force_time_exports_are_recognised_but_never_imported(tmp_path, head
     assert plan["adapter"] == "force-time-unverified" and plan["preview"]["rows"]  # reviewer still sees the data
     with pytest.raises(importer.ImportBlocked):
         importer.stage(plan, importer.build_context(FIXTURE))
+
+
+def test_blank_lines_are_not_records(tmp_path):
+    plan = importer.probe_file(_file(tmp_path, "blank.csv", HEADER + ROWS + "\n\n"))
+    assert plan["rows"] == 2
