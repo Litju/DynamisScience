@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import uuid
@@ -383,6 +384,13 @@ def _metadata_errors(frame: pl.DataFrame, family: str, metadata: dict[str, Any])
     return errors
 
 
+def _identifier_errors(frame: pl.DataFrame) -> list[str]:
+    if frame.is_empty():
+        return ["dataset contains no records"]
+    return [f"missing {column} identifiers" for column in ("subject_id", "session_id", "trial_id")
+            if any(value is None or not str(value).strip() for value in frame[column].to_list())]
+
+
 def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -399,6 +407,9 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     missing_required = sorted(CMJ_REQUIRED_COLUMNS - columns)
     if missing_required:
         errors.append(f"missing required columns: {', '.join(missing_required)}")
+    if errors:
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    errors.extend(_identifier_errors(frame))
     if errors:
         return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
 
@@ -440,7 +451,7 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
         errors.append("missing sampling_hz column")
     else:
         try:
-            invalid_sampling = any(v is None or float(v) <= 0 for v in sampling_values)
+            invalid_sampling = any(v is None or not math.isfinite(float(v)) or float(v) <= 0 for v in sampling_values)
         except (TypeError, ValueError):
             invalid_sampling = True
         if invalid_sampling:
@@ -524,6 +535,9 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
         errors.append(f"missing required columns: {', '.join(missing_required)}")
     if errors:
         return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    errors.extend(_identifier_errors(frame))
+    if errors:
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
     units = metadata.get("units", {})
     for key, canonical in (("time", "s"), ("distance", "m")):
         try:
@@ -538,7 +552,7 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
         errors.append("missing subject or session identifiers")
     if "sampling_hz" in columns:
         try:
-            invalid_sampling = any(v is None or float(v) <= 0 for v in frame["sampling_hz"].unique().to_list())
+            invalid_sampling = any(v is None or not math.isfinite(float(v)) or float(v) <= 0 for v in frame["sampling_hz"].unique().to_list())
         except (TypeError, ValueError):
             invalid_sampling = True
         if invalid_sampling:

@@ -197,6 +197,25 @@ def test_invalid_week_and_sampling_are_reported(service, tmp_path):
     assert "invalid sampling frequency" in quality["errors"]
 
 
+@pytest.mark.parametrize("row,reason", [("", "dataset contains no records"),
+                                        ("S1,A,,INST-FP-1,PROT-FP-1,1000\n", "missing trial_id identifiers")])
+def test_empty_or_unidentified_cmj_data_is_rejected(service, tmp_path, row, reason):
+    _register_fixture_source(service)
+    _register_instrument_protocol(service)
+    csv = "subject_id,session_id,trial_id,instrument_id,protocol_id,sampling_hz\n" + row
+    artifact = _ingest(service, tmp_path, "missing-identifiers.csv", csv.encode())
+    quality = service.validate_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", {})
+    assert quality["status"] == "REJECTED" and reason in quality["errors"]
+
+
+def test_sprint_missing_trial_identifier_is_rejected(service, tmp_path):
+    _register_fixture_source(service)
+    csv = "subject_id,session_id,trial_id,instrument_id,protocol_id,distance_m,time_s\nS1,A,,I,P,30,4.2\n"
+    artifact = _ingest(service, tmp_path, "missing-sprint-id.csv", csv.encode())
+    quality = service.validate_source_artifact(artifact["id"], "SPRINT_TIMING", {})
+    assert quality["status"] == "REJECTED" and "missing trial_id identifiers" in quality["errors"]
+
+
 @pytest.mark.parametrize(
     "filename,content,metadata",
     [
