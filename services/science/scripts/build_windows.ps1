@@ -1,4 +1,4 @@
-param([string]$AppVersion = "0.1.0")
+param([string]$AppVersion = "0.1.0", [switch]$TestIdentity)
 
 $ErrorActionPreference = "Stop"
 
@@ -80,10 +80,11 @@ try {
         "/DOutputDir=$installerRoot",
         (Join-Path $serviceRoot "packaging\DynamisScience.iss")
     )
+    if ($TestIdentity) { $innoArgs = @("/DTestIdentity=1") + $innoArgs }
     Invoke-Native "Inno Setup (per-user installer)" { & $isccPath /Qp @innoArgs } | Out-Host
 
     $bundleBytes = (Get-ChildItem -LiteralPath $bundleRoot -File -Recurse | Measure-Object -Property Length -Sum).Sum
-    $installerPath = Join-Path $installerRoot "DynamisScience-Setup-x64.exe"
+    $installerPath = Join-Path $installerRoot $(if ($TestIdentity) { "DynamisScience-RES621Test-Setup-x64.exe" } else { "DynamisScience-Setup-x64.exe" })
     if (-not (Test-Path -LiteralPath $installerPath)) { throw "Inno Setup reported success but $installerPath was not produced." }
     $installer = Get-Item -LiteralPath $installerPath
     $sourceDiffPath = Join-Path $buildRoot ".source-diff.tmp"
