@@ -1,4 +1,4 @@
-# RES-621 qualification — in progress
+# RES-621 qualification
 
 This is a partial engineering record, not product acceptance. RES-613 remains the owner acceptance gate.
 
@@ -48,3 +48,22 @@ Full source regression at `e3e9a37` (application source through `e0a2bd3`): **17
 - The prior RES-620 evidence records compact 3D, high-DPI hardware and load-sensitive journey-test limitations; they have not been requalified here. The checkbox change has only offscreen visual evidence so far.
 
 No current installer hash or installed-workflow receipt is claimed. Do not close RES-621 on this record.
+
+## Final campaign (2026-11-11)
+
+| Item | Result |
+| --- | --- |
+| `6531e75` | A FIXTURE_ONLY source may use a SIMULATED instrument and is admitted as `SYNTHETIC_ONLY` (record states `calibration=SIMULATED/NOT_APPLICABLE_TO_TEST_FIXTURE`, `empirical_validity=false`, `evidence_eligible=false`). Real-data QC is unchanged: the same SIMULATED instrument on a rights-verified non-fixture source is still QUARANTINED. 20 admission tests passed. |
+| Native admission (real `MainWindow` + `DatasetAdmissionDialog`, Windows Qt platform, disposable root, existing fixtures `cmj.csv`/`bad.csv`) | Valid TEST_FIXTURE: QC ADMITTED, snapshot `DS-ADMITTED-*` created, reads its own Parquet (2 rows, synthetic=true, real=false), repeat admission returns the same record. Invalid `bad.csv`: REJECTED, "missing required columns: instrument_id, protocol_id, sampling_hz, session_id", no snapshot. Real-claim source with SIMULATED instrument: QUARANTINED, "instrument … calibration is SIMULATED", no snapshot. Each artifact keeps its own source ID. Screenshots: `res621-evidence/valid-synthetic-*`, `invalid-rejected-*`, `quarantine-real-claim-*`, `main-window-after-admission.png`. Dialogs were driven programmatically, not by mouse. |
+| Long jobs | There is no Cancel control. Analyses run in an isolated worker process; the run record is written only after computation, so a failed worker leaves no run, evidence or temp file (`test_failed_isolated_worker_leaves_no_run_or_evidence`). The status line now says the analysis cannot be cancelled and the window stays usable. No estimator, optimizer or tolerance changed. |
+| Full regression at `ac650cd` | **261 passed** (pytest exit 0) with `QT_QPA_PLATFORM=offscreen` against a verified disposable copy of the research root (SQLite integrity ok; 1841 content files hash-identical to the source; the private root was re-hashed afterwards: 0 mismatches, integrity ok). Includes the Mendeley MixedLM and MoveSmart ICC checks against R references. |
+| Installed-package reproduction | Slope 0.9984512135, ICC(3,1) 0.8887265872, CI 0.7451953776–0.9692965400, typical error 75.7826 N, from the packaged worker on a disposable copy; digests equal the direct source runs. |
+| Package | Source commit `116bc2d274efffef94b428699b3909c27a513cb0` (working tree: only the owner's `generator_manifest.json` modification, diff SHA-256 `D0691F70663717FC86A4D9AB51AD62650903F0F3D19AB21457FABEB593DDBF4B`). Installer `DynamisScience-RES621Test-Setup-x64.exe`, SHA-256 `A837AD47CF66D42E65D8A48F4DC1CD99A76A68C43EB4A691A3A374D90BC16B7B`, 142,756,515 bytes; bundle 585,426,722 bytes. Test identity: AppId `{5B1E2C4A-7D3F-4E8B-9A61-0C2D4F6A8B13}`, name "DynamisScience RES621 Test", dir `DynamisScienceRES621Test`. |
+| Installer qualification (`test_windows_installer.ps1 -TestIdentity`) | PASS: onedir and installed startup to catalogue (3.9–7.0 s, no listening ports), Performance page, reopen, packaged workers for synthetic/Mendeley/MoveSmart with matching digests, Matplotlib PNG/PDF/SVG exports with embedded result digest, SQLite backup/restore (integrity ok, logical hash preserved, operational DB unchanged), uninstall removing app files while the research DB hash is unchanged. HKCU uninstall registry listing identical before and after. No DynamisScience registration was found in HKCU/HKLM or `%LOCALAPPDATA%\Programs` on this machine, so non-interference was shown by separate identity and an unchanged registry, not against a live production install. |
+
+## Remaining limitations
+
+- The installed executable was exercised by its scripted smoke/worker/export/recovery harness, not by an operator clicking the full journey inside the installed window; native on-screen clicking was done on the source application only (descriptives Run, earlier) and admission dialogs were driven through Qt calls.
+- The Dataset → … → Reopen journey is covered by the automated Qt regression (including freeze/fork, supersession, UNVERIFIED method versions, frozen report context); it was not re-driven by mouse in this campaign.
+- Figures/HTML were inspected in the earlier campaign (see above); no new figure inspection was made after `e0a2bd3`.
+- Legacy snapshots without recorded admission metadata still fail closed on re-admission.

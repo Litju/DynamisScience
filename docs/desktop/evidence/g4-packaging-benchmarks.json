@@ -1,114 +1,129 @@
-{
-  "platform": "Microsoft Windows NT 10.0.22631.0",
-  "source_commit": "5447b5466fdd1b81b20a055275e98374a24cea7c",
-  "source_status": [
-    " M data/synthetic/generator_manifest.json"
-  ],
-  "source_diff_sha256": "D0691F70663717FC86A4D9AB51AD62650903F0F3D19AB21457FABEB593DDBF4B",
-  "installer_path": "D:\\projects\\DynamisScience\\services\\science\\build\\res604-20261109-063239-387d9bb5\\dist\\installer\\DynamisScience-Setup-x64.exe",
-  "installer_sha256": "17C04C46F882690EDF49FA799DCD958C89938EEE0959CF9621E7AB0166889B2F",
-  "runs": [
-    {
-      "process_exit_code": 0,
-      "peak_working_set_mb": 5.51,
-      "label": "onedir",
-      "listener_count": 0,
-      "startup_to_catalogue_ms": 3694.823
-    },
-    {
-      "process_exit_code": 0,
-      "peak_working_set_mb": 108.69,
-      "label": "installed",
-      "listener_count": 0,
-      "startup_to_catalogue_ms": 1608.1125
-    },
-    {
-      "process_exit_code": 0,
-      "peak_working_set_mb": 232.86,
-      "label": "installed-performance",
-      "listener_count": 0,
-      "startup_to_catalogue_ms": 4615.3964
-    },
-    {
-      "process_exit_code": 0,
-      "peak_working_set_mb": 128.37,
-      "label": "installed-reopen",
-      "listener_count": 0,
-      "startup_to_catalogue_ms": 1571.3199
-    },
-    {
-      "process_exit_code": 0,
-      "peak_working_set_mb": 125.93,
-      "label": "installed-after-restore",
-      "listener_count": 0,
-      "startup_to_catalogue_ms": 1082.1911
-    }
-  ],
-  "network_listeners": [],
-  "scientific_worker": {
-    "status": "COMPLETED",
-    "elapsed_ms": 800.91,
-    "method_id": "METH-U-DESC",
-    "result_digest_matches_direct": true,
-    "result_digest": "e40b1aeb32d84f1a"
-  },
-  "real_scientific_workers": {
-    "mendeley-trend": {
-      "elapsed_ms": 3023.85,
-      "method_id": "METH-REAL-TREND",
-      "result_digest_matches_direct": true,
-      "result_digest": "c6de44b82ef0c7c5"
-    },
-    "movesmart-reliability": {
-      "elapsed_ms": 1727.38,
-      "method_id": "METH-REAL-RELIABILITY",
-      "result_digest_matches_direct": true,
-      "result_digest": "701ce1653ab28cfd"
-    },
-    "movesmart-signal": {
-      "elapsed_ms": 799.34,
-      "method_id": "METH-REAL-SIGNAL-QA",
-      "result_digest_matches_direct": true,
-      "result_digest": "58646a2b61d32de9"
-    }
-  },
-  "real_data_qualification": [
-    {
-      "status": "QUALIFIED",
-      "id": "QUAL-REAL-MIXEDLM"
-    },
-    {
-      "status": "QUALIFIED",
-      "id": "QUAL-REAL-RELIABILITY"
-    },
-    {
-      "status": "QUALIFIED",
-      "id": "QUAL-REAL-SIGNAL"
-    }
-  ],
-  "matplotlib_exports": {
-    "provenance_embedded": true,
-    "result_digest_matches_direct": true,
-    "extensions": [
-      "png",
-      "pdf",
-      "svg"
-    ]
-  },
-  "qualification_worker": {
-    "status": "NO_REAL_SNAPSHOTS",
-    "empty_state": true
-  },
-  "sqlite_recovery": {
-    "logical_hash_preserved": true,
-    "integrity_check": "ok",
-    "operational_database_unchanged": true,
-    "elapsed_ms": 779.62,
-    "restore_reopened": true
-  },
-  "data_root": "disposable isolated test root",
-  "database_survived_uninstall": true,
-  "bundle_bytes": 582741889.0,
-  "installer_bytes": 141528142,
-  "temporary_test_root_removed": true
+﻿{
+    "platform":  "Microsoft Windows NT 10.0.22631.0",
+    "source_commit":  "116bc2d274efffef94b428699b3909c27a513cb0",
+    "source_status":  [
+                          " M data/synthetic/generator_manifest.json"
+                      ],
+    "source_diff_sha256":  "D0691F70663717FC86A4D9AB51AD62650903F0F3D19AB21457FABEB593DDBF4B",
+    "installer_path":  "D:\\projects\\DynamisScience\\services\\science\\build\\res604-20261111-085845-c5291ae9\\dist\\installer\\DynamisScience-RES621Test-Setup-x64.exe",
+    "installer_sha256":  "A837AD47CF66D42E65D8A48F4DC1CD99A76A68C43EB4A691A3A374D90BC16B7B",
+    "runs":  [
+                 {
+                     "label":  "onedir",
+                     "listener_count":  0,
+                     "startup_to_catalogue_ms":  7027.7429,
+                     "peak_working_set_mb":  203.82,
+                     "process_exit_code":  0
+                 },
+                 {
+                     "label":  "installed",
+                     "listener_count":  0,
+                     "startup_to_catalogue_ms":  4758.6685000000007,
+                     "peak_working_set_mb":  199.19,
+                     "process_exit_code":  0
+                 },
+                 {
+                     "label":  "installed-performance",
+                     "listener_count":  0,
+                     "startup_to_catalogue_ms":  5389.2354000000005,
+                     "peak_working_set_mb":  278.81,
+                     "process_exit_code":  0
+                 },
+                 {
+                     "label":  "installed-reopen",
+                     "listener_count":  0,
+                     "startup_to_catalogue_ms":  4307.4639000000006,
+                     "peak_working_set_mb":  217.68,
+                     "process_exit_code":  0
+                 },
+                 {
+                     "label":  "installed-after-restore",
+                     "listener_count":  0,
+                     "startup_to_catalogue_ms":  3898.2156,
+                     "peak_working_set_mb":  219.04,
+                     "process_exit_code":  0
+                 }
+             ],
+    "network_listeners":  [
+
+                          ],
+    "scientific_worker":  {
+                              "method_id":  "METH-U-DESC",
+                              "status":  "COMPLETED",
+                              "elapsed_ms":  3303.99,
+                              "result_digest_matches_direct":  true,
+                              "result_digest":  "351ead824fba637b"
+                          },
+    "real_scientific_workers":  {
+                                    "mendeley-trend":  {
+                                                           "method_id":  "METH-REAL-TREND",
+                                                           "elapsed_ms":  4297.94,
+                                                           "result_digest_matches_direct":  true,
+                                                           "result_digest":  "519fe1309a9ace7c"
+                                                       },
+                                    "movesmart-reliability":  {
+                                                                  "method_id":  "METH-REAL-RELIABILITY",
+                                                                  "elapsed_ms":  3356.38,
+                                                                  "result_digest_matches_direct":  true,
+                                                                  "result_digest":  "e0eedb0e3428d3c7"
+                                                              },
+                                    "movesmart-signal":  {
+                                                             "method_id":  "METH-REAL-SIGNAL-QA",
+                                                             "elapsed_ms":  2268.49,
+                                                             "result_digest_matches_direct":  true,
+                                                             "result_digest":  "58646a2b61d32de9"
+                                                         }
+                                },
+    "res619_scientific_values":  {
+                                     "trend_residual_qq_type":  "CONDITIONAL_PEARSON",
+                                     "trend_slope_cm_per_occasion":  0.9984512135296157,
+                                     "typical_error_n":  75.78260598801388,
+                                     "minimal_detectable_change_95_n":  210.0548069159465,
+                                     "reliability_method_version":  "1.1.0",
+                                     "icc_3_1_ci":  [
+                                                        0.7451953776144685,
+                                                        0.9692965399576995
+                                                    ],
+                                     "trend_method_version":  "1.1.0",
+                                     "icc_3_1":  0.8887265871617835
+                                 },
+    "real_data_qualification":  [
+                                    {
+                                        "id":  "QUAL-REAL-MIXEDLM",
+                                        "status":  "QUALIFIED"
+                                    },
+                                    {
+                                        "id":  "QUAL-REAL-RELIABILITY",
+                                        "status":  "QUALIFIED"
+                                    },
+                                    {
+                                        "id":  "QUAL-REAL-SIGNAL",
+                                        "status":  "QUALIFIED"
+                                    }
+                                ],
+    "matplotlib_exports":  {
+                               "provenance_embedded":  true,
+                               "extensions":  [
+                                                  "png",
+                                                  "pdf",
+                                                  "svg"
+                                              ],
+                               "result_digest_matches_direct":  true
+                           },
+    "qualification_worker":  {
+                                 "empty_state":  true,
+                                 "status":  "NO_REAL_SNAPSHOTS"
+                             },
+    "sqlite_recovery":  {
+                            "elapsed_ms":  2350.8,
+                            "logical_hash_preserved":  true,
+                            "operational_database_unchanged":  true,
+                            "restore_reopened":  true,
+                            "integrity_check":  "ok"
+                        },
+    "data_root":  "disposable isolated test root",
+    "database_survived_uninstall":  true,
+    "bundle_bytes":  585426722,
+    "installer_bytes":  142756515,
+    "temporary_test_root_removed":  true
 }
