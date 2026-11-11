@@ -489,9 +489,14 @@ class ImportReviewDialog(QDialog):
         self.details.setVisible(shown)
         if shown and self.state in ("partial", "failure"):
             self.detail_tabs.setCurrentIndex(2)
-        screen = QGuiApplication.primaryScreen()
-        height = int(screen.availableGeometry().height() * 0.9) if screen else 700
+        screen = self.screen()
+        available = screen.availableGeometry() if screen else None
+        height = int(available.height() * 0.9) if available else 700
         self.resize(self.width(), min(760, height) if shown else max(self.minimumSizeHint().height(), 230))
+        if available:
+            frame = self.frameGeometry()
+            self.move(max(available.left(), min(self.x(), available.right() - frame.width() + 1)),
+                      max(available.top(), min(self.y(), available.bottom() - frame.height() + 1)))
 
     def _open_details(self, show: bool = True) -> None:
         self.details_button.setChecked(show)

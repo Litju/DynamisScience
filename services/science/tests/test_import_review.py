@@ -272,5 +272,9 @@ def test_theme_and_small_logical_desktop(dialog, qapp, mode):
     dialog.show()
     assert dialog.minimumSizeHint().width() <= 910 and dialog.minimumSizeHint().height() <= 512
     assert dialog.file_button.isVisible() and not dialog.detail_tabs.isVisible()
+    dialog.move(100, 300)
+    dialog.details_button.click()
+    qapp.processEvents()
+    assert dialog.screen().availableGeometry().contains(dialog.frameGeometry())
     theme.apply_theme(qapp, "light")
 
