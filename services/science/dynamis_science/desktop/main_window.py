@@ -1348,9 +1348,9 @@ class MainWindow(QMainWindow):
                 "Loading plan history",
             )
 
-    def _open_workspace(self) -> None:
+    def _open_workspace(self, snapshot_id: str | None = None) -> None:
         dialog = DataWorkspaceDialog(self.service, self.run_task, self._analyze_dataset, self)
-        dialog.open(getattr(self, "current_snapshot_id", None))
+        dialog.open(snapshot_id or getattr(self, "current_snapshot_id", None))
         dialog.exec()
 
     def _analyze_dataset(self, snapshot_id: str) -> None:
@@ -1358,7 +1358,9 @@ class MainWindow(QMainWindow):
                       lambda detail: self._show_dataset(snapshot_id, detail), "Opening dataset for analysis")
 
     def _open_import(self) -> None:
-        ImportReviewDialog(self.service, self.run_task, self._admission_saved, self).exec()
+        dialog = ImportReviewDialog(self.service, self.run_task, self._admission_saved, self)
+        dialog.open_dataset.connect(self._open_workspace)
+        dialog.exec()
 
     def _open_admission(self) -> None:
         dialog = DatasetAdmissionDialog(
