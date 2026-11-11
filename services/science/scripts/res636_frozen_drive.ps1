@@ -80,6 +80,7 @@ try {
   Shot 'workspace-table'
   Keys '%c' 3; Shot 'workspace-columns'
   Keys '%r' 5; Shot 'workspace-traces'
+  Keys '%m' 4; Shot 'workspace-compare'
   Keys '%q' 2; Keys '%s' 4; Shot 'workspace-query'
   Keys '%p' 3; Shot 'workspace-inspector'
   Keys '%a' 8                  # Analyze this dataset

@@ -19,7 +19,7 @@ from dynamis_science import importer  # noqa: E402
 
 (work / "inputs").mkdir(parents=True, exist_ok=True)
 HEADER = "Athlete,Trial,Jump Height (m),Body Mass (g),Peak Force (N)\n"
-(work / "inputs" / "cmj_valid.csv").write_text(HEADER + "A1,T1,0.401,80000,1800\nA2,T2,0.385,75000,1700\nA3,T3,0.372,82000,1900\n", encoding="utf-8")
+(work / "inputs" / "cmj_valid.csv").write_text(HEADER + "A1,TR-1,0.401,80000,1189\nA2,T2,0.385,75000,1700\nA3,T3,0.372,82000,1900\n", encoding="utf-8")
 (work / "inputs" / "cmj_invalid.csv").write_text(HEADER + "B1,T1,4.0,80000,1800\nB2,T1,0.385,75000,1700\n", encoding="utf-8")
 rows = "\n".join(f"{s},{t},{i / 1000:.3f},{700 + (i * 7) % 90 + (400 if 300 < i < 500 else 0)}"
                 for s, t in (("A1", "TR-1"), ("A2", "TR-2")) for i in range(1000))
