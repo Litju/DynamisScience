@@ -2,121 +2,132 @@
   "steps": [
     {
       "screenshot": "s01-first-import-asks-once.png",
-      "sha256": "1f525c822749601872e8e736ad054c4d2457af0f698bd1886a0c1841ed6d87fa",
+      "sha256": "fe5033148f7a7fdadca65f950f6ae9a728a45ebbde6da5c3677825f769cc74d1",
       "note": "first file from a new source: details open, the source is asked once"
     },
     {
       "screenshot": "s02-first-import-done.png",
-      "sha256": "d5cafd7f2d3759611555037b649119205c6518afaa7f44106da3d236ac4429ff",
+      "sha256": "3c41f41552a48de24404564dd40abc4e1c7f274eb06794054eff432b17966af8",
       "note": "one Import click: QC then batch added; summary says what happened"
     },
     {
       "screenshot": "s03-second-file-one-click.png",
-      "sha256": "fd43b3b5167d4f0f7b78d54b9d8a30624dcb187ee4f234737804f6bace9db11b",
+      "sha256": "eecc01fd3a255123024d3c487fed113f33fb701f0bb72644270a53c044a7f670",
       "note": "same schema: nothing asked, QC already ran, Import is the only action"
     },
     {
       "screenshot": "s04-second-file-imported.png",
-      "sha256": "c72ed890eb839061940ae3aabb266f9281a423d8c4004d48cb40e7dd2f82f730",
+      "sha256": "c2da09a6f585604d2c892625c65d7273cc53d3eda8a1b3a16e41828d779cfa54",
       "note": "second file imported into the same logical dataset"
     },
     {
       "screenshot": "s05-mixed-rows.png",
-      "sha256": "d5784f598c852ba6aa3bcaff4fd0dd01425ce162dc064f1f670ebb078cfcea2b",
+      "sha256": "2ee2fe920460d5a959ca08272563534119f04c0ec4023c2c72e1cfd0bb699a47",
       "note": "per-row QC: clean rows ready, bad rows will be quarantined with reasons"
     },
     {
       "screenshot": "s06-mixed-rows-imported.png",
-      "sha256": "6c21abc9fd5a7913863d1709994d9ab3cc16f3cc07c2bef29e2c40620c662bf6",
+      "sha256": "663bebee55b501097529f2f577cf8a0181a0d8b1973be38ec24dc47dc58d4429",
       "note": "partial import: good rows added, flagged rows kept in quarantine"
     },
     {
       "screenshot": "s07-invalid.png",
-      "sha256": "460e6ad61b050dccb1fe308c4559334ca853021f17959ac1acb0cf696556c2a3",
+      "sha256": "de4c0848e5d59d5c4b8a2477659017638a59955f206a945538c0defbad25ac5e",
       "note": "nothing importable: reason shown, Import disabled, details open"
     },
     {
       "screenshot": "s08-parquet.png",
-      "sha256": "833fd36f2518b05ef61250ace7d98feb4e7d5202eaa02a157fdcd2411fa4a6df",
+      "sha256": "f67d61a7a1e7fa8a8a664c6b3265666ad7691131633681fc820de65eb508d99f",
       "note": "Parquet file imported in one click"
     },
     {
       "screenshot": "s09-folder.png",
-      "sha256": "8cf457e398635031a9be1384700df0d16991599ac6252730f9437f364e64af7b",
+      "sha256": "ec97721e7e026a4d3f208c6c7c895deadf4ffec118a709de697914ef410d19b2",
       "note": "folder: all files imported with one click"
     },
     {
       "screenshot": "s10-trace.png",
-      "sha256": "3eee62aea02563b54ae0f2d93b58119e0370e8ce9312c7431c6ca7d875ce7b15",
+      "sha256": "36016648c1063e785a6752dece8847e3ccb2f6569e1bd64e8f3204734aee56cd",
       "note": "sample-level recording (repeated trial ids across samples) imported"
     },
     {
       "screenshot": "s11-workspace-table.png",
-      "sha256": "454333b404a6dd99e5b2ed4bb55e3f12c6cdd4c6ea18df0cc10762c88d94f87a",
+      "sha256": "ff8357080a6a96ee989dc74aabeb6680196944aabc0b13ea5440434cecaac434",
       "note": "dataset catalogue and paged table with units"
     },
     {
       "screenshot": "s12-workspace-filter.png",
-      "sha256": "17ff94df57dad5ca10a060a192b6f883659f52c984d7d8e8836a101aca11e980",
+      "sha256": "7ab262fc6a2844a9cef19daf8c07c63c8123e5884c8893656ed24747aca24568",
       "note": "filter peak_force_n >= 1700 applied (rows and total updated)"
     },
     {
       "screenshot": "s13-workspace-columns.png",
-      "sha256": "d65925f9f0d0eb66007f809c6a0849658cf3d272d1a8a970ec5a8ad493e7adf5",
+      "sha256": "c700e51c9c6eb3f512f33716ac638eecd06d6209e0fd5a9b3ed6111dd5204bc8",
       "note": "column types, units, missingness"
     },
     {
       "screenshot": "s14-workspace-query.png",
-      "sha256": "c9ad2beea5f7cef2278caa26ea620887f29ff3ea1ea41df855cb509f0e4e24b2",
+      "sha256": "d9f5806af9f637c91ccf867f930797904ca33c90a8046a3ddd9ef72633654a0f",
       "note": "read-only SELECT result"
     },
     {
-      "screenshot": "s15-workspace-inspector.png",
-      "sha256": "fefac544bdb5f0b654855644ef753340b8960e84b76a941bca61dbd406cf88fd",
+      "screenshot": "s15-workspace-saved-query.png",
+      "sha256": "218cefe62fe154ee13e541f65ae80a33aaa5892f1aa9267a1aa668ab4240ecec",
+      "note": "query saved by name, reusable from the picker"
+    },
+    {
+      "screenshot": "s16-workspace-inspector.png",
+      "sha256": "ce4f3cd1cefe750f89705ac8c2521be1ea06ff6564e2bc3122d12a96c577e321",
       "note": "rights, QC, exclusions, instrument, provenance, import receipt"
     },
     {
-      "screenshot": "s16-workspace-traces.png",
-      "sha256": "82cd0653bdb08b3d77f05fe9a3ab5a7938e670245e6705a5371e0e6146bb2981",
+      "screenshot": "s17-workspace-traces.png",
+      "sha256": "7a9d088c51663144c106479d8f73e5ee5bee6c07c65c00a05f4f296bfd0f128f",
       "note": "raw force-time recording plotted"
     },
     {
-      "screenshot": "s17-workspace-samples.png",
-      "sha256": "7d6ffa5036daf22eeeb1805605ff263bf745d944520bc874a188bb796d8094bb",
+      "screenshot": "s18-workspace-compare.png",
+      "sha256": "355e0fdbc6e4db09af00aea1abe5e8487df599ed63c4b01e83d840c26b9f6642",
+      "note": "derived (from raw samples) versus recorded (source file) values, labelled by origin"
+    },
+    {
+      "screenshot": "s19-workspace-samples.png",
+      "sha256": "d1719db3f599e3c465e9eded3576db282a4eec889c16c4ba636c71940ca57110",
       "note": "sample-level table: repeated trial ids across samples"
     },
     {
-      "screenshot": "s18-analysis-selected.png",
-      "sha256": "388d7227159ad7bc69a793a055f0239be7f720b3d92b8184d89c12b1bbb1d7ac",
+      "screenshot": "s20-analysis-selected.png",
+      "sha256": "cbba064719d9d5496d46538f38858ad80bdbac57f8af675e5fe1d2d862356036",
       "note": "dataset selected into the research workbench"
     },
     {
-      "screenshot": "s19-after-restart.png",
-      "sha256": "d6b3a9389a63be136d86e934070d61ffc1b8e4559480f90bbeecb4600bfb8670",
+      "screenshot": "s21-after-restart.png",
+      "sha256": "8eec90ac949c64b08c0aa43b1d7b9080a10f11d1d298bc612a9037a4869f443e",
       "note": "after restart: catalogue and datasets persisted"
     }
   ],
   "scale": "1.5",
   "logical_screen": "911x480",
   "admitted": {
-    "DS-ADMITTED-15BCE6433060": "RAW_FORCE_TIME",
-    "DS-ADMITTED-1654EDC14576": "CMJ_FORCE_PLATFORM",
-    "DS-ADMITTED-3E6AE034D7D9": "CMJ_FORCE_PLATFORM",
-    "DS-ADMITTED-4289E49BA3A9": "CMJ_FORCE_PLATFORM",
-    "DS-ADMITTED-4F2106A97CA3": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-0B840ECE8BF8": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-0DEA0E76D61B": "CMJ_FORCE_PLATFORM",
     "DS-ADMITTED-4FBFFAD3D018": "CMJ_FORCE_PLATFORM",
     "DS-ADMITTED-64F30C9E7599": "CMJ_FORCE_PLATFORM",
-    "DS-ADMITTED-708649A6EDCC": "CMJ_FORCE_PLATFORM"
+    "DS-ADMITTED-708649A6EDCC": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-AA82EBE2870E": "RAW_FORCE_TIME",
+    "DS-ADMITTED-CA4968FB5435": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-CFCA7C0DD6D6": "CMJ_FORCE_PLATFORM",
+    "DS-ADMITTED-D626595BF424": "CMJ_FORCE_PLATFORM"
   },
-  "filtered_rows": 3,
+  "filtered_rows": 0,
   "drop_rejected": "Only SELECT queries are allowed.",
   "sample_rows_total": 2000,
-  "analysis_snapshot": "DS-ADMITTED-4FBFFAD3D018",
+  "analysis_snapshot": "DS-ADMITTED-CA4968FB5435",
   "persisted_after_restart": true,
   "presets_after_restart": [
     "Walkthrough fixture lab \u00b7 CMJ_FORCE_PLATFORM \u00b7 8a0df6",
-    "Walkthrough fixture lab \u00b7 CMJ_FORCE_PLATFORM \u00b7 c3c426",
-    "Walkthrough fixture lab \u00b7 RAW_FORCE_TIME \u00b7 ed7f93"
+    "Parquet lab \u00b7 CMJ_FORCE_PLATFORM \u00b7 c3c426",
+    "Trace lab \u00b7 RAW_FORCE_TIME \u00b7 ed7f93"
   ],
   "import_receipts": [
     {
@@ -151,6 +162,13 @@
       "id": "IR-E64DA9633D32",
       "raw_filename": "cmj_parquet.parquet",
       "raw_sha256": "28451e1edfdbba83cc4daf0dc12561e5b52291aa4f521242ebd7c0e3615e8111",
+      "decision": "STAGED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-8E2788362E86",
+      "raw_filename": "cmj_parquet.parquet",
+      "raw_sha256": "28451e1edfdbba83cc4daf0dc12561e5b52291aa4f521242ebd7c0e3615e8111",
       "decision": "ADMITTED",
       "family": "CMJ_FORCE_PLATFORM"
     },
@@ -158,29 +176,64 @@
       "id": "IR-3AD39AAF8C20",
       "raw_filename": "f0.csv",
       "raw_sha256": "51c11c56085727144d023724ed24a52610b8b8505921a749bc3ec308ed23aaec",
-      "decision": "ADMITTED",
+      "decision": "STAGED",
       "family": "CMJ_FORCE_PLATFORM"
     },
     {
       "id": "IR-10FBB5A93CCB",
       "raw_filename": "f1.csv",
       "raw_sha256": "d9471b64a77c063a0637f40825ac0a6734bd64906d2bafee8166cf34a8924858",
-      "decision": "ADMITTED",
+      "decision": "STAGED",
       "family": "CMJ_FORCE_PLATFORM"
     },
     {
       "id": "IR-0893D8155FC1",
       "raw_filename": "f2.csv",
       "raw_sha256": "de2d650c7e3849a01d63f69de79f0804ce6abb946936087ac451e8da5e82310d",
+      "decision": "STAGED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-28298A90E234",
+      "raw_filename": "f0.csv",
+      "raw_sha256": "51c11c56085727144d023724ed24a52610b8b8505921a749bc3ec308ed23aaec",
       "decision": "ADMITTED",
       "family": "CMJ_FORCE_PLATFORM"
     },
     {
-      "id": "IR-896106BB89E9",
+      "id": "IR-667358845182",
+      "raw_filename": "f1.csv",
+      "raw_sha256": "d9471b64a77c063a0637f40825ac0a6734bd64906d2bafee8166cf34a8924858",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-CD7B0FD8CBCB",
+      "raw_filename": "f2.csv",
+      "raw_sha256": "de2d650c7e3849a01d63f69de79f0804ce6abb946936087ac451e8da5e82310d",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
+    },
+    {
+      "id": "IR-7ECBDCF62410",
+      "raw_filename": "traces.csv",
+      "raw_sha256": "4a5e9cdc180d507c6cccb417160aa21cbdb6c25b735a78937ad2b10b894213dc",
+      "decision": "STAGED",
+      "family": "RAW_FORCE_TIME"
+    },
+    {
+      "id": "IR-25EE7B651C20",
       "raw_filename": "traces.csv",
       "raw_sha256": "4a5e9cdc180d507c6cccb417160aa21cbdb6c25b735a78937ad2b10b894213dc",
       "decision": "ADMITTED_WITH_WARNINGS",
       "family": "RAW_FORCE_TIME"
+    },
+    {
+      "id": "IR-57401136E81B",
+      "raw_filename": "recorded.csv",
+      "raw_sha256": "39c152f589198801075dfe79fce923b9ccb7d56c5e2a5b915dacdfadee5375d9",
+      "decision": "ADMITTED",
+      "family": "CMJ_FORCE_PLATFORM"
     }
   ]
 }
