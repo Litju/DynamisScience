@@ -48,7 +48,7 @@ def test_unknown_file_review_then_admit(dialog, tmp_path):
     _fill(dialog)
     dialog.qc_button.click()
     text = dialog.verdict.toPlainText()
-    assert "QC verdict: ADMITTED" in text and "SYNTHETIC_ONLY" in text and "DS-ADMITTED-" in text
+    assert "QC verdict: QC passed" in text and "SYNTHETIC_ONLY" in text and "DS-ADMITTED-" in text
     assert dialog.admit_button.isEnabled()
     dialog.admit_button.click()
     assert dialog.items[0]["decision"].startswith("ADMITTED") and len(dialog.admitted) == 1

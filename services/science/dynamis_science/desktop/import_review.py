@@ -30,6 +30,9 @@ TEXT_FIELDS = (  # (key, label, required)
     ("session_id", "Session ID (if not in file)", False), ("sampling_hz", "Sampling rate Hz (if not in file)", False),
     ("coordinate_system", "Coordinate convention (sprint)", False),
 )
+QC_TEXT = {"ADMITTED": "QC passed", "ADMITTED_WITH_WARNINGS": "QC passed with warnings", "REJECTED": "QC rejected",
+           "QUARANTINED": "QC quarantined"}  # QC outcome, not yet an admission: the Admit click is what stores a snapshot
+UNIT_TEXT = {"n": "N", "kn": "kN", "hz": "Hz", "w/kg": "W/kg", "ns/kg": "N·s/kg"}
 STATE_TEXT = {"READY": "Mapped", "REVIEW": "Needs review", "UNSUPPORTED": "Unsupported"}
 
 
@@ -270,7 +273,10 @@ class ImportReviewDialog(QDialog):
         for row, item in enumerate(self.items):
             plan = item["plan"]
             detected = plan.get("mapping", {}).get("family") or plan.get("reason", "unrecognised")
-            status = item["decision"] or (item["staged"] and item["staged"]["quality"]["status"]) or STATE_TEXT[plan["state"]]
+            staged = item["staged"]
+            status = ("Admitted" if (item["decision"] or "").startswith("ADMITTED") else item["decision"] and item["decision"].title()
+                      or (staged and (QC_TEXT[staged["quality"]["status"]] + (" · duplicate" if staged["duplicate_of"] else "")))
+                      or STATE_TEXT[plan["state"]])
             for col, text in enumerate((plan["name"], f"{plan.get('format', '?')} · {detected}", str(status))):
                 self.files.setItem(row, col, QTableWidgetItem(text))
 
@@ -294,8 +300,10 @@ class ImportReviewDialog(QDialog):
         columns = plan.get("mapping", {}).get("columns", {})
         self.mapping.setRowCount(len(columns))
         for r, (target, entry) in enumerate(columns.items()):
-            for c, text in enumerate((target, entry["source"], entry["unit"] or "—", f"{entry['confidence']:.0%}", entry["origin"])):
+            for c, text in enumerate((target, entry["source"], UNIT_TEXT.get(entry["unit"], entry["unit"]) or "—", f"{entry['confidence']:.0%}", entry["origin"])):
                 self.mapping.setItem(r, c, QTableWidgetItem(text))
+        for table in (self.preview, self.mapping):
+            table.resizeColumnsToContents()
         self.verdict.setHtml(self._verdict_html(item))
 
     def _verdict_html(self, item: dict[str, Any]) -> str:
@@ -320,7 +328,7 @@ class ImportReviewDialog(QDialog):
             parts.append(f"<span style='color:{t['warn']}'>Missing: {esc(text)}</span>")
         if staged:
             q = staged["quality"]
-            parts.append(f"<b>QC verdict: {esc(q['status'])}</b> — {esc(', '.join(f'{k} {v}' for k, v in q['counts'].items()))}")
+            parts.append(f"<b>QC verdict: {QC_TEXT[q['status']]}</b> ({esc(q['status'])}) — {esc(', '.join(f'{k} {v}' for k, v in q['counts'].items()))}")
             for key, label in (("errors", "Error"), ("warnings", "Warning")):
                 parts += [f"{label}: {esc(str(v))}" for v in q[key]]
             if staged["duplicate_of"]:
