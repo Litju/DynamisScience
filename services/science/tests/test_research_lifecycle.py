@@ -305,9 +305,30 @@ def test_frozen_report_version_is_stable(root):
     # A second freeze at the same version is idempotent and cannot rewrite history.
     again = researchstore.freeze_report(study_id)
     assert again["content_hash"] == frozen["content_hash"]
+    researchstore.update_project(project["id"], {"title": "Changed project title"})
+    researchstore.update_entity(study_id, {"title": "Changed study title"})
     after = researchstore.export_html(study_id, frozen["version"])
     assert "EVID-U-0001" in before and "EVID-U-0001" in after
+    assert "Changed project title" not in after and "Changed study title" not in after
     assert before == after
+
+
+def test_legacy_frozen_report_warns_when_context_was_not_saved(root):
+    project = researchstore.create_project("Legacy report project")
+    detail = _study(project["id"])
+    study_id = detail["study"]["id"]
+    frozen = researchstore.freeze_report(study_id)
+    with researchstore._tx() as connection:
+        row = connection.execute("SELECT document FROM report_versions WHERE entity_id = ? AND version = ?",
+                                 (study_id, frozen["version"])).fetchone()
+        document = json.loads(row["document"])
+        for key in ("study", "project", "question", "hypotheses", "snapshot"):
+            document["frozen_content"].pop(key)
+        old_hash = researchstore._digest(document["frozen_content"])
+        connection.execute("UPDATE report_versions SET document = ?, content_hash = ? WHERE entity_id = ? AND version = ?",
+                           (researchstore._canonical(document), old_hash, study_id, frozen["version"]))
+    assert researchstore.freeze_report(study_id)["content_hash"] == old_hash
+    assert "Historical context incomplete" in researchstore.export_html(study_id, frozen["version"])
 
 
 def test_archived_project_keeps_children(root):

@@ -2680,6 +2680,11 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
             "citations": payload["citations"],
             "evidence": payload["evidence"],
             "figures": payload["figures"],
+            "study": payload["study"],
+            "project": payload["project"],
+            "question": payload["question"],
+            "hypotheses": payload["hypotheses"],
+            "snapshot": payload["snapshot"],
             "plan": payload["plan"],
             "cohort": payload["cohort"],
             "snapshot_id": payload["snapshot"]["id"],
@@ -2689,13 +2694,15 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
         content_hash = _digest(content)
         version = int(report["version"])
         existing = connection.execute(
-            "SELECT content_hash FROM report_versions WHERE entity_id = ? AND version = ?",
+            "SELECT content_hash, document FROM report_versions WHERE entity_id = ? AND version = ?",
             (entity_id, version),
         ).fetchone()
         if existing is not None:
-            if existing["content_hash"] != content_hash:
+            stored_content = json.loads(existing["document"]).get("frozen_content", {})
+            comparable = {key: content.get(key) for key in stored_content}
+            if existing["content_hash"] != _digest(comparable):
                 raise ResearchConflict("This report version is already frozen with different content")
-            return {"report_id": report["id"], "version": version, "status": "FROZEN", "content_hash": content_hash, "frozen_at": report.get("frozen_at")}
+            return {"report_id": report["id"], "version": version, "status": "FROZEN", "content_hash": existing["content_hash"], "frozen_at": report.get("frozen_at")}
         frozen_at = _now()
         report["status"] = "FROZEN"
         report["frozen_at"] = frozen_at
@@ -2871,18 +2878,23 @@ def _svg_distribution(figure: dict[str, Any], width: int = 640, height: int = 18
 def export_html(entity_id: str, version: int | None = None) -> str:
     payload = report_payload(entity_id)
     generated_at = _now()
+    legacy_context = False
     if version is not None:
         frozen = get_report_version(entity_id, version)
         if frozen is None:
             raise ResearchNotFound(f"Report version {version} not found")
         # Frozen content is authoritative for historical exports.
-        payload = {**payload, **frozen.get("frozen_content", {}), "status": "FROZEN", "version": version}
+        content = frozen.get("frozen_content", {})
+        legacy_context = not all(key in content for key in ("study", "project", "question", "hypotheses", "snapshot"))
+        payload = {**payload, **content, "status": "FROZEN", "version": version}
         generated_at = frozen.get("created_at") or frozen.get("frozen_at") or generated_at
     detail = study_detail(entity_id)
+    for key in ("study", "project", "question", "hypotheses", "snapshot", "plan", "cohort"):
+        detail[key] = payload.get(key, detail[key])
     snapshot = detail["snapshot"]
     evidence = payload.get("evidence", [])
     figures = payload.get("figures", [])
-    limitations = payload.get("research", {}).get("limitations", [])
+    limitations = payload.get("limitations", payload.get("research", {}).get("limitations", []))
     statuses = {}
     for item in evidence:
         run = get_run(item.get("analysis_run_id") or "")
@@ -2898,6 +2910,9 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         if superseded
         else ""
     )
+    if legacy_context:
+        warning_html += ('<div class="warning" role="alert"><strong>Historical context incomplete.</strong> '
+                         'This version did not capture all study and source details; displayed context may reflect later changes.</div>')
     manifest = {
         "report_id": payload.get("id"),
         "study_id": entity_id,
