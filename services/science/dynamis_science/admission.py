@@ -328,10 +328,6 @@ def _read_frame(artifact: dict[str, Any]) -> pl.DataFrame:
     raise ValueError(f"Unsupported artifact format: {artifact['format']}")
 
 
-def _assessment_id(artifact_id: str, family: str) -> str:
-    return "QA-" + hashlib.sha256(f"{artifact_id}:{family}".encode()).hexdigest()[:12].upper()
-
-
 def _unit_conversion(value: float, unit: str, canonical: str, quantity: str) -> float:
     unit = unit.strip().lower()
     canonical = canonical.strip().lower()
@@ -363,14 +359,14 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
         frame = _read_frame(artifact)
     except Exception as exc:  # pragma: no cover - corrupt file path
         errors.append(f"corrupt or unreadable file: {type(exc).__name__}")
-        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", "REJECTED", errors, warnings, rejected, quarantined, counts)
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, counts)
 
     columns = set(frame.columns)
     missing_required = sorted(CMJ_REQUIRED_COLUMNS - columns)
     if missing_required:
         errors.append(f"missing required columns: {', '.join(missing_required)}")
     if errors:
-        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
 
     # Units
     units = metadata.get("units", {})
@@ -459,7 +455,7 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     elif warnings:
         status = "ADMITTED_WITH_WARNINGS"
     counts = {"rows": frame.height, "subjects": int(frame["subject_id"].n_unique()), "trials": int(frame["trial_id"].n_unique())}
-    return _quality_result(artifact, "CMJ_FORCE_PLATFORM", status, errors, warnings, rejected, quarantined, counts)
+    return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, status, errors, warnings, rejected, quarantined, counts)
 
 
 def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
@@ -471,13 +467,13 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
         frame = _read_frame(artifact)
     except Exception as exc:
         errors.append(f"corrupt or unreadable file: {type(exc).__name__}")
-        return _quality_result(artifact, "SPRINT_TIMING", "REJECTED", errors, warnings, rejected, quarantined, {})
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {})
     columns = set(frame.columns)
     missing_required = sorted(SPRINT_REQUIRED_COLUMNS - columns)
     if missing_required:
         errors.append(f"missing required columns: {', '.join(missing_required)}")
     if errors:
-        return _quality_result(artifact, "SPRINT_TIMING", "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
     if frame["subject_id"].null_count() or frame["session_id"].null_count():
         errors.append("missing subject or session identifiers")
     if "sampling_hz" in columns:
@@ -520,24 +516,28 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
     elif warnings:
         status = "ADMITTED_WITH_WARNINGS"
     counts = {"rows": frame.height, "subjects": int(frame["subject_id"].n_unique()), "trials": int(frame["trial_id"].n_unique())}
-    return _quality_result(artifact, "SPRINT_TIMING", status, errors, warnings, rejected, quarantined, counts)
+    return _quality_result(artifact, "SPRINT_TIMING", metadata, status, errors, warnings, rejected, quarantined, counts)
 
 
-def _quality_result(artifact, family, status, errors, warnings, rejected, quarantined, counts):
+def _quality_result(artifact, family, metadata, status, errors, warnings, rejected, quarantined, counts):
     assessment = {
-        "id": _assessment_id(artifact["id"], family),
         "source_artifact_id": artifact["id"],
         "measurement_family": family,
+        "metadata": metadata,
         "status": status,
         "errors": errors,
         "warnings": warnings,
         "rejected_record_ids": sorted(set(rejected)),
         "quarantined_record_ids": sorted(set(quarantined)),
         "counts": counts,
-        "checked_at": _now(),
     }
+    digest = hashlib.sha256(json.dumps(assessment, sort_keys=True).encode()).hexdigest()[:12].upper()
+    assessment["id"] = "QA-" + digest
     records = _load_list(_artifact_path("admission_quality.json"))
-    records = [r for r in records if r.get("id") != assessment["id"]]
+    existing = next((r for r in records if r.get("id") == assessment["id"]), None)
+    if existing:
+        return existing
+    assessment["checked_at"] = _now()
     records.append(assessment)
     _save_list(_artifact_path("admission_quality.json"), records)
     return assessment
@@ -592,6 +592,15 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
     source = get_source(artifact["source_id"])
     if source is None:
         raise ValueError(f"Unknown source: {artifact['source_id']}")
+    existing_id = _snapshot_id(artifact, family)
+    existing_dir = _admitted_dir() / existing_id
+    if existing_dir.exists():
+        snapshot = _json(existing_dir / "snapshot.json", {})
+        record = next((r for r in list_admission_records() if r.get("dataset_snapshot_id") == existing_id), None)
+        if (snapshot.get("admission_metadata") == metadata and record
+                and record.get("rights_status") == source.get("rights_status")):
+            return record
+        raise ValueError("This artifact already has an immutable snapshot with different or unrecorded metadata. Register a new source for a new admission.")
     # rights gate
     rights_status = source.get("rights_status", "UNVERIFIED")
     if rights_status not in {"VERIFIED", "FIXTURE_ONLY"}:
@@ -647,7 +656,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             table_name = "sprint_trials"
         snapshot_id = _snapshot_id(artifact, family)
         snapshot_dir = _admitted_dir() / snapshot_id
-        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_dir.mkdir(parents=True, exist_ok=False)
         out_path = snapshot_dir / f"{table_name}.parquet"
         frame.write_parquet(out_path, compression="zstd")
         normalization_rules = ["canonical mass units", "canonical time units", "canonical distance units", "provenance columns"]
@@ -680,6 +689,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "path": str(snapshot_dir),
             "rights_status": rights_status,
             "admission_status": status,
+            "admission_metadata": metadata,
         })
     record = {
         "id": "AR-" + hashlib.sha256(f"{artifact_id}:{family}".encode()).hexdigest()[:12].upper(),

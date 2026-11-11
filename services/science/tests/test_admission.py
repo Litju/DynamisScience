@@ -194,6 +194,18 @@ def test_admission_is_idempotent_and_rejected_inputs_never_create_snapshots(
     first = service.admit_source_artifact(
         artifact["id"], "CMJ_FORCE_PLATFORM", metadata
     )
+    snapshot = paths()["admitted"] / first["dataset_snapshot_id"]
+    original_table = (snapshot / "cmj_trials.parquet").read_bytes()
+    original_manifest = (snapshot / "provenance_manifest.json").read_bytes()
+    original_quality = service.get_admission_quality(first["quality_assessment_id"])
+    changed_metadata = {"units": {"body_mass": "g", "time": "s", "distance": "cm"}}
+    changed_quality = service.validate_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", changed_metadata)
+    assert changed_quality["id"] != original_quality["id"]
+    assert service.get_admission_quality(original_quality["id"]) == original_quality
+    with pytest.raises(ValueError, match="immutable snapshot"):
+        service.admit_source_artifact(artifact["id"], "CMJ_FORCE_PLATFORM", changed_metadata)
+    assert (snapshot / "cmj_trials.parquet").read_bytes() == original_table
+    assert (snapshot / "provenance_manifest.json").read_bytes() == original_manifest
     before = len(service.list_admission_records())
     second = service.admit_source_artifact(
         artifact["id"], "CMJ_FORCE_PLATFORM", metadata
