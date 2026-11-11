@@ -54,7 +54,7 @@ def test_bom_semicolon_and_unknown_unit_review(tmp_path):
     assert any("stone" in a for a in plan["ambiguities"])
 
 
-@pytest.mark.parametrize("name,content,why", [("empty.csv", "", "empty"), ("x.xlsx", "x", "Unsupported"),
+@pytest.mark.parametrize("name,content,why", [("empty.csv", "", "empty"), ("x.docx", "x", "Unsupported"),
                                               ("dup.csv", "a,a\n1,2\n", "Duplicate")])
 def test_unreadable_inputs_are_unsupported(tmp_path, name, content, why):
     plan = importer.probe_file(_file(tmp_path, name, content))
