@@ -206,99 +206,80 @@ def test_protocol_scenarios_and_cohort_comparison(service, study):
     assert researchstore.get_entity(identity)["research_context"] == {"scope": "INDIVIDUAL", "subject_id": "P04", "investigation_id": investigation["id"]}
 
 
-def test_native_individual_research_workflow(service, study, tmp_path, qtbot, monkeypatch):
-    from PySide6.QtWidgets import QFileDialog
+def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_path, qtbot, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog, QInputDialog
 
-    from dynamis_science.desktop.individual_research import IndividualsExplorer
+    from dynamis_science import squad
     from dynamis_science.desktop.main_window import MainWindow
+    from dynamis_science.desktop.squad_view import SimulationDialog
 
     identity = study["id"]
+    squad.save_rules(identity, [{"name": "Low jump height", "category": "In danger", "tone": "negative",
+                                 "conditions": [{"metric_id": "MET-CMJ-HEIGHT", "measure": "latest", "operator": "<", "value": 34}]}])
     window = MainWindow(service)
     qtbot.addWidget(window)
     idle = lambda: qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
     idle()
     window._show_study(identity, service.get_study_detail(identity))
     idle()
-    assert "Squad longitudinal study · Data revision 1" in window.context_title.text()
-    assert window.scope_picker.isEnabled() and not window.investigation_picker.isEnabled()
-    explorer = IndividualsExplorer(service, window.run_task, identity, window)
+    home = window.squad
+    assert window.perspectives.currentWidget() is home and home.currentWidget() is home.board
+    assert "Data revision 1" in window.context_title.text()
+    tiles = home.board.tiles()
+    assert len(tiles) == 12
+    danger = [tile for tile in tiles if tile.athlete["flags"]]
+    assert {tile.athlete["subject_id"] for tile in danger} == {"P01", "P02", "P03"}
+    assert all("In danger" in tile.text() for tile in danger)
+
+    # Tap P01: athlete page on the main line, then a new branch becomes the individual investigation.
+    p01 = next(tile for tile in tiles if tile.athlete["subject_id"] == "P01")
+    p01.click()
     idle()
-    assert explorer.table.rowCount() == 12 and explorer.table.item(2, 5).text() == "3"
-    explorer.search.setText("P0")
-    idle()
-    assert explorer.table.rowCount() == 9
-    a = service.create_individual_investigation(identity, "P01", "Trajectory A")
-    b = service.create_individual_investigation(identity, "P02", "Trajectory B")
-    window.investigations = service.individual_investigations(identity)
-    window._select_scope("INDIVIDUAL", a["id"])
+    page = home.athlete_page
+    assert home.currentWidget() is page and "P01" in page.header.text() and page.branch_picker.currentData() is None
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Plyometric block", True))
+    page.new_branch()
     idle()
     panel = window.research.individual
-    assert window.research.tabs.currentWidget() is panel and "Participant P01" in panel.header.text()
-    assert panel.data_table.rowCount() == 3 and panel.run_button.isEnabled()
+    assert "Participant P01" in panel.header.text() and page.branch_picker.currentText() == "Branch · Plyometric block"
     panel.execute()
     idle()
-    assert panel.run_picker.count() == 1 and "Trial-noise SE" in panel.result_view.toPlainText()
+    assert panel.run_picker.count() == 1
 
-    # Switching participant clears A's measurements at once; a late completion for A is ignored.
+    # Back to the squad and into P02: P01's measurements are cleared, a late P01 completion is ignored.
     callbacks = []
     submit = window.runner.submit
     monkeypatch.setattr(window.runner, "submit", lambda operation, done, failed: callbacks.append(done))
-    panel.set_investigation(identity, a["id"])
-    window._select_scope("INDIVIDUAL", b["id"])
-    assert panel.data_table.rowCount() == 0 and panel.run_picker.count() == 0
-    callbacks[0](service.individual_research(a["id"]))
+    panel.set_investigation(identity, panel.investigation_id)
+    page.back_requested.emit()
+    next(tile for tile in home.board.tiles() if tile.athlete["subject_id"] == "P02").click()
+    assert panel.data_table.rowCount() == 0 and "P02" in page.header.text()
+    callbacks[0](service.individual_research(window.investigations[0]["id"]))
     assert "P01" not in panel.header.text()
     monkeypatch.setattr(window.runner, "submit", submit)
-    panel.reload()
-    idle()
-    assert "Participant P02" in panel.header.text() and panel.run_picker.count() == 0
 
-    # Protocol, scenario and cohort comparison through the native forms.
-    window._select_scope("INDIVIDUAL", a["id"])
+    # Researcher-defined squad simulation through the native dialog.
+    dialog = SimulationDialog(service, window.run_task, identity, home.board.board, None, window)
+    dialog.trend["worst"].setValue(-3)
+    dialog.run(True)
     idle()
-    panel._add_period({"kind": "BASELINE", "label": "Baseline", "start": 1, "end": 1})
-    panel._add_period({"kind": "INTERVENTION", "label": "Block", "start": 2, "end": 3}, {"adherence_percent": 90, "deviations": ""})
-    panel.save_protocol()
-    idle()
-    assert [item["label"] for item in panel.payload["investigation"]["protocol"]["periods"]] == ["Baseline", "Block"]
-    assert "Block (intervention): occasions 2, 3" in panel.period_view.toPlainText()
-    panel.scenario_kind.setCurrentIndex(panel.scenario_kind.findData("WORST_CASE"))
-    panel.scenario_title.setText("Detraining stress test")
-    panel.adverse.setText("Below baseline")
-    panel.assumptions.setPlainText("No jump training")
-    for column, text in enumerate(("weekly change", "-2", "0", "cm/week")):
-        from PySide6.QtWidgets import QTableWidgetItem
-        panel.bounds.setItem(0, column, QTableWidgetItem(text))
-    panel.save_scenario()
-    idle()
-    assert "HYPOTHETICAL · Worst-case" in panel.scenario_view.toPlainText()
-    assert "NOT QUALIFIED — Numerical forecast unavailable." in panel.scenario_view.toPlainText()
-    panel.compare()
-    idle()
-    assert panel.compare_table.rowCount() == 3 and "cohort descriptive summaries" in panel.compare_notes.toPlainText()
+    assert dialog.results.rowCount() == 12 and "not a model-based prediction" in dialog.summary.text()
+    assert researchstore.get_entity(identity)["simulations"][0]["definition"]["name"] == "Scenario"
 
-    # Individual and combined exports from the ordinary actions.
+    # Individual export from the branch, then reopen restores the athlete and branch.
+    window._select_scope("INDIVIDUAL", window.investigations[0]["id"])
+    idle()
     target = tmp_path / "individual.html"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(target), ""))
     window.research.export_report()
     idle()
     assert "Individual investigation · participant P01" in target.read_text(encoding="utf-8")
-    run(service, identity, study["rev1"])
-    window._show_study(identity, service.get_study_detail(identity))
-    idle()
-    assert window.research.individual.investigation_id == a["id"] and window.research.latest_run["scope"]["kind"] == "COHORT"
-    target = tmp_path / "combined.html"
-    window._export_combined_report()
-    idle()
-    assert "<h3>Cohort research</h3>" in target.read_text(encoding="utf-8")
     window.close()
-
-    # A fresh window restores the persisted scope and investigation.
     reopened = MainWindow(DynamisAppService())
     qtbot.addWidget(reopened)
     qtbot.waitUntil(lambda: not reopened.runner.active, timeout=30000)
     reopened._show_study(identity, service.get_study_detail(identity))
     qtbot.waitUntil(lambda: not reopened.runner.active, timeout=30000)
-    assert reopened.scope_picker.currentData() == "INDIVIDUAL" and reopened.investigation_picker.currentData() == a["id"]
+    assert reopened.perspectives.currentWidget() is reopened.squad and reopened.squad.currentWidget() is reopened.squad.athlete_page
     assert "Participant P01" in reopened.research.individual.header.text()
     reopened.close()

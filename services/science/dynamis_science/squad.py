@@ -16,7 +16,6 @@ import numpy as np
 import polars as pl
 
 from . import researchstore
-from .researchstore import ResearchValidation
 
 MEASURES = {
     "latest": "Latest value",
@@ -34,7 +33,7 @@ TONES = ("negative", "positive", "neutral")
 def _workspace(workspace_id: str) -> dict[str, Any]:
     entity = researchstore.get_entity(workspace_id)
     if not entity or not entity.get("workspace"):
-        raise ResearchValidation("Open a persistent research workspace first")
+        raise researchstore.ResearchValidation("Open a persistent research workspace first")
     return entity
 
 
@@ -51,7 +50,7 @@ def athlete_series(snapshot_id: str, metric: dict[str, Any]) -> tuple[dict[str, 
     frame = researchstore.read_snapshot_table(snapshot_id, metric["table"])
     axis = _axis(frame)
     if axis is None:
-        raise ResearchValidation(f"{metric['label']} has no measured time axis")
+        raise researchstore.ResearchValidation(f"{metric['label']} has no measured time axis")
     valid = frame.filter(pl.col(metric["column"]).is_not_null() & pl.col(axis).is_not_null())
     means = valid.group_by(["subject_id", axis]).agg(pl.col(metric["column"]).mean().alias("value")).sort(axis)
     series: dict[str, list[tuple[Any, float]]] = {}
@@ -84,7 +83,7 @@ def _measure(kind: str, values: list[float], squad_latest: list[float], points_t
             return None
         base = float(np.mean(values[-chronic:]))
         return float(np.mean(values[-acute:])) / base if base else None
-    raise ResearchValidation(f"Unknown measure {kind}")
+    raise researchstore.ResearchValidation(f"Unknown measure {kind}")
 
 
 def _compare(value: float, condition: dict[str, Any]) -> bool:
@@ -99,23 +98,23 @@ def _compare(value: float, condition: dict[str, Any]) -> bool:
 def validate_rule(rule: dict[str, Any], metrics: dict[str, dict[str, Any]]) -> dict[str, Any]:
     name, category = str(rule.get("name") or "").strip(), str(rule.get("category") or "").strip()
     if not name or not category:
-        raise ResearchValidation("Each rule needs a name and the category it assigns (for example 'In danger')")
+        raise researchstore.ResearchValidation("Each rule needs a name and the category it assigns (for example 'In danger')")
     if rule.get("tone", "neutral") not in TONES:
-        raise ResearchValidation("Tone must be negative, positive or neutral")
+        raise researchstore.ResearchValidation("Tone must be negative, positive or neutral")
     conditions = rule.get("conditions") or []
     if not conditions:
-        raise ResearchValidation(f"{name}: add at least one condition")
+        raise researchstore.ResearchValidation(f"{name}: add at least one condition")
     for condition in conditions:
         if condition.get("metric_id") not in metrics:
-            raise ResearchValidation(f"{name}: {condition.get('metric_id')} is not measured in this data revision")
+            raise researchstore.ResearchValidation(f"{name}: {condition.get('metric_id')} is not measured in this data revision")
         if condition.get("measure") not in MEASURES or condition.get("operator") not in OPERATORS:
-            raise ResearchValidation(f"{name}: choose a supported measure and operator")
+            raise researchstore.ResearchValidation(f"{name}: choose a supported measure and operator")
         try:
             float(condition["value"])
             if condition["operator"] in ("between", "outside"):
                 float(condition["value2"])
         except (KeyError, TypeError, ValueError) as error:
-            raise ResearchValidation(f"{name}: thresholds must be numbers") from error
+            raise researchstore.ResearchValidation(f"{name}: thresholds must be numbers") from error
     return {"id": rule.get("id") or f"RULE-{secrets.token_hex(3).upper()}", "name": name, "category": category,
             "tone": rule.get("tone", "neutral"), "match": "any" if rule.get("match") == "any" else "all",
             "enabled": rule.get("enabled", True), "conditions": conditions}
@@ -124,7 +123,7 @@ def validate_rule(rule: dict[str, Any], metrics: dict[str, dict[str, Any]]) -> d
 def save_rules(workspace_id: str, rules: list[dict[str, Any]], base_version: int | None = None) -> dict[str, Any]:
     entity = _workspace(workspace_id)
     if not entity.get("dataset_snapshot_id"):
-        raise ResearchValidation("Add data before defining flag rules")
+        raise researchstore.ResearchValidation("Add data before defining flag rules")
     metrics = _metrics(entity["dataset_snapshot_id"])
     validated = [validate_rule(rule, metrics) for rule in rules]
     return researchstore.update_entity(workspace_id, {"flag_rules": validated}, base_version, change_type="FLAG_RULES_SAVED")
@@ -171,12 +170,12 @@ def squad_board(workspace_id: str, group_by: str = "category") -> dict[str, Any]
     entity = _workspace(workspace_id)
     snapshot_id = entity.get("dataset_snapshot_id")
     if not snapshot_id:
-        raise ResearchValidation("Add data to the workspace to see the squad")
+        raise researchstore.ResearchValidation("Add data to the workspace to see the squad")
     metrics = _metrics(snapshot_id)
     primary = (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id")
     metric = metrics.get(primary) or next(iter(metrics.values()), None)
     if metric is None:
-        raise ResearchValidation("This data revision has no measured metric")
+        raise researchstore.ResearchValidation("This data revision has no measured metric")
     observed, points = athlete_series(snapshot_id, metric)
     rules = entity.get("flag_rules") or []
     hits = evaluate(snapshot_id, rules)
@@ -231,14 +230,14 @@ def simulate(workspace_id: str, scenario: dict[str, Any], subject_ids: list[str]
     name, steps = str(scenario.get("name") or "").strip(), int(scenario.get("steps") or 0)
     outcome = metrics.get(scenario.get("outcome_metric_id"))
     if not name or steps < 1 or steps > 104 or outcome is None:
-        raise ResearchValidation("Name the scenario, choose a measured outcome and a horizon of 1–104 steps")
+        raise researchstore.ResearchValidation("Name the scenario, choose a measured outcome and a horizon of 1–104 steps")
     drivers = scenario.get("drivers") or []
     for driver in drivers:
         if driver.get("metric_id") not in metrics:
-            raise ResearchValidation(f"Driver {driver.get('metric_id')} is not measured in this data revision")
+            raise researchstore.ResearchValidation(f"Driver {driver.get('metric_id')} is not measured in this data revision")
     effects = {item["driver_metric_id"]: item["outcome_pct_per_driver_pct"] for item in scenario.get("effects") or []}
     if set(effects) - {driver["metric_id"] for driver in drivers}:
-        raise ResearchValidation("Every effect must refer to one of the scenario drivers")
+        raise researchstore.ResearchValidation("Every effect must refer to one of the scenario drivers")
 
     def pick(values: Any, variant: str) -> float:
         return float((values or {}).get(variant, 0.0)) if isinstance(values, dict) else float(values or 0.0)

@@ -16,7 +16,7 @@ from typing import Any
 import polars as pl
 import pyarrow.parquet as pq
 
-from .. import admission, dataworkspace, importer, longitudinal, realanalysis, realstore, researchanalysis, researchstore
+from .. import admission, dataworkspace, importer, longitudinal, realanalysis, realstore, researchanalysis, researchstore, squad
 from ..data_root import DataRootConfigurationError, data_root, ensure_layout, paths
 from ..generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
@@ -115,6 +115,22 @@ class DynamisAppService:
     def save_scenario(self, investigation_id: str, scenario: dict[str, Any], base_version: int | None) -> dict[str, Any]:
         self.ensure_initialized()
         return longitudinal.save_scenario(investigation_id, scenario, base_version)
+
+    def squad_board(self, workspace_id: str, group_by: str = "category") -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.squad_board(workspace_id, group_by)
+
+    def save_flag_rules(self, workspace_id: str, rules: list[dict[str, Any]]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.save_rules(workspace_id, rules)
+
+    def simulate(self, workspace_id: str, scenario: dict[str, Any], subject_ids: list[str] | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.simulate(workspace_id, scenario, subject_ids)
+
+    def save_simulation(self, workspace_id: str, scenario: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.save_simulation(workspace_id, scenario)
 
     def compare_with_cohort(self, workspace_id: str, subject_id: str, metric_id: str | None = None) -> dict[str, Any]:
         self.ensure_initialized()

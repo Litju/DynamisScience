@@ -12,7 +12,6 @@ from typing import Any, Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -20,7 +19,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -77,94 +75,6 @@ def fit_dialog(dialog: QDialog, width: int, height: int) -> None:
     dialog.resize(width, height)
 
 
-class IndividualsExplorer(QDialog):
-    """Searchable pseudonymous participant catalogue of the active data revision."""
-
-    investigation_opened = Signal(str)
-
-    def __init__(self, service: DynamisAppService, run_task: RunTask, workspace_id: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.service, self.run_task, self.workspace_id = service, run_task, workspace_id
-        self.catalogue: dict[str, Any] = {}
-        self.generation = 0
-        self.setWindowTitle("Individuals")
-        fit_dialog(self, 900, 540)
-        layout = QVBoxLayout(self)
-        self.summary = QLabel("Loading participants…")
-        self.summary.setWordWrap(True)
-        layout.addWidget(self.summary)
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Search pseudonymous participant IDs")
-        self.search.setAccessibleName("Search participants")
-        self.search.textChanged.connect(self.reload)
-        layout.addWidget(self.search)
-        self.table = _table(["Participant", "Sessions", "Observations", "Latest", "Completeness", "Missing occasions",
-                             "Empty values", "QC flags", "Investigations"], "Participant catalogue")
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.doubleClicked.connect(lambda *_: self.open_selected())
-        layout.addWidget(self.table, 1)
-        buttons = QHBoxLayout()
-        self.open_button = QPushButton("Open individual research")
-        self.open_button.clicked.connect(self.open_selected)
-        self.new_button = QPushButton("New investigation…")
-        self.new_button.clicked.connect(lambda: self.open_selected(new=True))
-        close = QPushButton("Close")
-        close.clicked.connect(self.reject)
-        for button in (self.open_button, self.new_button):
-            buttons.addWidget(button)
-        buttons.addStretch(1)
-        buttons.addWidget(close)
-        layout.addLayout(buttons)
-        self.reload()
-
-    def reload(self) -> None:
-        self.generation += 1
-        generation, query = self.generation, self.search.text()
-        self.run_task(lambda: self.service.participant_catalogue(self.workspace_id, query),
-                      lambda value: self._loaded(value) if generation == self.generation else None, "Loading participants")
-
-    def _loaded(self, catalogue: dict[str, Any]) -> None:
-        self.catalogue = catalogue
-        metric = catalogue["metric"]
-        self.summary.setText(f"{metric['label']} ({metric['unit']}) · {len(catalogue['occasions'])} {catalogue['axis']}s in data "
-                             f"revision {catalogue['data_revision_id']}. Participant IDs are pseudonymous; this is a research "
-                             "browser, not a readiness dashboard.")
-        _fill(self.table, [[item["display_id"], item["sessions"], item["observations"], item["latest"],
-                            f"{item['completeness']:.0%}", ", ".join(map(str, item["missing_occasions"])) or "—",
-                            item["empty_values"], item["quality_flags"], len(item["investigations"])]
-                           for item in catalogue["participants"]])
-        if catalogue["participants"]:
-            self.table.selectRow(0)
-
-    def selected(self) -> dict[str, Any] | None:
-        row = self.table.currentRow()
-        participants = self.catalogue.get("participants", [])
-        return participants[row] if 0 <= row < len(participants) else None
-
-    def open_selected(self, new: bool = False) -> None:
-        participant = self.selected()
-        if participant is None:
-            return
-        existing = participant["investigations"]
-        if existing and not new:
-            labels = [f"{item['title']} · {item['id']}" for item in existing] + ["New investigation…"]
-            label, accepted = QInputDialog.getItem(self, "Open individual research", f"Investigation for {participant['display_id']}", labels, 0, False)
-            if not accepted:
-                return
-            if label != labels[-1]:
-                self.investigation_opened.emit(existing[labels.index(label)]["id"])
-                self.accept()
-                return
-        title, accepted = QInputDialog.getText(self, "New individual investigation", f"Title for {participant['display_id']}")
-        if not accepted or not title.strip():
-            return
-        question, _ = QInputDialog.getText(self, "New individual investigation", "Scientific question (optional)")
-        subject = participant["subject_id"]
-        self.run_task(lambda: self.service.create_individual_investigation(self.workspace_id, subject, title, question),
-                      lambda created: (self.investigation_opened.emit(created["id"]), self.accept()), "Creating investigation")
-
-
 class IndividualResearchPanel(QWidget):
     """Data, analysis, results, protocol, scenarios and cohort comparison for one individual investigation."""
 
@@ -178,7 +88,7 @@ class IndividualResearchPanel(QWidget):
         self.payload: dict[str, Any] = {}
         self.generation = 0
         layout = QVBoxLayout(self)
-        self.header = QLabel("Choose Individuals… to open a participant's research within this workspace.")
+        self.header = QLabel("Open an athlete from the squad to start individual research.")
         self.header.setObjectName("IndividualResearchHeader")
         self.header.setWordWrap(True)
         self.header.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -209,7 +119,7 @@ class IndividualResearchPanel(QWidget):
         self.run_picker.clear()
         self.setEnabled(bool(investigation_id))
         if not investigation_id:
-            self.header.setText("Cohort scope. Choose Individuals… to open a participant's research within this workspace.")
+            self.header.setText("Main line · observed data. Create or choose a branch above to run individual analyses, protocols and scenarios.")
             return
         self.header.setText("Loading individual research…")
         self.reload()

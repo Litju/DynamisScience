@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
         self.current_study: dict[str, Any] = {}
         self.research_context: dict[str, Any] = {"scope": "COHORT"}
         self.investigations: list[dict[str, Any]] = []
+        self._pending_athlete: str | None = None
         self.current_snapshot_id: str | None = None
         self.current_target: dict[str, str] | None = None
         self.current_project: dict[str, Any] | None = None
@@ -167,6 +168,14 @@ class MainWindow(QMainWindow):
         self._sync_result_actions()
         self.perspectives = QStackedWidget()
         self.perspectives.addWidget(self.workbench)
+        from .squad_view import SquadHome
+
+        self.squad = SquadHome(self.service, self.run_task, self.research.individual)
+        self.squad.board.athlete_opened.connect(self._athlete_opened)
+        self.squad.board.loaded.connect(self._board_loaded)
+        self.squad.board.research_requested.connect(self._show_research_mode)
+        self.squad.athlete_page.investigation_selected.connect(self._branch_selected)
+        self.perspectives.addWidget(self.squad)
         self.performance = None
         self.performance_header = None
         self.performance_rail = None
@@ -199,7 +208,7 @@ class MainWindow(QMainWindow):
         workspace_bar = QToolBar("Research Workspace", self)
         workspace_bar.setObjectName("PersistentWorkspaceActions")
         self.addToolBar(workspace_bar)
-        for label, callback in (("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
+        for label, callback in (("Squad", self._show_squad_mode), ("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
                                 ("Add data", self._add_workspace_data), ("Analyze", self._analyze_workspace),
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
             action = workspace_bar.addAction(label)
@@ -210,20 +219,8 @@ class MainWindow(QMainWindow):
         self.addToolBar(context_bar)
         self.context_title = QLabel("No workspace")
         self.context_title.setAccessibleName("Workspace title and active data revision")
-        self.scope_picker = QComboBox()
-        self.scope_picker.setAccessibleName("Research scope")
-        self.scope_picker.addItem("Cohort", "COHORT")
-        self.scope_picker.addItem("Individual", "INDIVIDUAL")
-        self.investigation_picker = QComboBox()
-        self.investigation_picker.setAccessibleName("Individual investigation")
-        self.investigation_picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.investigation_picker.setMinimumContentsLength(14)
-        for widget in (self.context_title, self.scope_picker, self.investigation_picker):
-            context_bar.addWidget(widget)
-        context_bar.addAction("Individuals…").triggered.connect(self._open_individuals)
+        context_bar.addWidget(self.context_title)
         context_bar.addAction("Combined report").triggered.connect(self._export_combined_report)
-        self.scope_picker.activated.connect(lambda _: self._scope_changed())
-        self.investigation_picker.activated.connect(lambda _: self._scope_changed())
         self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
@@ -582,12 +579,20 @@ class MainWindow(QMainWindow):
         self.performance_header.set_context(context)
         self.performance_rail.set_context(context)
 
+    def _show_squad_mode(self) -> None:
+        if not self.squad.board.workspace_id:
+            self.workbench.show_toast("Open a research workspace with data to see the squad.")
+            return
+        self._show_research_mode()
+        self.perspectives.setCurrentWidget(self.squad)
+        self._perspective = "squad"
+
     def _show_research_mode(self) -> None:
         self.menuBar().show()
         if self.performance_toolbar is not None:
             self.performance_toolbar.hide()
         self.perspectives.setCurrentWidget(self.workbench)
-        if self._perspective != "research":
+        if self._perspective not in ("research", "squad"):
             # The navigator lives in the Data pane; raw inspector detail is behind View > Advanced.
             self._perspective = "research"
             self.navigator_dock.hide()
@@ -1118,10 +1123,16 @@ class MainWindow(QMainWindow):
     def _load_research_context(self, study_id: str, detail: dict[str, Any]) -> None:
         self.research_context = dict(detail.get("study", {}).get("research_context") or {"scope": "COHORT"})
         self.investigations = []
+        self._pending_athlete = None
         self._sync_context_bar()
+        squad = self.squad
+        squad.setCurrentWidget(squad.board)
         if not detail.get("workspace") or not detail.get("metrics"):
+            squad.board.set_workspace(None)
             self.research.individual.set_investigation(None, None)
             return
+        squad.board.set_workspace(study_id)
+        self._show_squad_mode()
         revision = detail.get("active_data_revision_id")
 
         def loaded(investigations: list[dict[str, Any]]) -> None:
@@ -1130,7 +1141,6 @@ class MainWindow(QMainWindow):
             self.investigations = investigations
             if not any(item["id"] == self.research_context.get("investigation_id") for item in investigations):
                 self.research_context = {"scope": "COHORT"}
-            self._sync_context_bar()
             self._apply_research_context()
 
         self.run_task(lambda: self.service.individual_investigations(study_id), loaded, "Loading individual investigations")
@@ -1140,67 +1150,63 @@ class MainWindow(QMainWindow):
         number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == detail.get("active_data_revision_id")), None)
         title = detail.get("study", {}).get("title")
         self.context_title.setText(f"{title} · {'Data revision ' + str(number) if number else 'no data'}  " if title else "No workspace  ")
-        context = getattr(self, "research_context", {"scope": "COHORT"})
-        self.scope_picker.setCurrentIndex(max(0, self.scope_picker.findData(context.get("scope", "COHORT"))))
-        self.investigation_picker.clear()
-        for item in getattr(self, "investigations", []):
-            self.investigation_picker.addItem(f"{item['scope']['subject_id']} · {item['title']}", item["id"])
-        index = self.investigation_picker.findData(context.get("investigation_id"))
-        self.investigation_picker.setCurrentIndex(index)
-        enabled = bool(detail.get("metrics"))
-        self.scope_picker.setEnabled(enabled)
-        self.investigation_picker.setEnabled(enabled and context.get("scope") == "INDIVIDUAL")
 
     def _apply_research_context(self) -> None:
         context = self.research_context
-        individual = context.get("scope") == "INDIVIDUAL" and context.get("investigation_id")
-        self.research.individual.set_investigation(self.current_study_id, context["investigation_id"] if individual else None)
-        if individual:
-            self._set_record_view(True)
-            self.research.tabs.setCurrentWidget(self.research.individual)
+        investigation_id = context.get("investigation_id") if context.get("scope") == "INDIVIDUAL" else None
+        self.research.individual.set_investigation(self.current_study_id, investigation_id)
+        if investigation_id:
+            self._open_athlete(context["subject_id"])
+
+    def _open_athlete(self, subject_id: str) -> None:
+        squad = self.squad
+        athlete = next((item for group in squad.board.board.get("groups", []) for item in group["athletes"]
+                        if item["subject_id"] == subject_id), None)
+        if athlete is None:
+            self._pending_athlete = subject_id  # opened once the squad board has loaded
+            return
+        self._pending_athlete = None
+        branches = [item for item in self.investigations if item["scope"]["subject_id"] == subject_id]
+        current = self.research_context.get("investigation_id") if self.research_context.get("subject_id") == subject_id else None
+        squad.athlete_page.set_athlete(self.current_study_id, athlete, branches, current)
+        self._show_squad_mode()
+        squad.setCurrentWidget(squad.athlete_page)
+
+    def _board_loaded(self) -> None:
+        if self._pending_athlete:
+            self._open_athlete(self._pending_athlete)
+
+    def _athlete_opened(self, athlete: dict[str, Any]) -> None:
+        subject = athlete["subject_id"]
+        branches = [item for item in self.investigations if item["scope"]["subject_id"] == subject]
+        if self.research_context.get("subject_id") == subject:
+            self._open_athlete(subject)
+        elif branches:
+            self._select_scope("INDIVIDUAL", branches[-1]["id"])
+        else:
+            self._select_scope("COHORT")
+            self._open_athlete(subject)
+
+    def _branch_selected(self, investigation_id: str) -> None:
+        identity = self.current_study_id
+        if not investigation_id:
+            self._select_scope("COHORT")
+            return
+
+        def refreshed(investigations: list[dict[str, Any]]) -> None:
+            if self.current_study_id == identity:
+                self.investigations = investigations
+                self._select_scope("INDIVIDUAL", investigation_id)
+
+        self.run_task(lambda: self.service.individual_investigations(identity), refreshed, "Opening branch")
 
     def _select_scope(self, kind: str, investigation_id: str | None = None) -> None:
         identity = self.current_study_id
         investigation = next((item for item in self.investigations if item["id"] == investigation_id), None)
         self.research_context = {"scope": kind, "investigation_id": investigation_id,
                                  "subject_id": investigation["scope"]["subject_id"] if investigation else None}
-        self._sync_context_bar()
         self._apply_research_context()
         self.run_task(lambda: self.service.select_research_scope(identity, kind, investigation_id), lambda _: None, "Saving research context")
-
-    def _scope_changed(self) -> None:
-        if not self.current_study.get("workspace"):
-            return
-        if self.scope_picker.currentData() == "COHORT":
-            self._select_scope("COHORT")
-        elif self.investigation_picker.currentData():
-            self._select_scope("INDIVIDUAL", self.investigation_picker.currentData())
-        else:
-            self._open_individuals()
-
-    def _open_individuals(self) -> None:
-        if not self.current_study.get("workspace") or not self.current_study.get("metrics"):
-            self.workbench.show_toast("Add longitudinal data to the workspace before opening individuals.")
-            self._sync_context_bar()
-            return
-        from .individual_research import IndividualsExplorer
-
-        identity = self.current_study_id
-        dialog = IndividualsExplorer(self.service, self.run_task, identity, self)
-
-        def opened(investigation_id: str) -> None:
-            def refreshed(investigations: list[dict[str, Any]]) -> None:
-                if self.current_study_id != identity:
-                    return
-                self.investigations = investigations
-                self._select_scope("INDIVIDUAL", investigation_id)
-
-            self.run_task(lambda: self.service.individual_investigations(identity), refreshed, "Opening individual research")
-
-        dialog.investigation_opened.connect(opened)
-        dialog.finished.connect(lambda _: self._sync_context_bar())
-        dialog.open()
-        self.individuals_dialog = dialog
 
     def _export_combined_report(self) -> None:
         cohort = self.research.latest_run
@@ -1269,9 +1275,10 @@ class MainWindow(QMainWindow):
         if not self.current_study.get("workspace") or not self.current_snapshot_id:
             self.workbench.show_toast("Add data to your workspace before analyzing.")
             return
+        self._show_research_mode()
         self._set_record_view(True)
         if getattr(self, "research_context", {}).get("scope") == "INDIVIDUAL":
-            self.research.tabs.setCurrentWidget(self.research.individual)
+            self._show_squad_mode()
             self.research.individual.tabs.setCurrentIndex(1)
             return
         self.research.tabs.setCurrentIndex(3)
@@ -1861,8 +1868,7 @@ class ResearchWorkbench(QWidget):
         from .individual_research import IndividualResearchPanel
 
         # RES-647: individual research is a scope of this workspace, not a separate application.
-        self.individual = IndividualResearchPanel(self.service, window.run_task, self)
-        self.tabs.addTab(self.individual, "Individual Research")
+        self.individual = IndividualResearchPanel(self.service, window.run_task)  # hosted by the Squad athlete page
         self.tabs.currentChanged.connect(self._ensure_tab)
         self._ensure_tab(0)
 

@@ -16,7 +16,6 @@ import numpy as np
 import polars as pl
 
 from . import researchstore
-from .researchstore import ResearchConflict, ResearchValidation
 
 PERIOD_KINDS = ("BASELINE", "INTERVENTION", "EXPOSURE", "COMPARISON", "WASHOUT", "FOLLOW_UP")
 PROTOCOL_DESIGNS = {
@@ -37,7 +36,7 @@ FORECAST_REASON = ("No individualized forecasting model (hierarchical, Bayesian,
 def _workspace(workspace_id: str) -> dict[str, Any]:
     entity = researchstore.get_entity(workspace_id)
     if not entity or not entity.get("workspace"):
-        raise ResearchValidation("Open a persistent research workspace first")
+        raise researchstore.ResearchValidation("Open a persistent research workspace first")
     return entity
 
 
@@ -46,17 +45,17 @@ def _context(workspace_id: str, metric_id: str | None = None, revision_id: str |
     if revision_id:
         revision = researchstore.get_data_revision(revision_id)
         if not revision or revision["workspace_id"] != workspace_id:
-            raise ResearchValidation("This data revision does not belong to the workspace")
+            raise researchstore.ResearchValidation("This data revision does not belong to the workspace")
         snapshot_id = revision["snapshot_id"]
     else:
         snapshot_id = entity.get("dataset_snapshot_id")
     if not snapshot_id:
-        raise ResearchValidation("Add data to the workspace before selecting participants")
+        raise researchstore.ResearchValidation("Add data to the workspace before selecting participants")
     metrics = [item for item in researchstore.dataset_metrics(snapshot_id) if item["table"] in {"cmj_occasions", "cmj_trials"}]
     primary = metric_id or (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id")
     metric = next((item for item in metrics if item["id"] == primary), metrics[0] if metrics else None)
     if metric is None:
-        raise ResearchValidation("This data revision has no longitudinal outcome (CMJ occasions or weekly trials)")
+        raise researchstore.ResearchValidation("This data revision has no longitudinal outcome (CMJ occasions or weekly trials)")
     return entity, snapshot_id, metric
 
 
@@ -68,7 +67,7 @@ def _observations(snapshot_id: str, metric: dict[str, Any]) -> tuple[pl.DataFram
     frame = researchstore.read_snapshot_table(snapshot_id, metric["table"])
     axis = _axis(metric)
     if axis not in frame.columns:
-        raise ResearchValidation(f"Missing {axis} metadata; map the measured time axis during import.")
+        raise researchstore.ResearchValidation(f"Missing {axis} metadata; map the measured time axis during import.")
     points = sorted(int(value) for value in frame[axis].drop_nulls().unique().to_list())
     return frame, axis, points
 
@@ -122,19 +121,19 @@ def individual_investigations(workspace_id: str, subject_id: str | None = None) 
 def get_individual_investigation(investigation_id: str) -> dict[str, Any]:
     investigation = researchstore.get_investigation(investigation_id)
     if not investigation or (investigation.get("scope") or {}).get("kind") != "INDIVIDUAL":
-        raise ResearchValidation("Select an individual investigation")
+        raise researchstore.ResearchValidation("Select an individual investigation")
     return investigation
 
 
 def create_individual_investigation(workspace_id: str, subject_id: str, title: str, question: str = "") -> dict[str, Any]:
     entity, snapshot_id, _ = _context(workspace_id)
     if entity["state"] == "ARCHIVED":
-        raise ResearchConflict("Restore this workspace before creating investigations")
+        raise researchstore.ResearchConflict("Restore this workspace before creating investigations")
     if not title.strip():
-        raise ResearchValidation("An investigation title is required")
+        raise researchstore.ResearchValidation("An investigation title is required")
     known = set(researchstore.read_snapshot_table(snapshot_id, "subjects")["subject_id"].cast(pl.Utf8).to_list())
     if subject_id not in known:
-        raise ResearchValidation("This participant is not present in the active data revision")
+        raise researchstore.ResearchValidation("This participant is not present in the active data revision")
     return researchstore.create_investigation(workspace_id, title, blocks=[], fields={
         "scope": {"kind": "INDIVIDUAL", "subject_id": subject_id},
         "question": question.strip(),
@@ -169,10 +168,10 @@ def select_research_scope(workspace_id: str, kind: str, investigation_id: str | 
     elif kind == "INDIVIDUAL":
         investigation = get_individual_investigation(investigation_id or "")
         if investigation["study_id"] != workspace_id:
-            raise ResearchValidation("The investigation belongs to another workspace")
+            raise researchstore.ResearchValidation("The investigation belongs to another workspace")
         context = {"scope": "INDIVIDUAL", "subject_id": investigation["scope"]["subject_id"], "investigation_id": investigation["id"]}
     else:
-        raise ResearchValidation(f"Unknown research scope {kind}")
+        raise researchstore.ResearchValidation(f"Unknown research scope {kind}")
     if entity.get("research_context") == context:
         return entity
     return researchstore.update_entity(workspace_id, {"research_context": context}, change_type="SCOPE_SELECTED")
@@ -205,7 +204,7 @@ def individual_trajectory(snapshot_id: str, metric: dict[str, Any], subject_id: 
     axis, points = individual_points(snapshot_id, metric, subject_id)
     observed = [point for point in points if point["n_trials"]]
     if len(observed) < 2:
-        raise ResearchValidation("At least two measured occasions are required for a within-person trajectory")
+        raise researchstore.ResearchValidation("At least two measured occasions are required for a within-person trajectory")
     repeated = [point for point in observed if point["n_trials"] > 1]
     df = sum(point["n_trials"] - 1 for point in repeated)
     # Pooled within-session SD: trial-to-trial noise only, assuming exchangeable same-session trials.
@@ -246,40 +245,40 @@ def _text(value: Any) -> str:
 
 
 def save_protocol(investigation_id: str, protocol: dict[str, Any], base_version: int | None) -> dict[str, Any]:
-    investigation = get_individual_investigation(investigation_id)
+    get_individual_investigation(investigation_id)  # validates the scope
     design = protocol.get("design", "OBSERVATIONAL_TRACKING")
     if design not in PROTOCOL_DESIGNS:
-        raise ResearchValidation(f"Unknown protocol design {design}")
+        raise researchstore.ResearchValidation(f"Unknown protocol design {design}")
     periods = []
     for index, period in enumerate(protocol.get("periods", []), start=1):
         kind = period.get("kind")
         if kind not in PERIOD_KINDS:
-            raise ResearchValidation(f"Period {index}: unknown kind {kind}")
+            raise researchstore.ResearchValidation(f"Period {index}: unknown kind {kind}")
         try:
             start, end = int(period["start"]), int(period["end"])
         except (KeyError, TypeError, ValueError) as error:
-            raise ResearchValidation(f"Period {index}: start and end must be measured occasions/weeks") from error
+            raise researchstore.ResearchValidation(f"Period {index}: start and end must be measured occasions/weeks") from error
         if start > end:
-            raise ResearchValidation(f"Period {index}: start is after end")
+            raise researchstore.ResearchValidation(f"Period {index}: start is after end")
         periods.append({"id": f"P{index}", "kind": kind, "label": _text(period.get("label")) or kind.title(),
                         "start": start, "end": end, "notes": _text(period.get("notes"))})
     ordered = sorted(periods, key=lambda item: item["start"])
     for before, after in zip(ordered, ordered[1:]):
         if after["start"] <= before["end"]:
-            raise ResearchValidation(f"Periods {before['label']} and {after['label']} overlap")
+            raise researchstore.ResearchValidation(f"Periods {before['label']} and {after['label']} overlap")
     labels = {item["label"] for item in periods}
     adherence = []
     for item in protocol.get("adherence", []):
         if item.get("period") not in labels:
-            raise ResearchValidation("Adherence must reference a documented period")
+            raise researchstore.ResearchValidation("Adherence must reference a documented period")
         percent = item.get("adherence_percent")
         if percent is not None and not 0 <= float(percent) <= 100:
-            raise ResearchValidation("Adherence must be between 0 and 100%")
+            raise researchstore.ResearchValidation("Adherence must be between 0 and 100%")
         adherence.append({"period": item["period"], "adherence_percent": None if percent is None else float(percent),
                           "deviations": _text(item.get("deviations"))})
     changes = [{"at": int(item["at"]), "description": _text(item.get("description"))} for item in protocol.get("changes", [])]
     if any(not item["description"] for item in changes):
-        raise ResearchValidation("Describe every protocol change")
+        raise researchstore.ResearchValidation("Describe every protocol change")
     record = {
         "design": design, "design_label": PROTOCOL_DESIGNS[design], "periods": periods,
         "testing_occasions": sorted({int(value) for value in protocol.get("testing_occasions", [])}),
@@ -298,7 +297,7 @@ def save_protocol(investigation_id: str, protocol: dict[str, Any], base_version:
         if not record["prespecified"]:
             issues.append("periods must be prespecified before the outcome measurements")
         if issues:
-            raise ResearchValidation("Not an experimental design: " + "; ".join(issues) + ". A repeated-measurement history alone is observational tracking.")
+            raise researchstore.ResearchValidation("Not an experimental design: " + "; ".join(issues) + ". A repeated-measurement history alone is observational tracking.")
     return researchstore.update_investigation_fields(investigation_id, {"protocol": record}, base_version, "investigation.protocol_saved")
 
 
@@ -323,41 +322,41 @@ def save_scenario(investigation_id: str, scenario: dict[str, Any], base_version:
     revision_id = scenario.get("data_revision_id") or _workspace(workspace_id).get("active_data_revision_id")
     _, snapshot_id, metric = _context(workspace_id, scenario.get("outcome_metric_id"), revision_id)
     if scenario.get("outcome_metric_id") and scenario["outcome_metric_id"] != metric["id"]:
-        raise ResearchValidation("The outcome is not measured in the referenced data revision")
+        raise researchstore.ResearchValidation("The outcome is not measured in the referenced data revision")
     kind = scenario.get("kind")
     if kind not in SCENARIO_KINDS:
-        raise ResearchValidation(f"Unknown scenario type {kind}")
+        raise researchstore.ResearchValidation(f"Unknown scenario type {kind}")
     title = _text(scenario.get("title"))
     assumptions = [_text(item) for item in scenario.get("assumptions", []) if _text(item)]
     if not title or not assumptions:
-        raise ResearchValidation("A scenario needs a title and at least one explicit assumption")
+        raise researchstore.ResearchValidation("A scenario needs a title and at least one explicit assumption")
     unit = _text(scenario.get("unit")) or metric["unit"]
     if unit != metric["unit"]:
-        raise ResearchValidation(f"The outcome is recorded in {metric['unit']}, not {unit}")
+        raise researchstore.ResearchValidation(f"The outcome is recorded in {metric['unit']}, not {unit}")
     bounds = []
     for item in scenario.get("parameter_bounds", []):
         name, lower, upper = _text(item.get("name")), float(item["lower"]), float(item["upper"])
         if not name or lower > upper:
-            raise ResearchValidation("Each parameter bound needs a name and lower ≤ upper")
+            raise researchstore.ResearchValidation("Each parameter bound needs a name and lower ≤ upper")
         bounds.append({"name": name, "lower": lower, "upper": upper, "unit": _text(item.get("unit"))})
     if not bounds:
-        raise ResearchValidation("Define the parameter bounds of the scenario")
+        raise researchstore.ResearchValidation("Define the parameter bounds of the scenario")
     horizon = scenario.get("horizon") or {}
     if float(horizon.get("value") or 0) <= 0 or horizon.get("unit") not in HORIZON_UNITS:
-        raise ResearchValidation("Define a positive time horizon in occasions, weeks or days")
+        raise researchstore.ResearchValidation("Define a positive time horizon in occasions, weeks or days")
     adverse = _text(scenario.get("adverse_outcome"))
     if kind == "WORST_CASE" and not adverse:
-        raise ResearchValidation("A worst-case stress test must define the adverse outcome")
+        raise researchstore.ResearchValidation("A worst-case stress test must define the adverse outcome")
     model_run = None
     if scenario.get("model_run_id"):
         run = researchstore.get_run(scenario["model_run_id"])
         if not run or run.get("study_id") != workspace_id:
-            raise ResearchValidation("The referenced model run belongs to another workspace")
+            raise researchstore.ResearchValidation("The referenced model run belongs to another workspace")
         model_run = {"id": run["id"], "method_id": run["method_id"], "method_version": run["method_version"],
                      "data_revision_id": run.get("data_revision_id")}
     previous = [item for item in investigation["scenarios"] if item["id"] == scenario.get("id")]
     if scenario.get("id") and not previous:
-        raise ResearchValidation("Unknown scenario")
+        raise researchstore.ResearchValidation("Unknown scenario")
     record = {
         "id": scenario.get("id") or f"SCN-U-{secrets.token_hex(4).upper()}",
         "version": len(previous) + 1, "designation": "HYPOTHETICAL",
