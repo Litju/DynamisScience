@@ -188,7 +188,8 @@ def individual_points(snapshot_id: str, metric: dict[str, Any], subject_id: str)
     result = []
     for point in points:
         rows = own.filter(pl.col(axis) == point).to_dicts()
-        values = [float(row[metric["column"]]) for row in rows if row.get(metric["column"]) is not None]
+        values = [float(row[metric["column"]]) for row in rows if row.get(metric["column"]) is not None
+                  and math.isfinite(float(row[metric["column"]])) and row.get("quality_state", "VALID") == "VALID"]
         result.append({
             axis: point, "week": point, "n_trials": len(values), "values": values,
             "mean": float(np.mean(values)) if values else None,
@@ -225,12 +226,14 @@ def individual_trajectory(snapshot_id: str, metric: dict[str, Any], subject_id: 
         "within_session_sd": trial_sd, "within_session_df": df,
         "change_trial_noise_se": change_se,
         "error_note": ("Trial-noise SE of the change = pooled within-session SD × √(1/n_first + 1/n_last); it excludes "
-                       "day-to-day biological variation." if change_se is not None else
+                       "day-to-day biological variation. Assumes independent trials and common within-session variance across sessions; "
+                       "heteroscedastic sessions can invalidate this noise summary. It is not total longitudinal uncertainty." if change_se is not None else
                        "Not estimable: no occasion has repeated same-session trials."),
         "limitations": [
             "Observational within-person description; not a personalized causal estimate or forecast.",
             "Missing occasions are listed, not imputed.",
             "Trial error excludes day-to-day biological variation and is not an individual response threshold.",
+            "Pooled variance assumes common session variance and independent trial errors; unequal variance is not modeled. Single-trial endpoints borrow this pooled noise estimate.",
         ],
     }
 
@@ -359,7 +362,7 @@ def save_scenario(investigation_id: str, scenario: dict[str, Any], base_version:
         raise researchstore.ResearchValidation("Unknown scenario")
     record = {
         "id": scenario.get("id") or f"SCN-U-{secrets.token_hex(4).upper()}",
-        "version": len(previous) + 1, "designation": "HYPOTHETICAL",
+        "version": max((item["version"] for item in previous), default=0) + 1, "designation": "HYPOTHETICAL",
         "kind": kind, "kind_label": SCENARIO_KINDS[kind], "title": title,
         "data_revision_id": revision_id, "snapshot_id": snapshot_id, "model_run": model_run,
         "subject_id": investigation["scope"]["subject_id"],

@@ -263,7 +263,7 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     dialog.trend["worst"].setValue(-3)
     dialog.run(True)
     idle()
-    assert dialog.results.rowCount() == 12 and "not a model-based prediction" in dialog.summary.text()
+    assert dialog.results.rowCount() == 1 and "not a model-based prediction" in dialog.summary.text()
     assert researchstore.get_entity(identity)["simulations"][0]["definition"]["name"] == "Scenario"
 
     # Individual export from the branch, then reopen restores the athlete and branch.
@@ -283,3 +283,46 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     assert reopened.perspectives.currentWidget() is reopened.squad and reopened.squad.currentWidget() is reopened.squad.athlete_page
     assert "Participant P01" in reopened.research.individual.header.text()
     reopened.close()
+
+
+@pytest.mark.parametrize("sessions", [
+    [[10], [11, 12, 13], [16]],
+    [[1, 2], [4, 8, 12, 16], [20, 21, 22]],
+    [[3], [], [7]],
+    [[1, 9, 17], [], [10, 10.1]],
+])
+def test_individual_noise_against_independent_pairwise_identity(monkeypatch, sessions):
+    from statistics import mean
+    import polars as pl
+    rows = [{"subject_id": "A", "week": i+1, "height": v, "quality_state": "VALID"}
+            for i, values in enumerate(sessions) for v in values]
+    # Another participant establishes missing measurement occasions without imputing A.
+    rows += [{"subject_id": "B", "week": i+1, "height": 1.0, "quality_state": "VALID"} for i in range(len(sessions))]
+    frame = pl.DataFrame(rows)
+    monkeypatch.setattr(researchstore, "read_snapshot_table", lambda *args: frame)
+    result = longitudinal.individual_trajectory("test", {"table": "cmj_trials", "column": "height", "unit": "cm", "id": "height"}, "A")
+    observed = [v for v in sessions if v]
+    # SSE identity: sum of all unordered pair differences squared / n.
+    sse = sum(sum((x-y)**2 for i, x in enumerate(v) for y in v[i+1:])/len(v) for v in observed)
+    df = sum(len(v)-1 for v in observed)
+    pooled = math.sqrt(sse/df) if df else None
+    assert result["change_first_to_last"] == pytest.approx(mean(observed[-1])-mean(observed[0]))
+    assert result["within_session_df"] == df
+    assert result["missing_occasions"] == [i+1 for i,v in enumerate(sessions) if not v]
+    if df:
+        assert result["within_session_sd"] == pytest.approx(pooled)
+        assert result["change_trial_noise_se"] == pytest.approx(math.sqrt(sse/df*(1/len(observed[0])+1/len(observed[-1]))))
+    else:
+        assert result["within_session_sd"] is None and result["change_trial_noise_se"] is None
+    assert "common session variance" in " ".join(result["limitations"])
+
+
+def test_individual_excludes_nonfinite_and_qc_ineligible_trials(monkeypatch):
+    import polars as pl
+    frame = pl.DataFrame({"subject_id": ["A"]*6, "week": [1,1,1,2,2,3],
+                          "height": [10., float("nan"), 999., 14., 16., float("inf")],
+                          "quality_state": ["VALID", "VALID", "REJECTED", "VALID", "VALID", "VALID"]})
+    monkeypatch.setattr(researchstore, "read_snapshot_table", lambda *args: frame)
+    result = longitudinal.individual_trajectory("test", {"table": "cmj_trials", "column": "height", "unit": "cm", "id": "height"}, "A")
+    assert result["change_first_to_last"] == 5
+    assert result["n_observations"] == 3 and result["missing_occasions"] == [3]
