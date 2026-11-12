@@ -194,6 +194,14 @@ class MainWindow(QMainWindow):
         self.navigator.setFocus()
 
     def _build_menu(self) -> None:
+        workspace_bar = QToolBar("Research Workspace", self)
+        workspace_bar.setObjectName("PersistentWorkspaceActions")
+        self.addToolBar(workspace_bar)
+        for label, callback in (("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
+                                ("Add data", self._add_workspace_data), ("Analyze", self._analyze_workspace),
+                                ("Export report", self.research.export_report), ("History", self._workspace_history)):
+            action = workspace_bar.addAction(label)
+            action.triggered.connect(callback)
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
         export_action.triggered.connect(self.research.export_report)
@@ -576,11 +584,14 @@ class MainWindow(QMainWindow):
             self._run_descriptive(spec)
             return
         study_id = spec.study_id
+        revision_id = self.current_study.get("active_data_revision_id")
+        if revision_id:
+            spec.options["data_revision_id"] = revision_id
 
         def finish(run: dict[str, Any] | None) -> None:
             self.progress.setVisible(False)
             self.status_text.setText("Ready")
-            if spec.kind in ENGINE_KINDS and self.current_study_id != study_id:
+            if spec.kind in ENGINE_KINDS and (self.current_study_id != study_id or self.current_study.get("active_data_revision_id") != revision_id):
                 return  # the study changed while the run was in flight; never show it against another study
             if run is None:  # kind without a qualified engine: stated, never promotable
                 self.results_doc.show_unavailable(spec)
@@ -737,6 +748,14 @@ class MainWindow(QMainWindow):
         self.results_stack.setCurrentIndex(1 if record else 0)
         if self.action_study_record.isChecked() != record:
             self.action_study_record.setChecked(record)
+        if record and self.current_study.get("workspace"):
+            self.workbench.panes["options"].hide()
+            self.workbench.panes["data"].setVisible(not self.workbench._compact)
+            self.workbench.splitter.setSizes([300, 0, 1000])
+        else:
+            self.workbench.panes["data"].show()
+            if not self.workbench._compact:
+                self.workbench.panes["options"].show()
 
     def _reset_results(self, record: bool = False) -> None:
         """Dataset or study switch: no result, spec or run state outlives its data."""
@@ -1045,6 +1064,8 @@ class MainWindow(QMainWindow):
             )
         else:
             badge = f"SYNTHETIC FIXTURE · {snapshot.get('id', 'unknown snapshot')}"
+        if not self.current_snapshot_id:
+            badge = "NO DATA ATTACHED"
         self.context.setText(detail.get("study", {}).get("title") or study_id)
         self._reset_results()
         real = bool(detail.get("real_data") or snapshot.get("real_data"))
@@ -1061,8 +1082,116 @@ class MainWindow(QMainWindow):
             self.data_pane.clear()
         self.research.set_study(study_id, detail)
         self.workspace.setCurrentWidget(self.research)
+        if detail.get("workspace"):
+            self._set_record_view(True)
+
+    def _new_workspace(self) -> None:
+        title, accepted = QInputDialog.getText(self, "Create research workspace", "Title")
+        if accepted and title.strip():
+            self.run_task(lambda: self.service.create_workspace(title),
+                          lambda detail: self.refresh_catalogue({"type": "study", "id": detail["study"]["id"]}),
+                          "Creating workspace")
+
+    def _choose_workspace(self) -> None:
+        choices = [item for item in getattr(self, "studies", []) if item.get("workspace")]
+        if not choices:
+            self.workbench.show_toast("Create your first research workspace to get started.")
+            return
+        labels = [f"{item['title']} · {item['id']}" for item in choices]
+        label, accepted = QInputDialog.getItem(self, "Open research workspace", "Workspace", labels, 0, False)
+        if accepted:
+            identity = choices[labels.index(label)]["id"]
+            self.run_task(lambda: self.service.get_study_detail(identity), lambda detail: self._show_study(identity, detail), "Opening workspace")
+
+    def _add_workspace_data(self) -> None:
+        if not self.current_study.get("workspace"):
+            self.workbench.show_toast("Create or open a research workspace first.")
+            return
+        choice, accepted = QInputDialog.getItem(self, "Add data", "Choose data", ["Import a file", "Select an admitted dataset"], 0, False)
+        if not accepted:
+            return
+        if choice == "Import a file":
+            self._open_import()
+            return
+        datasets = getattr(self, "datasets", [])
+        labels = [f"{item.get('label') or item['id']} · {item['id']}" for item in datasets]
+        label, accepted = QInputDialog.getItem(self, "Select data", "Dataset", labels, 0, False)
+        if accepted and labels:
+            self._attach_workspace_dataset(datasets[labels.index(label)]["id"])
+
+    def _attach_workspace_dataset(self, snapshot_id: str, workspace_id: str | None = None) -> None:
+        identity = workspace_id or self.current_study_id
+        revision = self.current_study.get("active_data_revision_id")
+        append = False
+        if revision:
+            choice, accepted = QInputDialog.getItem(self, "Attach data", "How should these measurements be used?",
+                ["Attach separately (no pooling)", "Append compatible measurements (same participant identifiers)"], 0, False)
+            if not accepted:
+                return
+            append = choice.startswith("Append")
+        def attached(detail):
+            if self.current_study_id == identity:
+                self.refresh_catalogue({"type": "study", "id": identity})
+        self.run_task(lambda: self.service.attach_workspace_data(identity, snapshot_id, append=append,
+                      confirm_participant_ids=append, base_revision=revision), attached, "Attaching data to workspace")
+
+    def _analyze_workspace(self) -> None:
+        if not self.current_study.get("workspace") or not self.current_snapshot_id:
+            self.workbench.show_toast("Add data to your workspace before analyzing.")
+            return
+        self._set_record_view(True)
+        self.research.tabs.setCurrentIndex(3)
+
+    def _workspace_history(self) -> None:
+        if not self.current_study.get("workspace"):
+            return
+        identity = self.current_study_id
+        from .. import researchstore
+        def show(values):
+            revisions, runs, reports = values
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Workspace history")
+            dialog.resize(720, 480)
+            layout = QVBoxLayout(dialog)
+            picker = QComboBox()
+            layout.addWidget(picker)
+            for revision in revisions:
+                picker.addItem(f"Data revision {revision['number']} · {revision['mode'].lower()} · {revision['created_at']}", ("data", revision))
+            for run in runs:
+                picker.addItem(f"Analysis · {run['method_id']} · {run['id']}", ("run", run))
+            for report in reports:
+                picker.addItem(f"Report v{report['version']} · frozen", ("report", report))
+            detail = QTextBrowser()
+            layout.addWidget(detail, 1)
+            select = QPushButton("Open selected revision or analysis")
+            layout.addWidget(select)
+            def changed():
+                value = picker.currentData()
+                select.setEnabled(bool(value and value[0] in {"data", "run"}))
+                detail.setPlainText(json.dumps(value[1] if value else {}, indent=2, default=str))
+            def open_revision():
+                kind, selected = picker.currentData()
+                revision_id = selected["id"] if kind == "data" else selected["data_revision_id"]
+                dialog.accept()
+                def open_selected():
+                    researchstore.select_data_revision(identity, revision_id)
+                    if kind == "run":
+                        researchstore.select_workspace_run(identity, selected["id"])
+                    return self.service.get_study_detail(identity)
+                self.run_task(open_selected,
+                              lambda value: self._show_study(identity, value) if self.current_study_id == identity else None,
+                              "Opening historical revision")
+            picker.currentIndexChanged.connect(changed)
+            select.clicked.connect(open_revision)
+            changed()
+            dialog.exec()
+        self.run_task(lambda: (researchstore.data_revisions(identity), researchstore.list_runs(identity),
+                              [researchstore.get_report_version(identity, item["version"]) for item in researchstore.report_versions(identity)]), show, "Loading history")
 
     def _show_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        if self.current_study.get("workspace"):
+            self._attach_workspace_dataset(snapshot_id)
+            return
         self._show_research_mode()
         self.current_target = {"type": "dataset", "id": snapshot_id}
         self.current_study_id = None
@@ -1358,8 +1487,9 @@ class MainWindow(QMainWindow):
                       lambda detail: self._show_dataset(snapshot_id, detail), "Opening dataset for analysis")
 
     def _open_import(self) -> None:
-        dialog = ImportReviewDialog(self.service, self.run_task, self._admission_saved, self)
-        dialog.open_dataset.connect(self._open_workspace)
+        identity = self.current_study_id if self.current_study.get("workspace") else None
+        dialog = ImportReviewDialog(self.service, self.run_task, lambda record: self._admission_saved(record, identity), self)
+        dialog.open_dataset.connect(lambda snapshot: None if identity else self._open_workspace(snapshot))
         dialog.exec()
 
     def _open_admission(self) -> None:
@@ -1371,11 +1501,15 @@ class MainWindow(QMainWindow):
         )
         dialog.exec()
 
-    def _admission_saved(self, record: dict[str, Any]) -> None:
+    def _admission_saved(self, record: dict[str, Any], workspace_id: str | None = None) -> None:
         snapshot_id = record.get("dataset_snapshot_id")
         self.statusBar().showMessage(
             f"Admission recorded: {snapshot_id or record.get('status', 'QC result')}", 8000
         )
+        if snapshot_id and workspace_id:
+            if self.current_study_id == workspace_id:
+                self._attach_workspace_dataset(snapshot_id, workspace_id)
+            return
         target = {"type": "dataset", "id": snapshot_id} if snapshot_id else None
         self.refresh_catalogue(target)
 
@@ -1802,8 +1936,13 @@ class ResearchWorkbench(QWidget):
         self.report_version = None
         self.report_document_version = None
         self.exploration_result = None
+        if detail.get("workspace") and not detail.get("metrics"):
+            self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\n\nAdd data when you are ready. Your workspace identity stays the same.\n\nAttached data without eligible metrics can be inspected in Data Workspace.")
+            self.execute_button.setEnabled(False)
+            return
         self.investigation_editor.set_study(study_id)
         self.method_picker.clear()
+        self.parameters.setVisible(not self.detail.get("workspace"))
         self.metric_picker.clear()
         self.analysis_metric_picker.clear()
         self.execute_button.setEnabled(study_id != "STUDY-001")
@@ -1817,6 +1956,15 @@ class ResearchWorkbench(QWidget):
         self._load_cohorts(study_id)
         self._load_controls()
         self._load_runs_and_report()
+        if detail.get("workspace"):
+            revision = detail.get("active_data_revision_id")
+            runs = [run for run in detail.get("runs", []) if run.get("data_revision_id") == revision]
+            self.latest_run = next((run for run in runs if run["id"] == detail["study"].get("selected_run_id")), runs[-1] if runs else None)
+            if self.latest_run:
+                self.run_output.setPlainText(json.dumps(self.latest_run, indent=2, default=str))
+                self.show_figure_button.setEnabled(True)
+            number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == revision), "—")
+            self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\nData revision {number} · {self.snapshot_id}\n\n{len(runs)} saved analyses on this revision.\nUse Add data, Analyze, Export report or History above to continue.")
 
     def select_project(self, project: dict[str, Any]) -> None:
         self._ensure_tab(0)
@@ -1909,6 +2057,8 @@ class ResearchWorkbench(QWidget):
         if study_id != getattr(self, "study_id", None):
             return
         self.cohort_picker.clear()
+        if self.detail.get("workspace"):
+            cohorts = [cohort for cohort in cohorts if cohort.get("snapshot_id") == self.snapshot_id]
         for cohort in cohorts:
             self.cohort_picker.addItem(
                 f"{cohort.get('name', cohort['id'])} · {cohort.get('status', 'DRAFT')} · v{cohort.get('version', 1)}",
@@ -2013,6 +2163,8 @@ class ResearchWorkbench(QWidget):
         for method in methods:
             qualification = method.get("qualification", {}).get("status", "")
             self.method_picker.addItem(f"{method['id']} · {method['name']} · {qualification}", method["id"])
+        if self.detail.get("workspace"):
+            self.method_picker.setCurrentIndex(max(0, self.method_picker.findData("METH-U-DESC")))
         self.metric_picker.clear()
         self.analysis_metric_picker.clear()
         for metric in metrics:
@@ -2165,15 +2317,34 @@ class ResearchWorkbench(QWidget):
         if not self.method_picker.currentData() or not self.analysis_metric_picker.currentData():
             QMessageBox.information(self, "Analysis", "Select a registered method and metric first.")
             return
-        try:
-            parameters = json.loads(self.parameters.toPlainText() or "{}")
-            if not isinstance(parameters, dict):
-                raise ValueError("Analysis parameters must be a JSON object")
-        except (json.JSONDecodeError, ValueError) as error:
-            QMessageBox.warning(self, "Analysis parameters", str(error))
-            return
+        if self.detail.get("workspace"):
+            from ..researchstore import METHODS
+            parameters = {}
+            method = METHODS[self.method_picker.currentData()]
+            defaults = {"reference_occasion": 1, "contrast_occasion": 2, "reference_week": 1, "contrast_week": 2,
+                        "alpha": 0.05, "activity": "Walking", "max_trials": 8}
+            for key, schema in method.get("parameter_schema", {}).items():
+                label = key.replace("_", " ").capitalize()
+                if schema["type"] == "integer":
+                    value, accepted = QInputDialog.getInt(self, method["name"], label, defaults[key], schema.get("minimum", 1), schema.get("maximum", 100000))
+                elif schema["type"] == "number":
+                    value, accepted = QInputDialog.getDouble(self, method["name"], label, defaults[key], 0.001, 0.999, 3)
+                else:
+                    value, accepted = QInputDialog.getText(self, method["name"], label, text=defaults.get(key, ""))
+                if not accepted:
+                    return
+                parameters[key] = value
+        else:
+            try:
+                parameters = json.loads(self.parameters.toPlainText() or "{}")
+                if not isinstance(parameters, dict):
+                    raise ValueError("Analysis parameters must be a JSON object")
+            except (json.JSONDecodeError, ValueError) as error:
+                QMessageBox.warning(self, "Analysis parameters", str(error))
+                return
         study_id = self.study_id
         payload = {
+            "data_revision_id": self.detail.get("active_data_revision_id"),
             "method_id": self.method_picker.currentData(),
             "outcome_metric_id": self.analysis_metric_picker.currentData(),
             "parameters": parameters,
@@ -2186,6 +2357,8 @@ class ResearchWorkbench(QWidget):
 
     def _run_completed(self, study_id: str, run: dict[str, Any]) -> None:
         if study_id != self.study_id:
+            return
+        if self.detail.get("workspace") and run.get("data_revision_id") != self.detail.get("active_data_revision_id"):
             return
         self.latest_run = run
         self.latest_evidence_id = None
@@ -2380,6 +2553,16 @@ class ResearchWorkbench(QWidget):
         )
 
     def export_report(self) -> None:
+        if getattr(self, "detail", {}).get("workspace"):
+            if not self.latest_run:
+                self.window.workbench.show_toast("Analyze this data revision before exporting a report.")
+                return
+            identity, run_id = self.study_id, self.latest_run["id"]
+            path, _ = QFileDialog.getSaveFileName(self, "Export scientific report", f"{identity}-report.html", "HTML report (*.html)")
+            if path:
+                self.window.run_task(lambda: self.service.export_workspace_report(identity, run_id, path),
+                    lambda output: self.window.statusBar().showMessage(f"Report exported: {output}", 8000), "Saving and exporting immutable report")
+            return
         if not getattr(self, "study_id", None) or not self.study_id.startswith(("STUDY-U-", "PROG-U-")):
             QMessageBox.information(self, "Report export", "Versioned report export is available for persisted research studies.")
             return

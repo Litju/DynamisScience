@@ -1150,6 +1150,7 @@ def select_data_revision(entity_id: str, revision_id: str) -> dict[str, Any]:
         latest = runs[-1] if runs else {}
         entity.update({"active_data_revision_id": revision_id, "dataset_snapshot_id": snapshot_id,
                        "cohort_id": latest.get("cohort_id"), "analysis_plan_id": latest.get("plan_id"),
+                       "selected_run_id": latest.get("id"),
                        "outcomes": {"primary": metrics[:1], "secondary": []},
                        "version": entity["version"] + 1, "updated_at": _now()})
         connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
@@ -1158,6 +1159,21 @@ def select_data_revision(entity_id: str, revision_id: str) -> dict[str, Any]:
                            (entity_id, entity["version"], "DATA_SELECTED", _canonical(entity), entity["updated_at"]))
         _audit(connection, "workspace.data_selected", "study", entity_id, revision_id)
     return study_detail(entity_id)
+
+
+def select_workspace_run(entity_id: str, run_id: str) -> dict[str, Any]:
+    with _tx() as connection:
+        entity, run = get_entity(entity_id), get_run(run_id)
+        if not entity or not entity.get("workspace") or not run or run.get("study_id") != entity_id:
+            raise ResearchValidation("Select an analysis from this workspace")
+        if entity.get("active_data_revision_id") != run.get("data_revision_id"):
+            raise ResearchConflict("The analysis belongs to another data revision")
+        entity.update({"selected_run_id": run_id, "version": entity["version"] + 1, "updated_at": _now()})
+        connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                           (entity["version"], _canonical(entity), entity["updated_at"], entity_id))
+        connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
+                           (entity_id, entity["version"], "ANALYSIS_SELECTED", _canonical(entity), entity["updated_at"]))
+    return entity
 
 
 def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False,
@@ -1220,6 +1236,7 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
         if current["version"] != entity["version"]:
             raise ResearchConflict("Workspace changed while adding data; retry")
         entity.update({"dataset_snapshot_id": analytical["id"], "active_data_revision_id": revision_id,
+                       "selected_run_id": None,
                        "cohort_id": None, "analysis_plan_id": None, "outcomes": {"primary": [metric] if metric else [], "secondary": []},
                        "design": ("MEASUREMENT_REPEATED_TRIALS" if metric["table"] == "signal_trials" else "OBSERVATIONAL_LONGITUDINAL") if metric else "DESCRIPTIVE",
                        "version": entity["version"] + 1, "updated_at": _now()})
@@ -2528,6 +2545,7 @@ def study_detail(entity_id: str) -> dict[str, Any]:
     else:
         end_week = max(1, len(schedule.get("points", [])))
     study_summary = {
+        "selected_run_id": entity.get("selected_run_id"),
         "workspace": bool(entity.get("workspace")),
         "active_data_revision_id": entity.get("active_data_revision_id"),
         "id": entity["id"],
@@ -3100,19 +3118,26 @@ def _report_evidence_unit(item: dict[str, Any], run: dict[str, Any] | None) -> s
 
 
 def export_html(entity_id: str, version: int | None = None) -> str:
-    payload = report_payload(entity_id)
     generated_at = _now()
     legacy_context = False
+    frozen = None
     if version is not None:
         frozen = get_report_version(entity_id, version)
         if frozen is None:
             raise ResearchNotFound(f"Report version {version} not found")
-        # Frozen content is authoritative for historical exports.
-        content = frozen.get("frozen_content", {})
+    content = frozen.get("frozen_content", {}) if frozen else {}
+    context_keys = ("study", "project", "question", "hypotheses", "snapshot", "plan", "cohort")
+    if frozen and all(key in content for key in context_keys):
+        # Historical exports must remain readable even when current data is unavailable.
+        payload = {**frozen, **content}
+        detail = {key: content[key] for key in context_keys}
+    else:
+        payload = report_payload(entity_id)
+        detail = study_detail(entity_id)
+    if frozen:
         legacy_context = not all(key in content for key in ("study", "project", "question", "hypotheses", "snapshot"))
         payload = {**payload, **content, "status": "FROZEN", "version": version}
         generated_at = frozen.get("created_at") or frozen.get("frozen_at") or generated_at
-    detail = study_detail(entity_id)
     for key in ("study", "project", "question", "hypotheses", "snapshot", "plan", "cohort"):
         detail[key] = payload.get(key, detail[key])
     snapshot = detail["snapshot"]
@@ -3145,6 +3170,7 @@ def export_html(entity_id: str, version: int | None = None) -> str:
                          + html.escape(", ".join(unverified))
                          + ' is shown for audit only and is not currently qualified evidence.</div>')
     manifest = {
+        "data_revision": payload.get("data_revision"),
         "report_id": payload.get("id"),
         "study_id": entity_id,
         "project_id": detail["project"]["id"],

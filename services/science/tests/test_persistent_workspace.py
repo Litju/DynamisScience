@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import sqlite3
-
 import pytest
 
 from dynamis_science import importer, researchstore, researchanalysis
@@ -120,3 +117,67 @@ def test_additive_migration_repeatable(service):
     with researchstore._connect() as connection:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+
+def test_missing_time_metadata_is_rejected_before_saving_analysis_context(service, tmp_path):
+    identity = service.create_workspace("Missing axis")["study"]["id"]
+    file = tmp_path / "no-axis.csv"
+    file.write_text(HEADER + "A1,T1,40,80,1800\nA2,T2,39,75,1700\n")
+    snapshot = importer.admit(importer.stage(_ready(file), importer.build_context(FIXTURE)))["dataset_snapshot_id"]
+    revision = service.attach_workspace_data(identity, snapshot)["active_data_revision_id"]
+    detail = service.get_study_detail(identity)
+    assert any("Missing week" in issue for method in detail["eligibility"] for issue in method["issues"])
+    with pytest.raises(researchstore.ResearchValidation, match="Missing week"):
+        run(service, identity, revision)
+    assert not researchstore.list_cohorts(identity) and not researchstore.list_plans(identity)
+    assert not researchstore.list_runs(identity)
+
+
+def test_report_freeze_failure_rolls_back_and_historical_export_ignores_current_data(service, tmp_path, monkeypatch):
+    identity = service.create_workspace("Export transaction")["study"]["id"]
+    revision = service.attach_workspace_data(identity, batch(tmp_path, 1))["active_data_revision_id"]
+    saved = run(service, identity, revision)
+    freeze = researchstore.freeze_report
+    def failure(*args):
+        raise RuntimeError("Injected freeze failure")
+    monkeypatch.setattr(researchstore, "freeze_report", failure)
+    with pytest.raises(RuntimeError):
+        service.export_workspace_report(identity, saved["id"], str(tmp_path / "failed.html"))
+    assert not researchstore.list_evidence(identity) and not researchstore.report_versions(identity)
+    monkeypatch.setattr(researchstore, "freeze_report", freeze)
+    exported = service.export_workspace_report(identity, saved["id"], str(tmp_path / "saved.html"))
+    version = researchstore.report_versions(identity)[0]["version"]
+    original = exported.read_text(encoding="utf-8")
+    monkeypatch.setattr(researchstore, "report_payload", failure)
+    assert researchstore.export_html(identity, version) == original
+
+
+def test_workspace_native_controls_and_stale_completion(service, tmp_path, qtbot):
+    from PySide6.QtWidgets import QMessageBox
+    from dynamis_science.desktop.main_window import MainWindow
+
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    empty = service.create_workspace("Native context")
+    identity = empty["study"]["id"]
+    window._show_study(identity, empty)
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    assert window.current_study_id == identity and not window.current_snapshot_id
+    assert not window.research.execute_button.isEnabled()
+    first, second = batch(tmp_path, 1), batch(tmp_path, 2)
+    detail = service.attach_workspace_data(identity, first)
+    rev1 = detail["active_data_revision_id"]
+    saved = run(service, identity, rev1)
+    current = service.attach_workspace_data(identity, second, base_revision=rev1)
+    window._show_study(identity, current)
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    assert window.research.parameters.isHidden()
+    assert window.research.latest_run is None
+    window.research._run_completed(identity, saved)
+    assert window.research.latest_run is None
+    window._show_study(identity, researchstore.select_data_revision(identity, rev1))
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    assert window.research.latest_run["id"] == saved["id"]
+    assert window.current_study_id == identity
+    window.close()
