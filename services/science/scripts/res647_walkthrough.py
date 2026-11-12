@@ -25,6 +25,10 @@ else:
     work = Path(tempfile.mkdtemp(prefix="res647-native-"))
     os.environ["DYNAMISSCIENCE_DATA_ROOT"] = str(work / "private")
 out.mkdir(parents=True, exist_ok=True)
+if getattr(sys, "frozen", False):
+    sys.stdout = sys.stderr = (out / ("reopen-console.log" if reopen else "packaged-console.log")).open("w", encoding="utf-8")
+    import faulthandler
+    faulthandler.enable(sys.stderr)
 os.environ.pop("DYNAMISSCIENCE_TEST_SESSION", None)
 
 
