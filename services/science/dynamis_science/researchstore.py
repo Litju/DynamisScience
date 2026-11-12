@@ -24,6 +24,7 @@ import json
 import math
 import os
 import secrets
+import shutil
 import sqlite3
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -1200,53 +1201,60 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
             raise ResearchValidation("This batch is already in the selected data revision")
         _validate_workspace_append(inputs)
     revision_id = _new_id("DATA-U")
-    analytical = snapshot
-    if append:
-        # Derived Parquet is written once, before the transactional reference becomes visible.
-        directory = paths()["research"] / "data" / revision_id
-        directory.mkdir(parents=True)
-        tables, checksums = {}, {}
-        for table in sorted(set(_table_names(snapshot)) | {"subjects"}):
-            frames = [read_snapshot_table(item["id"], table) for item in inputs]
-            frame = pl.concat(frames, how="vertical")
-            if table == "subjects":
-                frame = frame.unique(maintain_order=True)
-                if frame["subject_id"].n_unique() != frame.height:
-                    raise ResearchValidation("Participant metadata conflicts; attach the batch separately")
-            elif "trial_id" in frame.columns and frame["trial_id"].n_unique() != frame.height:
-                raise ResearchValidation("Overlapping trial identifiers; attach the batch separately")
-            path = directory / f"{table}.parquet"
-            frame.write_parquet(path)
-            tables[table] = {"file": path.name, "rows": frame.height}
-            checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
-        analytical = {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables,
-                      "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
-    metrics = dataset_metrics(snapshot_id)
-    metric = next((item for item in metrics if item.get("role") == "PRIMARY"), metrics[0] if metrics else None)
-    number = len(data_revisions(entity_id)) + 1
-    revision = {
-        "id": revision_id, "workspace_id": entity_id, "number": number, "created_at": _now(),
-        "parent_revision_id": base_revision, "mode": "APPEND" if append else "SEPARATE",
-        "input_snapshot_ids": [item["id"] for item in inputs], "inputs": inputs,
-        "snapshot_id": analytical["id"], "snapshot": analytical,
-        "compatibility": {"pooled": append, "participant_ids_confirmed": confirm_participant_ids,
-                          "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append else "Separate analytical selection; no pooling"},
-    }
-    with _tx() as connection:
-        current = _row_document(connection.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone())
-        if current["version"] != entity["version"]:
-            raise ResearchConflict("Workspace changed while adding data; retry")
-        entity.update({"dataset_snapshot_id": analytical["id"], "active_data_revision_id": revision_id,
-                       "selected_run_id": None,
-                       "cohort_id": None, "analysis_plan_id": None, "outcomes": {"primary": [metric] if metric else [], "secondary": []},
-                       "design": ("MEASUREMENT_REPEATED_TRIALS" if metric["table"] == "signal_trials" else "OBSERVATIONAL_LONGITUDINAL") if metric else "DESCRIPTIVE",
-                       "version": entity["version"] + 1, "updated_at": _now()})
-        connection.execute("INSERT INTO workspace_revisions VALUES (?, ?, ?, ?)", (revision_id, entity_id, number, _canonical(revision)))
-        connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
-                           (entity["version"], _canonical(entity), entity["updated_at"], entity_id))
-        connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
-                           (entity_id, entity["version"], "DATA_ATTACHED", _canonical(entity), entity["updated_at"]))
-        _audit(connection, "workspace.data_attached", "study", entity_id, revision)
+    directory = paths()["research"] / "data" / revision_id
+    try:
+        analytical = snapshot
+        if append:
+            # Derived Parquet is written once, before the transactional reference becomes visible.
+            directory = paths()["research"] / "data" / revision_id
+            directory.mkdir(parents=True)
+            tables, checksums = {}, {}
+            for table in sorted(set(_table_names(snapshot)) | {"subjects"}):
+                frames = [read_snapshot_table(item["id"], table) for item in inputs]
+                frame = pl.concat(frames, how="vertical")
+                if table == "subjects":
+                    frame = frame.unique(maintain_order=True)
+                    if frame["subject_id"].n_unique() != frame.height:
+                        raise ResearchValidation("Participant metadata conflicts; attach the batch separately")
+                elif "trial_id" in frame.columns and frame["trial_id"].n_unique() != frame.height:
+                    raise ResearchValidation("Overlapping trial identifiers; attach the batch separately")
+                path = directory / f"{table}.parquet"
+                frame.write_parquet(path)
+                tables[table] = {"file": path.name, "rows": frame.height}
+                checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            analytical = {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables,
+                          "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
+        metrics = dataset_metrics(snapshot_id)
+        metric = next((item for item in metrics if item.get("role") == "PRIMARY"), metrics[0] if metrics else None)
+        number = len(data_revisions(entity_id)) + 1
+        revision = {
+            "id": revision_id, "workspace_id": entity_id, "number": number, "created_at": _now(),
+            "parent_revision_id": base_revision, "mode": "APPEND" if append else "SEPARATE",
+            "input_snapshot_ids": [item["id"] for item in inputs], "inputs": inputs,
+            "snapshot_id": analytical["id"], "snapshot": analytical,
+            "compatibility": {"pooled": append, "participant_ids_confirmed": confirm_participant_ids,
+                              "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append else "Separate analytical selection; no pooling"},
+        }
+        with _tx() as connection:
+            current = _row_document(connection.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone())
+            if current["version"] != entity["version"]:
+                raise ResearchConflict("Workspace changed while adding data; retry")
+            entity.update({"dataset_snapshot_id": analytical["id"], "active_data_revision_id": revision_id,
+                           "selected_run_id": None,
+                           "cohort_id": None, "analysis_plan_id": None, "outcomes": {"primary": [metric] if metric else [], "secondary": []},
+                           "design": ("MEASUREMENT_REPEATED_TRIALS" if metric["table"] == "signal_trials" else "OBSERVATIONAL_LONGITUDINAL") if metric else "DESCRIPTIVE",
+                           "version": entity["version"] + 1, "updated_at": _now()})
+            connection.execute("INSERT INTO workspace_revisions VALUES (?, ?, ?, ?)", (revision_id, entity_id, number, _canonical(revision)))
+            connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                               (entity["version"], _canonical(entity), entity["updated_at"], entity_id))
+            connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
+                               (entity_id, entity["version"], "DATA_ATTACHED", _canonical(entity), entity["updated_at"]))
+            _audit(connection, "workspace.data_attached", "study", entity_id, revision)
+    except BaseException:
+        # Only this attempt owns this generated directory; committed revisions are retained.
+        if directory.exists() and get_data_revision(revision_id) is None:
+            shutil.rmtree(directory)
+        raise
     return study_detail(entity_id)
 
 

@@ -200,3 +200,33 @@ def test_workspace_native_controls_and_stale_completion(service, tmp_path, qtbot
     callbacks[0](None)
     assert not rendered
     window.close()
+
+
+@pytest.mark.parametrize("failure_at", ["parquet", "transaction"])
+def test_failed_append_removes_only_uncommitted_derived_data(service, tmp_path, monkeypatch, failure_at):
+    identity = service.create_workspace("Atomic append")["study"]["id"]
+    context = importer.build_context(FIXTURE)
+    first, second, third = [batch(tmp_path, n, context) for n in (1, 2, 3)]
+    rev1 = service.attach_workspace_data(identity, first)["active_data_revision_id"]
+    rev2 = service.attach_workspace_data(identity, second, append=True,
+        confirm_participant_ids=True, base_revision=rev1)["active_data_revision_id"]
+    directory = researchstore.paths()["research"] / "data"
+    retained = {p: p.read_bytes() for p in directory.rglob("*.parquet")}
+    before = researchstore.get_entity(identity)
+    def fail(*args, **kwargs):
+        raise RuntimeError("Injected append failure")
+    with monkeypatch.context() as patch:
+        if failure_at == "parquet":
+            patch.setattr(researchstore.pl.DataFrame, "write_parquet", fail)
+        else:
+            patch.setattr(researchstore, "_audit", fail)
+        with pytest.raises(RuntimeError, match="Injected"):
+            service.attach_workspace_data(identity, third, append=True,
+                confirm_participant_ids=True, base_revision=rev2)
+    assert researchstore.get_entity(identity) == before
+    assert [p.name for p in directory.iterdir()] == [rev2]
+    assert all(p.read_bytes() == content for p, content in retained.items())
+    assert len(researchstore.data_revisions(identity)) == 2
+    rev3 = service.attach_workspace_data(identity, third, append=True,
+        confirm_participant_ids=True, base_revision=rev2)["active_data_revision_id"]
+    assert researchstore.read_snapshot_table(rev3, "cmj_trials").height == 6
