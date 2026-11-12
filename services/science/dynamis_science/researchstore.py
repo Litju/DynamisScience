@@ -1550,7 +1550,7 @@ def update_entity(entity_id: str, patch: dict[str, Any], base_version: int | Non
         allowed = {
             "title", "short_title", "research_question", "design", "population", "eligibility", "exclusions",
             "intervention", "arms", "outcomes", "protocols", "schedule", "hypotheses", "cohort_id", "analysis_plan_id",
-            "dataset_snapshot_id", "research_context",
+            "dataset_snapshot_id", "research_context", "flag_rules", "simulations",
         }
         if "dataset_snapshot_id" in patch and patch["dataset_snapshot_id"] != document.get("dataset_snapshot_id"):
             if list_cohorts(entity_id) or list_plans(entity_id):
