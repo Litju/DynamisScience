@@ -1155,7 +1155,8 @@ class MainWindow(QMainWindow):
             revisions, runs, reports = values
             dialog = QDialog(self)
             dialog.setWindowTitle("Workspace history")
-            dialog.resize(720, 480)
+            available = self.screen().availableGeometry()
+            dialog.resize(min(720, available.width() - 32), min(480, available.height() - 64))
             layout = QVBoxLayout(dialog)
             picker = QComboBox()
             layout.addWidget(picker)

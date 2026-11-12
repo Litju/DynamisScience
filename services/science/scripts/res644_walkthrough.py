@@ -151,6 +151,8 @@ shot("07-reopened")
 def inspect_history():
     modal = app.activeModalWidget()
     assert modal.windowTitle() == "Workspace history"
+    assert modal.height() <= geometry.height() - 64
+    assert modal.width() <= geometry.width() - 32
     shot("08-history", modal)
     modal.accept()
 QTimer.singleShot(200, inspect_history)
