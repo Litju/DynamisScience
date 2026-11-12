@@ -81,6 +81,9 @@ def test_failures_rollback_and_separate_attachments(service, tmp_path, monkeypat
     with pytest.raises(researchstore.ResearchValidation, match="Incompatible"):
         service.attach_workspace_data(identity, two, append=True, confirm_participant_ids=True, base_revision=rev1)
     assert researchstore.get_entity(identity) == before
+    original = researchstore.get_snapshot(one)
+    with pytest.raises(researchstore.ResearchValidation, match="calibration"):
+        researchstore._validate_workspace_append([original, {**original, "provenance": {**original["provenance"], "instrument_metadata": [{"calibration": "CHANGED"}]}}])
     audit = researchstore._audit
     def fail(*args, **kwargs):
         raise RuntimeError("Injected write failure")

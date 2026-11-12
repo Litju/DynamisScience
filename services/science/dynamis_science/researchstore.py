@@ -1195,7 +1195,7 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
     if append:
         if not previous or not confirm_participant_ids:
             raise ResearchValidation("Confirm that participant identifiers have the same meaning before appending")
-        inputs = [get_snapshot(sid) for sid in previous["input_snapshot_ids"]] + inputs
+        inputs = [*previous["inputs"], *inputs]
         if len({item["id"] for item in inputs}) != len(inputs):
             raise ResearchValidation("This batch is already in the selected data revision")
         _validate_workspace_append(inputs)
@@ -1262,6 +1262,8 @@ def _validate_workspace_append(inputs: list[dict[str, Any]]) -> None:
                 raise ResearchValidation(f"Incompatible {field}; attach separately")
         if not item.get("checksums") or not item.get("admission"):
             raise ResearchValidation("Missing QC or immutable checksums; attach separately")
+        if item.get("provenance", {}).get("instrument_metadata") != first.get("provenance", {}).get("instrument_metadata"):
+            raise ResearchValidation("Incompatible captured instrument or calibration metadata; attach separately")
         frame = read_snapshot_table(item["id"], "cmj_trials")
         reference = read_snapshot_table(first["id"], "cmj_trials")
         if frame.schema != reference.schema:
