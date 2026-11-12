@@ -102,7 +102,8 @@ responder.start(50)
 if reopen:
     identity = sys.argv[3]
     settle()
-    window._show_study(identity, window.service.get_study_detail(identity))
+    answers.append(researchstore.get_entity(identity)["title"] + " · " + identity)
+    window._choose_workspace()
     settle()
     panel = window.research.individual
     assert window.research_context["scope"] == "INDIVIDUAL" and "Participant P01" in panel.header.text()
@@ -199,7 +200,7 @@ def open_participant(row: int, title: str, question: str, name: str) -> None:
     answers.append(title)
     window.squad.athlete_page.new_branch()
     settle()
-    assert window.squad.athlete_page.research_tabs.currentIndex() == 1
+    assert window.squad.athlete_page.research_tabs.currentIndex() == 2
 
 
 
@@ -270,6 +271,11 @@ panel.tabs.setCurrentIndex(5)
 panel.compare()
 settle()
 assert panel.compare_table.rowCount() == 6
+for _ in range(10):
+    app.processEvents()
+    time.sleep(.01)
+assert panel.compare_table.horizontalScrollBar().maximum() == 0, "Comparison columns overflow"
+assert panel.compare_table.viewport().height() >= 60, "Comparison rows are clipped"
 shot("09-compare-with-cohort")
 
 # 13. Individual, cohort and combined exports through the ordinary actions.

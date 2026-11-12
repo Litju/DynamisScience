@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QToolBar,
     QSplitter,
     QStackedWidget,
@@ -64,6 +65,13 @@ from .workbench.data_pane import DataPane
 from .workbench.options_pane import OptionsPane
 from .workbench.results import DESCRIPTIVE_KINDS, ENGINE_KINDS, ResultsDocument, run_analysis
 from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
+
+
+class ResearchPerspectives(QStackedWidget):
+    def heightForWidth(self, width: int) -> int:
+        # Hidden workbench forms must not set the height of the active Squad page.
+        page = self.currentWidget()
+        return page.minimumSizeHint().height() if page is not None else 0
 
 
 class MainWindow(QMainWindow):
@@ -166,7 +174,7 @@ class MainWindow(QMainWindow):
         self.data_pane.dataset_changed.connect(
             lambda *_: self._analysis_selected(self.workbench.current_analysis() or ""))
         self._sync_result_actions()
-        self.perspectives = QStackedWidget()
+        self.perspectives = ResearchPerspectives()
         self.perspectives.addWidget(self.workbench)
         from .squad_view import SquadHome
 
@@ -186,6 +194,8 @@ class MainWindow(QMainWindow):
         self.performance_header = None
         self.performance_rail = None
         self.performance_toolbar = None
+        self.perspectives.currentChanged.connect(self._fit_perspective)
+        self._fit_perspective()
         screen = self.screen()
         available = screen.availableGeometry() if screen is not None else None
         # shortcut: compact layout follows the startup screen, reevaluate when supporting live monitor changes
@@ -229,16 +239,20 @@ class MainWindow(QMainWindow):
         context_bar.setObjectName("ResearchContext")
         self.addToolBarBreak()
         self.addToolBar(context_bar)
+        context_bar.setFixedHeight(24)
+        context_bar.layout().setContentsMargins(4, 0, 4, 0)
         self.context_title = QLabel("No workspace")
         self.context_title.setAccessibleName("Workspace title and active data revision")
         self.context_title.setMaximumWidth(560)
         context_bar.addWidget(self.context_title)
-        context_bar.addAction("Combined report").triggered.connect(self._export_combined_report)
+
         self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
         export_action.triggered.connect(self.research.export_report)
         file_menu.addAction(export_action)
+        combined = file_menu.addAction("Export combined report…")
+        combined.triggered.connect(self._export_combined_report)
         file_menu.addSeparator()
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self.close)
@@ -591,6 +605,11 @@ class MainWindow(QMainWindow):
     def _performance_context_loaded_from_service(self, context: dict[str, Any]) -> None:
         self.performance_header.set_context(context)
         self.performance_rail.set_context(context)
+
+    def _fit_perspective(self, *_args) -> None:
+        for index in range(self.perspectives.count()):
+            policy = QSizePolicy.Policy.Preferred if index == self.perspectives.currentIndex() else QSizePolicy.Policy.Ignored
+            self.perspectives.widget(index).setSizePolicy(policy, policy)
 
     def _show_squad_mode(self) -> None:
         if not self.squad.board.workspace_id:

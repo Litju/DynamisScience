@@ -17,7 +17,7 @@ work = Path(tempfile.mkdtemp(prefix="res647-scaling-"))
 os.environ["DYNAMISSCIENCE_DATA_ROOT"] = str(work / "private")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QPoint, QRect, QTimer
 from PySide6.QtWidgets import QApplication, QPushButton
 
 from dynamis_science import importer, squad
@@ -92,6 +92,20 @@ settle()
 window._show_study(identity, service.get_study_detail(identity))
 settle()
 record("01-athlete-branch", window)
+window.squad.athlete_page.research_tabs.setCurrentIndex(0)
+for _ in range(10):
+    app.processEvents()
+    time.sleep(.01)
+assert window.squad.athlete_page.figure.height() >= 160
+figure_widget = window.squad.athlete_page.figure
+visible = QRect(figure_widget.mapToGlobal(QPoint(0, 0)), figure_widget.size())
+ancestor = figure_widget.parentWidget()
+while ancestor is not None:
+    visible = visible.intersected(QRect(ancestor.mapToGlobal(QPoint(0, 0)), ancestor.size()))
+    ancestor = ancestor.parentWidget()
+assert visible.height() >= 160, "Trajectory clipped by ancestor viewport"
+record("01b-athlete-trajectory", window)
+window.squad.athlete_page.research_tabs.setCurrentIndex(2)
 window.squad.setCurrentWidget(window.squad.board)
 record("02-squad-board", window)
 window._show_events_mode()

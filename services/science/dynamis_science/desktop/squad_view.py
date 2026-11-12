@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QStackedWidget,
     QTableWidgetItem,
@@ -71,7 +72,7 @@ def flag_text(flag: dict[str, Any]) -> str:
     parts = []
     for item in flag["evidence"]:
         threshold = f"{item['threshold']}–{item['threshold2']}" if item["operator"] in ("between", "outside") else item["threshold"]
-        parts.append(f"{item['metric']} · {item['measure'].lower()} = {item['value']} ({item['operator']} {threshold})")
+        parts.append(f"{item['metric']} · {item['measure'].lower()} = {item['value']} {item.get('statistic_unit', item['unit'])} ({item['operator']} {threshold})")
     return f"Researcher-defined {flag['category']} — rule “{flag['rule']}” v{flag.get('rule_version', 1)} · revision {flag.get('data_revision_id')} · {flag.get('evaluated_at', 'not recorded')}: " + "; ".join(parts)
 
 
@@ -509,6 +510,7 @@ class AthletePage(QWidget):
         self.service, self.run_task, self.board = service, run_task, board
         self.athlete: dict[str, Any] = {}
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
         top = QHBoxLayout()
         back = QPushButton("← Squad")
         back.clicked.connect(self.back_requested.emit)
@@ -526,15 +528,18 @@ class AthletePage(QWidget):
         self.research_tabs.addTab(measurements, "Longitudinal measurements")
         self.research_tabs.addTab(investigations, "Scientific investigations")
         overview = QVBoxLayout(measurements)
+        overview.setContentsMargins(4, 4, 4, 4)
+        overview.setSpacing(4)
         self.cards = QHBoxLayout()
         overview.addLayout(self.cards)
         self.flags = QTextBrowser()
-        self.flags.setMaximumHeight(80)
-        overview.addWidget(self.flags)
+        self.flags.setMinimumHeight(80)
+        self.research_tabs.insertTab(1, self.flags, "Rule evaluations")
         self.figure = ScientificFigureWidget()
         self.figure.setMinimumHeight(160)
         overview.addWidget(self.figure, 1)
         research = QVBoxLayout(investigations)
+        research.setContentsMargins(4, 4, 4, 4)
         branches = QHBoxLayout()
         branches.addWidget(QLabel("Investigations"))
         self.branch_picker = QComboBox()
@@ -546,6 +551,13 @@ class AthletePage(QWidget):
         branches.addWidget(new_branch)
         research.addLayout(branches)
         research.addWidget(panel, 1)
+        self.research_tabs.currentChanged.connect(self._fit_current_tab)
+        self._fit_current_tab()
+
+    def _fit_current_tab(self, *_args) -> None:
+        for index in range(self.research_tabs.count()):
+            policy = QSizePolicy.Policy.Preferred if index == self.research_tabs.currentIndex() else QSizePolicy.Policy.Ignored
+            self.research_tabs.widget(index).setSizePolicy(policy, policy)
 
     def set_athlete(self, workspace_id: str, athlete: dict[str, Any], investigations: list[dict[str, Any]], current: str | None) -> None:
         self.workspace_id, self.athlete = workspace_id, athlete
@@ -568,7 +580,7 @@ class AthletePage(QWidget):
         for item in investigations:
             self.branch_picker.addItem(f"Branch · {item['title']}", item["id"])
         self.branch_picker.setCurrentIndex(max(0, self.branch_picker.findData(current)))
-        self.research_tabs.setCurrentIndex(1 if current else 0)
+        self.research_tabs.setCurrentIndex(2 if current else 0)
 
     def _plot(self, athlete: dict[str, Any]) -> None:
         figure = Figure(figsize=(5, 3), constrained_layout=True)

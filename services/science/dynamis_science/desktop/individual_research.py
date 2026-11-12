@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
+    QScrollArea,
+    QSizePolicy,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -88,6 +90,7 @@ class IndividualResearchPanel(QWidget):
         self.payload: dict[str, Any] = {}
         self.generation = 0
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.header = QLabel("Open an athlete from the squad to start individual research.")
         self.header.setObjectName("IndividualResearchHeader")
         self.header.setWordWrap(True)
@@ -101,7 +104,14 @@ class IndividualResearchPanel(QWidget):
         self._build_protocol()
         self._build_scenarios()
         self._build_compare()
+        self.tabs.currentChanged.connect(self._fit_current_tab)
+        self._fit_current_tab()
         self.setEnabled(False)
+
+    def _fit_current_tab(self, *_args) -> None:
+        for index in range(self.tabs.count()):
+            policy = QSizePolicy.Policy.Preferred if index == self.tabs.currentIndex() else QSizePolicy.Policy.Ignored
+            self.tabs.widget(index).setSizePolicy(policy, policy)
 
     # ------------------------------------------------------------------ context
 
@@ -138,12 +148,10 @@ class IndividualResearchPanel(QWidget):
         investigation, metric, axis = payload["investigation"], payload["metric"], payload["axis"]
         observed = [point for point in payload["points"] if point["n_trials"]]
         self.header.setText(
-            f"<b>Participant {html.escape(investigation['scope']['subject_id'])}</b> · {html.escape(investigation['title'])} "
-            f"<span>({html.escape(investigation['id'])} v{investigation['version']})</span><br>"
-            f"Data revision {payload['data_revision_number']} · {html.escape(str(payload['data_revision_id']))} · "
-            f"{len(observed)}/{len(payload['points'])} {axis}s observed · {sum(p['n_trials'] for p in observed)} trials · "
-            f"{html.escape(metric['label'])} ({html.escape(metric['unit'])})<br>"
-            f"<i>{html.escape(investigation.get('question') or 'No scientific question recorded.')}</i>")
+            f"<b>Participant {html.escape(investigation['scope']['subject_id'])}</b> · {html.escape(metric['label'])} ({html.escape(metric['unit'])}) · Data revision {payload['data_revision_number']} · "
+            f"{len(observed)}/{len(payload['points'])} {axis}s · {sum(p['n_trials'] for p in observed)} trials"
+            + (f"<br>{html.escape(investigation['question'])}" if investigation.get("question") else ""))
+        self.header.setToolTip(f"{investigation['id']} v{investigation['version']} · {payload['data_revision_id']}")
         _fill(self.data_table, [[point[axis], point["status"], point["n_trials"], ", ".join(f"{v:.2f}" for v in point["values"]) or "—",
                                  point["mean"], point["within_session_sd"], metric["unit"], point["empty_values"],
                                  ", ".join(point["quality_flags"]) or "—"] for point in payload["points"]])
@@ -317,7 +325,10 @@ class IndividualResearchPanel(QWidget):
         self.period_view = QTextBrowser()
         self.period_view.setMaximumHeight(90)
         layout.addWidget(self.period_view)
-        self.tabs.addTab(page, "Protocol")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        self.tabs.addTab(scroll, "Protocol")
 
     def _add_period(self, period: dict[str, Any], adherence: dict[str, Any] | None = None) -> None:
         row = self.period_table.rowCount()
@@ -424,7 +435,10 @@ class IndividualResearchPanel(QWidget):
         save = QPushButton("Save hypothetical scenario")
         save.clicked.connect(self.save_scenario)
         layout.addWidget(save)
-        self.tabs.addTab(page, "Scenarios")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        self.tabs.addTab(scroll, "Scenarios")
 
     def _show_scenarios(self, scenarios: list[dict[str, Any]]) -> None:
         def describe(item: dict[str, Any]) -> str:
@@ -468,16 +482,35 @@ class IndividualResearchPanel(QWidget):
     def _build_compare(self) -> None:
         page = QWidget()
         layout = QVBoxLayout(page)
-        button = QPushButton("Compare observed values with cohort context")
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+        button = QPushButton("Compare observed values")
         button.clicked.connect(self.compare)
-        layout.addWidget(button)
-        self.compare_table = _table(["Occasion", "Individual observed mean", "Trials", "Within-session SD", "Cohort n",
-                                     "Cohort mean", "Cohort SD", "Cohort 95% CI", "Comparable"], "Individual and cohort comparison")
+        actions = QHBoxLayout()
+        actions.addWidget(button)
+        details = QPushButton("Interpretation and limitations…")
+        details.clicked.connect(self._comparison_details)
+        actions.addWidget(details)
+        layout.addLayout(actions)
+        self.compare_table = _table(["Occasion", "Own mean", "Trials", "Trial SD", "Cohort n",
+                                     "Mean", "SD", "95% CI", "Aligned"], "Individual and cohort comparison")
         layout.addWidget(self.compare_table, 1)
-        self.compare_notes = QTextBrowser()
-        self.compare_notes.setMaximumHeight(140)
-        layout.addWidget(self.compare_notes)
+        self.compare_notes = QTextBrowser(page)
+        self.compare_notes.hide()
         self.tabs.addTab(page, "Compare with cohort")
+
+    def _comparison_details(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Comparison interpretation and limitations")
+        fit_dialog(dialog, 700, 450)
+        layout = QVBoxLayout(dialog)
+        notes = QTextBrowser()
+        notes.setHtml(self.compare_notes.toHtml())
+        layout.addWidget(notes)
+        close = QPushButton("Close")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def compare(self) -> None:
         if not self.payload:
