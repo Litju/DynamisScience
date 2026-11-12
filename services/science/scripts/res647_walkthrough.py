@@ -48,8 +48,13 @@ QMessageBox.warning = lambda parent, title, text, *args: failures.append(f"{titl
 def open_window() -> MainWindow:
     window = MainWindow(DynamisAppService())
     theme.apply_theme(app, mode)
-    window.resize(min(round(1366 / scale), geometry.width()), min(round(768 / scale), geometry.height()))
     window.show()
+    app.processEvents()
+    # Size the whole frame (title bar included) to the 1366×768 target clamped to the work area.
+    chrome = window.frameGeometry().height() - window.height()
+    window.resize(min(round(1366 / scale), geometry.width()), min(round(768 / scale), geometry.height()) - chrome)
+    window.move(geometry.topLeft())
+    app.processEvents()
     return window
 
 

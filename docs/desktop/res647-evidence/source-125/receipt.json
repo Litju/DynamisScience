@@ -1,0 +1,128 @@
+{
+  "source_commit": "d6a00f0f9451abe15525af89ab2d5a4c58bf21dd",
+  "dirty_files": [
+    " M data/synthetic/generator_manifest.json",
+    " M services/science/scripts/res647_walkthrough.py",
+    "?? docs/desktop/res647-evidence/",
+    "?? docs/desktop/res647-qualification.md"
+  ],
+  "platform": "windows",
+  "scale": 1.25,
+  "theme": "dark",
+  "available_geometry": [
+    1093,
+    576
+  ],
+  "data_root": "C:\\Users\\Usuario\\AppData\\Local\\Temp\\res647-native-9rt9o4pu\\private",
+  "workspace_id": "STUDY-U-264BC477",
+  "revisions": [
+    "DATA-U-8696B45A",
+    "DATA-U-DBC5A7ED"
+  ],
+  "investigations": [
+    {
+      "id": "INV-U-AD8A7E21",
+      "subject_id": "P01",
+      "version": 3
+    },
+    {
+      "id": "INV-U-9C1B4EFF",
+      "subject_id": "P02",
+      "version": 1
+    }
+  ],
+  "runs": [
+    {
+      "id": "RUN-U-0001",
+      "scope": {
+        "kind": "COHORT"
+      },
+      "data_revision_id": "DATA-U-8696B45A",
+      "method_id": "METH-U-DESC",
+      "result_digest": "54819011c67ca8f2"
+    },
+    {
+      "id": "RUN-U-0002",
+      "scope": {
+        "investigation_id": "INV-U-AD8A7E21",
+        "kind": "INDIVIDUAL",
+        "subject_id": "P01"
+      },
+      "data_revision_id": "DATA-U-8696B45A",
+      "method_id": "METH-U-INDIVIDUAL",
+      "result_digest": "076e1a9eea9213fd"
+    },
+    {
+      "id": "RUN-U-0003",
+      "scope": {
+        "investigation_id": "INV-U-9C1B4EFF",
+        "kind": "INDIVIDUAL",
+        "subject_id": "P02"
+      },
+      "data_revision_id": "DATA-U-8696B45A",
+      "method_id": "METH-U-INDIVIDUAL",
+      "result_digest": "d3e12f52318298ab"
+    },
+    {
+      "id": "RUN-U-0004",
+      "scope": {
+        "investigation_id": "INV-U-AD8A7E21",
+        "kind": "INDIVIDUAL",
+        "subject_id": "P01"
+      },
+      "data_revision_id": "DATA-U-DBC5A7ED",
+      "method_id": "METH-U-INDIVIDUAL",
+      "result_digest": "9ea0832f8b09092d"
+    },
+    {
+      "id": "RUN-U-0005",
+      "scope": {
+        "kind": "COHORT"
+      },
+      "data_revision_id": "DATA-U-DBC5A7ED",
+      "method_id": "METH-U-DESC",
+      "result_digest": "10916f05ca5743bb"
+    }
+  ],
+  "participant_a_first_run_unchanged": true,
+  "reports": [
+    {
+      "version": 16,
+      "status": "FROZEN",
+      "content_hash": "166b6d1748ac8d00d401fd99f53819837eadd314fb7b0684ccd8c14ee047b936",
+      "created_at": "2026-11-12T12:46:16.493114+00:00"
+    },
+    {
+      "version": 9,
+      "status": "FROZEN",
+      "content_hash": "ecca6cd990bac9dbe166b5e129bdc1762b19a4ac2a493bc512d94c150eb2b4f1",
+      "created_at": "2026-11-12T12:46:16.179595+00:00"
+    },
+    {
+      "version": 4,
+      "status": "FROZEN",
+      "content_hash": "75809c9c514a867ddfdaddc9d5f1cd9fcf4113ec40f13203c4c270c18dcdb3a5",
+      "created_at": "2026-11-12T12:46:15.478168+00:00"
+    }
+  ],
+  "failures": [],
+  "exports": {
+    "individual": "f63b7e3aa575d62572b15925e613dc364ed47dec2775def7e96372287fb4b337",
+    "cohort": "e9707474532e417ce4a6a68516c56fa8a54ce7cc40b9855841f8b43a47a281ff",
+    "combined": "792e8a42b0246940be568e836a44622ca43f75990cc5d16f880c99535d81ea48"
+  },
+  "screenshots": {
+    "01-cohort-analysis.png": "eeca067f91234a9a6f02487e8afc3fa33ae71eed90039b627f9e5c50135a9c56",
+    "02-individuals-explorer.png": "4ceeb7fe0af0b3937307f2641c469eb08d9a0d4657c151c45f3345ecea8e5d2b",
+    "03-individual-analysis-options.png": "c98605be0f3919b4523ad6db1f71b27bab13da6a68037b29f5bbccd36e6ebb20",
+    "04-individual-results.png": "1ba8a29078ba23e0fc9b3c56be06b1b6330fb9f61f1272c4fc982aee580bf73b",
+    "05-explorer-participant-b.png": "9a227c3dd39ad31ca2a6f1589700026749269f50f2c30b172cd24d508bc5aa24",
+    "06-individual-updated-revision.png": "bf985f8fac749293c98b24e40bf0755b3c702c7cf009e017af9342f06eea7e0c",
+    "07-protocol.png": "9d24cd3bd0e4a5d811637c42a77489023cce4eaaef214afde8ea788cab7c38af",
+    "08-scenario-not-qualified.png": "3f336d9ba54980cd3b616e987efd3011434d72e23e8ea99be582e324d376a7fb",
+    "09-compare-with-cohort.png": "a78cd526eb0db9f971dfb410fa80fddc68fdc086f30073a2f40061b82fc8b685",
+    "10-history.png": "1f80d9be33dc3878894f4cd06ce1f6b61379c76b0993b02b213278e6ef63d1e9",
+    "11-reopened.png": "b0802061efb3fe3048cf7b3b5b208538a5d7e57b788cd99e612d08240cc5c253",
+    "20-new-process-restored.png": "b0802061efb3fe3048cf7b3b5b208538a5d7e57b788cd99e612d08240cc5c253"
+  }
+}
