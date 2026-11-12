@@ -544,6 +544,8 @@ class DatasetAdmissionDialog(QDialog):
         self.manufacturer = QLineEdit()
         self.instrument_model = QLineEdit()
         self.serial = QLineEdit()
+        self.instrument_id_input = QLineEdit(self.instrument_id)
+        self.protocol_id_input = QLineEdit(self.protocol_id)
         self.calibration = QLineEdit("UNKNOWN")
         self.protocol_name = QLineEdit()
         self.protocol_version = QLineEdit("1.0")
@@ -552,20 +554,28 @@ class DatasetAdmissionDialog(QDialog):
         self.sampling.setValue(1000)
         self.mass_unit = QLineEdit("kg")
         self.time_unit = QLineEdit("s")
-        self.distance_unit = QLineEdit("m")
+        self.distance_unit = QLineEdit("cm")
+        self.privacy.currentTextChanged.connect(  # a test fixture has no physical calibration; never imply one
+            lambda text: self.calibration.setText("SIMULATED") if text == "TEST_FIXTURE" and self.calibration.text() == "UNKNOWN" else None
+        )
+        self.family.currentIndexChanged.connect(
+            lambda: self.distance_unit.setText("cm" if self.family.currentData() == "CMJ_FORCE_PLATFORM" else "m")
+        )
+        self.coordinate_system = QLineEdit()
         form.addRow("Measurement family", self.family)
-        form.addRow("Instrument ID", QLabel(self.instrument_id))
+        form.addRow("Instrument ID (match file)", self.instrument_id_input)
         form.addRow("Manufacturer", self.manufacturer)
         form.addRow("Model", self.instrument_model)
         form.addRow("Serial number", self.serial)
         form.addRow("Calibration status", self.calibration)
-        form.addRow("Protocol ID", QLabel(self.protocol_id))
+        form.addRow("Protocol ID (match file)", self.protocol_id_input)
         form.addRow("Protocol name", self.protocol_name)
         form.addRow("Protocol version", self.protocol_version)
         form.addRow("Sampling rate (Hz)", self.sampling)
-        form.addRow("Mass unit", self.mass_unit)
-        form.addRow("Time unit", self.time_unit)
-        form.addRow("Distance unit", self.distance_unit)
+        form.addRow("Input mass unit", self.mass_unit)
+        form.addRow("Input time unit", self.time_unit)
+        form.addRow("Input distance unit", self.distance_unit)
+        form.addRow("Coordinate convention (sprint)", self.coordinate_system)
         return page
 
     def _file_page(self) -> QWidget:
@@ -607,10 +617,10 @@ class DatasetAdmissionDialog(QDialog):
             "privacy_status": self.privacy.currentText(),
             "retention_limitations": self.retention.text().strip(),
             "derived_data_publishable": False,
-            "rights_status": "UNVERIFIED",
+            "rights_status": "FIXTURE_ONLY" if self.privacy.currentText() == "TEST_FIXTURE" else "UNVERIFIED",
         }
         instrument = {
-            "id": self.instrument_id,
+            "id": self.instrument_id_input.text().strip(),
             "measurement_family": self.family.currentData(),
             "manufacturer": self.manufacturer.text().strip(),
             "model": self.instrument_model.text().strip(),
@@ -618,7 +628,7 @@ class DatasetAdmissionDialog(QDialog):
             "calibration_status": self.calibration.text().strip() or "UNKNOWN",
         }
         protocol = {
-            "id": self.protocol_id,
+            "id": self.protocol_id_input.text().strip(),
             "measurement_family": self.family.currentData(),
             "name": self.protocol_name.text().strip(),
             "version": self.protocol_version.text().strip(),
@@ -628,12 +638,15 @@ class DatasetAdmissionDialog(QDialog):
                 "time": self.time_unit.text().strip(),
                 "distance": self.distance_unit.text().strip(),
             },
+            "coordinate_convention": self.coordinate_system.text().strip() or "NOT_SPECIFIED",
         }
         metadata = {
             "units": protocol["units"],
-            "instrument_default": self.instrument_id,
-            "protocol_default": self.protocol_id,
+            "instrument_default": instrument["id"],
+            "protocol_default": protocol["id"],
         }
+        if self.coordinate_system.text().strip():
+            metadata["coordinate_system"] = self.coordinate_system.text().strip()
         return source, instrument, protocol, {"path": str(file_path.resolve()), "family": self.family.currentData(), "metadata": metadata}
 
     def _review(self) -> None:
@@ -656,7 +669,7 @@ class DatasetAdmissionDialog(QDialog):
         def register_ingest_validate() -> dict[str, Any]:
             self.service.register_admission_source(source)
             rights = self.service.verify_source_rights(source["id"], verifier)
-            if rights["rights_status"] != "VERIFIED":
+            if rights["rights_status"] not in {"VERIFIED", "FIXTURE_ONLY"}:
                 raise ValueError(f"Source rights remain unverified: {rights['problems']}")
             self.service.register_admission_instrument(instrument)
             self.service.register_admission_protocol(protocol)
@@ -675,7 +688,7 @@ class DatasetAdmissionDialog(QDialog):
         self.measurement_metadata = result["metadata"]
         self.tabs.setEnabled(False)
         status = self.quality["status"]
-        self.summary.setPlainText(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+        self.summary.setPlainText(self._quality_summary())
         eligible = status in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
         self.admit_button.setEnabled(eligible)
         self.quarantine_button.setEnabled(not eligible)
@@ -707,10 +720,28 @@ class DatasetAdmissionDialog(QDialog):
     def _admission_recorded(self, record: dict[str, Any]) -> None:
         self.admit_button.setEnabled(False)
         self.quarantine_button.setEnabled(False)
-        self.summary.setPlainText(json.dumps(record, indent=2, ensure_ascii=False, default=str))
+        note = ("\nSYNTHETIC_ONLY test fixture: simulated instrument, no physical calibration, "
+                "no empirical validity, not eligible as real scientific evidence.") if record.get("admission_class") else ""
+        self.summary.setPlainText(self._quality_summary() + f"\n\nAdmission record: {record['id']}{note}")
         self.on_admitted(record)
         if record.get("dataset_snapshot_id"):
             self.accept()
+
+    def _quality_summary(self) -> str:
+        quality = self.quality or {}
+        lines = [f"QC decision: {quality.get('status', 'unknown')}"]
+        counts = quality.get("counts", {})
+        if counts:
+            lines.append("  ·  ".join(f"{name}: {value}" for name, value in counts.items()))
+        for key, label in (("errors", "Errors"), ("warnings", "Warnings"),
+                           ("rejected_record_ids", "Rejected records"),
+                           ("quarantined_record_ids", "Quarantined records")):
+            values = quality.get(key, [])
+            if values:
+                lines.append(f"{label}: " + "; ".join(map(str, values)))
+        if not quality.get("errors") and not quality.get("warnings"):
+            lines.append("No QC errors or warnings.")
+        return "\n".join(lines)
 
 
 class AdmissionHistoryDialog(QDialog):

@@ -1,0 +1,61 @@
+{
+  "import_receipts": [
+    {
+      "raw_filename": "valid.xlsx",
+      "decision": "ADMITTED",
+      "normalized_rows": 2,
+      "row_quarantine": {
+        "count": 0,
+        "file": null,
+        "reasons": {}
+      },
+      "raw_sha256": "03d1bfac870a688dda0de440fefe1111a166d5b8b0c5444c27415672c2c3d634",
+      "admission_record_id": "AR-031547957CFC"
+    },
+    {
+      "raw_filename": "partial.xlsx",
+      "decision": "ADMITTED",
+      "normalized_rows": 1,
+      "row_quarantine": {
+        "count": 1,
+        "file": "D:\\SWE_HOME\\tmp\\res636-qualified-portable\\private\\quarantine\\IR-2B6B27A50791\\rows.parquet",
+        "reasons": {
+          "implausible jump_height_cm": 1
+        }
+      },
+      "raw_sha256": "a4f3e03db276ad1825cddb8fb5899f5361cfbd3bb7fe4af63243248df84964ea",
+      "admission_record_id": "AR-A630F2057D7B"
+    },
+    {
+      "raw_filename": "invalid.xlsx",
+      "decision": "QUARANTINED",
+      "normalized_rows": 0,
+      "row_quarantine": {
+        "count": 2,
+        "file": "D:\\SWE_HOME\\tmp\\res636-qualified-portable\\private\\quarantine\\IR-E7ACA9F65938\\rows.parquet",
+        "reasons": {
+          "implausible jump_height_cm": 2
+        }
+      },
+      "raw_sha256": "5847cce9c7e6cafb7ecdb493044e6b9a2560cc5af311b2f48b6c26c2684353eb",
+      "admission_record_id": "AR-D4F3AC262763"
+    },
+    {
+      "raw_filename": "needs_attention.xlsx",
+      "decision": "ADMITTED",
+      "normalized_rows": 2,
+      "row_quarantine": {
+        "count": 0,
+        "file": null,
+        "reasons": {}
+      },
+      "raw_sha256": "fbfe573601df8c164b7e75fa8abcdebb5a1f44314a1960bed8af0a1d66cb6fc2",
+      "admission_record_id": "AR-443FAAB68A5B"
+    }
+  ],
+  "admitted_batches": 3,
+  "admitted_records": 5,
+  "private_copy_baseline_files": 21,
+  "private_source_changes_since_copy": [],
+  "manifest_sha256": "835398da594421bc9f04647992b0e9cefd5dc844fd931d1964896b2e164a2587"
+}

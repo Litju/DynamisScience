@@ -1,0 +1,215 @@
+Window: "DynamisScience", App: DynamisScience.exe.
+	0 window (settable, string) DynamisScience Secondary Actions: Raise ID: QApplication.MainWindow
+		417 window (settable, string) Import data Secondary Actions: Raise ID: QApplication.ImportReviewDialog
+			418 title bar (settable, string) Value: Import data
+				419 menu bar System ID: MenuBar
+					420 menu item System
+				421 button Close
+			422 text Your data is ready. ID: QApplication.ImportReviewDialog.QLabel
+			429 text Import summary ID: QApplication.ImportReviewDialog.QLabel
+			430 checkbox (check box) (settable, string) View details / Advanced ID: QApplication.ImportReviewDialog.QPushButton
+			977 button (settable, string) Import another ID: QApplication.ImportReviewDialog.QPushButton
+			978 button (settable, string) Open dataset ID: QApplication.ImportReviewDialog.QPushButton
+			431 button (settable, string) Close ID: QApplication.ImportReviewDialog.QPushButton
+		1 title bar (settable, string) Value: DynamisScience
+			2 menu bar System ID: MenuBar
+				3 menu item System
+			4 button Minimize
+			5 button Maximize
+			6 button Close
+		7 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget
+			8 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell
+				9 toolbar (tool bar) (settable, string) Analyses ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon
+					10 checkbox (check box) (settable, string) Descriptives ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					11 checkbox (check box) (settable, string) T-Tests ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					12 checkbox (check box) (settable, string) ANOVA ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					13 checkbox (check box) (settable, string) Regression ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					14 checkbox (check box) (settable, string) Mixed Models ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					15 checkbox (check box) (settable, string) Reliability ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					16 checkbox (check box) (settable, string) Frequencies ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					17 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolBarSeparator
+					18 checkbox (check box) (settable, string) Signals ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					19 checkbox (check box) (settable, string) Athlete change ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					20 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QWidget
+					21 button (settable, string) Search commands (Ctrl+K) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.PaletteLauncher
+					22 custom (settable, string) Run state: No results yet ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill
+						23 text ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill.RunStateDot
+						24 text No results yet ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill.QLabel
+					25 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.Segmented
+						26 checkbox (check box) (settable, string) Light theme ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.Segmented.QPushButton
+						27 checkbox (check box) (settable, string) Dark theme ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.Segmented.QPushButton
+				28 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk
+					29 custom (settable, string) Workbench panes ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter
+						30 custom (settable, string) Results pane ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+							31 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+								32 text Results ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+								33 button (settable, string) Run analysis ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+								34 button (disabled, settable, string) Export ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+								35 button (disabled, settable, string) Add to report ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+							36 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar
+								37 text SYNTAX ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxCaption
+								38 text field (edit) Python syntax equivalent ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxText
+									39 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxText.qt_scrollarea_viewport
+								40 button (settable, string) Copy syntax ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.QPushButton
+							41 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget
+								233 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll
+									234 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport
+										235 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget
+											979 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench
+												980 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget
+													981 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget
+														982 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget
+															983 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget
+																984 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget
+																	985 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget
+																		986 text Snapshot table ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QLabel
+																		987 combo box (settable, string) Value: cmj_trials ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QComboBox
+																		988 table (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			989 pane (selectable, settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			990 header (selectable, settable, string) subject_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			991 header (selectable, settable, string) session_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			992 header (selectable, settable, string) trial_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			993 header (selectable, settable, string) instrument_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			994 header (selectable, settable, string) protocol_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			995 header (selectable, settable, string) sampling_hz ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			996 header (selectable, settable, string) body_mass_kg ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			997 header (selectable, settable, string) jump_height_cm ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			998 header (selectable, settable, string) peak_force_n ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			999 header (selectable, settable, string) source_artifact_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1000 header (selectable, settable, string) _instrument_default ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1001 header (selectable, settable, string) 1 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1002 data item (item) (selectable, settable, string) M1 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1003 data item (item) (selectable, settable, string) needs_attention ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1004 data item (item) (selectable, settable, string) T1 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1005 data item (item) (selectable, settable, string) INST-IMP-2B08779D ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1006 data item (item) (selectable, settable, string) PROT-IMP-34792774 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1007 data item (item) (selectable, settable, string) 1000.0 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1008 header (selectable, settable, string) 2 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1009 data item (item) (selectable, settable, string) M2 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1010 data item (item) (selectable, settable, string) needs_attention ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1011 data item (item) (selectable, settable, string) T2 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1012 data item (item) (selectable, settable, string) INST-IMP-2B08779D ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1013 data item (item) (selectable, settable, string) PROT-IMP-34792774 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																			1014 data item (item) (selectable, settable, string) 1000.0 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTableView
+																		1015 text 2 rows · showing pages of at most 500 rows · 11 columns ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QLabel
+																1016 tab (settable, string) Parquet preview ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_tabbar
+																	1017 tab item (selectable, settable, string) Parquet preview ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_tabbar
+																	1018 tab item (selectable, settable, string) Cohort resolution ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_stackedwidget.QWidget.QTabWidget.qt_tabwidget_tabbar
+													1019 tab (settable, string) Dataset Cohort ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar
+														1020 tab item (selectable, settable, string) Overview Protocol ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar
+														1021 tab item (selectable, settable, string) Dataset Cohort ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar
+														1022 tab item (selectable, settable, string) Exploration Signals ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar
+														1023 tab item (selectable, settable, string) Analysis Plan Runs ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar
+														1024 tab item (selectable, settable, string) Evidence Report ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar
+														1025 button (selectable, disabled, settable, string) Scroll Left ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar.ScrollLeftButton
+														1026 button (selectable, settable, string) Scroll Right ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_viewport.QStackedWidget.ResearchWorkbench.QTabWidget.qt_tabwidget_tabbar.ScrollRightButton
+									284 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_hcontainer
+										285 scroll bar (settable, float) Value: 0 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_hcontainer.QScrollBar
+									286 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_vcontainer
+										287 scroll bar (settable, float) Value: 0 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.WorkbenchResultsScroll.qt_scrollarea_vcontainer.QScrollBar
+						46 custom (settable, string) Analysis options pane ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+							47 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+								48 text Analysis options ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+							49 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.OptionsPane
+								50 text Choose an analysis in the ribbon. ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.OptionsPane.PaneEmpty
+						51 custom (settable, string) Data pane ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+							52 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+								53 text Data ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+								54 text Open research context ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneContext
+							288 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane
+								56 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible
+									57 checkbox (check box) (settable, string) Library section ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QToolButton
+								67 combo box (settable, string) Table Value: cmj_trials ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QComboBox
+								68 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented
+									69 checkbox (check box) (disabled, settable, string) By athlete view ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+									70 checkbox (check box) (settable, string) Variables view ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+									71 checkbox (check box) (settable, string) Rows view ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+								72 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget
+									289 table (settable, string) Variables table ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1027 pane (selectable, settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1028 header (selectable, settable, string) Variable ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1029 header (selectable, settable, string) Type ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1030 header (selectable, settable, string) Unit ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1031 header (selectable, settable, string) N ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1032 header (selectable, settable, string) Missing ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1033 header (selectable, settable, string) Missing % ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1034 header (selectable, settable, string) Quality ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1035 header (selectable, settable, string) Role ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1036 header (selectable, settable, string) Distribution ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1037 data item (item) (selectable, settable, string) subject_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1038 data item (item) (selectable, settable, string) identifier ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1039 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1040 data item (item) (selectable, settable, string) 2 distinct ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1041 data item (item) (selectable, settable, string) session_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1042 data item (item) (selectable, settable, string) identifier ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1043 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1044 data item (item) (selectable, settable, string) 1 distinct ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1045 data item (item) (selectable, settable, string) trial_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1046 data item (item) (selectable, settable, string) identifier ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1047 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1048 data item (item) (selectable, settable, string) 2 distinct ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1049 data item (item) (selectable, settable, string) instrument_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1050 data item (item) (selectable, settable, string) identifier ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1051 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1052 data item (item) (selectable, settable, string) 1 distinct ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1053 data item (item) (selectable, settable, string) protocol_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1054 data item (item) (selectable, settable, string) identifier ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1055 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1056 data item (item) (selectable, settable, string) 1 distinct ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1057 data item (item) (selectable, settable, string) sampling_hz ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1058 data item (item) (selectable, settable, string) numerical ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1059 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1060 data item (item) (selectable, settable, string) 1000 to 1000 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1061 data item (item) (selectable, settable, string) body_mass_kg ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1062 data item (item) (selectable, settable, string) numerical ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1063 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1064 data item (item) (selectable, settable, string) 75 to 80 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1065 data item (item) (selectable, settable, string) jump_height_cm ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1066 data item (item) (selectable, settable, string) numerical ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1067 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1068 data item (item) (selectable, settable, string) 38 to 40 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1069 data item (item) (selectable, settable, string) peak_force_n ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1070 data item (item) (selectable, settable, string) numerical ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1071 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1072 data item (item) (selectable, settable, string) 1700 to 1800 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1073 data item (item) (selectable, settable, string) source_artifact_id ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1074 data item (item) (selectable, settable, string) identifier ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1075 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1076 data item (item) (selectable, settable, string) 1 distinct ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1077 data item (item) (selectable, settable, string) _instrument_default ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1078 data item (item) (selectable, settable, string) categorical ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1079 data item (item) (selectable, settable, string) — ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+										1080 data item (item) (selectable, settable, string) INST-IMP-2B08779D ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.QTableView
+								74 text Dataset summary ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.PaneContext
+						75 thumb (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.qt_splithandle_WorkbenchPane
+						76 thumb (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.qt_splithandle_WorkbenchPane
+		77 status bar ID: QApplication.MainWindow.QStatusBar
+			78 thumb (settable, string) ID: QApplication.MainWindow.QStatusBar.QSizeGrip
+			781 text Application status ID: QApplication.MainWindow.QStatusBar.QLabel
+			80 group (settable, string) ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus
+				344 text provenance: SYNTHETIC ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus.Chip
+				81 text Scientific provenance ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus.QLabel
+		82 menu bar (settable, string) ID: QApplication.MainWindow.QMenuBar
+			83 menu item (settable, string) File ID: QApplication.MainWindow.QMenuBar.QAction
+			84 menu item (settable, string) Research ID: QApplication.MainWindow.QMenuBar.QAction
+			85 menu item (settable, string) Tools ID: QApplication.MainWindow.QMenuBar.QAction
+			86 menu item (settable, string) Analyses ID: QApplication.MainWindow.QMenuBar.QAction
+			87 menu item (settable, string) Results ID: QApplication.MainWindow.QMenuBar.QAction
+			88 menu item (settable, string) View ID: QApplication.MainWindow.QMenuBar.QAction
+			89 menu item (settable, string) Perspective ID: QApplication.MainWindow.QMenuBar.QAction
+			90 menu item (settable, string) Help ID: QApplication.MainWindow.QMenuBar.QAction
+		417 window (settable, string) Import data Secondary Actions: Raise ID: QApplication.ImportReviewDialog
+			418 title bar (settable, string) Value: Import data
+				419 menu bar System ID: MenuBar
+					420 menu item System
+				421 button Close
+			422 text Your data is ready. ID: QApplication.ImportReviewDialog.QLabel
+			429 text Import summary ID: QApplication.ImportReviewDialog.QLabel
+			430 checkbox (check box) (settable, string) View details / Advanced ID: QApplication.ImportReviewDialog.QPushButton
+			977 button (settable, string) Import another ID: QApplication.ImportReviewDialog.QPushButton
+			978 button (settable, string) Open dataset ID: QApplication.ImportReviewDialog.QPushButton
+			431 button (settable, string) Close ID: QApplication.ImportReviewDialog.QPushButton
+
+Document text: ```
+No results yet
+```

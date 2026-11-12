@@ -218,6 +218,9 @@ def run_figure(run: dict[str, Any]) -> Figure:
             fontsize=9,
             fontweight="bold",
         )
+    elif status["state"] == "UNVERIFIED":
+        figure.suptitle("UNVERIFIED METHOD VERSION · audit only, not current evidence",
+                        color="#b3261e", fontsize=9, fontweight="bold")
     provenance = {
         "run_id": run.get("id"),
         "method_id": run.get("method_id"),

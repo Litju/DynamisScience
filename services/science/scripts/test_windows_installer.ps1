@@ -1,3 +1,4 @@
+param([switch]$TestIdentity)
 $ErrorActionPreference = "Stop"
 $serviceRoot = Split-Path -Parent $PSScriptRoot
 $repoRoot = Split-Path -Parent (Split-Path -Parent $serviceRoot)
@@ -10,7 +11,7 @@ $packagingRecord = Get-ChildItem -LiteralPath (Join-Path $serviceRoot "build") -
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 1
 if (-not $packagingRecord) { throw "Run build_windows.ps1 before installer verification." }
-$installer = Join-Path $packagingRecord.FullName "dist\installer\DynamisScience-Setup-x64.exe"
+$installer = Join-Path $packagingRecord.FullName ("dist\installer\" + $(if ($TestIdentity) { "DynamisScience-RES621Test-Setup-x64.exe" } else { "DynamisScience-Setup-x64.exe" }))
 $unpackedExe = Join-Path $packagingRecord.FullName "dist\DynamisScience\DynamisScience.exe"
 if (-not (Test-Path -LiteralPath $installer) -or -not (Test-Path -LiteralPath $unpackedExe)) {
     throw "The PyInstaller bundle or Inno Setup installer is missing."

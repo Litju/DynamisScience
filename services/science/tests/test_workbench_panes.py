@@ -110,7 +110,7 @@ def test_assignment_syntax_and_run_state(wb):
     assert shell.provenance_label.text() == "" and shell.run_label.text() == "No results yet"
     runs = []
     ctl.run_requested.connect(runs.append)
-    shell.action_run.trigger()
+    shell.run_button.click()
     assert runs == [spec] and shell.run_label.text().startswith("Running")
     ctl.set_last_run_hash(spec.spec_hash(), "RUN-1", "abcd")
     assert shell.run_label.text() == "Results up to date" and "result digest abcd" in shell.provenance_label.text()

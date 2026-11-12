@@ -201,15 +201,21 @@ SUPERSEDED_METHOD_VERSIONS: dict[tuple[str, str], dict[str, str]] = {
 
 
 def method_status(run: dict[str, Any]) -> dict[str, Any]:
-    """CURRENT or SUPERSEDED for the implementation version that produced ``run``."""
+    """Identify current, superseded, and unverified implementation versions."""
     method_id = str(run.get("method_id") or "")
     spec = (run.get("execution") or {}).get("analysis_spec") or {}
-    # Runs before RES-619 recorded only the registered spec version, which was always 1.0.0.
-    computed_with = str(run.get("method_version") or spec.get("method_version") or "1.0.0")
-    current = METHODS.get(method_id, {}).get("version")
+    # Older runs may record the implementation version in the registered spec.
+    recorded = run.get("method_version") or spec.get("method_version")
+    computed_with = str(recorded) if recorded else "not recorded"
+    method = METHODS.get(method_id, {})
+    current = method.get("version")
     superseded = SUPERSEDED_METHOD_VERSIONS.get((method_id, computed_with))
     if superseded:
         return {"state": "SUPERSEDED", "computed_with": computed_with, "current_version": current, **superseded}
+    if (not recorded or not current or computed_with != current
+            or method.get("qualification", {}).get("status") not in {"QUALIFIED", "QUALIFIED_DESCRIPTIVE"}):
+        return {"state": "UNVERIFIED", "computed_with": computed_with, "current_version": current,
+                "reason": "The method or its recorded version is not currently qualified."}
     return {"state": "CURRENT", "computed_with": computed_with, "current_version": current}
 
 
@@ -220,6 +226,8 @@ def ensure_current(run: dict[str, Any], action: str) -> None:
             f"{run.get('id')} was computed with {run.get('method_id')} {status['computed_with']}, superseded by "
             f"{status['current_version']} ({status['reason']}) It cannot be used to {action}; re-run the analysis."
         )
+    if status["state"] != "CURRENT":
+        raise ResearchValidation(f"{run.get('id')} has an unverified method or version and cannot be used to {action}; re-run a qualified method.")
 
 
 REJECTED_METHODS = {
@@ -2680,6 +2688,11 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
             "citations": payload["citations"],
             "evidence": payload["evidence"],
             "figures": payload["figures"],
+            "study": payload["study"],
+            "project": payload["project"],
+            "question": payload["question"],
+            "hypotheses": payload["hypotheses"],
+            "snapshot": payload["snapshot"],
             "plan": payload["plan"],
             "cohort": payload["cohort"],
             "snapshot_id": payload["snapshot"]["id"],
@@ -2689,13 +2702,15 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
         content_hash = _digest(content)
         version = int(report["version"])
         existing = connection.execute(
-            "SELECT content_hash FROM report_versions WHERE entity_id = ? AND version = ?",
+            "SELECT content_hash, document FROM report_versions WHERE entity_id = ? AND version = ?",
             (entity_id, version),
         ).fetchone()
         if existing is not None:
-            if existing["content_hash"] != content_hash:
+            stored_content = json.loads(existing["document"]).get("frozen_content", {})
+            comparable = {key: content.get(key) for key in stored_content}
+            if existing["content_hash"] != _digest(comparable):
                 raise ResearchConflict("This report version is already frozen with different content")
-            return {"report_id": report["id"], "version": version, "status": "FROZEN", "content_hash": content_hash, "frozen_at": report.get("frozen_at")}
+            return {"report_id": report["id"], "version": version, "status": "FROZEN", "content_hash": existing["content_hash"], "frozen_at": report.get("frozen_at")}
         frozen_at = _now()
         report["status"] = "FROZEN"
         report["frozen_at"] = frozen_at
@@ -2868,24 +2883,40 @@ def _svg_distribution(figure: dict[str, Any], width: int = 640, height: int = 18
     return f"<svg viewBox='0 0 {width} {height}' width='100%' role='img' aria-label='distribution'>{bars}</svg>"
 
 
+def _report_evidence_unit(item: dict[str, Any], run: dict[str, Any] | None) -> str:
+    unit = str(item.get("unit") or "")
+    if run and run.get("method_id") == "METH-REAL-RELIABILITY":
+        if unit and unit not in {"dimensionless", "ICC(3,1)"}:
+            return f"dimensionless (recorded unit: {unit}; corrected for display)"
+        return "dimensionless"
+    return unit
+
+
 def export_html(entity_id: str, version: int | None = None) -> str:
     payload = report_payload(entity_id)
     generated_at = _now()
+    legacy_context = False
     if version is not None:
         frozen = get_report_version(entity_id, version)
         if frozen is None:
             raise ResearchNotFound(f"Report version {version} not found")
         # Frozen content is authoritative for historical exports.
-        payload = {**payload, **frozen.get("frozen_content", {}), "status": "FROZEN", "version": version}
+        content = frozen.get("frozen_content", {})
+        legacy_context = not all(key in content for key in ("study", "project", "question", "hypotheses", "snapshot"))
+        payload = {**payload, **content, "status": "FROZEN", "version": version}
         generated_at = frozen.get("created_at") or frozen.get("frozen_at") or generated_at
     detail = study_detail(entity_id)
+    for key in ("study", "project", "question", "hypotheses", "snapshot", "plan", "cohort"):
+        detail[key] = payload.get(key, detail[key])
     snapshot = detail["snapshot"]
     evidence = payload.get("evidence", [])
     figures = payload.get("figures", [])
-    limitations = payload.get("research", {}).get("limitations", [])
+    limitations = payload.get("limitations", payload.get("research", {}).get("limitations", []))
     statuses = {}
+    evidence_runs = {}
     for item in evidence:
         run = get_run(item.get("analysis_run_id") or "")
+        evidence_runs[item["id"]] = run
         statuses[item["id"]] = method_status(run) if run else {"state": "UNKNOWN"}
     superseded = {key: value for key, value in statuses.items() if value["state"] == "SUPERSEDED"}
     warning_html = (
@@ -2898,6 +2929,14 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         if superseded
         else ""
     )
+    if legacy_context:
+        warning_html += ('<div class="warning" role="alert"><strong>Historical context incomplete.</strong> '
+                         'This version did not capture all study and source details; displayed context may reflect later changes.</div>')
+    unverified = [key for key, value in statuses.items() if value["state"] not in {"CURRENT", "SUPERSEDED"}]
+    if unverified:
+        warning_html += ('<div class="warning" role="alert"><strong>Unverified method version.</strong> '
+                         + html.escape(", ".join(unverified))
+                         + ' is shown for audit only and is not currently qualified evidence.</div>')
     manifest = {
         "report_id": payload.get("id"),
         "study_id": entity_id,
@@ -2910,8 +2949,17 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         "generated_at": generated_at,
         "limitations": limitations,
     }
+    def interval_text(item: dict[str, Any]) -> str:
+        interval = item.get("interval")
+        if not interval:
+            return "—"
+        label = interval.get("kind") or "Interval"
+        if item.get("uncertainty_label") == "95% CI half-width at the final point":
+            label = "Student-t 95% CI for final-point mean (not the change)"
+        return f"{label}: {interval.get('low')} – {interval.get('high')}"
+
     rows = "".join(
-        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(str(item.get('unit', '')))}</td><td>{html.escape(str(item.get('interval', {}).get('low') if item.get('interval') else ''))} – {html.escape(str(item.get('interval', {}).get('high') if item.get('interval') else ''))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
+        f"<tr><td>{html.escape(item['id'])}</td><td>{html.escape(item.get('title', ''))}</td><td>{html.escape(str(item.get('estimate')))} {html.escape(_report_evidence_unit(item, evidence_runs[item['id']]))}</td><td>{html.escape(interval_text(item))}</td><td>{html.escape(item.get('analysis_run_id', ''))}</td><td>{html.escape(statuses[item['id']]['state'])} · v{html.escape(str(statuses[item['id']].get('computed_with', '')))}</td><td>{html.escape(item.get('interpretation', ''))}</td></tr>"
         for item in evidence
     )
     figure_html = "".join(
@@ -2967,7 +3015,7 @@ pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid 
 <p>{html.escape(detail['plan']['primary_estimand'])}</p>
 <p class="meta">{html.escape(str(detail['plan'].get('method_id') or ''))} · {html.escape(detail['plan']['status'])} · {html.escape(str(detail['plan'].get('parameters', {})))}</p>
 <h2>4. Results</h2>
-{'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>95% interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
+{'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>Interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
 {figure_html}
 {narrative}
 <h2>5. Limitations</h2><ul>{limitation_html}</ul>

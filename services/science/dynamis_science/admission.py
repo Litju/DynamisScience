@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import uuid
@@ -87,12 +88,13 @@ def _write_json(path: Path, value: Any) -> None:
 
 def _safe_column_values(artifact: dict[str, Any], column: str) -> list[str]:
     try:
-        frame = _read_frame(artifact)
+        path = Path(artifact["stored_path"])
+        lazy = pl.scan_parquet(path) if artifact["format"] == "PARQUET" else pl.scan_csv(path)
+        if column not in lazy.collect_schema().names():
+            return []
+        return sorted(str(v) for v in lazy.select(column).unique().collect()[column].to_list())
     except Exception:
         return []
-    if column not in frame.columns:
-        return []
-    return sorted(set(str(v) for v in frame[column].to_list()))
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -172,10 +174,10 @@ def verify_rights(source_id: str, verifier: str = "system") -> dict[str, Any]:
     if source.get("rights_status") == "BLOCKED":
         problems.append("source is blocked")
     status = "VERIFIED" if not problems else "UNVERIFIED"
-    if source.get("rights_status") == "FIXTURE_ONLY":
+    if not problems and source.get("rights_status") == "FIXTURE_ONLY":
         status = "FIXTURE_ONLY"
     source["rights_status"] = status if status != "VERIFIED" else ("VERIFIED" if not problems else "UNVERIFIED")
-    if source["rights_status"] == "VERIFIED":
+    if source["rights_status"] in {"VERIFIED", "FIXTURE_ONLY"}:
         source["rights_verified_at"] = _now()
         source["rights_verified_by"] = verifier
     sources = [item if item.get("id") != source_id else source for item in _load_list(_artifact_path("admission_sources.json"))]
@@ -285,8 +287,17 @@ def _ingest_source_stream(source_id: str, original_filename: str, content, acqui
                 content_hash.update(chunk)
                 artifact_hash.update(chunk)
                 size_bytes += len(chunk)
+        artifacts = _load_list(_artifact_path("admission_source_artifacts.json"))
+        existing = next((item for item in artifacts if item.get("source_id") == source_id
+                         and item.get("original_filename") == original_filename
+                         and item.get("content_hash_sha256") == content_hash.hexdigest()), None)
+        if existing:
+            return existing
+        artifact_hash.update(source_id.encode())
         artifact_hash.update(original_filename.encode())
         artifact_id = "SA-" + artifact_hash.hexdigest()[:12].upper()
+        if any(item.get("id") == artifact_id for item in artifacts):
+            raise ValueError("Source artifact identifier collision; the file was not ingested")
         stored_path = source_dir / f"{artifact_id}{suffix}"
         os.replace(temporary_path, stored_path)
     finally:
@@ -304,10 +315,8 @@ def _ingest_source_stream(source_id: str, original_filename: str, content, acqui
         "acquisition_method": acquisition_method,
         "rights_record_id": source_id,
     }
-    artifacts = _load_list(_artifact_path("admission_source_artifacts.json"))
-    if not any(item.get("id") == artifact_id for item in artifacts):
-        artifacts.append(artifact)
-        _save_list(_artifact_path("admission_source_artifacts.json"), artifacts)
+    artifacts.append(artifact)
+    _save_list(_artifact_path("admission_source_artifacts.json"), artifacts)
     return artifact
 
 
@@ -328,10 +337,6 @@ def _read_frame(artifact: dict[str, Any]) -> pl.DataFrame:
     raise ValueError(f"Unsupported artifact format: {artifact['format']}")
 
 
-def _assessment_id(artifact_id: str, family: str) -> str:
-    return "QA-" + hashlib.sha256(f"{artifact_id}:{family}".encode()).hexdigest()[:12].upper()
-
-
 def _unit_conversion(value: float, unit: str, canonical: str, quantity: str) -> float:
     unit = unit.strip().lower()
     canonical = canonical.strip().lower()
@@ -344,6 +349,7 @@ def _unit_conversion(value: float, unit: str, canonical: str, quantity: str) -> 
         ("s", "s"): 1.0,
         ("min", "s"): 60.0,
         ("cm", "m"): 0.01,
+        ("m", "cm"): 100.0,
         ("m", "m"): 1.0,
         ("n", "n"): 1.0,
     }
@@ -351,6 +357,51 @@ def _unit_conversion(value: float, unit: str, canonical: str, quantity: str) -> 
     if key in conversions:
         return value * conversions[key]
     raise ValueError(f"Cannot convert {quantity} from {unit} to {canonical}")
+
+
+def _metadata_errors(frame: pl.DataFrame, family: str, metadata: dict[str, Any]) -> list[str]:
+    errors = []
+    for instrument_id in sorted(set(str(v) for v in frame["instrument_id"].to_list())):
+        instrument = get_instrument(instrument_id)
+        if instrument and instrument.get("measurement_family") != family:
+            errors.append(f"instrument {instrument_id} belongs to a different measurement family")
+    for protocol_id in sorted(set(str(v) for v in frame["protocol_id"].to_list())):
+        protocol = get_protocol(protocol_id)
+        if not protocol:
+            continue
+        if protocol.get("measurement_family") != family:
+            errors.append(f"protocol {protocol_id} belongs to a different measurement family")
+        for unit, declared in metadata.get("units", {}).items():
+            recorded = protocol.get("units", {}).get(unit)
+            if recorded and str(recorded).strip().lower() != str(declared).strip().lower():
+                errors.append(f"protocol {protocol_id} {unit} unit differs from the input unit")
+        if "sampling_hz" in frame.columns:
+            values = frame.filter(pl.col("protocol_id") == protocol_id)["sampling_hz"].drop_nulls().unique().to_list()
+            try:
+                if any(float(value) != float(protocol["sampling_hz"]) for value in values):
+                    errors.append(f"protocol {protocol_id} sampling rate differs from the file")
+            except (TypeError, ValueError):
+                errors.append("invalid sampling frequency")
+    return errors
+
+
+def _identifier_errors(frame: pl.DataFrame) -> list[str]:
+    if frame.is_empty():
+        return ["dataset contains no records"]
+    return [f"missing {column} identifiers" for column in ("subject_id", "session_id", "trial_id")
+            if any(value is None or not str(value).strip() for value in frame[column].to_list())]
+
+
+def _calibration_warnings(artifact: dict[str, Any], instrument_ids: list[str]) -> list[str]:
+    """Real-data QC requires CALIBRATED; a FIXTURE_ONLY source may use a SIMULATED instrument (synthetic-only admission, no physical calibration claimed)."""
+    fixture = (get_source(artifact["source_id"]) or {}).get("rights_status") == "FIXTURE_ONLY"
+    out = []
+    for iid in instrument_ids:
+        inst = get_instrument(iid)
+        status = inst.get("calibration_status") if inst else "CALIBRATED"
+        if status != "CALIBRATED" and not (fixture and status == "SIMULATED"):
+            out.append(f"instrument {iid} calibration is {status}")
+    return out
 
 
 def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
@@ -363,20 +414,32 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
         frame = _read_frame(artifact)
     except Exception as exc:  # pragma: no cover - corrupt file path
         errors.append(f"corrupt or unreadable file: {type(exc).__name__}")
-        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", "REJECTED", errors, warnings, rejected, quarantined, counts)
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, counts)
 
     columns = set(frame.columns)
     missing_required = sorted(CMJ_REQUIRED_COLUMNS - columns)
     if missing_required:
         errors.append(f"missing required columns: {', '.join(missing_required)}")
     if errors:
-        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    errors.extend(_identifier_errors(frame))
+    if errors:
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
 
     # Units
     units = metadata.get("units", {})
     mass_unit = str(units.get("body_mass", units.get("mass", "kg"))).lower()
     if mass_unit not in {"kg", "g"}:
         errors.append(f"unrecognized mass unit: {mass_unit}")
+    for key, canonical, quantity in (("time", "s", "time"), ("distance", "cm", "distance")):
+        try:
+            _unit_conversion(1.0, str(units.get(key, canonical)), canonical, quantity)
+        except ValueError as exc:
+            errors.append(str(exc))
+    if errors:
+        return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    frame = harmonize_cmj(artifact, metadata)
+    errors.extend(_metadata_errors(frame, "CMJ_FORCE_PLATFORM", metadata))
     if "mass_unit" not in metadata and "units" not in metadata:
         warnings.append("missing unit metadata; assuming canonical units")
     # We quarantine missing units rather than reject if not explicitly provided.
@@ -389,15 +452,22 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
         except Exception:
             pass
     if "week" in columns:
-        bad_weeks = [int(v) for v in frame["week"].to_list() if v is None or int(v) < 1 or int(v) > 52]
-        if bad_weeks:
+        try:
+            invalid_week = any(v is None or int(v) < 1 or int(v) > 52 for v in frame["week"].to_list())
+        except (TypeError, ValueError):
+            invalid_week = True
+        if invalid_week:
             errors.append("invalid week values")
     # sampling
     sampling_values = frame["sampling_hz"].unique().to_list() if "sampling_hz" in columns else []
     if "sampling_hz" not in columns:
         errors.append("missing sampling_hz column")
     else:
-        if any(v is None or float(v) <= 0 for v in sampling_values):
+        try:
+            invalid_sampling = any(v is None or not math.isfinite(float(v)) or float(v) <= 0 for v in sampling_values)
+        except (TypeError, ValueError):
+            invalid_sampling = True
+        if invalid_sampling:
             errors.append("invalid sampling frequency")
         if len(sampling_values) > 1:
             warnings.append("inconsistent sampling frequency across rows")
@@ -422,10 +492,7 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     if unknown_protocols:
         warnings.append(f"unrecognized protocol: {unknown_protocols}")
     # calibration
-    for iid in instrument_ids:
-        inst = get_instrument(iid)
-        if inst is not None and inst.get("calibration_status") != "CALIBRATED":
-            warnings.append(f"instrument {iid} calibration is {inst.get('calibration_status')}")
+    warnings.extend(_calibration_warnings(artifact, instrument_ids))
     # implausible values
     for column, (low, high) in CMJ_RANGES.items():
         if column in columns:
@@ -459,7 +526,7 @@ def validate_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str
     elif warnings:
         status = "ADMITTED_WITH_WARNINGS"
     counts = {"rows": frame.height, "subjects": int(frame["subject_id"].n_unique()), "trials": int(frame["trial_id"].n_unique())}
-    return _quality_result(artifact, "CMJ_FORCE_PLATFORM", status, errors, warnings, rejected, quarantined, counts)
+    return _quality_result(artifact, "CMJ_FORCE_PLATFORM", metadata, status, errors, warnings, rejected, quarantined, counts)
 
 
 def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
@@ -471,17 +538,34 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
         frame = _read_frame(artifact)
     except Exception as exc:
         errors.append(f"corrupt or unreadable file: {type(exc).__name__}")
-        return _quality_result(artifact, "SPRINT_TIMING", "REJECTED", errors, warnings, rejected, quarantined, {})
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {})
     columns = set(frame.columns)
     missing_required = sorted(SPRINT_REQUIRED_COLUMNS - columns)
     if missing_required:
         errors.append(f"missing required columns: {', '.join(missing_required)}")
     if errors:
-        return _quality_result(artifact, "SPRINT_TIMING", "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    errors.extend(_identifier_errors(frame))
+    if errors:
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    units = metadata.get("units", {})
+    for key, canonical in (("time", "s"), ("distance", "m")):
+        try:
+            _unit_conversion(1.0, str(units.get(key, canonical)), canonical, key)
+        except ValueError as exc:
+            errors.append(str(exc))
+    if errors:
+        return _quality_result(artifact, "SPRINT_TIMING", metadata, "REJECTED", errors, warnings, rejected, quarantined, {"rows": frame.height})
+    frame = harmonize_sprint(artifact, metadata)
+    errors.extend(_metadata_errors(frame, "SPRINT_TIMING", metadata))
     if frame["subject_id"].null_count() or frame["session_id"].null_count():
         errors.append("missing subject or session identifiers")
     if "sampling_hz" in columns:
-        if any(v is None or float(v) <= 0 for v in frame["sampling_hz"].unique().to_list()):
+        try:
+            invalid_sampling = any(v is None or not math.isfinite(float(v)) or float(v) <= 0 for v in frame["sampling_hz"].unique().to_list())
+        except (TypeError, ValueError):
+            invalid_sampling = True
+        if invalid_sampling:
             errors.append("invalid sampling frequency")
     if "trial_id" in columns:
         dupes = frame.group_by("trial_id").len().filter(pl.col("len") > 1)
@@ -496,10 +580,7 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
     unknown_protocols = [pid for pid in protocol_ids if get_protocol(pid) is None]
     if unknown_protocols:
         warnings.append(f"unrecognized protocol: {unknown_protocols}")
-    for iid in instrument_ids:
-        inst = get_instrument(iid)
-        if inst is not None and inst.get("calibration_status") != "CALIBRATED":
-            warnings.append(f"instrument {iid} calibration is {inst.get('calibration_status')}")
+    warnings.extend(_calibration_warnings(artifact, instrument_ids))
     for column, (low, high) in SPRINT_RANGES.items():
         if column in columns:
             bad = frame.filter((pl.col(column) < low) | (pl.col(column) > high))
@@ -520,24 +601,28 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
     elif warnings:
         status = "ADMITTED_WITH_WARNINGS"
     counts = {"rows": frame.height, "subjects": int(frame["subject_id"].n_unique()), "trials": int(frame["trial_id"].n_unique())}
-    return _quality_result(artifact, "SPRINT_TIMING", status, errors, warnings, rejected, quarantined, counts)
+    return _quality_result(artifact, "SPRINT_TIMING", metadata, status, errors, warnings, rejected, quarantined, counts)
 
 
-def _quality_result(artifact, family, status, errors, warnings, rejected, quarantined, counts):
+def _quality_result(artifact, family, metadata, status, errors, warnings, rejected, quarantined, counts):
     assessment = {
-        "id": _assessment_id(artifact["id"], family),
         "source_artifact_id": artifact["id"],
         "measurement_family": family,
+        "metadata": metadata,
         "status": status,
         "errors": errors,
         "warnings": warnings,
         "rejected_record_ids": sorted(set(rejected)),
         "quarantined_record_ids": sorted(set(quarantined)),
         "counts": counts,
-        "checked_at": _now(),
     }
+    digest = hashlib.sha256(json.dumps(assessment, sort_keys=True).encode()).hexdigest()[:12].upper()
+    assessment["id"] = "QA-" + digest
     records = _load_list(_artifact_path("admission_quality.json"))
-    records = [r for r in records if r.get("id") != assessment["id"]]
+    existing = next((r for r in records if r.get("id") == assessment["id"]), None)
+    if existing:
+        return existing
+    assessment["checked_at"] = _now()
     records.append(assessment)
     _save_list(_artifact_path("admission_quality.json"), records)
     return assessment
@@ -556,10 +641,13 @@ def harmonize_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> pl.Data
         frame = frame.with_columns((pl.col("body_mass_kg") * _unit_conversion(1.0, mass_unit, "kg", "mass")).alias("body_mass_kg"))
     # time unit conversion for duration columns
     time_unit = str(units.get("time", "s")).lower() or "s"
-    for col in ("eccentric_braking_duration_s",):
+    for col in ("eccentric_braking_duration_s", "time_s"):
         if col in frame.columns and time_unit != "s":
             frame = frame.with_columns((pl.col(col) * _unit_conversion(1.0, time_unit, "s", "time")).alias(col))
-    # distance unit conversion for jump height? keep cm canonical for metric
+    distance_unit = str(units.get("distance", "cm")).lower() or "cm"
+    for col in ("jump_height_cm", "countermovement_depth_cm"):
+        if col in frame.columns and distance_unit != "cm":
+            frame = frame.with_columns((pl.col(col) * _unit_conversion(1.0, distance_unit, "cm", "distance")).alias(col))
     # Add canonical provenance columns
     frame = frame.with_columns(
         pl.lit(artifact["id"]).alias("source_artifact_id"),
@@ -581,6 +669,13 @@ def harmonize_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> pl.D
     return frame
 
 
+def _synthetic_semantics(rights_status: str) -> dict[str, Any]:
+    if rights_status != "FIXTURE_ONLY":
+        return {}
+    return {"admission_class": "SYNTHETIC_ONLY", "calibration": "SIMULATED/NOT_APPLICABLE_TO_TEST_FIXTURE",
+            "empirical_validity": False, "evidence_eligible": False}
+
+
 def _snapshot_id(artifact: dict[str, Any], family: str) -> str:
     return "DS-ADMITTED-" + hashlib.sha256(f"{artifact['id']}:{family}".encode()).hexdigest()[:12].upper()
 
@@ -592,6 +687,15 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
     source = get_source(artifact["source_id"])
     if source is None:
         raise ValueError(f"Unknown source: {artifact['source_id']}")
+    existing_id = _snapshot_id(artifact, family)
+    existing_dir = _admitted_dir() / existing_id
+    if existing_dir.exists():
+        snapshot = _json(existing_dir / "snapshot.json", {})
+        record = next((r for r in list_admission_records() if r.get("dataset_snapshot_id") == existing_id), None)
+        if (snapshot.get("admission_metadata") == metadata and record
+                and record.get("rights_status") == source.get("rights_status")):
+            return record
+        raise ValueError("This artifact already has an immutable snapshot with different or unrecorded metadata. Register a new source for a new admission.")
     # rights gate
     rights_status = source.get("rights_status", "UNVERIFIED")
     if rights_status not in {"VERIFIED", "FIXTURE_ONLY"}:
@@ -629,6 +733,11 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
     elif family == "SPRINT_TIMING":
         assessment = validate_sprint(artifact, metadata)
         family_name = "SPRINT_TIMING"
+    elif family == "RAW_FORCE_TIME":
+        from . import traces
+
+        assessment = traces.validate_trace(artifact, metadata)
+        family_name = family
     else:
         raise ValueError(f"Unsupported measurement family: {family}")
 
@@ -639,17 +748,20 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
     normalization_rules: list[str] = []
     qc_operations = ["schema_validation", "unit_check", "duplicate_check", "range_check", "instrument_check", "protocol_check"]
     if status in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}:
-        if family == "CMJ_FORCE_PLATFORM":
-            frame = harmonize_cmj(artifact, metadata)
-            table_name = "cmj_trials"
-        else:
-            frame = harmonize_sprint(artifact, metadata)
-            table_name = "sprint_trials"
         snapshot_id = _snapshot_id(artifact, family)
         snapshot_dir = _admitted_dir() / snapshot_id
-        snapshot_dir.mkdir(parents=True, exist_ok=True)
-        out_path = snapshot_dir / f"{table_name}.parquet"
-        frame.write_parquet(out_path, compression="zstd")
+        snapshot_dir.mkdir(parents=True, exist_ok=False)
+        if family == "RAW_FORCE_TIME":  # sample-level grain: streamed, never loaded whole
+            written = traces.write_snapshot(artifact, metadata, snapshot_dir)
+            table_name, row_count, hashes = traces.TRIALS, written["rows"][traces.TRIALS], written["hashes"]
+            tables = {name: {"file": f"{name}.parquet", "rows": rows} for name, rows in written["rows"].items()}
+        else:
+            frame = harmonize_cmj(artifact, metadata) if family == "CMJ_FORCE_PLATFORM" else harmonize_sprint(artifact, metadata)
+            table_name = "cmj_trials" if family == "CMJ_FORCE_PLATFORM" else "sprint_trials"
+            out_path = snapshot_dir / f"{table_name}.parquet"
+            frame.write_parquet(out_path, compression="zstd")
+            row_count, hashes = frame.height, {f"{table_name}.parquet": hashlib.sha256(out_path.read_bytes()).hexdigest()}
+            tables = {table_name: {"file": f"{table_name}.parquet", "rows": row_count}}
         normalization_rules = ["canonical mass units", "canonical time units", "canonical distance units", "provenance columns"]
         # manifest
         manifest_id = "PM-" + hashlib.sha256(snapshot_id.encode()).hexdigest()[:12].upper()
@@ -657,13 +769,13 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "id": manifest_id,
             "snapshot_id": snapshot_id,
             "source_artifact_ids": [artifact_id],
-            "content_hashes": {f"{table_name}.parquet": hashlib.sha256(out_path.read_bytes()).hexdigest()},
+            "content_hashes": hashes,
             "data_rights_status": rights_status,
             "parser_version": PARSER_VERSION,
             "normalization_rules": normalization_rules,
             "qc_operations": qc_operations,
             "exclusion_criteria": assessment.get("rejected_record_ids", []) + assessment.get("quarantined_record_ids", []),
-            "instrument_metadata": [get_instrument(iid) for iid in sorted(set(str(v) for v in _read_frame(artifact)["instrument_id"].to_list())) if get_instrument(iid)],
+            "instrument_metadata": [get_instrument(iid) for iid in _safe_column_values(artifact, "instrument_id") if get_instrument(iid)],
             "metric_definitions": [],
             "algorithm_versions": {"admission": PARSER_VERSION},
             "schema_version": SCHEMA_VERSION,
@@ -675,11 +787,14 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "label": f"Admitted {family} snapshot",
             "source_artifact_id": artifact_id,
             "measurement_family": family,
-            "row_count": frame.height,
+            "row_count": row_count,
             "table": table_name,
+            "tables": tables,
             "path": str(snapshot_dir),
             "rights_status": rights_status,
             "admission_status": status,
+            "admission_metadata": metadata,
+            **_synthetic_semantics(rights_status),
         })
     record = {
         "id": "AR-" + hashlib.sha256(f"{artifact_id}:{family}".encode()).hexdigest()[:12].upper(),
@@ -701,6 +816,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
         "schema_version": SCHEMA_VERSION,
         "admitted_at": _now(),
         "provenance_manifest_id": manifest_id,
+        **(_synthetic_semantics(rights_status) if snapshot_id else {}),
     }
     records = _load_list(_artifact_path("admission_records.json"))
     records = [r for r in records if r.get("source_artifact_id") != artifact_id or r.get("measurement_family") != family]
@@ -744,9 +860,10 @@ def get_admitted_snapshot(snapshot_id: str) -> dict[str, Any] | None:
         return None
     directory = _admitted_dir() / snapshot["id"]
     table = snapshot.get("table", "")
-    if table not in {"cmj_trials", "sprint_trials"}:
+    if table not in {"cmj_trials", "sprint_trials", "trace_index"}:
         return None
-    if not (directory / f"{table}.parquet").is_file():
+    tables = snapshot.get("tables") or {table: {"file": f"{table}.parquet", "rows": snapshot.get("row_count", 0)}}
+    if not all((directory / f"{name}.parquet").is_file() for name in tables):
         return None
     artifact = get_source_artifact(snapshot.get("source_artifact_id", ""))
     source = get_source(artifact.get("source_id", "")) if artifact else None
@@ -774,8 +891,8 @@ def get_admitted_snapshot(snapshot_id: str) -> dict[str, Any] | None:
         "real_data": snapshot.get("rights_status") != "FIXTURE_ONLY",
         "synthetic": snapshot.get("rights_status") == "FIXTURE_ONLY",
         "admitted_source": True,
-        "tables": {table: {"file": f"{table}.parquet", "rows": snapshot.get("row_count", 0)}},
-        "row_counts": {table: snapshot.get("row_count", 0)},
+        "tables": tables,
+        "row_counts": {name: info["rows"] for name, info in tables.items()},
         "checksums": provenance.get("content_hashes", {}),
         "admission": admission_record,
         "provenance": provenance,

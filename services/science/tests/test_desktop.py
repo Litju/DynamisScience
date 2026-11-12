@@ -178,7 +178,7 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
 
 
 def _isolated_real_root(tmp_path: Path) -> Path:
-    source_root = Path(r"D:\datasets\DynamisScience")
+    source_root = Path(os.environ.get("DYNAMISSCIENCE_TEST_SOURCE_ROOT", r"D:\datasets\DynamisScience"))
     source_snapshots = source_root / "snapshots"
     snapshot_paths = sorted(source_snapshots.glob("DS-REAL-*")) if source_snapshots.is_dir() else []
     admissions = source_root / "manifests" / "admissions.json"
@@ -983,6 +983,7 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     dialog.license.setText("Test-only license terms")
     dialog.permitted_uses.setText("research testing")
     dialog.restrictions.setPlainText("Local test data; do not redistribute")
+    dialog.privacy.setCurrentText("TEST_FIXTURE")
     dialog.rights_reviewed.setChecked(True)
     dialog.manufacturer.setText("Test")
     dialog.instrument_model.setText("Force plate")
@@ -995,6 +996,7 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     qtbot.waitUntil(lambda: dialog.quality is not None or bool(errors), timeout=30000)
     assert not errors, errors
     assert dialog.quality["status"] in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}
+    assert "QC decision: ADMITTED" in dialog.summary.toPlainText()
     dialog.admit_button.click()
     qtbot.waitUntil(
         lambda: any(item.get("dataset_snapshot_id") for item in service.list_admission_records()),
@@ -1004,10 +1006,34 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     record = service.list_admission_records()[-1]
     assert record["dataset_snapshot_id"]
     admitted = service.get_dataset_detail(record["dataset_snapshot_id"])
-    assert admitted["source"]["rights_status"] == "VERIFIED"
+    assert admitted["source"]["rights_status"] == "FIXTURE_ONLY"
+    assert admitted["synthetic"] and not admitted["real_data"]
     assert any(item["id"] == record["dataset_snapshot_id"] for item in service.list_datasets())
     dialog.close()
     window.close()
+
+
+def test_admission_dialog_preserves_sprint_coordinate_and_explains_quarantine(qtbot, tmp_path):
+    source_file = tmp_path / "sprint.csv"
+    source_file.write_text("subject_id\nP01\n", encoding="utf-8")
+    dialog = DatasetAdmissionDialog(None, None, lambda _record: None)
+    qtbot.addWidget(dialog)
+    dialog.family.setCurrentIndex(1)
+    dialog.instrument_id_input.setText("INST-FILE")
+    dialog.protocol_id_input.setText("PROT-FILE")
+    dialog.file_path.setText(str(source_file))
+    dialog.coordinate_system.setText("track lane")
+    _, instrument, protocol, file = dialog._payloads()
+    assert instrument["id"] == file["metadata"]["instrument_default"] == "INST-FILE"
+    assert protocol["id"] == file["metadata"]["protocol_default"] == "PROT-FILE"
+    assert protocol["coordinate_convention"] == "track lane"
+    assert file["metadata"]["coordinate_system"] == "track lane"
+    dialog._reviewed({"artifact": {}, "quality": {"status": "QUARANTINED",
+        "warnings": ["instrument calibration is UNKNOWN"], "counts": {"rows": 1}},
+        "family": "SPRINT_TIMING", "metadata": file["metadata"]})
+    assert "instrument calibration is UNKNOWN" in dialog.summary.toPlainText()
+    dialog._admission_recorded({"id": "AR-TEST", "dataset_snapshot_id": None})
+    assert "instrument calibration is UNKNOWN" in dialog.summary.toPlainText()
 
 
 def test_native_cohort_and_plan_forms_support_freeze_fork_and_history(

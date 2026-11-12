@@ -1,0 +1,120 @@
+{
+  "steps": [
+    {
+      "screenshot": "01-unknown-file-review.png",
+      "sha256": "0c17eba5cacaffa3557733d4a2c64003e7f57e70bcbba1f0646d369d365f25ed",
+      "note": "unknown CSV: detected mapping, session and sampling rate requested, nothing assumed"
+    },
+    {
+      "screenshot": "02-qc-verdict-synthetic-only.png",
+      "sha256": "1cb3fa1e16b8a85bb1c7f55f93bcfe7ba923f3f158e14681c47587e50ed9e05d",
+      "note": "QC verdict ADMITTED_WITH_WARNINGS/ADMITTED, SYNTHETIC_ONLY, storage outcome"
+    },
+    {
+      "screenshot": "03-admitted.png",
+      "sha256": "5fb641e3414758fef0ddc4424ea2e1d5046d8a630ccc081d042817f0ab7cdeec",
+      "note": "snapshot stored"
+    },
+    {
+      "screenshot": "04-preset-saved.png",
+      "sha256": "0e4e87b3506ccbadba057081f3e024b80383734b2704600f37da87ba688bb24f",
+      "note": "preset saved against the schema fingerprint"
+    },
+    {
+      "screenshot": "05-preset-repeat-import.png",
+      "sha256": "2b8ca2ed947249d6b040176cdc8aef5a7e15b4fed3dc968197b1bce839beef7a",
+      "note": "repeat import: preset applied, QC already run, one click left (Admit)"
+    },
+    {
+      "screenshot": "06-schema-drift.png",
+      "sha256": "a04ab6c94cd2afcd742d4725c672ab1d6fccd96557785280817c8ae94d1bbe76",
+      "note": "schema drift: preset not reused, review required"
+    },
+    {
+      "screenshot": "07-invalid-rejected.png",
+      "sha256": "083f9fb05ce115d706c2c4468b2e6cad29d237b25de59c74ec885068e5b8b4ae",
+      "note": "invalid data: REJECTED, Admit disabled"
+    },
+    {
+      "screenshot": "08-quarantined.png",
+      "sha256": "d7ff6a3a60b697ca38d1baab0486d8cd610b216e8d05094b069a012cb5a37e93",
+      "note": "quarantined without a snapshot"
+    },
+    {
+      "screenshot": "09-folder-import.png",
+      "sha256": "e1003b553782bea080f15b2ffd3196d313044fd3641da8e3e718a1aff97d5819",
+      "note": "bounded folder import: one row per file"
+    },
+    {
+      "screenshot": "10-raw-force-time-held.png",
+      "sha256": "9d9266799ebc31c2c3d2c23af23d872f28847561e0e76c0e448381db5600fd8f",
+      "note": "raw force-time export recognised but not imported (vendor layout unverified)"
+    },
+    {
+      "screenshot": "11-main-window-after-import.png",
+      "sha256": "e90a866c341d4db88a7667cba423987e0f7d53e7bb356c5b7447945f31628d8b",
+      "note": "main window with the admitted snapshots in the catalogue"
+    }
+  ],
+  "data_root": "D:\\SWE_HOME\\tmp\\res636-walk-w6isg0ly\\private",
+  "admitted_snapshots": [
+    "DS-ADMITTED-2796C0B439BB",
+    "DS-ADMITTED-E7B27EFB9499"
+  ],
+  "visible_in_workbench_catalogue": [
+    "DS-ADMITTED-2796C0B439BB",
+    "DS-ADMITTED-E7B27EFB9499"
+  ],
+  "workbench_read_table_rows": 3,
+  "import_receipts": [
+    {
+      "id": "IR-577B7D97798C",
+      "raw_filename": "cmj_a.csv",
+      "raw_sha256": "8778b914bd5876385bda602210cb7f0cf5dcbf9c3a8d5bf5a8e50fe757159ae6",
+      "decision": "ADMITTED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    },
+    {
+      "id": "IR-20ECD7DA50DE",
+      "raw_filename": "cmj_b.csv",
+      "raw_sha256": "bfe141734c2fd7ae76e7d9ffe8298b5bd4da47f8b2904b2c5423d3a792479af5",
+      "decision": "STAGED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    },
+    {
+      "id": "IR-5D5A5713C827",
+      "raw_filename": "cmj_c.csv",
+      "raw_sha256": "96310186c3656739f23295832fb69b1cba16c1e59f0850437fecdd5854940cf8",
+      "decision": "ADMITTED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    },
+    {
+      "id": "IR-5F3BFD91C233",
+      "raw_filename": "bad.csv",
+      "raw_sha256": "8962b9481de9e553696c76540c52e401f52ff9fe0435121ee694f4c6ab318fa1",
+      "decision": "QUARANTINED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    },
+    {
+      "id": "IR-579C236A7B92",
+      "raw_filename": "f0.csv",
+      "raw_sha256": "51c11c56085727144d023724ed24a52610b8b8505921a749bc3ec308ed23aaec",
+      "decision": "STAGED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    },
+    {
+      "id": "IR-2383D6804015",
+      "raw_filename": "f1.csv",
+      "raw_sha256": "d9471b64a77c063a0637f40825ac0a6734bd64906d2bafee8166cf34a8924858",
+      "decision": "STAGED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    },
+    {
+      "id": "IR-58132B8450B6",
+      "raw_filename": "f2.csv",
+      "raw_sha256": "de2d650c7e3849a01d63f69de79f0804ce6abb946936087ac451e8da5e82310d",
+      "decision": "STAGED",
+      "source_id": "SRC-IMP-B82F1D3A"
+    }
+  ]
+}

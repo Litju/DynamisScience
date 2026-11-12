@@ -232,9 +232,6 @@ QPushButton[primary="true"]:disabled { background: $line; border-color: $line; c
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit { padding: 4px 8px; min-height: 21px; border-color: $line2; }
 QComboBox::drop-down { border: 0; width: 18px; }
 QComboBox QAbstractItemView { background: $base; border: 1px solid $line2; }
-QCheckBox::indicator { width: 15px; height: 15px; border: 1px solid $line2; border-radius: 4px; background: $base; }
-QCheckBox::indicator:checked { background: $accent; border-color: $accent; }
-QCheckBox::indicator:disabled { border-color: $line; background: $alt; }
 QTabWidget::pane { border: 1px solid $line; background: $window; border-radius: 6px; top: -1px; }
 QTabBar::tab { background: transparent; color: $dim_text; border: 0; border-bottom: 2px solid transparent;
     padding: 6px 10px; margin-right: 2px; }

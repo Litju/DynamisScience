@@ -75,7 +75,9 @@ def test_authored_project_study_cohort_plan_and_report_versions(tmp_path, monkey
     service.cite_report_artifact(study_id, evidence["id"])
     version = service.freeze_report(study_id)["version"]
     report = service.export_report_html(study_id, tmp_path / "report-v1.html", version)
-    assert run["id"] in report.read_text(encoding="utf-8")
+    report_html = report.read_text(encoding="utf-8")
+    assert run["id"] in report_html
+    assert "Student-t 95% CI for final-point mean (not the change)" in report_html
     assert researchstore.report_versions(study_id)[0]["status"] == "FROZEN"
     first_report = service.get_report_version(study_id, version)
     draft_report = service.update_report(

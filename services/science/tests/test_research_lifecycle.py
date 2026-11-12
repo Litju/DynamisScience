@@ -305,9 +305,56 @@ def test_frozen_report_version_is_stable(root):
     # A second freeze at the same version is idempotent and cannot rewrite history.
     again = researchstore.freeze_report(study_id)
     assert again["content_hash"] == frozen["content_hash"]
+    researchstore.update_project(project["id"], {"title": "Changed project title"})
+    researchstore.update_entity(study_id, {"title": "Changed study title"})
     after = researchstore.export_html(study_id, frozen["version"])
     assert "EVID-U-0001" in before and "EVID-U-0001" in after
+    assert "Changed project title" not in after and "Changed study title" not in after
     assert before == after
+
+
+def test_reliability_evidence_uses_dimensionless_icc(monkeypatch):
+    monkeypatch.setattr(researchanalysis, "_metric_label", lambda *_: {
+        "id": "force", "label": "Peak force", "unit": "N", "table": "signal_trials"})
+    monkeypatch.setattr(researchstore, "get_snapshot", lambda *_: {})
+    run = {"id": "RUN-1", "snapshot_id": "DS-1", "outcome_metric_id": "force",
+           "method_id": "METH-REAL-RELIABILITY", "analysis_spec_id": "SPEC-1", "cohort_id": "COHORT-1",
+           "result": {"status": "COMPUTED", "icc_3_1": 0.89, "icc_3_1_ci_low": 0.74,
+                      "icc_3_1_ci_high": 0.97, "mean_cv_percent": 5.0, "typical_error": 75.8,
+                      "activity": "Walking"}}
+    evidence = researchanalysis._evidence_profile(run, {"id": "STUDY-1"})["evidence"]
+    assert evidence["unit"] == "dimensionless"
+    assert "75.8 N" in evidence["interpretation"]
+    historical = researchstore._report_evidence_unit({"unit": "N"}, run)
+    assert historical == "dimensionless (recorded unit: N; corrected for display)"
+
+
+@pytest.mark.parametrize("method,version", [("METH-REAL-TREND", "9.9.9"),
+                                            ("METH-UNKNOWN", "1.0.0"),
+                                            ("METH-REAL-TREND", None)])
+def test_unknown_method_versions_cannot_be_promoted(method, version):
+    run = {"id": "RUN-UNKNOWN", "method_id": method, "method_version": version}
+    assert researchstore.method_status(run)["state"] == "UNVERIFIED"
+    with pytest.raises(researchstore.ResearchValidation, match="unverified"):
+        researchstore.ensure_current(run, "promote new evidence")
+
+
+def test_legacy_frozen_report_warns_when_context_was_not_saved(root):
+    project = researchstore.create_project("Legacy report project")
+    detail = _study(project["id"])
+    study_id = detail["study"]["id"]
+    frozen = researchstore.freeze_report(study_id)
+    with researchstore._tx() as connection:
+        row = connection.execute("SELECT document FROM report_versions WHERE entity_id = ? AND version = ?",
+                                 (study_id, frozen["version"])).fetchone()
+        document = json.loads(row["document"])
+        for key in ("study", "project", "question", "hypotheses", "snapshot"):
+            document["frozen_content"].pop(key)
+        old_hash = researchstore._digest(document["frozen_content"])
+        connection.execute("UPDATE report_versions SET document = ?, content_hash = ? WHERE entity_id = ? AND version = ?",
+                           (researchstore._canonical(document), old_hash, study_id, frozen["version"]))
+    assert researchstore.freeze_report(study_id)["content_hash"] == old_hash
+    assert "Historical context incomplete" in researchstore.export_html(study_id, frozen["version"])
 
 
 def test_archived_project_keeps_children(root):
@@ -335,3 +382,24 @@ def test_dataset_binding_is_snapshot_bound(root):
                 "min_metric_observations": 1,
             },
         )
+
+
+def test_failed_isolated_worker_leaves_no_run_or_evidence(tmp_path, monkeypatch):
+    from dynamis_science.desktop.services import DynamisAppService
+
+    monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "root"))
+    service = DynamisAppService()
+    service.ensure_initialized()
+
+    def snapshot():
+        return {p.relative_to(service.root).as_posix(): p.stat().st_size
+                for p in service.root.rglob("*") if p.is_file() and p.suffix in {".json", ".parquet"}}
+
+    before = snapshot()
+    with pytest.raises(RuntimeError, match="persisted research study"):
+        service.execute_analysis_isolated(
+            "STUDY-DOES-NOT-EXIST",
+            {"method_id": "METH-REAL-TREND", "outcome_metric_id": "jump_height"},
+        )
+    assert snapshot() == before
+    assert not list((service.root / "tmp").glob("worker-*"))

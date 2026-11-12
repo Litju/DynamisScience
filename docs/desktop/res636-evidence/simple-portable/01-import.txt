@@ -1,0 +1,126 @@
+Window: "DynamisScience", App: DynamisScience.exe.
+	0 window (settable, string) DynamisScience Secondary Actions: Raise ID: QApplication.MainWindow
+		91 window (settable, string) Import data Secondary Actions: Raise ID: QApplication.ImportReviewDialog
+			92 title bar (settable, string) Value: Import data
+				93 menu bar System ID: MenuBar
+					94 menu item System
+				95 button Close
+			96 text Import your data ID: QApplication.ImportReviewDialog.QLabel
+			97 text Drag a file here, or choose one from your computer. ID: QApplication.ImportReviewDialog.QLabel
+			98 group (settable, string) Drop zone ID: QApplication.ImportReviewDialog.DropZone
+				99 text Drop your file here ID: QApplication.ImportReviewDialog.DropZone.QLabel
+				100 button (settable, string) Choose file ID: QApplication.ImportReviewDialog.DropZone.QPushButton
+				101 text CSV · TSV · Excel · Parquet · Arrow · JSON ID: QApplication.ImportReviewDialog.DropZone.QLabel
+				102 button (settable, string) Choose folder… ID: QApplication.ImportReviewDialog.DropZone.QPushButton
+			103 text Import summary ID: QApplication.ImportReviewDialog.QLabel
+			104 checkbox (check box) (settable, string) View details / Advanced ID: QApplication.ImportReviewDialog.QPushButton
+			105 button (settable, string) Close ID: QApplication.ImportReviewDialog.QPushButton
+		1 title bar (settable, string) Value: DynamisScience
+			2 menu bar System ID: MenuBar
+				3 menu item System
+			4 button Minimize
+			5 button Maximize
+			6 button Close
+		7 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget
+			8 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell
+				9 toolbar (tool bar) (settable, string) Analyses ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon
+					10 checkbox (check box) (settable, string) Descriptives ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					11 checkbox (check box) (settable, string) T-Tests ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					12 checkbox (check box) (settable, string) ANOVA ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					13 checkbox (check box) (settable, string) Regression ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					14 checkbox (check box) (settable, string) Mixed Models ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					15 checkbox (check box) (settable, string) Reliability ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					16 checkbox (check box) (settable, string) Frequencies ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					17 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolBarSeparator
+					18 checkbox (check box) (settable, string) Signals ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					19 checkbox (check box) (settable, string) Athlete change ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+					20 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QWidget
+					21 button (settable, string) Search commands (Ctrl+K) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.PaletteLauncher
+					22 custom (settable, string) Run state: No results yet ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill
+						23 text ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill.RunStateDot
+						24 text No results yet ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill.QLabel
+					25 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.Segmented
+						26 checkbox (check box) (settable, string) Light theme ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.Segmented.QPushButton
+						27 checkbox (check box) (settable, string) Dark theme ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchRibbon.Segmented.QPushButton
+				28 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk
+					29 custom (settable, string) Workbench panes ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter
+						30 custom (settable, string) Results pane ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+							31 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+								32 text Results ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+								33 button (settable, string) Run analysis ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+								34 button (disabled, settable, string) Export ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+								35 button (disabled, settable, string) Add to report ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+							36 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar
+								37 text SYNTAX ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxCaption
+								38 text field (edit) Python syntax equivalent ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxText
+									39 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxText.qt_scrollarea_viewport
+								40 button (settable, string) Copy syntax ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.QPushButton
+							41 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget
+								42 group (settable, string) Results document ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument
+									43 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument.qt_scrollarea_viewport
+										44 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument.qt_scrollarea_viewport.ResultsCanvas
+											45 text Run an analysis to see results here. ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument.qt_scrollarea_viewport.ResultsCanvas.PaneEmpty
+						46 custom (settable, string) Analysis options pane ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+							47 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+								48 text Analysis options ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+							49 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.OptionsPane
+								50 text Open a dataset or study to assign variables. ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.OptionsPane.PaneEmpty
+						51 custom (settable, string) Data pane ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+							52 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+								53 text Data ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+								54 text Open research context ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneContext
+							55 group (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane
+								56 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible
+									57 checkbox (check box) (settable, string) Library section ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QToolButton
+									58 tree (settable, string) Research navigator ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										59 tree item (selectable, settable, string) Projects ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										60 tree item (selectable, settable, string) Studies and monitoring ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										61 tree item (selectable, settable, string) CMJ Response to 8-Week Strength Intervention ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										62 tree item (selectable, settable, string) Datasets ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										63 tree item (selectable, settable, string) Synthetic football longitudinal snapshot ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										64 tree item (selectable, settable, string) Performance OS · synthetic fixture ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										65 tree item (selectable, settable, string) Today ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										66 tree item (selectable, settable, string) Athlete 360 ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+								67 combo box (disabled, settable, string) Table ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QComboBox
+								68 custom (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented
+									69 checkbox (check box) (disabled, settable, string) By athlete view ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+									70 checkbox (check box) (disabled, settable, string) Variables view ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+									71 checkbox (check box) (disabled, settable, string) Rows view ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+								72 pane (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget
+									73 text Open a dataset or study to see its data. ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.PaneEmpty
+								74 text Dataset summary ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.PaneContext
+						75 thumb (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.qt_splithandle_WorkbenchPane
+						76 thumb (settable, string) ID: QApplication.MainWindow.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.qt_splithandle_WorkbenchPane
+		77 status bar ID: QApplication.MainWindow.QStatusBar
+			78 thumb (settable, string) ID: QApplication.MainWindow.QStatusBar.QSizeGrip
+			79 text Application status ID: QApplication.MainWindow.QStatusBar.QLabel
+			80 group (settable, string) ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus
+				81 text Scientific provenance ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus.QLabel
+		82 menu bar (settable, string) ID: QApplication.MainWindow.QMenuBar
+			83 menu item (settable, string) File ID: QApplication.MainWindow.QMenuBar.QAction
+			84 menu item (settable, string) Research ID: QApplication.MainWindow.QMenuBar.QAction
+			85 menu item (settable, string) Tools ID: QApplication.MainWindow.QMenuBar.QAction
+			86 menu item (settable, string) Analyses ID: QApplication.MainWindow.QMenuBar.QAction
+			87 menu item (settable, string) Results ID: QApplication.MainWindow.QMenuBar.QAction
+			88 menu item (settable, string) View ID: QApplication.MainWindow.QMenuBar.QAction
+			89 menu item (settable, string) Perspective ID: QApplication.MainWindow.QMenuBar.QAction
+			90 menu item (settable, string) Help ID: QApplication.MainWindow.QMenuBar.QAction
+		91 window (settable, string) Import data Secondary Actions: Raise ID: QApplication.ImportReviewDialog
+			92 title bar (settable, string) Value: Import data
+				93 menu bar System ID: MenuBar
+					94 menu item System
+				95 button Close
+			96 text Import your data ID: QApplication.ImportReviewDialog.QLabel
+			97 text Drag a file here, or choose one from your computer. ID: QApplication.ImportReviewDialog.QLabel
+			98 group (settable, string) Drop zone ID: QApplication.ImportReviewDialog.DropZone
+				99 text Drop your file here ID: QApplication.ImportReviewDialog.DropZone.QLabel
+				100 button (settable, string) Choose file ID: QApplication.ImportReviewDialog.DropZone.QPushButton
+				101 text CSV · TSV · Excel · Parquet · Arrow · JSON ID: QApplication.ImportReviewDialog.DropZone.QLabel
+				102 button (settable, string) Choose folder… ID: QApplication.ImportReviewDialog.DropZone.QPushButton
+			103 text Import summary ID: QApplication.ImportReviewDialog.QLabel
+			104 checkbox (check box) (settable, string) View details / Advanced ID: QApplication.ImportReviewDialog.QPushButton
+			105 button (settable, string) Close ID: QApplication.ImportReviewDialog.QPushButton
+
+Document text: ```
+No results yet
+```

@@ -1,0 +1,111 @@
+Window: "DynamisScience", App: DynamisScience.exe.
+	0 window (settable, string) DynamisScience Secondary Actions: Raise ID: QApplication.MainWindow
+		84 window (settable, string) Import data Secondary Actions: Raise ID: QApplication.ImportReviewDialog
+			85 title bar (settable, string) Value: Import data
+				86 menu bar System ID: MenuBar
+					87 menu item System
+				88 button Close
+			89 text Integrating your data… ID: QApplication.ImportReviewDialog.QLabel
+			96 text Import summary ID: QApplication.ImportReviewDialog.QLabel
+			221 text Extracting → Validating → Saving → Integrating Extracting ID: QApplication.ImportReviewDialog.QLabel
+			222 progress bar Import processing Value: -1 ID: QApplication.ImportReviewDialog.QProgressBar
+			97 checkbox (check box) (disabled, settable, string) View details / Advanced ID: QApplication.ImportReviewDialog.QPushButton
+			98 button (settable, string) Close ID: QApplication.ImportReviewDialog.QPushButton
+		1 title bar (settable, string) Value: DynamisScience
+			2 menu bar System ID: MenuBar
+				3 menu item System
+			4 button Minimize
+			5 button Maximize
+			6 button Close
+		7 group (settable, string) ID: QApplication.MainWindow.QScrollArea
+			8 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport
+				9 pane (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget
+					10 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell
+						11 toolbar (tool bar) (settable, string) Analyses ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon
+							12 checkbox (check box) (settable, string) Descriptives ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							13 checkbox (check box) (settable, string) T-Tests ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							14 checkbox (check box) (settable, string) ANOVA ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							15 checkbox (check box) (settable, string) Regression ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							16 checkbox (check box) (settable, string) Mixed Models ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							17 checkbox (check box) (settable, string) Reliability ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							18 checkbox (check box) (settable, string) Frequencies ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							19 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolBarSeparator
+							20 checkbox (check box) (settable, string) Signals ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							21 checkbox (check box) (settable, string) Athlete change ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QToolButton
+							22 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.QWidget
+							23 button (settable, string) Search commands (Ctrl+K) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.PaletteLauncher
+							24 custom (settable, string) Run state: No results yet ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill
+								25 text ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill.RunStateDot
+								26 text No results yet ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchRibbon.RunStatePill.QLabel
+						27 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk
+							28 custom (settable, string) Workbench panes ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter
+								29 custom (settable, string) Results pane ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+									30 custom (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+										31 text Results ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+										32 button (settable, string) Run analysis ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+										33 button (disabled, settable, string) Export ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+										34 button (disabled, settable, string) Add to report ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.QPushButton
+									35 custom (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar
+										36 text SYNTAX ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxCaption
+										37 text field (edit) Python syntax equivalent ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxText
+											38 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.SyntaxText.qt_scrollarea_viewport
+										39 button (settable, string) Copy syntax ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.SyntaxBar.QPushButton
+									40 pane (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget
+										41 group (settable, string) Results document ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument
+											42 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument.qt_scrollarea_viewport
+												43 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument.qt_scrollarea_viewport.ResultsCanvas
+													44 text Run an analysis to see results here. ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.QStackedWidget.ResultsDocument.qt_scrollarea_viewport.ResultsCanvas.PaneEmpty
+								45 custom (settable, string) Data pane ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane
+									46 custom (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader
+										47 text Data ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneTitle
+										48 text Open research context ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.PaneHeader.PaneContext
+									49 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane
+										50 custom (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible
+											51 checkbox (check box) (settable, string) Library section ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QToolButton
+											52 tree (settable, string) Research navigator ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+												79 tree item (selectable, settable, string) Projects ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+												80 tree item (selectable, settable, string) Studies and monitoring ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+												81 tree item (selectable, settable, string) CMJ Response to 8-Week Strength Intervention ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+												82 tree item (selectable, settable, string) Datasets ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+												83 tree item (selectable, settable, string) Synthetic football longitudinal snapshot ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane._Collapsible.QTreeWidget
+										53 combo box (disabled, settable, string) Table ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QComboBox
+										54 custom (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented
+											55 checkbox (check box) (disabled, settable, string) By athlete view ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+											56 checkbox (check box) (disabled, settable, string) Variables view ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+											57 checkbox (check box) (disabled, settable, string) Rows view ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.Segmented.QPushButton
+										58 pane (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget
+											59 text Open a dataset or study to see its data. ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.QStackedWidget.PaneEmpty
+										60 text Dataset summary ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.WorkbenchPane.DataPane.PaneContext
+								61 thumb (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_viewport.QStackedWidget.WorkbenchShell.WorkbenchDesk.WorkbenchSplitter.qt_splithandle_WorkbenchPane
+			62 group (settable, string) ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_vcontainer
+				63 scroll bar (settable, float) Value: 0 ID: QApplication.MainWindow.QScrollArea.qt_scrollarea_vcontainer.QScrollBar
+		64 status bar ID: QApplication.MainWindow.QStatusBar
+			65 thumb (settable, string) ID: QApplication.MainWindow.QStatusBar.QSizeGrip
+			66 text Application status ID: QApplication.MainWindow.QStatusBar.QLabel
+			223 progress bar Background task in progress Value: -1 ID: QApplication.MainWindow.QStatusBar.QProgressBar
+			68 group (settable, string) ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus
+				69 text Scientific provenance ID: QApplication.MainWindow.QStatusBar.ProvenanceStatus.QLabel
+		70 menu bar (settable, string) ID: QApplication.MainWindow.QMenuBar
+			71 menu item (settable, string) File ID: QApplication.MainWindow.QMenuBar.QAction
+			72 menu item (settable, string) Research ID: QApplication.MainWindow.QMenuBar.QAction
+			73 menu item (settable, string) Tools ID: QApplication.MainWindow.QMenuBar.QAction
+			74 menu item (settable, string) Analyses ID: QApplication.MainWindow.QMenuBar.QAction
+			75 menu item (settable, string) Results ID: QApplication.MainWindow.QMenuBar.QAction
+			76 menu item (settable, string) View ID: QApplication.MainWindow.QMenuBar.QAction
+			77 menu item (settable, string) Perspective ID: QApplication.MainWindow.QMenuBar.QAction
+			78 menu item (settable, string) Help ID: QApplication.MainWindow.QMenuBar.QAction
+		84 window (settable, string) Import data Secondary Actions: Raise ID: QApplication.ImportReviewDialog
+			85 title bar (settable, string) Value: Import data
+				86 menu bar System ID: MenuBar
+					87 menu item System
+				88 button Close
+			89 text Integrating your data… ID: QApplication.ImportReviewDialog.QLabel
+			96 text Import summary ID: QApplication.ImportReviewDialog.QLabel
+			221 text Extracting → Validating → Saving → Integrating Extracting ID: QApplication.ImportReviewDialog.QLabel
+			222 progress bar Import processing Value: -1 ID: QApplication.ImportReviewDialog.QProgressBar
+			97 checkbox (check box) (disabled, settable, string) View details / Advanced ID: QApplication.ImportReviewDialog.QPushButton
+			98 button (settable, string) Close ID: QApplication.ImportReviewDialog.QPushButton
+
+Document text: ```
+No results yet
+```

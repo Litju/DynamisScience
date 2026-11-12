@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 from pathlib import Path
@@ -24,7 +25,7 @@ from dynamis_science.desktop.workbench.results import (  # noqa: E402
 )
 from dynamis_science.desktop.workbench.spec import AnalysisSpec  # noqa: E402
 
-PRIVATE = Path(r"D:\datasets\DynamisScience")
+PRIVATE = Path(os.environ.get("DYNAMISSCIENCE_TEST_SOURCE_ROOT", r"D:\datasets\DynamisScience"))
 
 
 @pytest.fixture(scope="module")
@@ -62,6 +63,11 @@ def test_helpers():
     assert superseded["kind"] == "superseded" and not superseded["promotable"]
     current = run_method_state({"method_id": "METH-REAL-TREND", "method_version": "1.1.0", "status": "COMPLETED", "result": {}})
     assert current["kind"] == "qualified" and current["promotable"]
+    unknown = run_method_state({"method_id": "METH-REAL-TREND", "method_version": "9.9.9", "status": "COMPLETED", "result": {}})
+    assert unknown["kind"] == "not_qualified" and not unknown["promotable"]
+    figure, _ = figures._new(theme.tokens())
+    figures._finish(figure, {"method_status": {"state": "UNVERIFIED"}}, theme.tokens())
+    assert "UNVERIFIED" in figure._suptitle.get_text()
     insufficient = run_method_state({"method_id": "METH-REAL-RELIABILITY", "method_version": "1.1.0", "status": "COMPLETED",
                                      "result": {"status": "INSUFFICIENT_DATA", "message": "too few"}})
     assert insufficient["kind"] == "unavailable" and not insufficient["promotable"]
