@@ -6,6 +6,7 @@ Tapping a tile opens the athlete; from there the researcher opens or branches in
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Callable
 
 from matplotlib.figure import Figure
@@ -44,6 +45,16 @@ RunTask = Callable[[Callable[[], Any], Callable[[Any], None], str], None]
 TILE_WIDTH = 176
 
 
+def _x(point: Any) -> Any:
+    """ISO dates plot on a time axis; occasions and weeks stay numeric."""
+    if isinstance(point, str):
+        try:
+            return date.fromisoformat(point)
+        except ValueError:
+            return point
+    return point
+
+
 def _fmt(value: Any, digits: int = 1, suffix: str = "") -> str:
     return "—" if value is None else f"{value:+.{digits}f}{suffix}" if suffix == "%" else f"{value:.{digits}f}{suffix}"
 
@@ -62,13 +73,13 @@ def flag_text(flag: dict[str, Any]) -> str:
 
 
 class AthleteTile(QToolButton):
-    def __init__(self, athlete: dict[str, Any], parent: QWidget | None = None) -> None:
+    def __init__(self, athlete: dict[str, Any], time_word: str = "tests", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.athlete = athlete
         flag = athlete["flags"][0] if athlete["flags"] else None
         arrow = {"up": "↑", "down": "↓", "flat": "→"}.get(athlete["trend"], "·")
         lines = [athlete["display_id"], flag["category"] if flag else " ",
-                 f"{athlete['tests']}/{athlete['tests_expected']} tests · {arrow} {_fmt(athlete['change_from_baseline_pct'], 1, '%')}"]
+                 f"{athlete['tests']}/{athlete['tests_expected']} {time_word} · {arrow} {_fmt(athlete['change_from_baseline_pct'], 1, '%')}"]
         if len(athlete["flags"]) > 1:
             lines[1] += f" +{len(athlete['flags']) - 1}"
         self.setText("\n".join(lines))
@@ -102,11 +113,16 @@ class SquadBoard(QWidget):
         self.group_picker = QComboBox()
         self.group_picker.setAccessibleName("Group athletes by")
         self.group_picker.activated.connect(lambda _: self.reload())
+        self.metric_picker = QComboBox()
+        self.metric_picker.setAccessibleName("Metric shown on tiles")
+        self.metric_picker.activated.connect(lambda _: self.reload())
         self.rules_button = QPushButton("Flag rules…")
         self.rules_button.clicked.connect(self.edit_rules)
         self.simulate_button = QPushButton("Simulate squad…")
         self.simulate_button.clicked.connect(lambda: self.simulate(None))
         bar.addWidget(self.title, 1)
+        bar.addWidget(QLabel("Show"))
+        bar.addWidget(self.metric_picker)
         bar.addWidget(QLabel("Group by"))
         bar.addWidget(self.group_picker)
         research = QPushButton("Research workbench")
@@ -129,6 +145,7 @@ class SquadBoard(QWidget):
     def set_workspace(self, workspace_id: str | None) -> None:
         self.workspace_id = workspace_id
         self.board = {}
+        self.metric_picker.clear()  # a new workspace starts from its own outcome
         self.scroll.takeWidget()
         self.setEnabled(bool(workspace_id))
         if workspace_id:
@@ -140,7 +157,8 @@ class SquadBoard(QWidget):
         self.generation += 1
         generation, workspace_id = self.generation, self.workspace_id
         group_by = self.group_picker.currentData() or "category"
-        self.run_task(lambda: self.service.squad_board(workspace_id, group_by),
+        metric_id = self.metric_picker.currentData()
+        self.run_task(lambda: self.service.squad_board(workspace_id, group_by, metric_id),
                       lambda board: self._loaded(board) if (generation, workspace_id) == (self.generation, self.workspace_id) else None,
                       "Loading squad")
 
@@ -158,6 +176,12 @@ class SquadBoard(QWidget):
             self.group_picker.addItem(labels.get(option, option.replace("_", " ").capitalize()), option)
         self.group_picker.setCurrentIndex(max(0, self.group_picker.findData(board["group_by"])))
         self.group_picker.blockSignals(False)
+        self.metric_picker.blockSignals(True)
+        self.metric_picker.clear()
+        for metric in board["metrics"]:
+            self.metric_picker.addItem(f"{metric['label']} ({metric['unit']})", metric["id"])
+        self.metric_picker.setCurrentIndex(max(0, self.metric_picker.findData(board["metric"]["id"])))
+        self.metric_picker.blockSignals(False)
         content = QWidget()
         grid = QVBoxLayout(content)
         columns = max(1, (self.scroll.viewport().width() - 16) // (TILE_WIDTH + 10))
@@ -168,7 +192,7 @@ class SquadBoard(QWidget):
             tiles.setHorizontalSpacing(10)
             tiles.setVerticalSpacing(10)
             for index, athlete in enumerate(group["athletes"]):
-                tile = AthleteTile(athlete)
+                tile = AthleteTile(athlete, board.get("time_word", "tests"))
                 tile.clicked.connect(lambda _=False, value=athlete: self.athlete_opened.emit(value))
                 tiles.addWidget(tile, index // columns, index % columns, Qt.AlignmentFlag.AlignLeft)
             tiles.setColumnStretch(columns, 1)
@@ -503,7 +527,7 @@ class AthletePage(QWidget):
             self.cards.takeAt(0).widget().deleteLater()
         unit = self.board.board["metric"]["unit"]
         for label, value in (("Latest", _fmt(athlete["latest"], 2, f" {unit}")), ("Change from baseline", _fmt(athlete["change_from_baseline_pct"], 1, "%")),
-                             ("Tests", f"{athlete['tests']}/{athlete['tests_expected']}"), ("Flags", str(len(athlete["flags"])))):
+                             (self.board.board.get("time_word", "tests").capitalize(), f"{athlete['tests']}/{athlete['tests_expected']}"), ("Flags", str(len(athlete["flags"])))):
             card = QLabel(f"<span style='font-size:11px'>{label}</span><br><b>{value}</b>")
             card.setObjectName("MetricCard")
             card.setFrameShape(QFrame.Shape.StyledPanel)
@@ -521,16 +545,24 @@ class AthletePage(QWidget):
         figure = Figure(figsize=(5, 3), constrained_layout=True)
         axis = figure.subplots()
         metric = self.board.board["metric"]
-        points = [item["point"] for item in athlete["series"]]
-        axis.plot(points, [item["value"] for item in athlete["series"]], marker="o", color=theme.tokens()["obs"], label=f"{athlete['display_id']} observed")
+        points = [_x(item["point"]) for item in athlete["series"]]
+        dense = len(points) > 15
+        axis.plot(points, [item["value"] for item in athlete["series"]], marker="." if dense else "o", markersize=4 if dense else 6,
+                  color=theme.tokens()["obs"], label=f"{athlete['display_id']} observed")
         squad = {}
         for group in self.board.board["groups"]:
             for other in group["athletes"]:
                 for item in other["series"]:
-                    squad.setdefault(item["point"], []).append(item["value"])
+                    squad.setdefault(_x(item["point"]), []).append(item["value"])
         xs = sorted(squad)
         axis.plot(xs, [sum(squad[x]) / len(squad[x]) for x in xs], linestyle="--", color=theme.tokens()["dim"], label="Squad mean")
         axis.set_ylabel(f"{metric['label']} ({metric['unit']})")
+        if points and isinstance(points[0], date):
+            from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
+
+            locator = AutoDateLocator(maxticks=6)
+            axis.xaxis.set_major_locator(locator)
+            axis.xaxis.set_major_formatter(ConciseDateFormatter(locator))
         axis.legend(frameon=False, fontsize=8)
         self.figure.show_figure(figure)
 

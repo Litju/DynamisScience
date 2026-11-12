@@ -628,7 +628,7 @@ def read_snapshot_table(snapshot_id: str, table: str) -> pl.DataFrame:
         if real.get("admitted_source"):
             if table == "subjects" and table not in _table_names(real):
                 observation_table = next(
-                    (name for name in ("cmj_trials", "sprint_trials") if name in _table_names(real)),
+                    (name for name in ("cmj_trials", "sprint_trials", "monitoring") if name in _table_names(real)),
                     None,
                 )
                 if observation_table is None:
@@ -703,8 +703,6 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
         return result
     # Synthetic fixture: keep the same metric identities used by the accepted UI.
     tables = set(_table_names(snapshot))
-    if snapshot.get("admitted_source") and not (tables & {"cmj_trials"}):
-        return []
     candidates = [
         ("MET-CMJ-IMPULSE", "Concentric impulse", "N·s·kg⁻¹", "concentric_impulse_n_s_kg", "cmj_trials", "PRIMARY"),
         ("MET-CMJ-HEIGHT", "Jump height (flight time)", "cm", "jump_height_cm", "cmj_trials", "SECONDARY"),
@@ -712,6 +710,15 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
         ("MET-CMJ-POWER", "Peak power", "W·kg⁻¹", "peak_power_w_kg", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-DEPTH", "Countermovement depth", "cm", "countermovement_depth_cm", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-RSI-MOD", "RSI-mod", "cm·s⁻¹", "rsi_mod", "cmj_trials", "CONTEXT"),
+        # RES-647 athlete monitoring; questionnaire items keep the scale the source used.
+        ("MET-MON-LOAD", "Training load", "AU", "training_load_au", "monitoring", "SECONDARY"),
+        ("MET-MON-SLEEP", "Sleep duration", "h", "sleep_hours", "monitoring", "SECONDARY"),
+        ("MET-MON-SLEEP-QUALITY", "Sleep quality", "score", "sleep_quality", "monitoring", "SECONDARY"),
+        ("MET-MON-WELLNESS", "Wellness", "score", "wellness_score", "monitoring", "SECONDARY"),
+        ("MET-MON-FATIGUE", "Fatigue", "score", "fatigue", "monitoring", "SECONDARY"),
+        ("MET-MON-SORENESS", "Muscle soreness", "score", "soreness", "monitoring", "SECONDARY"),
+        ("MET-MON-STRESS", "Stress", "score", "stress", "monitoring", "SECONDARY"),
+        ("MET-MON-MOOD", "Mood", "score", "mood", "monitoring", "SECONDARY"),
     ]
     result = [
         {"id": metric_id, "metric_id": metric_id, "label": label, "unit": unit, "column": column, "table": table, "definition_id": metric_id, "status": "ACTIVE", "role": role}
@@ -721,9 +728,9 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
     if snapshot.get("admitted_source"):
         import pyarrow.parquet as pq
 
-        path = (paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]) / snapshot_id / "cmj_trials.parquet"
-        columns = set(pq.ParquetFile(path).schema_arrow.names)
-        result = [item for item in result if item["column"] in columns]
+        root = (paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]) / snapshot_id
+        columns = {table: set(pq.ParquetFile(root / f"{table}.parquet").schema_arrow.names) for table in {item["table"] for item in result}}
+        result = [item for item in result if item["column"] in columns[item["table"]]]
     return result
 
 
@@ -936,6 +943,8 @@ def _axis_for_table(table: str) -> tuple[str, str]:
         return "week", "Week"
     if table == "signal_trials":
         return "activity", "Activity"
+    if table == "monitoring":
+        return "date", "Date"
     return "row", "Observation"
 
 
@@ -1192,9 +1201,13 @@ def select_workspace_run(entity_id: str, run_id: str) -> dict[str, Any]:
     return entity
 
 
-def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False,
+def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False, link: bool = False,
                           confirm_participant_ids: bool = False, base_revision: str | None = None) -> dict[str, Any]:
-    """Append a revision; separate attachments never imply analytical pooling."""
+    """Append a revision; separate attachments never imply analytical pooling.
+
+    ``link`` keeps the current measurements and adds a different kind of measurement (e.g. monitoring next to CMJ)
+    as its own table for the same participants. Rows are never pooled across tables.
+    """
     entity = get_entity(entity_id)
     if not entity or not entity.get("workspace"):
         raise ResearchValidation("Open a research workspace before attaching data")
@@ -1207,45 +1220,43 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
         raise ResearchValidation("Select an admitted input dataset")
     previous = get_data_revision(base_revision) if base_revision else None
     inputs = [snapshot]
+    if append and link:
+        raise ResearchValidation("Choose either append or link")
+    if link:
+        if not previous or not confirm_participant_ids:
+            raise ResearchValidation("Confirm that participant identifiers have the same meaning before linking")
+        shared = (set(_table_names(previous["snapshot"])) & set(_table_names(snapshot))) - {"subjects"}
+        if shared:
+            raise ResearchValidation(f"This revision already has {', '.join(sorted(shared))}; append compatible batches instead")
+        inputs = [*previous["inputs"], snapshot]
+        if len({item["id"] for item in inputs}) != len(inputs):
+            raise ResearchValidation("This batch is already in the selected data revision")
     if append:
         if not previous or not confirm_participant_ids:
             raise ResearchValidation("Confirm that participant identifiers have the same meaning before appending")
         inputs = [*previous["inputs"], *inputs]
         if len({item["id"] for item in inputs}) != len(inputs):
             raise ResearchValidation("This batch is already in the selected data revision")
-        _validate_workspace_append(inputs)
+        _validate_workspace_append([item for item in inputs if item.get("measurement_family") == snapshot.get("measurement_family")])
     revision_id = _new_id("DATA-U")
     analytical = snapshot
-    if append:
+    if link or append:
         # Derived Parquet is written once, before the transactional reference becomes visible.
-        directory = paths()["research"] / "data" / revision_id
-        directory.mkdir(parents=True)
-        tables, checksums = {}, {}
-        for table in sorted(set(_table_names(snapshot)) | {"subjects"}):
-            frames = [read_snapshot_table(item["id"], table) for item in inputs]
-            frame = pl.concat(frames, how="vertical")
-            if table == "subjects":
-                frame = frame.unique(maintain_order=True)
-                if frame["subject_id"].n_unique() != frame.height:
-                    raise ResearchValidation("Participant metadata conflicts; attach the batch separately")
-            elif "trial_id" in frame.columns and frame["trial_id"].n_unique() != frame.height:
-                raise ResearchValidation("Overlapping trial identifiers; attach the batch separately")
-            path = directory / f"{table}.parquet"
-            frame.write_parquet(path)
-            tables[table] = {"file": path.name, "rows": frame.height}
-            checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
-        analytical = {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables,
-                      "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
+        analytical = _materialize_revision(revision_id, previous, snapshot, append)
     metrics = dataset_metrics(snapshot_id)
     metric = next((item for item in metrics if item.get("role") == "PRIMARY"), metrics[0] if metrics else None)
+    if link:  # the outcome being studied stays the same; the linked measures are additional
+        metric = (entity.get("outcomes", {}).get("primary") or [metric])[0]
     number = len(data_revisions(entity_id)) + 1
     revision = {
         "id": revision_id, "workspace_id": entity_id, "number": number, "created_at": _now(),
-        "parent_revision_id": base_revision, "mode": "APPEND" if append else "SEPARATE",
+        "parent_revision_id": base_revision, "mode": "APPEND" if append else "LINK" if link else "SEPARATE",
         "input_snapshot_ids": [item["id"] for item in inputs], "inputs": inputs,
         "snapshot_id": analytical["id"], "snapshot": analytical,
-        "compatibility": {"pooled": append, "participant_ids_confirmed": confirm_participant_ids,
-                          "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append else "Separate analytical selection; no pooling"},
+        "compatibility": {"pooled": append, "linked": link, "participant_ids_confirmed": confirm_participant_ids,
+                          "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append
+                          else "Different measurement kinds linked by confirmed participant identifiers; tables are not pooled" if link
+                          else "Separate analytical selection; no pooling"},
     }
     with _tx() as connection:
         current = _row_document(connection.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone())
@@ -1265,12 +1276,51 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
     return study_detail(entity_id)
 
 
+def _materialize_revision(revision_id: str, previous: dict[str, Any], snapshot: dict[str, Any], append: bool) -> dict[str, Any]:
+    """Carry every table of the previous revision forward and add the new batch: appended rows of the same table,
+    or a linked table of a different measurement kind. One participant roster is rebuilt from the observations."""
+    directory = paths()["research"] / "data" / revision_id
+    directory.mkdir(parents=True)
+    frames = {table: read_snapshot_table(previous["snapshot_id"], table) for table in _table_names(previous["snapshot"]) if table != "subjects"}
+    for table in _table_names(snapshot):
+        if table == "subjects":
+            continue
+        frame = read_snapshot_table(snapshot["id"], table)
+        if append:
+            frame = pl.concat([frames[table], frame], how="vertical")
+            key = ["trial_id"] if "trial_id" in frame.columns else ["subject_id", next(a for a in ("date", "day", "week") if a in frame.columns)]
+            if frame.select(pl.struct(key).is_duplicated().any()).item():
+                raise ResearchValidation(f"Overlapping {' and '.join(key)} records; attach the batch separately")
+        frames[table] = frame
+    roster = pl.concat([frame.select("subject_id", *(["position"] if "position" in frame.columns else []))
+                        .with_columns(pl.col("subject_id").cast(pl.Utf8)) for frame in frames.values() if "subject_id" in frame.columns],
+                       how="diagonal_relaxed")
+    if "position" in roster.columns:
+        known = roster.drop_nulls("position").unique()
+        if known["subject_id"].n_unique() != known.height:
+            raise ResearchValidation("Participant metadata conflicts (different positions); correct the roster first")
+        roster = roster.group_by("subject_id", maintain_order=True).agg(pl.col("position").drop_nulls().first())
+    else:
+        roster = roster.unique(maintain_order=True)
+    frames["subjects"] = roster.with_columns(pl.col("subject_id").alias("display_id"))
+    tables, checksums = {}, {}
+    for table, frame in frames.items():
+        path = directory / f"{table}.parquet"
+        frame.write_parquet(path)
+        tables[table] = {"file": path.name, "rows": frame.height}
+        checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    family = snapshot.get("measurement_family") if append and previous["snapshot"].get("measurement_family") != "LINKED" else "LINKED"
+    return {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables, "measurement_family": family,
+            "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
+
+
 def _validate_workspace_append(inputs: list[dict[str, Any]]) -> None:
     from . import admission
 
     first = inputs[0]
-    if not first.get("admitted_source") or first.get("measurement_family") != "CMJ_FORCE_PLATFORM":
-        raise ResearchValidation("Append is supported for admitted CMJ summaries; attach other data separately")
+    table = {"CMJ_FORCE_PLATFORM": "cmj_trials", "ATHLETE_MONITORING": "monitoring"}.get(first.get("measurement_family"))
+    if not first.get("admitted_source") or table is None:
+        raise ResearchValidation("Append is supported for admitted CMJ summaries and athlete monitoring; attach other data separately")
     for item in inputs:
         for field in ("source", "measurement_family", "rights_status"):
             if item.get(field) != first.get(field):
@@ -1279,8 +1329,8 @@ def _validate_workspace_append(inputs: list[dict[str, Any]]) -> None:
             raise ResearchValidation("Missing QC or immutable checksums; attach separately")
         if item.get("provenance", {}).get("instrument_metadata") != first.get("provenance", {}).get("instrument_metadata"):
             raise ResearchValidation("Incompatible captured instrument or calibration metadata; attach separately")
-        frame = read_snapshot_table(item["id"], "cmj_trials")
-        reference = read_snapshot_table(first["id"], "cmj_trials")
+        frame = read_snapshot_table(item["id"], table)
+        reference = read_snapshot_table(first["id"], table)
         if frame.schema != reference.schema:
             raise ResearchValidation("Incompatible columns or physical units; attach separately")
         for column, lookup in (("instrument_id", admission.get_instrument), ("protocol_id", admission.get_protocol)):

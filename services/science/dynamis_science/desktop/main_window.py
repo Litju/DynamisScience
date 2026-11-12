@@ -1258,18 +1258,20 @@ class MainWindow(QMainWindow):
     def _attach_workspace_dataset(self, snapshot_id: str, workspace_id: str | None = None) -> None:
         identity = workspace_id or self.current_study_id
         revision = self.current_study.get("active_data_revision_id")
-        append = False
+        append = link = False
         if revision:
             choice, accepted = QInputDialog.getItem(self, "Attach data", "How should these measurements be used?",
-                ["Attach separately (no pooling)", "Append compatible measurements (same participant identifiers)"], 0, False)
+                ["Append compatible measurements (same participant identifiers)",
+                 "Link a different kind of measurement to the same participants (e.g. load, sleep, wellness)",
+                 "Attach separately (no pooling)"], 0, False)
             if not accepted:
                 return
-            append = choice.startswith("Append")
+            append, link = choice.startswith("Append"), choice.startswith("Link")
         def attached(detail):
             if self.current_study_id == identity:
                 self.refresh_catalogue({"type": "study", "id": identity})
-        self.run_task(lambda: self.service.attach_workspace_data(identity, snapshot_id, append=append,
-                      confirm_participant_ids=append, base_revision=revision), attached, "Attaching data to workspace")
+        self.run_task(lambda: self.service.attach_workspace_data(identity, snapshot_id, append=append, link=link,
+                      confirm_participant_ids=append or link, base_revision=revision), attached, "Attaching data to workspace")
 
     def _analyze_workspace(self) -> None:
         if not self.current_study.get("workspace") or not self.current_snapshot_id:

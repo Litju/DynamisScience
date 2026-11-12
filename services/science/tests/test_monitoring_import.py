@@ -1,0 +1,104 @@
+"""RES-647 athlete monitoring import (load, sleep, wellness, roster) linked to CMJ in one workspace revision."""
+
+from __future__ import annotations
+
+from datetime import date, timedelta
+
+import polars as pl
+import pytest
+
+from dynamis_science import importer, researchstore, squad
+from test_importer import FIXTURE, service  # noqa: F401  (service is a fixture)
+from test_longitudinal_research import PARTICIPANTS, admit, study_file
+
+POSITIONS = ["Forward", "Midfield", "Defence"]
+START = date(2026, 9, 1)
+
+
+def load(index: int, day: int) -> float:
+    spike = 1.6 if index == 3 and day >= 35 else 1.0  # P03: load spike in the final week
+    return round((400 + 20 * index + 60 * (day % 7 == 2)) * spike, 1)
+
+
+def monitoring_file(tmp_path, days: range, name: str, header: str = "Athlete,Date,Position,sRPE Load (AU),Sleep (h),Wellness"):
+    lines = [header]
+    for index, participant in enumerate(PARTICIPANTS, start=1):
+        for day in days:
+            tired = index == 3 and day >= 35
+            lines.append(f"{participant},{START + timedelta(days=day)},{POSITIONS[index % 3]},{load(index, day)},"
+                         f"{6.0 if tired else 7.5 + (index % 3) * 0.25},{12 if tired else 20 + index % 4}")
+    path = tmp_path / name
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def monitoring_context():
+    return importer.build_context({**FIXTURE, "dataset_identity": "fixture-monitoring", "manufacturer": "Questionnaire app",
+                                   "model": "Daily wellness", "protocol_name": "Morning wellness + sRPE"})
+
+
+def test_monitoring_file_is_detected_mapped_and_admitted(tmp_path):
+    plan = importer.probe_file(monitoring_file(tmp_path, range(0, 7), "week1.csv"))
+    assert plan["mapping"]["family"] == "ATHLETE_MONITORING" and plan["state"] == "READY", plan["needs"]
+    columns = plan["mapping"]["columns"]
+    assert {"subject_id", "date", "position", "training_load_au", "sleep_hours", "wellness_score"} <= set(columns)
+    snapshot_id = admit(plan["path"] and monitoring_file(tmp_path, range(0, 7), "week1b.csv"), monitoring_context())
+    frame = researchstore.read_snapshot_table(snapshot_id, "monitoring")
+    assert frame.height == 84 and frame["date"].min() == "2026-09-01"
+    subjects = researchstore.read_snapshot_table(snapshot_id, "subjects")
+    assert dict(zip(subjects["subject_id"], subjects["position"]))["P02"] == "Defence"
+    assert {m["id"] for m in researchstore.dataset_metrics(snapshot_id)} == {"MET-MON-LOAD", "MET-MON-SLEEP", "MET-MON-WELLNESS"}
+    # No time axis: blocked, never assumed.
+    blocked = importer.probe_file(monitoring_file(tmp_path, range(0, 2), "noaxis.csv", "Athlete,X,Position,sRPE Load (AU),Sleep (h),Wellness"))
+    assert blocked["state"] == "REVIEW" and any("date, day or week" in need for need in blocked["needs"])
+
+
+def test_link_cmj_and_monitoring_then_flag_and_simulate_across_measures(service, tmp_path):
+    identity = service.create_workspace("Squad monitoring")["study"]["id"]
+    cmj = admit(study_file(tmp_path, range(1, 7), "cmj.csv"), importer.build_context(FIXTURE))
+    rev1 = service.attach_workspace_data(identity, cmj)["active_data_revision_id"]
+    first = admit(monitoring_file(tmp_path, range(0, 28), "weeks1-4.csv"), monitoring_context())
+    with pytest.raises(researchstore.ResearchValidation, match="Confirm"):
+        service.attach_workspace_data(identity, first, link=True, base_revision=rev1)
+    rev2 = service.attach_workspace_data(identity, first, link=True, confirm_participant_ids=True, base_revision=rev1)["active_data_revision_id"]
+    revision = researchstore.get_data_revision(rev2)
+    assert revision["mode"] == "LINK" and revision["compatibility"]["linked"] and not revision["compatibility"]["pooled"]
+    assert set(revision["snapshot"]["tables"]) == {"cmj_trials", "monitoring", "subjects"}
+    entity = researchstore.get_entity(identity)
+    assert entity["outcomes"]["primary"][0]["id"] == "MET-CMJ-HEIGHT"  # the studied outcome is unchanged
+    with pytest.raises(researchstore.ResearchValidation, match="already has monitoring"):
+        service.attach_workspace_data(identity, first, link=True, confirm_participant_ids=True, base_revision=rev2)
+
+    # Later monitoring weeks are appended; CMJ stays in the revision.
+    later = admit(monitoring_file(tmp_path, range(28, 42), "weeks5-6.csv"), monitoring_context())
+    rev3 = service.attach_workspace_data(identity, later, append=True, confirm_participant_ids=True, base_revision=rev2)["active_data_revision_id"]
+    snapshot = researchstore.get_data_revision(rev3)["snapshot"]
+    assert snapshot["row_counts"]["monitoring"] == 12 * 42 and snapshot["row_counts"]["cmj_trials"] == researchstore.read_snapshot_table(cmj, "cmj_trials").height
+    metrics = {m["id"] for m in researchstore.dataset_metrics(rev3)}
+    assert {"MET-CMJ-HEIGHT", "MET-MON-LOAD", "MET-MON-SLEEP", "MET-MON-WELLNESS"} <= metrics
+    with pytest.raises(researchstore.ResearchValidation, match="Overlapping"):
+        service.attach_workspace_data(identity, admit(monitoring_file(tmp_path, range(40, 42), "dup.csv"), monitoring_context()),
+                                      append=True, confirm_participant_ids=True, base_revision=rev3)
+
+    # The researcher's own multi-measure rule: load spike (ACWR) AND falling wellness.
+    squad.save_rules(identity, [{"name": "Load spike with poor wellness", "category": "In danger", "tone": "negative", "match": "all",
+                                 "conditions": [
+                                     {"metric_id": "MET-MON-LOAD", "measure": "acute_chronic_ratio", "acute": 7, "chronic": 28, "operator": ">", "value": 1.3},
+                                     {"metric_id": "MET-MON-WELLNESS", "measure": "change_from_baseline_pct", "operator": "<", "value": -20}]}])
+    board = squad.squad_board(identity, "position")
+    flagged = {a["subject_id"] for g in board["groups"] for a in g["athletes"] if a["flags"]}
+    assert flagged == {"P03"}
+    assert {g["name"] for g in board["groups"]} == set(POSITIONS)
+    acwr = next(a for g in board["groups"] for a in g["athletes"] if a["subject_id"] == "P03")["flags"][0]["evidence"][0]["value"]
+    recent = [load(3, d) for d in range(35, 42)]
+    chronic = [load(3, d) for d in range(14, 42)]
+    assert acwr == pytest.approx(round((sum(recent) / 7) / (sum(chronic) / 28), 3))
+
+    # "Load +20%/step" with an assumed CMJ effect: researcher-defined driver and effect.
+    result = squad.simulate(identity, {"name": "Load push", "steps": 2, "outcome_metric_id": "MET-CMJ-HEIGHT",
+                                       "drivers": [{"metric_id": "MET-MON-LOAD", "change_pct_per_step": {"best": 10, "expected": 20, "worst": 30}}],
+                                       "effects": [{"driver_metric_id": "MET-MON-LOAD", "outcome_pct_per_driver_pct": {"best": 0.05, "expected": -0.05, "worst": -0.1}}]})
+    p01 = next(a for a in result["athletes"] if a["subject_id"] == "P01")
+    assert p01["projection"]["worst"][-1] == pytest.approx(p01["start"] * 0.97 ** 2, rel=1e-4)
+    assert p01["drivers"]["MET-MON-LOAD"]["expected"][0] == pytest.approx(load(1, 41) * 1.2, rel=1e-4)
+    assert pl.DataFrame(researchstore.read_snapshot_table(rev3, "subjects"))["position"].null_count() == 0

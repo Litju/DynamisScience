@@ -116,9 +116,9 @@ class DynamisAppService:
         self.ensure_initialized()
         return longitudinal.save_scenario(investigation_id, scenario, base_version)
 
-    def squad_board(self, workspace_id: str, group_by: str = "category") -> dict[str, Any]:
+    def squad_board(self, workspace_id: str, group_by: str = "category", metric_id: str | None = None) -> dict[str, Any]:
         self.ensure_initialized()
-        return squad.squad_board(workspace_id, group_by)
+        return squad.squad_board(workspace_id, group_by, metric_id)
 
     def save_flag_rules(self, workspace_id: str, rules: list[dict[str, Any]]) -> dict[str, Any]:
         self.ensure_initialized()

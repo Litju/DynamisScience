@@ -72,6 +72,18 @@ COLUMNS: dict[str, tuple[str, dict[str, float] | None, tuple[str, ...]]] = {
     "peak_power_w_kg": ("CMJ", {"w/kg": 1.0}, ("peak_power",)),
     "rsi_mod": ("CMJ", {"m/s": 1.0, "": 1.0}, ("rsi_modified", "rsimod")),
     "sample_index": ("ANY", _ONE, ("sample", "sample_number", "frame", "index")),
+    # RES-647 athlete monitoring: dated self-reports and training load, plus roster attributes for any family.
+    "date": ("ANY", _ID, ("day_date", "session_date", "recorded_on", "recorded_at")),
+    "day": ("ANY", _ONE, ("day_number", "day_index", "study_day")),
+    "position": ("ANY", _ID, ("playing_position", "role", "player_position")),
+    "training_load_au": ("MON", {"au": 1.0, "": 1.0}, ("training_load", "load", "session_load", "srpe", "s_rpe", "srpe_load", "s_rpe_load", "rpe_load", "session_rpe", "session_rpe_load")),
+    "sleep_hours": ("MON", {"h": 1.0, "min": 1 / 60}, ("sleep", "sleep_duration", "sleep_time", "hours_slept")),
+    "sleep_quality": ("MON", _ONE, ("sleep_score", "sleep_rating")),
+    "wellness_score": ("MON", _ONE, ("wellness", "wellness_total", "wellbeing", "well_being", "hooper", "hooper_index")),
+    "fatigue": ("MON", _ONE, ("tiredness", "fatigue_score")),
+    "soreness": ("MON", _ONE, ("muscle_soreness", "doms", "soreness_score")),
+    "stress": ("MON", _ONE, ("stress_score",)),
+    "mood": ("MON", _ONE, ("mood_score",)),
     "force_z_n": ("TRACE", _FORCE, ("force", "vertical_force", "total_force", "fz", "force_z")),
     "force_left_n": ("TRACE", _FORCE, ("left_force", "leftforce", "force_left", "fz_left")),
     "force_right_n": ("TRACE", _FORCE, ("right_force", "rightforce", "force_right", "fz_right")),
@@ -82,10 +94,13 @@ COLUMNS: dict[str, tuple[str, dict[str, float] | None, tuple[str, ...]]] = {
 _ALIAS = {alias: name for name, (_, _, aliases) in COLUMNS.items() for alias in (name, *aliases)}
 _UNIT_SYNONYMS = {"sec": "s", "secs": "s", "second": "s", "seconds": "s", "milliseconds": "ms", "centimeters": "cm",
                   "centimetres": "cm", "meters": "m", "metres": "m", "kilograms": "kg", "grams": "g", "pounds": "lb",
-                  "lbs": "lb", "newton": "n", "newtons": "n", "hertz": "hz", "nsperkg": "ns/kg", "ns/kg": "ns/kg"}
-FAMILIES = {"CMJ": "CMJ_FORCE_PLATFORM", "SPRINT": "SPRINT_TIMING", "TRACE": traces.FAMILY}
+                  "lbs": "lb", "newton": "n", "newtons": "n", "hertz": "hz", "nsperkg": "ns/kg", "ns/kg": "ns/kg",
+                  "hour": "h", "hours": "h", "hrs": "h", "hr": "h", "minutes": "min", "mins": "min", "arbitraryunits": "au"}
+FAMILIES = {"CMJ": "CMJ_FORCE_PLATFORM", "SPRINT": "SPRINT_TIMING", "TRACE": traces.FAMILY, "MON": "ATHLETE_MONITORING"}
+MONITORING_AXES = ("date", "day", "week")
 CANONICAL_UNITS = {"CMJ_FORCE_PLATFORM": {"body_mass": "kg", "time": "s", "distance": "cm"},
-                   "SPRINT_TIMING": {"time": "s", "distance": "m"}, traces.FAMILY: {"force": "N", "time": "s"}}
+                   "SPRINT_TIMING": {"time": "s", "distance": "m"}, traces.FAMILY: {"force": "N", "time": "s"},
+                   "ATHLETE_MONITORING": {"load": "AU", "sleep": "h"}}
 CONSTANT_FIELDS = ("session_id", "sampling_hz", "coordinate_system", "subject_id", "trial_id")  # researcher-supplied, never invented
 
 
@@ -221,7 +236,7 @@ def propose_generic(frame: pl.DataFrame) -> tuple[dict[str, Any], list[str]]:
             if unit not in units:
                 ambiguities.append(f"'{header}': unit '{bracket}' is not supported for {name}; choose a supported unit.")
                 unit, confidence = None, 0.3
-        elif name in ("rsi_mod", "week", "sample_index"):
+        elif name in ("rsi_mod", "week", "sample_index", "day") or (units and "" in units):
             unit = ""
         else:
             ambiguities.append(f"'{header}': the unit is not stated; choose one for {name}.")
@@ -242,7 +257,9 @@ def _canonical_unit(name: str) -> str:
 
 
 def detect_family(columns: dict[str, Any]) -> str | None:
-    count = {g: sum(COLUMNS[c][0] == g for c in columns) for g in ("CMJ", "SPRINT", "TRACE")}
+    count = {g: sum(COLUMNS[c][0] == g for c in columns) for g in ("CMJ", "SPRINT", "TRACE", "MON")}
+    if count["MON"]:
+        return None if count["CMJ"] or count["TRACE"] or count["SPRINT"] else FAMILIES["MON"]  # mixed: researcher splits
     if count["TRACE"]:
         return None if count["CMJ"] else FAMILIES["TRACE"]  # trace channels with scalar metrics: researcher decides
     if count["CMJ"] and count["SPRINT"] == 2:
@@ -256,6 +273,11 @@ def outstanding(mapping: dict[str, Any]) -> list[str]:
     if family is None:
         return ["measurement family not recognised; map at least one measurement column"]
     supplied = lambda key: bool(str(constants.get(key, "")).strip())  # noqa: E731
+    if family == FAMILIES["MON"]:
+        missing = [] if "subject_id" in columns else ["subject_id column"]
+        if not any(axis in columns for axis in MONITORING_AXES):
+            missing.append("a date, day or week column (the time axis is never assumed)")
+        return missing
     if family == traces.FAMILY:
         missing = [f"{k} (a column, or one value you supply for a single-trace file)" for k in ("subject_id", "trial_id")
                    if k not in columns and not supplied(k)]
@@ -411,6 +433,11 @@ def normalize(frame: pl.DataFrame, mapping: dict[str, Any]) -> pl.DataFrame:
             except Exception as error:
                 raise ImportBlocked(f"Column '{entry['source']}' contains non-numeric values.") from error
             out[name] = (pl.col(entry["source"]).cast(pl.Float64) * units[entry["unit"]]).alias(name)
+    if family == FAMILIES["MON"]:
+        if "date" in out:  # ISO dates only; anything else would need a guess about the day order
+            out["date"] = pl.col(mapping["columns"]["date"]["source"]).cast(pl.Utf8).str.strip_chars().str.to_date(
+                "%Y-%m-%d", strict=False).cast(pl.Utf8).alias("date")
+        return frame.select(list(out.values()))
     if "session_id" not in out:
         out["session_id"] = pl.lit(str(constants["session_id"]).strip()).alias("session_id")
     if family == "CMJ_FORCE_PLATFORM" and "sampling_hz" not in out:
@@ -487,9 +514,17 @@ def split_rows(frame: pl.DataFrame, family: str) -> tuple[pl.DataFrame, pl.DataF
     bad row no longer rejects a whole file. Every row sharing a duplicated trial id is flagged: which one is right is
     not for the importer to guess.
     """
-    ranges = admission.CMJ_RANGES if family == "CMJ_FORCE_PLATFORM" else admission.SPRINT_RANGES
-    reasons = [pl.when(pl.col(c).is_null()).then(pl.lit(f"missing {c}")) for c in ("subject_id", "session_id", "trial_id")]
-    reasons.append(pl.when(pl.col("trial_id").is_duplicated()).then(pl.lit("duplicate trial_id")))
+    if family == FAMILIES["MON"]:
+        ranges = admission.MONITORING_RANGES
+        axis = next(a for a in MONITORING_AXES if a in frame.columns)
+        reasons = [pl.when(pl.col(c).is_null()).then(pl.lit(f"missing {c}")) for c in ("subject_id", axis)]
+        if axis == "date" and "date" in frame.columns:
+            reasons[-1] = pl.when(pl.col("date").is_null()).then(pl.lit("missing or non-ISO date (YYYY-MM-DD)"))
+        reasons.append(pl.when(pl.struct("subject_id", axis).is_duplicated()).then(pl.lit(f"duplicate subject_id and {axis}")))
+    else:
+        ranges = admission.CMJ_RANGES if family == "CMJ_FORCE_PLATFORM" else admission.SPRINT_RANGES
+        reasons = [pl.when(pl.col(c).is_null()).then(pl.lit(f"missing {c}")) for c in ("subject_id", "session_id", "trial_id")]
+        reasons.append(pl.when(pl.col("trial_id").is_duplicated()).then(pl.lit("duplicate trial_id")))
     reasons += [pl.when((pl.col(c) < lo) | (pl.col(c) > hi)).then(pl.lit(f"implausible {c}"))
                 for c, (lo, hi) in ranges.items() if c in frame.columns]
     flagged = frame.with_columns(pl.coalesce(reasons).alias("qc_flag"))
@@ -651,7 +686,7 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
     if not raw_copy.exists():
         shutil.copyfile(path, raw_copy)
     validate = {"CMJ_FORCE_PLATFORM": admission.validate_cmj, "SPRINT_TIMING": admission.validate_sprint,
-                traces.FAMILY: traces.validate_trace}[family]
+                traces.FAMILY: traces.validate_trace, FAMILIES["MON"]: admission.validate_monitoring}[family]
     quality = validate(artifact, metadata)
     rights = (admission.get_source(src["id"]) or {}).get("rights_status", "UNVERIFIED")
     eligible = quality["status"] in ADMITTABLE and rights in {"VERIFIED", "FIXTURE_ONLY"} and duplicate_of is None

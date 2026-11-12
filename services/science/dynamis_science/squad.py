@@ -22,8 +22,8 @@ MEASURES = {
     "change_from_baseline_pct": "% change from own baseline",
     "change_from_previous_pct": "% change from previous test",
     "vs_squad_sd": "Latest vs squad (SD units)",
-    "rolling_mean": "Rolling mean of last N tests",
-    "acute_chronic_ratio": "Acute:chronic ratio (last A vs last C tests)",
+    "rolling_mean": "Rolling mean of last N records",
+    "acute_chronic_ratio": "Acute:chronic ratio (last A vs last C records)",
     "missed_tests": "Missed tests",
 }
 OPERATORS = ("<", "<=", ">", ">=", "between", "outside")
@@ -156,7 +156,12 @@ def evaluate(snapshot_id: str, rules: list[dict[str, Any]], overrides: dict[str,
                 ok = value is not None and _compare(value, condition)
                 matched.append(ok)
                 metric = metrics[condition["metric_id"]]
-                evidence.append({"metric": metric["label"], "unit": metric["unit"], "measure": MEASURES[condition["measure"]],
+                label = MEASURES[condition["measure"]]
+                if condition["measure"] == "rolling_mean":
+                    label = f"Rolling mean of last {condition.get('window') or 3}"
+                elif condition["measure"] == "acute_chronic_ratio":
+                    label = f"Acute:chronic ratio ({condition.get('acute') or 1} vs {condition.get('chronic') or 4})"
+                evidence.append({"metric": metric["label"], "unit": metric["unit"], "measure": label,
                                  "value": None if value is None else round(value, 3), "operator": condition["operator"],
                                  "threshold": condition["value"], "threshold2": condition.get("value2"), "met": ok})
             if (all(matched) if rule["match"] == "all" else any(matched)):
@@ -165,18 +170,20 @@ def evaluate(snapshot_id: str, rules: list[dict[str, Any]], overrides: dict[str,
     return hits
 
 
-def squad_board(workspace_id: str, group_by: str = "category") -> dict[str, Any]:
+def squad_board(workspace_id: str, group_by: str = "category", metric_id: str | None = None) -> dict[str, Any]:
     """Every athlete with key metrics and the rules that fired, grouped by category, a subject attribute or trend."""
     entity = _workspace(workspace_id)
     snapshot_id = entity.get("dataset_snapshot_id")
     if not snapshot_id:
         raise researchstore.ResearchValidation("Add data to the workspace to see the squad")
     metrics = _metrics(snapshot_id)
-    primary = (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id")
+    primary = metric_id or (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id")
     metric = metrics.get(primary) or next(iter(metrics.values()), None)
     if metric is None:
         raise researchstore.ResearchValidation("This data revision has no measured metric")
     observed, points = athlete_series(snapshot_id, metric)
+    frame_columns = researchstore.read_snapshot_table(snapshot_id, metric["table"]).columns
+    time_word = "days" if _axis(pl.DataFrame(schema=dict.fromkeys(frame_columns, pl.Utf8))) in ("day", "date") else "tests"
     rules = entity.get("flag_rules") or []
     hits = evaluate(snapshot_id, rules)
     subjects = researchstore.read_snapshot_table(snapshot_id, "subjects").to_dicts()
@@ -202,7 +209,7 @@ def squad_board(workspace_id: str, group_by: str = "category") -> dict[str, Any]
     for athlete in athletes:
         groups.setdefault(group_of(athlete), []).append(athlete)
     return {"workspace_id": workspace_id, "data_revision_id": entity.get("active_data_revision_id"),
-            "metric": metric, "metrics": list(metrics.values()), "rules": rules, "group_by": group_by,
+            "metric": metric, "metrics": list(metrics.values()), "rules": rules, "group_by": group_by, "time_word": time_word,
             "group_options": ["category", "trend", *sorted({key for athlete in athletes for key in athlete["attributes"]})],
             "groups": [{"name": name, "athletes": members} for name, members in groups.items()],
             "note": "Flags show which of your rules fired on observed data; they are not diagnoses."}
