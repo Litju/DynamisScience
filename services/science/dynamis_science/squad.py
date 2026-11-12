@@ -223,13 +223,13 @@ VARIANTS = ("best", "expected", "worst")
 
 
 def simulate(workspace_id: str, scenario: dict[str, Any], subject_ids: list[str] | None = None) -> dict[str, Any]:
-    """Project each athlete forward under the researcher's assumptions.
+    """Validate a hypothetical scenario definition without calculating athlete futures.
 
     scenario = {"name", "steps": int, "outcome_metric_id",
                 "drivers": [{"metric_id", "change_pct_per_step": {"best","expected","worst"}}],
                 "effects": [{"driver_metric_id", "outcome_pct_per_driver_pct": {"best","expected","worst"}}],
                 "outcome_trend_pct_per_step": {"best","expected","worst"}}
-    Each step: driver_t = driver_{t-1} × (1 + change%); outcome_t = outcome_{t-1} × (1 + trend% + Σ effect × driver change%).
+    Legacy best/expected/worst keys are retained as saved assumption identifiers only.
     """
     entity = _workspace(workspace_id)
     snapshot_id = entity.get("dataset_snapshot_id")
@@ -246,56 +246,23 @@ def simulate(workspace_id: str, scenario: dict[str, Any], subject_ids: list[str]
     if set(effects) - {driver["metric_id"] for driver in drivers}:
         raise researchstore.ResearchValidation("Every effect must refer to one of the scenario drivers")
 
-    def pick(values: Any, variant: str) -> float:
-        return float((values or {}).get(variant, 0.0)) if isinstance(values, dict) else float(values or 0.0)
-
-    outcome_series, _ = athlete_series(snapshot_id, outcome)
-    driver_series = {driver["metric_id"]: athlete_series(snapshot_id, metrics[driver["metric_id"]])[0] for driver in drivers}
-    chosen = subject_ids or sorted(outcome_series)
-    athletes, projected_outcomes = [], {variant: {} for variant in VARIANTS}
-    for subject in chosen:
-        rows = outcome_series.get(subject)
-        if not rows:
-            athletes.append({"subject_id": subject, "status": "No observed outcome; nothing to project from"})
-            continue
-        start = rows[-1][1]
-        projections = {}
-        for variant in VARIANTS:
-            value, path = start, []
-            for _ in range(steps):
-                change = pick(scenario.get("outcome_trend_pct_per_step"), variant)
-                for driver in drivers:
-                    change += pick(effects.get(driver["metric_id"]), variant) * pick(driver.get("change_pct_per_step"), variant)
-                value *= 1 + change / 100
-                path.append(round(value, 4))
-            projections[variant] = path
-            projected_outcomes[variant][subject] = [v for _, v in rows] + path
-        driver_paths = {}
-        for driver in drivers:
-            series = driver_series[driver["metric_id"]].get(subject)
-            if series:
-                level = series[-1][1]
-                driver_paths[driver["metric_id"]] = {variant: [round(level * (1 + pick(driver.get("change_pct_per_step"), variant) / 100) ** (k + 1), 4)
-                                                               for k in range(steps)] for variant in VARIANTS}
-        athletes.append({"subject_id": subject, "status": "PROJECTED", "observed": [{"point": p, "value": v} for p, v in rows],
-                         "start": start, "projection": projections, "drivers": driver_paths})
-    rules = entity.get("flag_rules") or []
-    crossing = {variant: {subject: [hit["category"] for hit in hits]
-                          for subject, hits in evaluate(snapshot_id, rules, {outcome["id"]: projected_outcomes[variant]}).items()
-                          if hits and subject in projected_outcomes[variant]} for variant in VARIANTS} if rules else {}
     return {"scenario": {**scenario, "name": name}, "designation": "HYPOTHETICAL",
-            "basis": "Projection of the researcher's stated assumptions from each athlete's latest observed value; not a model-based prediction.",
+            "qualification": {"status": "NOT_QUALIFIED",
+                              "message": "Numerical forecast unavailable until RES-619/RES-590 qualification."},
+            "numerical_result": None,
+            "basis": "Scenario definition only; not a model-based prediction or observed evidence. No numerical forecast is qualified.",
             "outcome": {"id": outcome["id"], "label": outcome["label"], "unit": outcome["unit"]},
-            "data_revision_id": entity.get("active_data_revision_id"), "athletes": athletes, "flags_at_horizon": crossing}
+            "data_revision_id": entity.get("active_data_revision_id"), "athletes": [], "flags_at_horizon": {}}
 
 
 def save_simulation(workspace_id: str, scenario: dict[str, Any], base_version: int | None = None) -> dict[str, Any]:
-    """Keep the scenario definition and its last result with the workspace (versioned like every workspace change)."""
+    """Version a hypothetical definition; never store forecast numbers or projected flag classifications."""
     entity = _workspace(workspace_id)
     result = simulate(workspace_id, scenario)
     record = {"id": scenario.get("id") or f"SIM-{secrets.token_hex(3).upper()}", "definition": result["scenario"],
               "data_revision_id": result["data_revision_id"], "created_at": researchstore._now(),
-              "summary": {variant: sorted(subjects) for variant, subjects in result["flags_at_horizon"].items()}}
+              "summary": {}, "designation": "HYPOTHETICAL", "qualification": result["qualification"],
+              "numerical_result": None}
     simulations = [item for item in entity.get("simulations") or [] if item["id"] != record["id"]] + [record]
     researchstore.update_entity(workspace_id, {"simulations": simulations}, base_version, change_type="SIMULATION_SAVED")
     return {**result, "record": record}
@@ -345,10 +312,9 @@ def events(workspace_id: str) -> dict[str, Any]:
         items.append({"at": run["created_at"], "kind": "analysis", "tone": "neutral", "subject_id": scope.get("subject_id"),
                       "title": f"Analysis saved · {who}", "detail": f"{run['id']} · {run['method_id']} · {run['method_status']['state'].lower()}"})
     for simulation in entity.get("simulations") or []:
-        worst = simulation["summary"].get("worst", [])
         items.append({"at": simulation["created_at"], "kind": "simulation", "tone": "neutral", "subject_id": None,
-                      "title": f"Simulation saved · {simulation['definition']['name']}",
-                      "detail": f"Worst case: {len(worst)} athlete(s) would meet your flag rules ({', '.join(worst) or 'none'}). Hypothetical."})
+                      "title": f"Hypothetical scenario saved · {simulation['definition']['name']}",
+                      "detail": "Assumptions only. Numerical forecast unavailable; not observed or qualified evidence."})
     items.sort(key=lambda item: item["at"], reverse=True)
     branched = {(item.get("scope") or {}).get("subject_id") for item in researchstore.list_investigations(workspace_id)}
     attention = [{"kind": "attention", "tone": "negative", "subject_id": subject,

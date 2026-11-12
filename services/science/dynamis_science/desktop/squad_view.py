@@ -120,7 +120,7 @@ class SquadBoard(QWidget):
         self.metric_picker.activated.connect(lambda _: self.reload())
         self.rules_button = QPushButton("Flag rules…")
         self.rules_button.clicked.connect(self.edit_rules)
-        self.simulate_button = QPushButton("Simulate squad…")
+        self.simulate_button = QPushButton("Hypothetical scenarios…")
         self.simulate_button.clicked.connect(lambda: self.simulate(None))
         bar.addWidget(self.title, 1)
         bar.addWidget(QLabel("Show"))
@@ -368,7 +368,7 @@ class SimulationDialog(QDialog):
                  subject_id: str | None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.service, self.run_task, self.workspace_id, self.subject_id = service, run_task, workspace_id, subject_id
-        self.setWindowTitle(f"Simulate · {subject_id}" if subject_id else "Simulate squad")
+        self.setWindowTitle(f"Scenarios · {subject_id}" if subject_id else "Hypothetical scenarios")
         fit_dialog(self, 960, 620)
         self.metrics = board["metrics"]
         self.result: dict[str, Any] | None = None
@@ -379,8 +379,8 @@ class SimulationDialog(QDialog):
         self.tabs.addTab(results, "Results")
         outer.addWidget(self.tabs)
         layout = QVBoxLayout(setup)
-        banner = QLabel("<b>HYPOTHETICAL</b> · Projects your assumptions from each athlete's latest observed value. "
-                        "It is not a model prediction and is never stored as data.")
+        banner = QLabel("<b>HYPOTHETICAL · NOT QUALIFIED</b> · Save researcher-defined assumptions. "
+                        "Numerical forecasts are unavailable pending RES-619/RES-590 qualification. Definitions are not evidence.")
         banner.setWordWrap(True)
         layout.addWidget(banner)
         form = QFormLayout()
@@ -402,7 +402,7 @@ class SimulationDialog(QDialog):
             box.setValue(default)
             box.setAccessibleName(f"Outcome change per step, {variant}")
             self.trend[variant] = box
-            trend.addWidget(QLabel(variant.capitalize()))
+            trend.addWidget(QLabel({"best": "Favorable", "expected": "Reference", "worst": "Adverse"}[variant]))
             trend.addWidget(box)
         form.addRow("Scenario name", self.name)
         form.addRow("Horizon (tests/steps)", self.steps)
@@ -410,15 +410,15 @@ class SimulationDialog(QDialog):
         form.addRow("Outcome change per step", trend)
         layout.addLayout(form)
         layout.addWidget(QLabel("Drivers: how each metric changes per step and the outcome % change you assume per 1% driver change"))
-        self.drivers = _table(["Driver metric", "Best %/step", "Expected %/step", "Worst %/step",
-                               "Effect best", "Effect expected", "Effect worst"], "Simulation drivers")
+        self.drivers = _table(["Driver metric", "Favorable %/step", "Reference %/step", "Adverse %/step",
+                               "Favorable effect", "Reference effect", "Adverse effect"], "Simulation drivers")
         self.drivers.setMinimumHeight(70)
         layout.addWidget(self.drivers)
         row = QHBoxLayout()
         add, remove = QPushButton("Add driver"), QPushButton("Remove driver")
         add.clicked.connect(self._add_driver)
         remove.clicked.connect(lambda: self.drivers.removeRow(self.drivers.currentRow()))
-        run, save = QPushButton("Run simulation"), QPushButton("Save scenario")
+        run, save = QPushButton("Validate definition"), QPushButton("Save scenario")
         run.setProperty("primary", True)
         run.clicked.connect(lambda: self.run(False))
         save.clicked.connect(lambda: self.run(True))
@@ -429,8 +429,7 @@ class SimulationDialog(QDialog):
         row.addWidget(save)
         layout.addLayout(row)
         layout = QVBoxLayout(results)
-        self.results = _table(["Athlete", "Latest observed", "Best at horizon", "Expected at horizon", "Worst at horizon",
-                               "Your flags under worst case"], "Simulation results")
+        self.results = _table(["Scenario", "Status"], "Scenario definition status")
         layout.addWidget(self.results, 1)
         self.summary = QLabel("")
         self.summary.setWordWrap(True)
@@ -466,23 +465,16 @@ class SimulationDialog(QDialog):
         workspace_id, subjects = self.workspace_id, [self.subject_id] if self.subject_id else None
         operation = (lambda: self.service.save_simulation(workspace_id, scenario)) if save else \
             (lambda: self.service.simulate(workspace_id, scenario, subjects))
-        self.run_task(operation, self._shown, "Saving scenario" if save else "Running simulation")
+        self.run_task(operation, self._shown, "Saving scenario" if save else "Validating scenario definition")
 
     def _shown(self, result: dict[str, Any]) -> None:
         self.result = result
         self.tabs.setCurrentIndex(1)
-        worst = result["flags_at_horizon"].get("worst", {})
-        rows = [a for a in result["athletes"] if a["status"] == "PROJECTED" and (not self.subject_id or a["subject_id"] == self.subject_id)]
-        self.results.setRowCount(len(rows))
-        for index, athlete in enumerate(rows):
-            values = [athlete["subject_id"], f"{athlete['start']:.2f}", *(f"{athlete['projection'][v][-1]:.2f}" for v in VARIANTS),
-                      ", ".join(worst.get(athlete["subject_id"], [])) or "—"]
-            for column, value in enumerate(values):
-                self.results.setItem(index, column, QTableWidgetItem(value))
-        crossing = {variant: len(subjects) for variant, subjects in result["flags_at_horizon"].items()}
-        self.summary.setText(f"{result['basis']} Athletes with at least one of your flags at the horizon: "
-                             + ", ".join(f"{variant} {count}" for variant, count in crossing.items()) if crossing
-                             else result["basis"] + " Define flag rules to see who would cross them.")
+        self.results.setRowCount(1)
+        self.results.setItem(0, 0, QTableWidgetItem(result["scenario"]["name"]))
+        self.results.setItem(0, 1, QTableWidgetItem("HYPOTHETICAL / NOT QUALIFIED"))
+        self.summary.setText(result["basis"] + " " + result["qualification"]["message"])
+
 
 
 class AthletePage(QWidget):
@@ -500,7 +492,7 @@ class AthletePage(QWidget):
         back.clicked.connect(self.back_requested.emit)
         self.header = QLabel("")
         self.header.setWordWrap(True)
-        self.simulate_button = QPushButton("Simulate…")
+        self.simulate_button = QPushButton("Scenarios…")
         self.simulate_button.clicked.connect(lambda: self.board.simulate(self.athlete.get("subject_id")))
         top.addWidget(back)
         top.addWidget(self.header, 1)

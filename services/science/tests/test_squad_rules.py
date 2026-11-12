@@ -56,23 +56,23 @@ def test_user_rules_flag_athletes_with_evidence(workspace):
     assert {s for s, hits in missed.items() if hits} == {"P03", "P11"}
 
 
-def test_simulation_projects_user_assumptions_and_reports_flag_crossings(workspace):
-    squad.save_rules(workspace, [{"name": "Below 35 cm", "category": "In danger", "tone": "negative",
-                                  "conditions": [{"metric_id": "MET-CMJ-HEIGHT", "measure": "latest", "operator": "<", "value": 35}]}])
-    scenario = {"name": "Detraining", "steps": 4, "outcome_metric_id": "MET-CMJ-HEIGHT",
+def test_scenarios_preserve_definitions_without_forecasts_or_flag_crossings(workspace):
+    squad.save_rules(workspace, [DANGER])
+    before = researchstore.get_entity(workspace)
+    board = squad.squad_board(workspace)
+    scenario = {"name": "Detraining assumptions", "steps": 4, "outcome_metric_id": "MET-CMJ-HEIGHT",
                 "outcome_trend_pct_per_step": {"best": 1, "expected": 0, "worst": -3}}
     result = squad.save_simulation(workspace, scenario)
-    assert result["designation"] == "HYPOTHETICAL" and "not a model-based prediction" in result["basis"]
-    p10 = next(a for a in result["athletes"] if a["subject_id"] == "P10")
-    start = mean(10, 6)
-    assert p10["start"] == pytest.approx(start)
-    assert p10["projection"]["worst"][-1] == pytest.approx(start * 0.97 ** 4, rel=1e-4)
-    assert p10["projection"]["expected"] == [pytest.approx(start, rel=1e-4)] * 4
-    # Worst case pushes more athletes under the researcher's threshold than the observed data does.
-    observed = {s for s, hits in squad.evaluate(researchstore.get_entity(workspace)["dataset_snapshot_id"],
-                                                researchstore.get_entity(workspace)["flag_rules"]).items() if hits}
-    assert observed < set(result["flags_at_horizon"]["worst"])
-    assert set(result["flags_at_horizon"]["best"]) <= observed
-    assert researchstore.get_entity(workspace)["simulations"][0]["definition"]["name"] == "Detraining"
+    assert result["designation"] == "HYPOTHETICAL"
+    assert result["qualification"]["status"] == "NOT_QUALIFIED" and result["numerical_result"] is None
+    assert result["athletes"] == [] and result["flags_at_horizon"] == {}
+    after = researchstore.get_entity(workspace)
+    assert after["simulations"][0]["definition"] == scenario
+    assert after["simulations"][0]["summary"] == {}
+    assert after["dataset_snapshot_id"] == before["dataset_snapshot_id"]
+    assert after["active_data_revision_id"] == before["active_data_revision_id"]
+    assert squad.squad_board(workspace)["groups"] == board["groups"]
+    assert not researchstore.list_runs(workspace) and not researchstore.list_evidence(workspace)
+    assert all("would meet" not in e["detail"] for e in squad.events(workspace)["events"])
     with pytest.raises(researchstore.ResearchValidation, match="not measured"):
         squad.simulate(workspace, {**scenario, "drivers": [{"metric_id": "MET-LOAD", "change_pct_per_step": 10}]})
