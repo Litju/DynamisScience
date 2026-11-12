@@ -61,7 +61,9 @@ def test_workspace_empty_attach_analyze_append_export_reopen(service, tmp_path):
     assert versions[0]["frozen_content"]["data_revision"]["id"] == rev1
     assert versions[1]["frozen_content"]["data_revision"]["id"] == rev2
     assert versions[1]["frozen_content"]["evidence"][0]["analysis_run_id"] == second["id"]
+    researchstore.update_entity(identity, {"design": "DESCRIPTIVE"})
     historical = researchstore.select_data_revision(identity, rev1)
+    assert historical["study"]["design_code"] == "OBSERVATIONAL_LONGITUDINAL"
     assert historical["snapshot"]["id"] == one
     assert historical["current_plan"]["id"] == first["plan_id"]
 

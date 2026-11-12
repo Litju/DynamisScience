@@ -1149,6 +1149,7 @@ def select_data_revision(entity_id: str, revision_id: str) -> dict[str, Any]:
         runs = [run for run in list_runs(entity_id) if run.get("data_revision_id") == revision_id]
         latest = runs[-1] if runs else {}
         entity.update({"active_data_revision_id": revision_id, "dataset_snapshot_id": snapshot_id,
+                       "design": "MEASUREMENT_REPEATED_TRIALS" if metrics and metrics[0]["table"] == "signal_trials" else "OBSERVATIONAL_LONGITUDINAL",
                        "cohort_id": latest.get("cohort_id"), "analysis_plan_id": latest.get("plan_id"),
                        "selected_run_id": latest.get("id"),
                        "outcomes": {"primary": metrics[:1], "secondary": []},
