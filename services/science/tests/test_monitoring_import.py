@@ -166,3 +166,21 @@ def test_native_events_screen_opens_athletes_and_starts_follow_ups(service, tmp_
     idle()
     assert "0 need attention" in feed.title.text()
     window.close()
+
+
+def test_mixed_file_has_targeted_explicit_family_recovery(service, tmp_path, qtbot):
+    from dynamis_science.desktop.import_review import MappingEditor
+    path = tmp_path / "mixed.csv"
+    path.write_text("Athlete,Trial,Jump Height (cm),Body Mass (kg),Peak Force (N),week,Training Load (AU)\nP01,T1,40,80,1800,1,300\n")
+    plan = importer.probe_file(path)
+    assert plan["mapping"]["family"] is None and "Edit mapping" in " ".join(plan["needs"])
+    dialog = MappingEditor(plan)
+    qtbot.addWidget(dialog)
+    dialog.family.setCurrentIndex(dialog.family.findData("ATHLETE_MONITORING"))
+    mon = importer.edit_mapping(plan, dialog.edits())
+    assert mon["mapping"]["family"] == "ATHLETE_MONITORING"
+    assert "jump_height_cm" not in mon["mapping"]["columns"]
+    dialog.family.setCurrentIndex(dialog.family.findData("CMJ_FORCE_PLATFORM"))
+    cmj = importer.edit_mapping(plan, dialog.edits(), {"session_id": "S1", "sampling_hz": 1000})
+    assert cmj["mapping"]["family"] == "CMJ_FORCE_PLATFORM"
+    assert not any(importer.COLUMNS[c][0] == "MON" for c in cmj["mapping"]["columns"])

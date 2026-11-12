@@ -271,7 +271,7 @@ def outstanding(mapping: dict[str, Any]) -> list[str]:
     """What the researcher must still decide before this file can be staged."""
     columns, constants, family = mapping["columns"], mapping.get("constants", {}), mapping.get("family")
     if family is None:
-        return ["measurement family not recognised; map at least one measurement column"]
+        return ["Mixed or unrecognised measurement family. Open Edit mapping and explicitly select CMJ or Monitoring; import the same file again for the other family, then link confirmed participant identifiers. Monitoring requires one record per participant and date/day/week; repeated CMJ trials must not be silently pooled."]
     supplied = lambda key: bool(str(constants.get(key, "")).strip())  # noqa: E731
     if family == FAMILIES["MON"]:
         missing = [] if "subject_id" in columns else ["subject_id column"]
