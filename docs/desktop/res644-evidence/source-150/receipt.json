@@ -1,0 +1,49 @@
+{
+  "source_commit": "ed5f54a98bcce159a10bfc1628551dffada11946",
+  "platform": "windows",
+  "scale": 1.5,
+  "window_logical": [
+    911,
+    480
+  ],
+  "data_root": "C:\\Users\\Usuario\\AppData\\Local\\Temp\\res644-native-zr6qqk02\\private",
+  "workspace_id": "STUDY-U-0A6C2854",
+  "revisions": [
+    "DATA-U-C3DD32FD",
+    "DATA-U-3481A417"
+  ],
+  "runs": [
+    {
+      "id": "RUN-U-0001",
+      "data_revision_id": "DATA-U-C3DD32FD",
+      "snapshot_id": "DS-ADMITTED-B5E4EA8296AA",
+      "result_digest": "f865c3472f85c4ef"
+    },
+    {
+      "id": "RUN-U-0002",
+      "data_revision_id": "DATA-U-3481A417",
+      "snapshot_id": "DATA-U-3481A417",
+      "result_digest": "8d0b4441ff1fc2c5"
+    }
+  ],
+  "reports": [
+    {
+      "version": 4,
+      "status": "FROZEN",
+      "content_hash": "e81d5af77a5f0f04271e212673734815dc337129678bbf6eb196e43715c0f527",
+      "created_at": "2026-11-12T09:59:10.038066+00:00"
+    }
+  ],
+  "failures": [],
+  "screenshots": {
+    "01-empty-workspace.png": "3b076c2bc601793cdf9c0641a2791a7f9a6d1757e4ef647b60274e9396f51055",
+    "02-import-ready.png": "cf6de5542f58b98dbd6eca67543bb810bf163b99851a7258d223efb8ee622748",
+    "03-analysis.png": "2350cab50beaee6eddef8aab2d59ff987449876385cbdbc66af396ad6e791e64",
+    "04-import-ready.png": "369e84d4ff6f3e37edd8dc586805254d1fac3fb1900dc97e84d2be08a3de7136",
+    "05-analysis.png": "e37b9a97d63caf13b37f1654cd878e51c2d1f920c43e469ca04a72935418a38e",
+    "06-exported.png": "895531e6320dcda7dfc548a9642be6e531db126e52eb5ab1ba84cc5e55545d25",
+    "07-reopened.png": "22202d8c74f0fcf3345f72aedc4b760fb6f6fe651a1fd367f7a237b441ed4bba",
+    "08-history.png": "8177003b58798348da8d3713487654a0fc03647424246c01a76b59c78af35168",
+    "09-earlier-analysis.png": "464c6907600b8703357712e1e9daa833380a9dc4d48e836fead3b86ca47e0a2f"
+  }
+}

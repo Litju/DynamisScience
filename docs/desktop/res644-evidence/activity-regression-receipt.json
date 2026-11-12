@@ -1,0 +1,9 @@
+{
+  "source_commit": "18494d5eb3afe8831a8c1de6f09c5bac5ec67630",
+  "command": "uv run pytest",
+  "platform": "offscreen Qt; native GUI qualified separately",
+  "passed": 290,
+  "failed": 0,
+  "seconds": 360.84,
+  "log_sha256": "65d4f1c9500f92fbee10604db4a7e82cd5776d0956331081747c67bda122a161"
+}
