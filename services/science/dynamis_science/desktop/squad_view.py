@@ -95,7 +95,8 @@ class AthleteTile(QToolButton):
         edge = _tone_color(flag["tone"]) if flag else colors["line2"]
         self.setStyleSheet(f"QToolButton {{ text-align: left; padding: 8px 10px; border: 1px solid {colors['line2']};"
                            f" border-left: 4px solid {edge}; border-radius: 6px; background: {colors['base']}; color: {colors['text']}; }}"
-                           f" QToolButton:hover {{ border-color: {colors['accent']}; border-left: 4px solid {edge}; }}")
+                           f" QToolButton:hover {{ border-color: {colors['accent']}; border-left: 4px solid {edge}; }}"
+                           f" QToolButton:focus {{ border: 2px solid {colors['accent']}; }}")
 
 
 class SquadBoard(QWidget):
@@ -268,9 +269,13 @@ class RulesDialog(QDialog):
         self.conditions = _table(self.COLUMNS, "Rule conditions")
         self.conditions.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.conditions.horizontalHeader().setMinimumSectionSize(32)
-        for column, width in enumerate((125, 145, 42, 54, 54, 42, 42)):
+        for column, width in enumerate((125, 145, 60, 50, 50, 42, 42)):
             self.conditions.setColumnWidth(column, width)
+        self.conditions.setHorizontalHeaderLabels(["Metric", "Statistic", "Op.", "Cutoff", "Upper", "N / A", "C"])
         right.addWidget(self.conditions, 1)
+        self.condition_note = QLabel("Record windows count valid session means, not days. Thresholds are researcher-defined and are not validated risk limits.")
+        self.condition_note.setWordWrap(True)
+        right.addWidget(self.condition_note)
         row = QHBoxLayout()
         add_condition, remove_condition = QPushButton("Add condition"), QPushButton("Remove condition")
         add_condition.clicked.connect(lambda: self._add_condition({}))
@@ -388,7 +393,11 @@ class SimulationDialog(QDialog):
         outer = QVBoxLayout(self)
         self.tabs = QTabWidget()
         setup, results = QWidget(), QWidget()
-        self.tabs.addTab(setup, "Setup")
+        setup_scroll = QScrollArea()
+        setup_scroll.setWidgetResizable(True)
+        setup_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        setup_scroll.setWidget(setup)
+        self.tabs.addTab(setup_scroll, "Assumptions")
         self.tabs.addTab(results, "Results")
         outer.addWidget(self.tabs)
         layout = QVBoxLayout(setup)
@@ -440,7 +449,7 @@ class SimulationDialog(QDialog):
         row.addStretch(1)
         row.addWidget(run)
         row.addWidget(save)
-        layout.addLayout(row)
+        outer.addLayout(row)
         layout = QVBoxLayout(results)
         self.results = _table(["Scenario", "Status"], "Scenario definition status")
         layout.addWidget(self.results, 1)

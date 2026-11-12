@@ -219,6 +219,11 @@ class MainWindow(QMainWindow):
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
             action = workspace_bar.addAction(label)
             action.triggered.connect(callback)
+            shortcut = {"Research Workbench": "Ctrl+Shift+R", "Squad": "Ctrl+Shift+S", "Events": "Ctrl+Shift+E", "New": "Ctrl+N", "Open": "Ctrl+O"}.get(label)
+            if shortcut:
+                action.setShortcut(shortcut)
+            action.setToolTip(f"{label} ({shortcut})" if shortcut else label)
+            workspace_bar.widgetForAction(action).setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         # RES-647 research context: one workspace identity, cohort or individual scope within it.
         context_bar = QToolBar("Research Context", self)
         context_bar.setObjectName("ResearchContext")

@@ -4,6 +4,8 @@ Disposable synthetic data only. uv run python scripts/res647_scaling.py <output-
 """
 from __future__ import annotations
 
+import hashlib
+import subprocess
 import json
 import os
 import sys
@@ -16,7 +18,7 @@ os.environ["DYNAMISSCIENCE_DATA_ROOT"] = str(work / "private")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from dynamis_science import importer, squad
 from dynamis_science.desktop import theme
@@ -75,6 +77,13 @@ def record(name: str, widget) -> None:
     app.processEvents()
     widget.grab().save(str(out / f"{name}.png"))
     frame = widget.frameGeometry()
+    assert frame.width() <= geometry.width() and frame.height() <= geometry.height(), (name, frame, geometry)
+    if isinstance(widget, RulesDialog):
+        assert widget.conditions.horizontalScrollBar().maximum() == 0, "Rule columns overflow"
+    if isinstance(widget, SimulationDialog):
+        for button in widget.findChildren(QPushButton):
+            if button.text() in ("Validate definition", "Save scenario"):
+                assert button.isVisibleTo(widget) and widget.rect().contains(button.mapTo(widget, button.rect().center())), button.text()
     report["checks"][name] = {"frame": [frame.width(), frame.height()],
                               "fits": frame.width() <= geometry.width() and frame.height() <= geometry.height()}
 
@@ -101,6 +110,8 @@ for name, dialog in (("04-flag-rules", RulesDialog(board["metrics"], board["rule
     else:
         QTimer.singleShot(300, lambda n=name, d=dialog: (record(n, d), d.reject()))
     dialog.exec()
+report["source_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+report["screenshots"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in out.glob("*.png")}
 (out / "scaling-receipt.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report))
 window.close()
