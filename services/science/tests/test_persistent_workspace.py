@@ -230,3 +230,26 @@ def test_failed_append_removes_only_uncommitted_derived_data(service, tmp_path, 
     rev3 = service.attach_workspace_data(identity, third, append=True,
         confirm_participant_ids=True, base_revision=rev2)["active_data_revision_id"]
     assert researchstore.read_snapshot_table(rev3, "cmj_trials").height == 6
+
+
+@pytest.mark.parametrize("break_migration", [False, True])
+def test_real_v1_schema_upgrade_is_additive_and_rollback_safe(service, monkeypatch, break_migration):
+    import sqlite3
+    project = researchstore.create_project("Legacy retained")
+    database = researchstore._db_path()
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE workspace_revisions")
+        connection.execute("PRAGMA user_version=1")
+        before = connection.execute("SELECT document FROM projects WHERE id=?", (project["id"],)).fetchone()[0]
+    with monkeypatch.context() as patch:
+        if break_migration:
+            patch.setattr(researchstore, "_SCHEMA", (*researchstore._SCHEMA, "INVALID MIGRATION SQL"))
+            with pytest.raises(sqlite3.OperationalError):
+                researchstore.list_projects()
+        else:
+            assert researchstore.get_project(project["id"])["title"] == "Legacy retained"
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT document FROM projects WHERE id=?", (project["id"],)).fetchone()[0] == before
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == (1 if break_migration else 2)
+        assert bool(connection.execute("SELECT name FROM sqlite_master WHERE name='workspace_revisions'").fetchone()) != break_migration
+    assert researchstore.get_project(project["id"])["title"] == "Legacy retained"
