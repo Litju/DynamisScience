@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QLineEdit,
@@ -253,7 +254,7 @@ class RulesDialog(QDialog):
         right = QVBoxLayout()
         form = QFormLayout()
         self.name, self.category = QLineEdit(), QLineEdit()
-        self.category.setPlaceholderText("In danger")
+        self.category.setPlaceholderText("Research follow-up")
         self.tone, self.match = QComboBox(), QComboBox()
         for tone in TONES:
             self.tone.addItem({"negative": "Concern (red)", "positive": "Good news (green)", "neutral": "Watch (amber)"}[tone], tone)
@@ -265,6 +266,10 @@ class RulesDialog(QDialog):
         form.addRow("Fires when", self.match)
         right.addLayout(form)
         self.conditions = _table(self.COLUMNS, "Rule conditions")
+        self.conditions.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.conditions.horizontalHeader().setMinimumSectionSize(32)
+        for column, width in enumerate((125, 145, 42, 54, 54, 42, 42)):
+            self.conditions.setColumnWidth(column, width)
         right.addWidget(self.conditions, 1)
         row = QHBoxLayout()
         add_condition, remove_condition = QPushButton("Add condition"), QPushButton("Remove condition")
@@ -310,7 +315,7 @@ class RulesDialog(QDialog):
                                                  (list(MEASURES.items()), "measure"), ([(op, op) for op in OPERATORS], "operator"))):
             picker = QComboBox()
             picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-            picker.setMinimumContentsLength(4 if key == "operator" else 12)
+            picker.setMinimumContentsLength(2 if key == "operator" else 8)
             for value, label in options:
                 picker.addItem(label, value)
                 picker.setItemData(picker.count() - 1, label, Qt.ItemDataRole.ToolTipRole)

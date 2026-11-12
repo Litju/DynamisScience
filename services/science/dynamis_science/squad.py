@@ -124,7 +124,7 @@ def validate_rule(rule: dict[str, Any], metrics: dict[str, dict[str, Any]]) -> d
                 raise researchstore.ResearchValidation(f"{name}: record windows must be positive integers")
         if condition.get("measure") == "acute_chronic_ratio" and condition.get("acute", 1) >= condition.get("chronic", 4):
             raise researchstore.ResearchValidation(f"{name}: short record window must be less than long window")
-        if not all(math.isfinite(float(condition[k])) for k in ("value", "value2") if k in condition):
+        if not all(math.isfinite(float(condition[k])) for k in (("value", "value2") if condition["operator"] in ("between", "outside") else ("value",))):
             raise researchstore.ResearchValidation(f"{name}: thresholds must be finite")
     return {"id": rule.get("id") or f"RULE-{secrets.token_hex(3).upper()}", "name": name, "category": category,
             "tone": rule.get("tone", "neutral"), "match": "any" if rule.get("match") == "any" else "all",
@@ -340,8 +340,8 @@ def events(workspace_id: str) -> dict[str, Any]:
                               "title": f"Retrospective: {subject} entered {category}", "detail": "Current rules re-evaluated now; not recorded at the revision date. " + _evidence_text(hit), "revision": revision["number"], "evaluation_kind": "RETROSPECTIVE", "evaluated_at": researchstore._now()})
             for category, _ in sorted(before - categories):
                 items.append({"at": revision["created_at"], "kind": "flag", "tone": "neutral", "subject_id": subject,
-                              "title": f"Retrospective: {subject} no longer meets {category}", "detail": f"Data revision {revision['number']}",
-                              "revision": revision["number"]})
+                              "title": f"Retrospective: {subject} no longer recorded as matching {category}", "detail": f"Data revision {revision['number']}; current rules evaluated now. Values may be unavailable; absence of a match is not normal status.",
+                              "revision": revision["number"], "evaluation_kind": "RETROSPECTIVE", "evaluated_at": researchstore._now()})
         previous, current_hits = state, hits
     active_revision = researchstore.get_data_revision(entity.get("active_data_revision_id"))
     current_hits = evaluate(active_revision["snapshot_id"], rules, data_revision_id=active_revision["id"]) if active_revision and rules else {}

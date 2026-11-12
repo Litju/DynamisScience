@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
         screen = self.screen()
         available = screen.availableGeometry() if screen is not None else None
         # shortcut: compact layout follows the startup screen, reevaluate when supporting live monitor changes
-        if available is not None and (available.width() < 1100 or available.height() < 650):
+        if available is not None and (available.width() < 1100 or available.height() < 850):
             perspectives_scroll = QScrollArea()
             perspectives_scroll.setWidgetResizable(True)
             perspectives_scroll.setWidget(self.perspectives)

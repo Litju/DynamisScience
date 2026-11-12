@@ -26,7 +26,7 @@ else:
     os.environ["DYNAMISSCIENCE_DATA_ROOT"] = str(work / "private")
 out.mkdir(parents=True, exist_ok=True)
 os.environ.pop("DYNAMISSCIENCE_TEST_SESSION", None)
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
+
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox, QTableWidgetItem
@@ -101,7 +101,7 @@ if reopen:
     window._show_study(identity, window.service.get_study_detail(identity))
     settle()
     panel = window.research.individual
-    assert window.scope_picker.currentData() == "INDIVIDUAL" and "Participant P01" in panel.header.text()
+    assert window.research_context["scope"] == "INDIVIDUAL" and "Participant P01" in panel.header.text()
     assert panel.run_picker.count() == 2
     shot("20-new-process-restored")
     (out / "reopen-receipt.json").write_text(json.dumps({
@@ -112,7 +112,20 @@ if reopen:
     window.close()
     sys.exit(0)
 
-from test_longitudinal_research import study_file  # noqa: E402  deterministic 12-participant fixture
+def study_file(directory, weeks, name):
+    lines = ["Athlete,Trial,Jump Height (cm),Body Mass (kg),Peak Force (N),week"]
+    missing = {("P03", 3), ("P03", 5), ("P07", 6), ("P11", 2), ("P11", 3), ("P11", 4), ("P11", 5), ("P11", 6)}
+    for index in range(1, 13):
+        subject = f"P{index:02d}"
+        for week in weeks:
+            if (subject, week) in missing:
+                continue
+            for trial in range(1, 3 + index % 2):
+                value = round(30 + index + .4*week + ((trial*7+index*3+week)%5-2)*.3, 2)
+                lines.append(f"{subject},{subject}-W{week}-T{trial},{value},{70+index},{1600+10*index},{week}")
+    path = directory / name
+    path.write_text("\n".join(lines)+"\n")
+    return path
 
 settle()
 answers.append("Squad CMJ longitudinal research")
@@ -162,25 +175,32 @@ cohort_first = window.research.latest_run
 assert cohort_first["scope"]["kind"] == "COHORT" and cohort_first["result"]["n_subjects"] == 12
 shot("01-cohort-analysis")
 fits(window)
+from PySide6.QtWidgets import QToolBar
+bar = window.findChild(QToolBar, "PersistentWorkspaceActions")
+assert all(bar.widgetForAction(a).isVisibleTo(window) for a in bar.actions()), "Primary action hidden in overflow"
 
 # 3–5. Individuals explorer; Participant A and Participant B investigations.
 panel = window.research.individual
 
 
 def open_participant(row: int, title: str, question: str, name: str) -> None:
-    window._open_individuals()
-    explorer = window.individuals_dialog
+    window._show_squad_mode()
+    window.squad.setCurrentWidget(window.squad.board)
     settle()
-    explorer.table.selectRow(row)
-    shot(name, explorer)
-    fits(explorer)
-    answers.extend([title, question])
-    explorer.new_button.click()
+    tiles = sorted(window.squad.board.tiles(), key=lambda t: t.athlete["subject_id"])
+    assert len(tiles) == 12
+    shot(name)
+    tiles[row].click()
     settle()
+    answers.append(title)
+    window.squad.athlete_page.new_branch()
+    settle()
+    assert window.squad.athlete_page.research_tabs.currentIndex() == 1
+
 
 
 open_participant(0, "Jump height trajectory", "How did P01's CMJ height change across the season?", "02-individuals-explorer")
-assert "Participant P01" in panel.header.text() and window.scope_picker.currentData() == "INDIVIDUAL"
+assert "Participant P01" in panel.header.text() and window.research_context["scope"] == "INDIVIDUAL"
 panel.tabs.setCurrentIndex(1)
 shot("03-individual-analysis-options")
 panel.execute()
@@ -199,8 +219,7 @@ rev2 = window.current_study["active_data_revision_id"]
 assert rev2 != rev1 and window.current_study_id == identity
 investigations = window.service.individual_investigations(identity)
 a_id = next(item["id"] for item in investigations if item["scope"]["subject_id"] == "P01")
-window.investigation_picker.setCurrentIndex(window.investigation_picker.findData(a_id))
-window._scope_changed()
+window._select_scope("INDIVIDUAL", a_id)
 settle()
 assert "Participant P01" in panel.header.text() and "Data revision 2" in panel.header.text()
 panel.execute()
@@ -232,6 +251,16 @@ settle()
 assert "NOT QUALIFIED — Numerical forecast unavailable." in panel.scenario_view.toPlainText()
 shot("08-scenario-not-qualified")
 
+# Events distinguish original recorded evaluations from current-rule retrospective history.
+window.service.save_flag_rules(identity, [{"name": "Observed decrease", "category": "Research follow-up", "tone": "neutral",
+    "conditions": [{"metric_id": "MET-CMJ-HEIGHT", "measure": "change_from_previous_pct", "operator": "<", "value": 0}]}])
+window._show_events_mode()
+settle()
+assert any(e["kind"] == "rule_evaluation" for e in window.events_view.feed["events"])
+assert all(e.get("evaluation_kind") == "RETROSPECTIVE" for e in window.events_view.feed["events"] if e["kind"] == "flag")
+shot("08b-events-and-history")
+window._open_athlete("P01")
+settle()
 # 12. Compare with cohort.
 panel.tabs.setCurrentIndex(5)
 panel.compare()
@@ -248,17 +277,14 @@ for name in ("individual", "cohort", "combined"):
     if name == "individual":
         window.research.export_report()
     elif name == "cohort":
-        window.scope_picker.setCurrentIndex(window.scope_picker.findData("COHORT"))
-        window._scope_changed()
+        window._select_scope("COHORT")
         window._analyze_workspace()
         window.research.analysis_metric_picker.setCurrentIndex(window.research.analysis_metric_picker.findData("MET-CMJ-HEIGHT"))
         window.research.execute_button.click()
         settle()
         window.research.export_report()
     else:
-        window.investigation_picker.setCurrentIndex(window.investigation_picker.findData(a_id))
-        window.scope_picker.setCurrentIndex(window.scope_picker.findData("INDIVIDUAL"))
-        window._scope_changed()
+        window._select_scope("INDIVIDUAL", a_id)
         settle()
         window._export_combined_report()
     settle()
@@ -290,14 +316,16 @@ settle()
 window._show_study(identity, window.service.get_study_detail(identity))
 settle()
 panel = window.research.individual
-assert window.scope_picker.currentData() == "INDIVIDUAL" and "Participant P01" in panel.header.text()
+assert window.research_context["scope"] == "INDIVIDUAL" and "Participant P01" in panel.header.text()
 assert {item["version"]: item["content_hash"] for item in researchstore.report_versions(identity)} == reports_before
 shot("11-reopened")
 fits(window)
 window.close()
-subprocess.run([sys.executable, __file__, "--reopen", os.environ["DYNAMISSCIENCE_DATA_ROOT"], identity, str(out), mode], check=True)
-receipt = {"source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-           "dirty_files": subprocess.check_output(["git", "status", "--porcelain"], text=True).splitlines(),
+subprocess.run([sys.executable, *( ["--qualification-walkthrough"] if getattr(sys, "frozen", False) else [__file__] ), "--reopen", os.environ["DYNAMISSCIENCE_DATA_ROOT"], identity, str(out), mode], check=True)
+receipt = {"source_commit": os.environ.get("DYNAMISSCIENCE_QUALIFICATION_COMMIT") or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+           "dirty_files": [] if getattr(sys, "frozen", False) else subprocess.check_output(["git", "status", "--porcelain"], text=True).splitlines(),
+           "packaged": bool(getattr(sys, "frozen", False)),
+           "executable_sha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),
            "platform": app.platformName(), "scale": scale, "theme": mode, "available_geometry": [geometry.width(), geometry.height()],
            "data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"], "workspace_id": identity, "revisions": [rev1, rev2],
            "investigations": [{"id": item["id"], "subject_id": item["scope"]["subject_id"], "version": item["version"]}
