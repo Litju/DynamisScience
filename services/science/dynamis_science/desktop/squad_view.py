@@ -123,6 +123,13 @@ class SquadBoard(QWidget):
         self.simulate_button = QPushButton("Hypothetical scenarios…")
         self.simulate_button.clicked.connect(lambda: self.simulate(None))
         bar.addWidget(self.title, 1)
+        layout.addLayout(bar)
+        bar = QHBoxLayout()
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search participants…")
+        self.search.setAccessibleName("Search participants")
+        self.search.textChanged.connect(lambda: self._loaded(self.board) if self.board else None)
+        bar.addWidget(self.search, 1)
         bar.addWidget(QLabel("Show"))
         bar.addWidget(self.metric_picker)
         bar.addWidget(QLabel("Group by"))
@@ -168,9 +175,9 @@ class SquadBoard(QWidget):
         self.board = board
         flagged = sum(1 for group in board["groups"] for athlete in group["athletes"] if athlete["flags"])
         total = sum(len(group["athletes"]) for group in board["groups"])
-        self.title.setText(f"<b>Squad</b> · {total} athletes · {flagged} flagged · {board['metric']['label']} ({board['metric']['unit']})")
+        self.title.setText(f"<b>{html.escape(board.get('title', 'Squad research'))}</b> · {board['data_revision_id']} · {total} participants · {board['metric']['label']} ({board['metric']['unit']})")
         self.note.setText(board["note"] if board["rules"] else
-                          "No flag rules yet. Use Flag rules… to define what counts as ‘in danger’, ‘doing great’ or anything else for your squad.")
+                          "Open a participant to inspect measurements and create an investigation, or open Research Workbench for cohort analyses. Flags are optional researcher-defined descriptions, not validated risk classifications.")
         self.group_picker.blockSignals(True)
         self.group_picker.clear()
         labels = {"category": "Flag category", "trend": "Trend"}
@@ -193,7 +200,8 @@ class SquadBoard(QWidget):
             tiles = QGridLayout()
             tiles.setHorizontalSpacing(10)
             tiles.setVerticalSpacing(10)
-            for index, athlete in enumerate(group["athletes"]):
+            visible = [a for a in group["athletes"] if not self.search.text().strip() or self.search.text().strip().lower() in a["display_id"].lower() or self.search.text().strip().lower() in a["subject_id"].lower()]
+            for index, athlete in enumerate(visible):
                 tile = AthleteTile(athlete, board.get("time_word", "tests"))
                 tile.clicked.connect(lambda _=False, value=athlete: self.athlete_opened.emit(value))
                 tiles.addWidget(tile, index // columns, index % columns, Qt.AlignmentFlag.AlignLeft)
@@ -498,10 +506,12 @@ class AthletePage(QWidget):
         top.addWidget(self.header, 1)
         top.addWidget(self.simulate_button)
         layout.addLayout(top)
-        body = QHBoxLayout()
-        layout.addLayout(body, 1)
-        overview = QVBoxLayout()
-        body.addLayout(overview, 2)
+        self.research_tabs = QTabWidget()
+        layout.addWidget(self.research_tabs, 1)
+        measurements, investigations = QWidget(), QWidget()
+        self.research_tabs.addTab(measurements, "Longitudinal measurements")
+        self.research_tabs.addTab(investigations, "Scientific investigations")
+        overview = QVBoxLayout(measurements)
         self.cards = QHBoxLayout()
         overview.addLayout(self.cards)
         self.flags = QTextBrowser()
@@ -510,14 +520,13 @@ class AthletePage(QWidget):
         self.figure = ScientificFigureWidget()
         self.figure.setMinimumHeight(160)
         overview.addWidget(self.figure, 1)
-        research = QVBoxLayout()
-        body.addLayout(research, 3)
+        research = QVBoxLayout(investigations)
         branches = QHBoxLayout()
-        branches.addWidget(QLabel("Branches"))
+        branches.addWidget(QLabel("Investigations"))
         self.branch_picker = QComboBox()
         self.branch_picker.setAccessibleName("Individual research branches")
         self.branch_picker.activated.connect(lambda _: self._branch_chosen())
-        new_branch = QPushButton("New branch…")
+        new_branch = QPushButton("New investigation…")
         new_branch.clicked.connect(self.new_branch)
         branches.addWidget(self.branch_picker, 1)
         branches.addWidget(new_branch)
@@ -545,6 +554,7 @@ class AthletePage(QWidget):
         for item in investigations:
             self.branch_picker.addItem(f"Branch · {item['title']}", item["id"])
         self.branch_picker.setCurrentIndex(max(0, self.branch_picker.findData(current)))
+        self.research_tabs.setCurrentIndex(1 if current else 0)
 
     def _plot(self, athlete: dict[str, Any]) -> None:
         figure = Figure(figsize=(5, 3), constrained_layout=True)

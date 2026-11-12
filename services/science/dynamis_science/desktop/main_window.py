@@ -214,7 +214,7 @@ class MainWindow(QMainWindow):
         workspace_bar = QToolBar("Research Workspace", self)
         workspace_bar.setObjectName("PersistentWorkspaceActions")
         self.addToolBar(workspace_bar)
-        for label, callback in (("Squad", self._show_squad_mode), ("Events", self._show_events_mode), ("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
+        for label, callback in (("Research Workbench", self._show_research_mode), ("Squad", self._show_squad_mode), ("Events", self._show_events_mode), ("New", self._new_workspace), ("Open", self._choose_workspace),
                                 ("Add data", self._add_workspace_data), ("Analyze", self._analyze_workspace),
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
             action = workspace_bar.addAction(label)
@@ -222,9 +222,11 @@ class MainWindow(QMainWindow):
         # RES-647 research context: one workspace identity, cohort or individual scope within it.
         context_bar = QToolBar("Research Context", self)
         context_bar.setObjectName("ResearchContext")
+        self.addToolBarBreak()
         self.addToolBar(context_bar)
         self.context_title = QLabel("No workspace")
         self.context_title.setAccessibleName("Workspace title and active data revision")
+        self.context_title.setMaximumWidth(560)
         context_bar.addWidget(self.context_title)
         context_bar.addAction("Combined report").triggered.connect(self._export_combined_report)
         self._sync_context_bar()
