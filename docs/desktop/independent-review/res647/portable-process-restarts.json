@@ -1,0 +1,26 @@
+[
+  {
+    "scale": "1",
+    "workspace_id": "STUDY-U-CFD02E30",
+    "first_process_id": 11100,
+    "first_process_exited_before_restart": true,
+    "restarted_process_id": 276,
+    "restart_exit_code": 0
+  },
+  {
+    "scale": "1.25",
+    "workspace_id": "STUDY-U-F50CD731",
+    "first_process_id": 11812,
+    "first_process_exited_before_restart": true,
+    "restarted_process_id": 6628,
+    "restart_exit_code": 0
+  },
+  {
+    "scale": "1.5",
+    "workspace_id": "STUDY-U-DEB5B520",
+    "first_process_id": 14184,
+    "first_process_exited_before_restart": true,
+    "restarted_process_id": 3392,
+    "restart_exit_code": 0
+  }
+]

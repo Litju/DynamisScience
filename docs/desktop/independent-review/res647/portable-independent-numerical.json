@@ -1,0 +1,611 @@
+{
+  "basis": "Standard-library means/SD and independent pairwise-difference SSE; deterministic fixture expectations, not fitted forecasts",
+  "checks": [
+    {
+      "scale": "100",
+      "executable_sha256": "e43bb87faa0f0b70c5bee3b7461172cfe1c6fd4ecdfc58a05d066105ff7db9ce",
+      "source_commit": "e748962a8a0c3fc264959549cb10dc967e779c25",
+      "workspace_id": "STUDY-U-CFD02E30",
+      "runs": [
+        {
+          "run_id": "RUN-U-0001",
+          "scope": {
+            "kind": "COHORT"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 36.895833333333336,
+              "sd": 3.6336469492116534,
+              "n": 12
+            },
+            {
+              "week": 2,
+              "mean": 36.86363636363637,
+              "sd": 3.446308960982091,
+              "n": 11
+            },
+            {
+              "week": 3,
+              "mean": 37.58,
+              "sd": 3.480756622728263,
+              "n": 10
+            }
+          ],
+          "expected_change": 0.6841666666666626,
+          "matched": true
+        },
+        {
+          "run_id": "RUN-U-0002",
+          "scope": {
+            "investigation_id": "INV-U-8B0B32C6",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P01"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 31.2,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 2,
+              "mean": 31.9,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 3,
+              "mean": 32.1,
+              "sd": 0.45825756949558355,
+              "n": 3
+            }
+          ],
+          "expected_change": 0.9000000000000021,
+          "matched": true,
+          "independent_sse": 1.259999999999996,
+          "df": 6,
+          "independent_trial_noise_se": 0.3741657386773935
+        },
+        {
+          "run_id": "RUN-U-0003",
+          "scope": {
+            "investigation_id": "INV-U-0B60D5D3",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P02"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 32.55,
+              "sd": 0.6363961030678917,
+              "n": 2
+            },
+            {
+              "week": 2,
+              "mean": 32.5,
+              "sd": 0.4242640687119245,
+              "n": 2
+            },
+            {
+              "week": 3,
+              "mean": 33.2,
+              "sd": 0.4242640687119295,
+              "n": 2
+            }
+          ],
+          "expected_change": 0.6500000000000057,
+          "matched": true,
+          "independent_sse": 0.7649999999999961,
+          "df": 3,
+          "independent_trial_noise_se": 0.5049752469181026
+        },
+        {
+          "run_id": "RUN-U-0004",
+          "scope": {
+            "investigation_id": "INV-U-8B0B32C6",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P01"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 31.2,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 2,
+              "mean": 31.9,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 3,
+              "mean": 32.1,
+              "sd": 0.45825756949558355,
+              "n": 3
+            },
+            {
+              "week": 4,
+              "mean": 32.8,
+              "sd": 0.45825756949558666,
+              "n": 3
+            },
+            {
+              "week": 5,
+              "mean": 33.0,
+              "sd": 0.6000000000000014,
+              "n": 3
+            },
+            {
+              "week": 6,
+              "mean": 33.2,
+              "sd": 0.45825756949558666,
+              "n": 3
+            }
+          ],
+          "expected_change": 2.0000000000000036,
+          "matched": true,
+          "independent_sse": 2.820000000000009,
+          "df": 12,
+          "independent_trial_noise_se": 0.39581140290126454
+        },
+        {
+          "run_id": "RUN-U-0005",
+          "scope": {
+            "kind": "COHORT"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 36.895833333333336,
+              "sd": 3.6336469492116534,
+              "n": 12
+            },
+            {
+              "week": 2,
+              "mean": 36.86363636363637,
+              "sd": 3.446308960982091,
+              "n": 11
+            },
+            {
+              "week": 3,
+              "mean": 37.58,
+              "sd": 3.480756622728263,
+              "n": 10
+            },
+            {
+              "week": 4,
+              "mean": 37.71818181818182,
+              "sd": 3.4620999933041166,
+              "n": 11
+            },
+            {
+              "week": 5,
+              "mean": 38.405,
+              "sd": 3.5381610100917293,
+              "n": 10
+            },
+            {
+              "week": 6,
+              "mean": 38.394999999999996,
+              "sd": 3.707458698353901,
+              "n": 10
+            }
+          ],
+          "expected_change": 1.4991666666666603,
+          "matched": true
+        }
+      ]
+    },
+    {
+      "scale": "125",
+      "executable_sha256": "e43bb87faa0f0b70c5bee3b7461172cfe1c6fd4ecdfc58a05d066105ff7db9ce",
+      "source_commit": "e748962a8a0c3fc264959549cb10dc967e779c25",
+      "workspace_id": "STUDY-U-F50CD731",
+      "runs": [
+        {
+          "run_id": "RUN-U-0001",
+          "scope": {
+            "kind": "COHORT"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 36.895833333333336,
+              "sd": 3.6336469492116534,
+              "n": 12
+            },
+            {
+              "week": 2,
+              "mean": 36.86363636363637,
+              "sd": 3.446308960982091,
+              "n": 11
+            },
+            {
+              "week": 3,
+              "mean": 37.58,
+              "sd": 3.480756622728263,
+              "n": 10
+            }
+          ],
+          "expected_change": 0.6841666666666626,
+          "matched": true
+        },
+        {
+          "run_id": "RUN-U-0002",
+          "scope": {
+            "investigation_id": "INV-U-ABCAACE2",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P01"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 31.2,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 2,
+              "mean": 31.9,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 3,
+              "mean": 32.1,
+              "sd": 0.45825756949558355,
+              "n": 3
+            }
+          ],
+          "expected_change": 0.9000000000000021,
+          "matched": true,
+          "independent_sse": 1.259999999999996,
+          "df": 6,
+          "independent_trial_noise_se": 0.3741657386773935
+        },
+        {
+          "run_id": "RUN-U-0003",
+          "scope": {
+            "investigation_id": "INV-U-621AE96C",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P02"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 32.55,
+              "sd": 0.6363961030678917,
+              "n": 2
+            },
+            {
+              "week": 2,
+              "mean": 32.5,
+              "sd": 0.4242640687119245,
+              "n": 2
+            },
+            {
+              "week": 3,
+              "mean": 33.2,
+              "sd": 0.4242640687119295,
+              "n": 2
+            }
+          ],
+          "expected_change": 0.6500000000000057,
+          "matched": true,
+          "independent_sse": 0.7649999999999961,
+          "df": 3,
+          "independent_trial_noise_se": 0.5049752469181026
+        },
+        {
+          "run_id": "RUN-U-0004",
+          "scope": {
+            "investigation_id": "INV-U-ABCAACE2",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P01"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 31.2,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 2,
+              "mean": 31.9,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 3,
+              "mean": 32.1,
+              "sd": 0.45825756949558355,
+              "n": 3
+            },
+            {
+              "week": 4,
+              "mean": 32.8,
+              "sd": 0.45825756949558666,
+              "n": 3
+            },
+            {
+              "week": 5,
+              "mean": 33.0,
+              "sd": 0.6000000000000014,
+              "n": 3
+            },
+            {
+              "week": 6,
+              "mean": 33.2,
+              "sd": 0.45825756949558666,
+              "n": 3
+            }
+          ],
+          "expected_change": 2.0000000000000036,
+          "matched": true,
+          "independent_sse": 2.820000000000009,
+          "df": 12,
+          "independent_trial_noise_se": 0.39581140290126454
+        },
+        {
+          "run_id": "RUN-U-0005",
+          "scope": {
+            "kind": "COHORT"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 36.895833333333336,
+              "sd": 3.6336469492116534,
+              "n": 12
+            },
+            {
+              "week": 2,
+              "mean": 36.86363636363637,
+              "sd": 3.446308960982091,
+              "n": 11
+            },
+            {
+              "week": 3,
+              "mean": 37.58,
+              "sd": 3.480756622728263,
+              "n": 10
+            },
+            {
+              "week": 4,
+              "mean": 37.71818181818182,
+              "sd": 3.4620999933041166,
+              "n": 11
+            },
+            {
+              "week": 5,
+              "mean": 38.405,
+              "sd": 3.5381610100917293,
+              "n": 10
+            },
+            {
+              "week": 6,
+              "mean": 38.394999999999996,
+              "sd": 3.707458698353901,
+              "n": 10
+            }
+          ],
+          "expected_change": 1.4991666666666603,
+          "matched": true
+        }
+      ]
+    },
+    {
+      "scale": "150",
+      "executable_sha256": "e43bb87faa0f0b70c5bee3b7461172cfe1c6fd4ecdfc58a05d066105ff7db9ce",
+      "source_commit": "e748962a8a0c3fc264959549cb10dc967e779c25",
+      "workspace_id": "STUDY-U-DEB5B520",
+      "runs": [
+        {
+          "run_id": "RUN-U-0001",
+          "scope": {
+            "kind": "COHORT"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 36.895833333333336,
+              "sd": 3.6336469492116534,
+              "n": 12
+            },
+            {
+              "week": 2,
+              "mean": 36.86363636363637,
+              "sd": 3.446308960982091,
+              "n": 11
+            },
+            {
+              "week": 3,
+              "mean": 37.58,
+              "sd": 3.480756622728263,
+              "n": 10
+            }
+          ],
+          "expected_change": 0.6841666666666626,
+          "matched": true
+        },
+        {
+          "run_id": "RUN-U-0002",
+          "scope": {
+            "investigation_id": "INV-U-6C617630",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P01"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 31.2,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 2,
+              "mean": 31.9,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 3,
+              "mean": 32.1,
+              "sd": 0.45825756949558355,
+              "n": 3
+            }
+          ],
+          "expected_change": 0.9000000000000021,
+          "matched": true,
+          "independent_sse": 1.259999999999996,
+          "df": 6,
+          "independent_trial_noise_se": 0.3741657386773935
+        },
+        {
+          "run_id": "RUN-U-0003",
+          "scope": {
+            "investigation_id": "INV-U-259D6DE0",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P02"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 32.55,
+              "sd": 0.6363961030678917,
+              "n": 2
+            },
+            {
+              "week": 2,
+              "mean": 32.5,
+              "sd": 0.4242640687119245,
+              "n": 2
+            },
+            {
+              "week": 3,
+              "mean": 33.2,
+              "sd": 0.4242640687119295,
+              "n": 2
+            }
+          ],
+          "expected_change": 0.6500000000000057,
+          "matched": true,
+          "independent_sse": 0.7649999999999961,
+          "df": 3,
+          "independent_trial_noise_se": 0.5049752469181026
+        },
+        {
+          "run_id": "RUN-U-0004",
+          "scope": {
+            "investigation_id": "INV-U-6C617630",
+            "investigation_version": 1,
+            "kind": "INDIVIDUAL",
+            "subject_id": "P01"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 31.2,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 2,
+              "mean": 31.9,
+              "sd": 0.45825756949558316,
+              "n": 3
+            },
+            {
+              "week": 3,
+              "mean": 32.1,
+              "sd": 0.45825756949558355,
+              "n": 3
+            },
+            {
+              "week": 4,
+              "mean": 32.8,
+              "sd": 0.45825756949558666,
+              "n": 3
+            },
+            {
+              "week": 5,
+              "mean": 33.0,
+              "sd": 0.6000000000000014,
+              "n": 3
+            },
+            {
+              "week": 6,
+              "mean": 33.2,
+              "sd": 0.45825756949558666,
+              "n": 3
+            }
+          ],
+          "expected_change": 2.0000000000000036,
+          "matched": true,
+          "independent_sse": 2.820000000000009,
+          "df": 12,
+          "independent_trial_noise_se": 0.39581140290126454
+        },
+        {
+          "run_id": "RUN-U-0005",
+          "scope": {
+            "kind": "COHORT"
+          },
+          "expected_points": [
+            {
+              "week": 1,
+              "mean": 36.895833333333336,
+              "sd": 3.6336469492116534,
+              "n": 12
+            },
+            {
+              "week": 2,
+              "mean": 36.86363636363637,
+              "sd": 3.446308960982091,
+              "n": 11
+            },
+            {
+              "week": 3,
+              "mean": 37.58,
+              "sd": 3.480756622728263,
+              "n": 10
+            },
+            {
+              "week": 4,
+              "mean": 37.71818181818182,
+              "sd": 3.4620999933041166,
+              "n": 11
+            },
+            {
+              "week": 5,
+              "mean": 38.405,
+              "sd": 3.5381610100917293,
+              "n": 10
+            },
+            {
+              "week": 6,
+              "mean": 38.394999999999996,
+              "sd": 3.707458698353901,
+              "n": 10
+            }
+          ],
+          "expected_change": 1.4991666666666603,
+          "matched": true
+        }
+      ]
+    }
+  ]
+}

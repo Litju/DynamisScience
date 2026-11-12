@@ -1,0 +1,18 @@
+{
+  "source_commit": "e748962a8a0c3fc264959549cb10dc967e779c25",
+  "application_tree": "47e9b7f82fde12395207f5dee0ce89da7c0b3b74",
+  "tests_passed": 314,
+  "tests_failed": 0,
+  "tests_skipped": 0,
+  "seconds": 396.75,
+  "platform": "Windows / Python 3.12.13 / PySide6 6.12.0",
+  "qt_test_platform": "offscreen; native Windows qualification is recorded separately",
+  "source_status": [
+    " M data/synthetic/generator_manifest.json"
+  ],
+  "log_sha256": "755e3f8f4fc760adb4aedc7d825172268ebe0b6571156077a22a41c436218dc0",
+  "static_checks": {
+    "compileall": "passed",
+    "changed_python_whitespace": "passed"
+  }
+}

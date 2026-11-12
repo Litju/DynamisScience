@@ -1,0 +1,21 @@
+e748962a8a0c3fc264959549cb10dc967e779c25 RES-647 Fit active scientific pages and comparison tables to native work areas
+983fa37e70f2df9e12d049a91a40f34e63567c62 RES-647 Guard comparison revisions and require unambiguous monitoring time axes
+092b1250d72b5e40742b427bec0ab10d734396aa RES-647 Keep scenario actions visible and qualify high-DPI editors
+960959f87b7cd1e66a0e93a927bc291de222f7bf RES-647 Integrate independent legacy migration verification
+97cd6ff77b6a5527f2eb2628178aeb286b2f1307 RES-647 Freeze investigation versions and preserve linked measurement sources
+c933a6c8f29276a37407e34bb6a92589bc13ee7a RES-647 Add repeatable Windows regression and packaged qualification entry
+2a41945c5f40febf18e7c113371bf06dcd600b92 RES-647 Integrate independently qualified RES-644 append recovery
+695d8d62083d56ffe47f740922b137a88faaeecf RES-647 Exercise current native research workflow and correct work-area overflow
+f660ae7f1efde96accfd6eafa384cc4954064322 RES-647 Provide explicit mixed-family import recovery without pooling
+cc931135308022343003f72cf6de577c7ab046d5 RES-647 Make research navigation and athlete investigations accessible at high DPI
+5b9998c2e817e8c9034bc5a2d71ae7f9ec190470 RES-647 Qualify individual trial-noise arithmetic and state variance assumptions
+d116fb5627bcc8dfbfe3b03a577c0dda80f8ebc6 RES-647 Record descriptive flag provenance and distinguish retrospective evaluations
+87b3f9cc5f85cdd8a79ba7f3330f1a0af2ddca75 RES-647 Preserve hypothetical definitions and disable unqualified numerical futures
+b97babba7092471a6c99f29b6fac1c0f1bafb3da RES-647 Qualify Squad, athlete, Events and editors at 125% and 150%
+974f505fcf7ebc69f40b178194107c3fd7854471 RES-647 Events feed: flag changes, new data, analyses and follow-ups
+352e5e89b7fda9224be5520762292a6357939aba RES-647 Import athlete monitoring and link it to CMJ in one revision
+08da414636893fc0f106940f9fcfca8e5d59adb9 RES-647 Squad home perspective with athlete pages, branches and simulations
+f6a7594ccbc50119ac1c7ee7a2a0a62d75beace0 RES-647 Add researcher-configured squad flag rules and simulations
+7dc0ae8cdfc1eff935c5f718795de8d0fcadbe92 RES-647 Record native longitudinal research qualification
+d6a00f0f9451abe15525af89ab2d5a4c58bf21dd RES-647 Native individual research context, explorer and research panel
+d0d62378f0b5983097271ce3e5fea2886d4d536c RES-647 Add individual research scopes, protocols, scenarios and labeled reports

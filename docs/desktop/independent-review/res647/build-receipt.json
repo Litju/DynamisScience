@@ -1,0 +1,291 @@
+{
+  "source_commit": "e748962a8a0c3fc264959549cb10dc967e779c25",
+  "application_tree": "47e9b7f82fde12395207f5dee0ce89da7c0b3b74",
+  "source_status": [
+    " M data/synthetic/generator_manifest.json"
+  ],
+  "executable": "C:\\Users\\Usuario\\AppData\\Local\\Temp\\dynamis-independent-20261112\\delivery-dist\\DynamisScience\\DynamisScience.exe",
+  "executable_sha256": "e43bb87faa0f0b70c5bee3b7461172cfe1c6fd4ecdfc58a05d066105ff7db9ce",
+  "executable_bytes": 31537702,
+  "embedded_pyz_sha256": "6564738f4679abcf06716b4d7cf139519111748934a71081242f88be47478f6c",
+  "entry_code_equal": true,
+  "modules": [
+    {
+      "module": "dynamis_science",
+      "source_sha256": "58f5a3deccc8333dbc904d10280ea6cef8b0613de9e140e0e0873ab7e3693b22",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.admission",
+      "source_sha256": "2f4a05c27dc10f3afb1ec44bd18ca3e96e69069b181c004ac33362ee706f57e4",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.analysis",
+      "source_sha256": "abd27ec285ba280d2362ffcdf4262c1fa09a5c1573e7d42901aa3d70b67c7307",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.contracts",
+      "source_sha256": "d111a84658993bf5a3f859b2bb9193f494946b0f8cf67a68b7d49c985ae7bbc0",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.data_root",
+      "source_sha256": "1ae5ca67aa5da43e44dccf40b4af4bcf152feae815e8de70a6b33e6339c53966",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.dataworkspace",
+      "source_sha256": "aca486ffd632d750ff6074a456385d8335d78b339ab5306386059fff607a2f01",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop",
+      "source_sha256": "bc7015330ac6aaa6dabcd07cebd465c3611fcb22fe083f32995a3695736f6287",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.__main__",
+      "source_sha256": "1cf6252dee36d92add676566c389070136e7a740b7039bcfd83df76c7258760b",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.data_workspace",
+      "source_sha256": "2df9d9bc47f51817281cf5f3399d0231b55c2d0469b0bf3370204fe835e8b474",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.dialogs",
+      "source_sha256": "a4195b3a55a3e95f2314e906ef5922f7701f08c58760ac4d9c9b35ceaf2d7214",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.import_review",
+      "source_sha256": "fafcbc53ede4bb7a6061c95ab178e8ea210658a15cb3017fd0576cc25e5cc420",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.individual_research",
+      "source_sha256": "d73eac9af9c5a012b300103843ffa78540cbbe012d9d7a02c9d4aff1c8475d91",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.investigation_editor",
+      "source_sha256": "5343dd655a84b5f3e0d1fa4ce675820d389dcea897ed6fa83b04b93fb7ad8734",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.library_dialog",
+      "source_sha256": "50dc3c0bbc0eb0e0f6434a40b63f71953e9883460027257095103eb8ab1361e2",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.lineage_dialog",
+      "source_sha256": "f7127c002cde8a4b2cba1a87b1eb0895075304840415820b0ecf94c92b543654",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.main_window",
+      "source_sha256": "601e70bb32cf07d1deb9754106e06e9d9b800b5c9fb38df9687fcfa349f69df9",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.models",
+      "source_sha256": "69465904bf269b2759f1bfa8b3f8ea07f1720e7a8f647beddbc06acd58cee5fa",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.performance_navigation",
+      "source_sha256": "baed7287923a1601f39cfbcf75799d56e27df14578df1b1d2d6221bc98129fd8",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.performance_workbench",
+      "source_sha256": "c731110913dd4407af65409080869367b7b479f0b7238658dd6d3b5350183e74",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.plots",
+      "source_sha256": "b6afb5bc02ae263b98c9de54e763c56be7a042da90a41443af4c1668469120d0",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.services",
+      "source_sha256": "f83e326ad4de76fe43a713554d8930eeae6f0ed3db09f63863ddb33979ae2461",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.squad_view",
+      "source_sha256": "1ab435b12f49771b7ef8e28c31ab96c7afb604ee8b371338a4896e59df19c7c4",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.tasks",
+      "source_sha256": "a388fac77fac9d493bf8afa1af74093b8b677ce77051d4b996d983a3145a5399",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.theme",
+      "source_sha256": "ae8e8f461895fbae7719fb69011ba5b17813382856df1a29e11bf5be842502ef",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.controller",
+      "source_sha256": "43ca444e287d58597939e24a380ff3c2627344711469ad8375603135ef803d9f",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.data_models",
+      "source_sha256": "7e8ef111af421241de2581fd774875d2ad9838e35206dc3e30a3f4f4a29f6ca6",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.data_pane",
+      "source_sha256": "1b01b6c2434bf57fe5f5500514bd86ed1848d689124c5915d812b907d9412d86",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.descriptive",
+      "source_sha256": "b4eb2fe4fac55d81e453b9301fb08d6933db54a18474238ca6fe3da37c3d8432",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.figures",
+      "source_sha256": "ef74ce70c069d298a9d1f18bac16a5af1c3b4c72f2f47f2615309cc15d64230c",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.interactive",
+      "source_sha256": "69b12ea924a2e6bf152ed553b18d7edea6402a858c464e6297ae914d916e320e",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.options_pane",
+      "source_sha256": "43afb02f9cc89f4e221ec12f72be565cd11f71fec1f5b600d4674a32b07a30a3",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.palette",
+      "source_sha256": "3632eb4ccc9e83da0c7161c5c96f7cfea91c58339d776ab774637ac0ef53e2cf",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.results",
+      "source_sha256": "cc5f824462c979be41bbc2c6e47e1e1f787035c0886c17e724965b031dda9e19",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.shell",
+      "source_sha256": "bc731edc48330a6e89eeaa590aa81d39a71fa2abec3cc172209e7a8cce93cf3b",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.signals_view",
+      "source_sha256": "bc35f9ddd7ce293fb1b9c96e522f95bfc137b5821b5953314627e2d48d987da8",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.workbench.spec",
+      "source_sha256": "ceb3ecf2e626149fbec23a43ad5c957aa2b1a5fb6cbf42cf92c738bdc47f4f33",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.desktop.worker",
+      "source_sha256": "c367a344c7de4886fab35722862919222f9c2c283e34be0c0e6f78c3cff86dc1",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.generate",
+      "source_sha256": "f4a7b186af3245dd550fd1626ea79a032a8c0bf50c0d67208f0d27698449add7",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.importer",
+      "source_sha256": "705eeaec7680c20b77d5fd50ae6514ffd6682b136b71bab86965dd23906010ee",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.longitudinal",
+      "source_sha256": "0a4f782a8943de21b24a8f6f5b653cba237a3acff48006730f86fdf512f77bae",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.performance",
+      "source_sha256": "19ce3abd6a76f32f57d79b11459bab6803846c80a511e1bc150c414143156ecb",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.qualification",
+      "source_sha256": "a1122c89ae54162d78a96d4665f71c93cafdbe250f39ceb83dc2885f12306e68",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.qualification_real",
+      "source_sha256": "9b0bcadb810b9647512f371c3e8d099c92d39744dc2580d0795a162f47b0d99e",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.real_movesmart",
+      "source_sha256": "b651b42564893e204f05f2017c8b872bc96ea57955072c9ce4e85b5c9e8fbb44",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.real_sources",
+      "source_sha256": "bbc76245adc7204f8512d73227688f093b6c8337b858ddb0efb1897a77d14927",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.realanalysis",
+      "source_sha256": "afb433d65d707612b6be847ddf02eaeff27686f06ad27f03dd070eecca729317",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.realstore",
+      "source_sha256": "61ace5ea6c26224f0b488a332c8a022db630165729d30209becac38d16117624",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.researchanalysis",
+      "source_sha256": "1e698cb7f0d3c2ea12767543f5f8b320f9977bb81ca6e311294387da6a655a3e",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.researchstore",
+      "source_sha256": "02b7171724622579eaa4fb7fbca0366ef49000deb0af17f1f75061737b28cd23",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.scientific_library",
+      "source_sha256": "f28dec1b9341bbd0ca16a146424f3bae3102504129aed53913ba26834ee4213a",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.squad",
+      "source_sha256": "3019ed5af5bc43f6aaeb8949834b3cc00b44082739e387fad82eccb3b2051ca1",
+      "code_equal": true
+    },
+    {
+      "module": "dynamis_science.traces",
+      "source_sha256": "d4e143bc4d058d03748ca122d8f8b8e5bc3928e3b68c89ef5106787d827dcfd6",
+      "code_equal": true
+    },
+    {
+      "module": "scripts.res647_walkthrough",
+      "source_sha256": "02dbe722a9a8d1ec1f15316f0e14913019afdfea62147bf4e7a29d0df220c409",
+      "code_equal": true
+    }
+  ],
+  "python": "3.12.13 (main, Jun 23 2026, 15:23:43) [MSC v.1944 64 bit (AMD64)]",
+  "pyinstaller": "6.22.3",
+  "build_command": "python -m PyInstaller packaging/DynamisScience.spec --noconfirm --clean --log-level WARN --distpath <isolated C: delivery-dist> --workpath <new isolated C: delivery-work>",
+  "build_exit_code": 0,
+  "build_log_sha256": "a1403c883c97a037652698906399a234db55cc34bb901687b4631d37bd5e667f",
+  "owner_manifest_sha256": "835398da594421bc9f04647992b0e9cefd5dc844fd931d1964896b2e164a2587",
+  "fixture_manifest_sha256": "835398da594421bc9f04647992b0e9cefd5dc844fd931d1964896b2e164a2587"
+}

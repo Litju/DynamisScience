@@ -1,0 +1,40 @@
+{
+  "pid": 11656,
+  "workspace_id": "STUDY-U-7E3D5C97",
+  "research_context": {
+    "investigation_id": "INV-U-49B2FF73",
+    "scope": "INDIVIDUAL",
+    "subject_id": "P01"
+  },
+  "investigations": [
+    "INV-U-49B2FF73",
+    "INV-U-F822D6AD"
+  ],
+  "runs": [
+    "RUN-U-0001",
+    "RUN-U-0002",
+    "RUN-U-0003",
+    "RUN-U-0004",
+    "RUN-U-0005"
+  ],
+  "reports": [
+    {
+      "version": 16,
+      "status": "FROZEN",
+      "content_hash": "94d8687be5d2e281637d3957f9262bf2344df9cc42853478419391b09213735e",
+      "created_at": "2026-11-12T15:39:26.521482+00:00"
+    },
+    {
+      "version": 9,
+      "status": "FROZEN",
+      "content_hash": "96edd3d8154f23fe670a40643cbb8073c9af94563e41c3f03ae1bcb60f14c3b4",
+      "created_at": "2026-11-12T15:39:25.834320+00:00"
+    },
+    {
+      "version": 4,
+      "status": "FROZEN",
+      "content_hash": "5deb3186eae75b18b13615813aec8ec4d9c01710d2997c09b32480134f972d45",
+      "created_at": "2026-11-12T15:39:24.200220+00:00"
+    }
+  ]
+}
