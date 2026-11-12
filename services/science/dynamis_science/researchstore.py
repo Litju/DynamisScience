@@ -159,6 +159,21 @@ METHODS: dict[str, dict[str, Any]] = {
         "diagnostics": ["sampling rate", "saturation", "plate coverage", "NaN trials", "device clock offset", "body-weight comparison"],
         "output_schema": ["activity-level summaries", "IMU sampling and gravity checks", "body-weight bias and limits of agreement"],
     },
+    "METH-U-INDIVIDUAL": {
+        "id": "METH-U-INDIVIDUAL",
+        "name": "Individual observed trajectory with repeated-trial error context",
+        "version": "1.0.0",
+        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "QUAL-U-INDIVIDUAL", "reference": "Independent NumPy recomputation (RES-647)", "basis": "Session means, within-session trial SD, pooled within-session SD and the trial-noise standard error of the first-to-last change recomputed from the selected revision."},
+        "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
+        "required_tables": ["cmj_occasions", "cmj_trials"],
+        "required_shape": "One participant with a numeric outcome on at least two measured occasions/weeks; repeated same-session trials are optional.",
+        "constraints": ["Individual scope only.", "Observational description; not a personalized causal or forecast estimate.", "Trial error excludes day-to-day biological variation."],
+        "missingness": "Missing occasions and empty values are listed; no imputation.",
+        "parameter_schema": {},
+        "assumptions": ["Repeated trials within a session are exchangeable measurements of the same state."],
+        "diagnostics": ["observed and missing occasions", "trials per occasion", "pooled within-session SD and degrees of freedom", "quality flags"],
+        "output_schema": ["session means", "within-session SD", "first-to-last change", "trial-noise standard error of the change"],
+    },
     "METH-U-DESC": {
         "id": "METH-U-DESC",
         "name": "Descriptive longitudinal summary",
@@ -1535,7 +1550,7 @@ def update_entity(entity_id: str, patch: dict[str, Any], base_version: int | Non
         allowed = {
             "title", "short_title", "research_question", "design", "population", "eligibility", "exclusions",
             "intervention", "arms", "outcomes", "protocols", "schedule", "hypotheses", "cohort_id", "analysis_plan_id",
-            "dataset_snapshot_id",
+            "dataset_snapshot_id", "research_context",
         }
         if "dataset_snapshot_id" in patch and patch["dataset_snapshot_id"] != document.get("dataset_snapshot_id"):
             if list_cohorts(entity_id) or list_plans(entity_id):
@@ -2225,7 +2240,8 @@ def _create_default_investigation(entity: dict[str, Any]) -> dict[str, Any]:
     return create_investigation(entity["id"], "Primary investigation", blocks=blocks)
 
 
-def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]] | None = None, parent_id: str | None = None) -> dict[str, Any]:
+def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]] | None = None, parent_id: str | None = None,
+                         fields: dict[str, Any] | None = None) -> dict[str, Any]:
     blocks = blocks or []
     validate_investigation_blocks(blocks)
     entity = get_entity(entity_id)
@@ -2245,6 +2261,7 @@ def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]
         "created_at": now,
         "updated_at": now,
         "schema_version": SCHEMA_VERSION,
+        **(fields or {}),
     }
     with _tx() as connection:
         connection.execute(
@@ -2295,6 +2312,33 @@ def update_investigation_research(investigation_id: str, blocks: list[dict[str, 
         )
         _audit(connection, "investigation.updated", "investigation", investigation_id, {"blocks": len(blocks)})
     return document
+
+
+def update_investigation_fields(investigation_id: str, fields: dict[str, Any], base_version: int | None, action: str) -> dict[str, Any]:
+    """Versioned update of non-block investigation fields (protocol, scenarios); earlier versions stay readable."""
+    with _tx() as connection:
+        row = connection.execute("SELECT * FROM investigations WHERE id = ?", (investigation_id,)).fetchone()
+        if row is None:
+            raise ResearchNotFound(f"Investigation {investigation_id} not found")
+        document = _row_document(row)
+        if base_version is not None and int(base_version) != int(document["version"]):
+            raise ResearchConflict(f"Investigation is at version {document['version']}, not {base_version}")
+        document.update(fields)
+        document["version"] = int(document["version"]) + 1
+        document["updated_at"] = _now()
+        connection.execute("UPDATE investigations SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                           (document["version"], _canonical(document), document["updated_at"], investigation_id))
+        connection.execute("INSERT INTO investigation_versions (investigation_id, version, document, created_at) VALUES (?, ?, ?, ?)",
+                           (investigation_id, document["version"], _canonical(document), document["updated_at"]))
+        _audit(connection, action, "investigation", investigation_id, sorted(fields))
+    return document
+
+
+def investigation_versions(investigation_id: str) -> list[dict[str, Any]]:
+    with _connect() as connection:
+        rows = connection.execute("SELECT document FROM investigation_versions WHERE investigation_id = ? ORDER BY version",
+                                  (investigation_id,)).fetchall()
+    return [json.loads(row[0]) for row in rows]
 
 
 def fork_investigation(investigation_id: str, title: str | None = None) -> dict[str, Any]:
@@ -2549,6 +2593,7 @@ def study_detail(entity_id: str) -> dict[str, Any]:
         end_week = max(1, len(schedule.get("points", [])))
     study_summary = {
         "selected_run_id": entity.get("selected_run_id"),
+        "research_context": entity.get("research_context"),
         "workspace": bool(entity.get("workspace")),
         "active_data_revision_id": entity.get("active_data_revision_id"),
         "id": entity["id"],
@@ -2641,12 +2686,27 @@ def method_eligibility(entity: dict[str, Any], cohort: dict[str, Any], resolved:
     table_by_metric = {item["id"]: item["table"] for item in metrics}
     outcome = (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id") or (plan or {}).get("outcome_metric_id")
     table = table_by_metric.get(outcome)
+    scope = cohort.get("scope") or {"kind": "COHORT"}
     results = []
     for method in methods_for_snapshot(entity["dataset_snapshot_id"]):
         issues: list[str] = []
+        individual_method = method["id"] == "METH-U-INDIVIDUAL"
+        if scope["kind"] == "INDIVIDUAL" and not individual_method:
+            issues.append("Cohort-level method; an individual investigation has one participant and is analysed with the individual trajectory method.")
+        if scope["kind"] != "INDIVIDUAL" and individual_method:
+            issues.append("Individual-scope method; select a participant investigation to use it.")
+        if individual_method and scope["kind"] == "INDIVIDUAL" and table in method["required_tables"]:
+            frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
+            axis = "occasion" if table == "cmj_occasions" else "week"
+            column = next((item["column"] for item in metrics if item["id"] == outcome), None)
+            if axis in frame.columns and column in frame.columns:
+                own = frame.filter((pl.col("subject_id") == scope["subject_id"]) & pl.col(column).is_not_null() & pl.col(axis).is_not_null())
+                observed = own[axis].n_unique()
+                if observed < 2:
+                    issues.append(f"Only {observed} measured {axis}(s) for this participant; at least two are required for a within-person trajectory.")
         if table not in method["required_tables"]:
             issues.append(f"Requires {', '.join(method['required_tables'])}; selected outcome is in {table}.")
-        if table in method["required_tables"] and method["id"] in {"METH-U-DESC", "METH-U-CHANGE", "METH-REAL-DESC", "METH-REAL-TREND"}:
+        if table in method["required_tables"] and method["id"] in {"METH-U-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL", "METH-REAL-DESC", "METH-REAL-TREND"}:
             frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
             axis = "occasion" if table == "cmj_occasions" else "week" if table == "cmj_trials" else "activity"
             if axis not in frame.columns or frame[axis].drop_nulls().is_empty():
@@ -2784,6 +2844,8 @@ def report_payload(entity_id: str) -> dict[str, Any]:
     report["evidence"] = evidence
     report["figures"] = [{**figure, "data": figure.get("data")} for figure in figures]
     report["runs"] = [runs_by_id[item["analysis_run_id"]] for item in evidence if item["analysis_run_id"] in runs_by_id]
+    cited = sorted(evidence, key=lambda item: report["evidence_ids"].index(item["id"]))  # sections follow citation order
+    report["research_sections"] = research_sections([runs_by_id[item["analysis_run_id"]] for item in cited if item["analysis_run_id"] in runs_by_id]) if detail.get("workspace") else []
     report["study"] = detail["study"]
     report["project"] = detail["project"]
     report["question"] = detail["question"]
@@ -2807,6 +2869,30 @@ def report_payload(entity_id: str) -> dict[str, Any]:
     report["provenance_note"] = report["research"]["provenance_note"]
     report["export_url"] = f"/research/studies/{entity_id}/report/export"
     return report
+
+
+def report_section_label(run: dict[str, Any]) -> str:
+    scope = run.get("scope") or {"kind": "COHORT"}
+    if scope["kind"] != "INDIVIDUAL":
+        return "Cohort research"
+    investigation = get_investigation(scope.get("investigation_id") or "") or {}
+    return f"Individual investigation · participant {scope['subject_id']} · {investigation.get('title', scope.get('investigation_id'))}"
+
+
+def research_sections(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One labeled section per research scope; individual sections freeze the investigation version they cite."""
+    sections: dict[str, dict[str, Any]] = {}
+    for run in runs:
+        scope = run.get("scope") or {"kind": "COHORT"}
+        label = report_section_label(run)
+        section = sections.setdefault(label, {"label": label, "scope": scope, "run_ids": []})
+        section["run_ids"].append(run["id"])
+        if scope["kind"] == "INDIVIDUAL" and "investigation" not in section:
+            investigation = get_investigation(scope["investigation_id"]) or {}
+            latest = {item["id"]: item for item in investigation.get("scenarios", [])}
+            section["investigation"] = {key: investigation.get(key) for key in ("id", "title", "version", "question", "protocol")}
+            section["scenarios"] = list(latest.values())
+    return list(sections.values())
 
 
 def report_limitations(detail: dict[str, Any]) -> list[str]:
@@ -2926,6 +3012,7 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
             "snapshot_id": payload["snapshot"]["id"],
             "snapshot_checksums": payload["snapshot"].get("checksums", {}),
             "limitations": payload["research"]["limitations"],
+            "research_sections": payload["research_sections"],
         }
         content_hash = _digest(content)
         version = int(report["version"])
@@ -3120,6 +3207,32 @@ def _report_evidence_unit(item: dict[str, Any], run: dict[str, Any] | None) -> s
     return unit
 
 
+def _research_sections_html(sections: list[dict[str, Any]]) -> str:
+    """Separate labeled cohort/individual sections; hypothetical scenarios never appear as results."""
+    if not sections:
+        return ""  # Reports frozen before RES-647 keep their original HTML.
+    parts = ["<h2>Research scopes</h2>"]
+    for section in sections:
+        parts.append(f"<h3>{html.escape(section['label'])}</h3><p class=\"meta\">Runs {html.escape(', '.join(section['run_ids']))}</p>")
+        investigation = section.get("investigation")
+        if not investigation:
+            continue
+        protocol = investigation.get("protocol") or {}
+        parts.append(f"<p>{html.escape(str(investigation.get('question') or 'No question recorded.'))} "
+                     f"<span class=\"meta\">{html.escape(str(investigation.get('id')))} v{html.escape(str(investigation.get('version')))}</span></p>")
+        parts.append(f"<p><span class=\"badge\">{html.escape(str(protocol.get('design_label', '')))}</span></p>")
+        periods = "".join(f"<li>{html.escape(item['label'])} ({html.escape(item['kind'].lower())}) · {item['start']}–{item['end']}</li>"
+                          for item in protocol.get("periods", []))
+        if periods:
+            parts.append(f"<ul>{periods}</ul>")
+        for scenario in section.get("scenarios", []):
+            parts.append(f"<div class=\"warning\"><strong>HYPOTHETICAL · {html.escape(scenario['kind_label'])}</strong> "
+                         f"{html.escape(scenario['title'])} (v{scenario['version']}). {html.escape(scenario['qualification']['message'])} "
+                         f"Assumptions: {html.escape('; '.join(scenario['assumptions']))}.</div>")
+        parts.append("<p class=\"muted\">Observational within-person description; not a personalized causal estimate or forecast.</p>")
+    return "".join(parts)
+
+
 def export_html(entity_id: str, version: int | None = None) -> str:
     generated_at = _now()
     legacy_context = False
@@ -3203,6 +3316,7 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         for item in figures
     )
     limitation_html = "".join(f"<li>{html.escape(item)}</li>" for item in limitations)
+    sections_html = _research_sections_html(payload.get("research_sections") or [])
     source = snapshot.get("source", {})
     title = html.escape(payload.get("title", "Research report"))
     narrative = "".join(
@@ -3253,6 +3367,7 @@ pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid 
 <h2>4. Results</h2>
 {'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>Interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
 {figure_html}
+{sections_html}
 {narrative}
 <h2>5. Limitations</h2><ul>{limitation_html}</ul>
 <h2>6. Provenance and reproducibility</h2>

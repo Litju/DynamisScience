@@ -331,6 +331,28 @@ def execute(
                 for index, row in enumerate(result["activities"], start=1)
             ],
         }
+    elif method_id == "METH-U-INDIVIDUAL":
+        if (cohort.get("scope") or {}).get("kind") != "INDIVIDUAL" or len(cohort_ids) != 1:
+            raise researchstore.ResearchValidation("The individual trajectory method requires an individual investigation scope")
+        from .longitudinal import individual_trajectory
+        result = individual_trajectory(snapshot_id, metric, cohort_ids[0])
+        diagnostics = {
+            "status": "COMPUTED",
+            "observed_occasions": result["observed_occasions"],
+            "missing_occasions": result["missing_occasions"],
+            "trials_per_occasion": {str(point[result["axis"]]): point["n_trials"] for point in result["points"]},
+            "within_session_df": result["within_session_df"],
+            "quality_flags": {str(point[result["axis"]]): point["quality_flags"] for point in result["points"] if point["quality_flags"]},
+            "assumptions": researchstore.METHODS["METH-U-INDIVIDUAL"]["assumptions"],
+            "limitations": result["limitations"],
+        }
+        figure_data = {
+            "kind": "LINE",
+            "unit": metric["unit"],
+            "metric": {"label": metric["label"], "unit": metric["unit"], "id": metric["definition_id"], "metric_id": metric["id"]},
+            "series": [{"arm": "INTERVENTION", "week": row[result["axis"]], "n": row["n_trials"], "mean": row["mean"], "sd": row["within_session_sd"], "ci_low": None, "ci_high": None}
+                       for row in result["points"] if row["n_trials"]],
+        }
     elif method_id == "METH-U-DESC":
         result = _descriptive(snapshot_id, metric, cohort_ids, definition)
         diagnostics = {
@@ -382,7 +404,10 @@ def execute(
             "excluded": sorted(excluded_subject_ids or []),
         }
     )[:24]
+    scope = cohort.get("scope") or {"kind": "COHORT"}
     run = {
+        "scope": scope,
+        "investigation_id": scope.get("investigation_id"),
         "workspace_id": entity["id"] if entity.get("workspace") else None,
         "data_revision_id": entity.get("active_data_revision_id"),
         "input_snapshot_ids": (researchstore.get_data_revision(entity["active_data_revision_id"]) or {}).get("input_snapshot_ids", []) if entity.get("workspace") else [snapshot_id],
@@ -414,7 +439,7 @@ def execute(
         "figure_data": figure_data,
     }
     saved = researchstore.append_run(run)
-    if entity.get("workspace"):
+    if entity.get("workspace") and scope["kind"] == "COHORT":
         try:
             researchstore.select_workspace_run(entity["id"], saved["id"])
         except researchstore.ResearchConflict:
@@ -525,6 +550,17 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
             "This is descriptive context, not a causal individual response."
         )
         quality = "EXPLORATORY"
+    elif run["method_id"] == "METH-U-INDIVIDUAL":
+        value = result["change_first_to_last"]
+        uncertainty = result.get("change_trial_noise_se")
+        uncertainty_label = "trial-noise SE of the change (excludes day-to-day variation)" if uncertainty is not None else None
+        title = f"Observed trajectory of {metric['label'].lower()} · participant {result['subject_id']}"
+        interpretation = (
+            f"Participant {result['subject_id']} changed by {value:+.3f} {metric['unit']} from {result['axis_label'].lower()} "
+            f"{result['first']} to {result['last']}. {result['error_note']} "
+            "Observational within-person description; not a personalized causal estimate or forecast."
+        )
+        quality = "EXPLORATORY"
     else:
         value = result.get("change_first_to_last")
         title = f"Descriptive trajectory of {metric['label'].lower()}"
@@ -551,7 +587,7 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         "interval": interval,
         "effect_size": effect_size,
         "contrast_id": contrast_id,
-        "population": f"{entity.get('population', 'Participants')} · {entity['id']}",
+        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] == "METH-U-INDIVIDUAL" else f"{entity.get('population', 'Participants')} · {entity['id']}",
         "sample_size": int(result.get("n_subjects") or result.get("n_observations") or 0),
         "protocol_id": protocol_id,
         "dataset_snapshot_id": run["snapshot_id"],
