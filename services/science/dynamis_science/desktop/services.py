@@ -595,7 +595,10 @@ class DynamisAppService:
                 if metric is None:
                     raise researchstore.ResearchValidation("Choose a measured outcome available in this revision")
                 # Every execution captures its own frozen context, without claiming prospective registration.
-                cohort = researchstore.create_cohort(study_id, "Analysis selection", researchstore._default_cohort_definition(metric, entity["dataset_snapshot_id"]))
+                definition = researchstore._default_cohort_definition(metric, entity["dataset_snapshot_id"])
+                if metric["table"] == "signal_trials" and payload.get("parameters", {}).get("activity"):
+                    definition["activity"] = payload["parameters"]["activity"]
+                cohort = researchstore.create_cohort(study_id, "Analysis selection", definition)
                 selection = {**entity, "outcomes": {"primary": [metric]}}
                 resolved = researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"])
                 eligibility = researchstore.method_eligibility(selection, cohort, resolved, {"parameters": payload.get("parameters", {})})
