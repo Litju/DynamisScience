@@ -35,3 +35,9 @@ Branch `codex/res-647-longitudinal-research`, based on RES-644 `5eefae4`. No pus
 - No hierarchical, Bayesian, state-space or mechanistic individual model was added; scenarios cannot produce numbers until one passes RES-590/RES-619 qualification.
 
 The owner's `data/synthetic/generator_manifest.json` modification remains uncommitted and untouched. All walkthrough data roots were disposable temporary directories; the operational research database was not opened.
+
+## Squad, monitoring and Events (follow-up iteration)
+
+Owner review rejected the first native UI. The redesign made Squad (athlete tiles grouped by researcher-defined flag categories, trend or roster attributes) the workspace home, added an athlete page with individual research as branches, researcher-configured flag rules and best/expected/worst simulations, an ATHLETE_MONITORING import family (load, sleep, wellness items, position) linked to CMJ in one revision, and an Events screen (flag changes between revisions, new data, analyses, simulations, needs-attention follow-ups). Commits `f6a7594`, `08da414`, `352e5e8`, `974f505` and the scaling fixes. Full regression: 300 passed ([log](res647-evidence/scaling-regression.log)).
+
+Scaling on the real Windows platform ([125%](res647-evidence/scaling-125/scaling-receipt.json), [150%](res647-evidence/scaling-15/scaling-receipt.json), dark): Squad, athlete page, Events and both editors fit the work area (1093×576 and 911×480). Fixed: compact-mode screens now open at their top, simulation results have their own tab, rule pickers are compact. Remaining at 150%: the toolbar overflows into `»`, the rule table's last column needs horizontal scrolling, and the athlete page scrolls to show its plot.

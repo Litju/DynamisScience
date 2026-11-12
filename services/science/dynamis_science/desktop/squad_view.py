@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QStackedWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTextBrowser,
     QToolButton,
     QVBoxLayout,
@@ -300,8 +301,11 @@ class RulesDialog(QDialog):
         for column, (options, key) in enumerate(((([(m["id"], f"{m['label']} ({m['unit']})") for m in self.metrics]), "metric_id"),
                                                  (list(MEASURES.items()), "measure"), ([(op, op) for op in OPERATORS], "operator"))):
             picker = QComboBox()
+            picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            picker.setMinimumContentsLength(4 if key == "operator" else 12)
             for value, label in options:
                 picker.addItem(label, value)
+                picker.setItemData(picker.count() - 1, label, Qt.ItemDataRole.ToolTipRole)
             picker.setCurrentIndex(max(0, picker.findData(condition.get(key))))
             self.conditions.setCellWidget(row, column, picker)
         for column, key, default in ((3, "value", ""), (4, "value2", ""), (5, "window", ""), (6, "chronic", "")):
@@ -368,7 +372,13 @@ class SimulationDialog(QDialog):
         fit_dialog(self, 960, 620)
         self.metrics = board["metrics"]
         self.result: dict[str, Any] | None = None
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        setup, results = QWidget(), QWidget()
+        self.tabs.addTab(setup, "Setup")
+        self.tabs.addTab(results, "Results")
+        outer.addWidget(self.tabs)
+        layout = QVBoxLayout(setup)
         banner = QLabel("<b>HYPOTHETICAL</b> · Projects your assumptions from each athlete's latest observed value. "
                         "It is not a model prediction and is never stored as data.")
         banner.setWordWrap(True)
@@ -402,7 +412,7 @@ class SimulationDialog(QDialog):
         layout.addWidget(QLabel("Drivers: how each metric changes per step and the outcome % change you assume per 1% driver change"))
         self.drivers = _table(["Driver metric", "Best %/step", "Expected %/step", "Worst %/step",
                                "Effect best", "Effect expected", "Effect worst"], "Simulation drivers")
-        self.drivers.setMaximumHeight(130)
+        self.drivers.setMinimumHeight(70)
         layout.addWidget(self.drivers)
         row = QHBoxLayout()
         add, remove = QPushButton("Add driver"), QPushButton("Remove driver")
@@ -418,6 +428,7 @@ class SimulationDialog(QDialog):
         row.addWidget(run)
         row.addWidget(save)
         layout.addLayout(row)
+        layout = QVBoxLayout(results)
         self.results = _table(["Athlete", "Latest observed", "Best at horizon", "Expected at horizon", "Worst at horizon",
                                "Your flags under worst case"], "Simulation results")
         layout.addWidget(self.results, 1)
@@ -459,6 +470,7 @@ class SimulationDialog(QDialog):
 
     def _shown(self, result: dict[str, Any]) -> None:
         self.result = result
+        self.tabs.setCurrentIndex(1)
         worst = result["flags_at_horizon"].get("worst", {})
         rows = [a for a in result["athletes"] if a["status"] == "PROJECTED" and (not self.subject_id or a["subject_id"] == self.subject_id)]
         self.results.setRowCount(len(rows))
@@ -504,7 +516,7 @@ class AthletePage(QWidget):
         self.flags.setMaximumHeight(80)
         overview.addWidget(self.flags)
         self.figure = ScientificFigureWidget()
-        self.figure.setMinimumHeight(220)
+        self.figure.setMinimumHeight(160)
         overview.addWidget(self.figure, 1)
         research = QVBoxLayout()
         body.addLayout(research, 3)

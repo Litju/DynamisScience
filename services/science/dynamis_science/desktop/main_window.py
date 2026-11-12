@@ -592,6 +592,12 @@ class MainWindow(QMainWindow):
         self._show_research_mode()
         self.perspectives.setCurrentWidget(self.squad)
         self._perspective = "squad"
+        self._scroll_to_top()
+
+    def _scroll_to_top(self) -> None:
+        central = self.centralWidget()
+        if isinstance(central, QScrollArea):
+            central.verticalScrollBar().setValue(0)
 
     def _show_events_mode(self) -> None:
         if not self.events_view.workspace_id:
@@ -600,6 +606,7 @@ class MainWindow(QMainWindow):
         self._show_research_mode()
         self.perspectives.setCurrentWidget(self.events_view)
         self._perspective = "events"
+        self._scroll_to_top()
         self.events_view.reload()
 
     def _start_follow_up(self, subject_id: str) -> None:
@@ -1199,6 +1206,7 @@ class MainWindow(QMainWindow):
         squad.athlete_page.set_athlete(self.current_study_id, athlete, branches, current)
         self._show_squad_mode()
         squad.setCurrentWidget(squad.athlete_page)
+        self._scroll_to_top()
 
     def _board_loaded(self) -> None:
         if self._pending_athlete:
