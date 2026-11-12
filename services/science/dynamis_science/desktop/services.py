@@ -22,6 +22,38 @@ from ..generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
 
 class DynamisAppService:
+    def create_workspace(self, title: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.create_workspace(title)
+
+    def export_workspace_report(self, workspace_id: str, run_id: str, target_path: str) -> Path:
+        self.ensure_initialized()
+        with researchstore._tx():
+            entity = researchstore.get_entity(workspace_id)
+            run = researchstore.get_run(run_id)
+            if not entity or not entity.get("workspace") or not run or run.get("study_id") != workspace_id:
+                raise researchstore.ResearchValidation("Select a saved workspace analysis to export")
+            if run.get("data_revision_id") != entity.get("active_data_revision_id"):
+                raise researchstore.ResearchConflict("This result belongs to an earlier data revision; select that revision in History")
+            researchstore.ensure_current(run, "export evidence")
+            if run.get("plan_alignment") != "PLANNED":
+                raise researchstore.ResearchValidation("Exploratory results cannot be automatically promoted to report evidence")
+            researchstore.update_entity(workspace_id, {"cohort_id": run["cohort_id"], "analysis_plan_id": run["plan_id"]})
+            promoted = researchanalysis.promote(run_id)
+            researchstore.update_report(workspace_id, {})
+            report = researchstore.get_report_document(workspace_id)
+            for artifact in [*report.get("evidence_ids", []), *report.get("figure_ids", [])]:
+                researchstore.uncite_artifact(workspace_id, artifact)
+            researchstore.cite_artifact(workspace_id, promoted["evidence_artifact"]["id"])
+            if promoted.get("figure_artifact"):
+                researchstore.cite_artifact(workspace_id, promoted["figure_artifact"]["id"])
+            frozen = researchstore.freeze_report(workspace_id)
+        return self.export_report_html(workspace_id, target_path, frozen["version"])
+
+    def attach_workspace_data(self, workspace_id: str, snapshot_id: str, **options) -> dict[str, Any]:
+        self.ensure_initialized()
+        return researchstore.attach_workspace_data(workspace_id, snapshot_id, **options)
+
     """Direct Python access to the existing scientific and persistence modules."""
 
     def __init__(self, root: str | os.PathLike[str] | None = None) -> None:
@@ -552,6 +584,30 @@ class DynamisAppService:
             )
         if entity.get("state") == "ARCHIVED":
             raise researchstore.ResearchConflict("Archived studies cannot execute analyses")
+        if entity.get("workspace"):
+            with researchstore._tx():
+                entity = researchstore.get_entity(study_id)
+                expected = payload.get("data_revision_id")
+                if expected != entity.get("active_data_revision_id") or not expected:
+                    raise researchstore.ResearchConflict("The data revision changed before analysis started; run again")
+                metric = next((m for m in researchstore.dataset_metrics(entity["dataset_snapshot_id"])
+                               if m["id"] == payload["outcome_metric_id"]), None)
+                if metric is None:
+                    raise researchstore.ResearchValidation("Choose a measured outcome available in this revision")
+                # Every execution captures its own frozen context, without claiming prospective registration.
+                cohort = researchstore.create_cohort(study_id, "Analysis selection", researchstore._default_cohort_definition(metric, entity["dataset_snapshot_id"]))
+                selection = {**entity, "outcomes": {"primary": [metric]}}
+                resolved = researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"])
+                eligibility = researchstore.method_eligibility(selection, cohort, resolved, {"parameters": payload.get("parameters", {})})
+                available = next((item for item in eligibility if item["method_id"] == payload["method_id"]), None)
+                if not available or available["status"] != "ELIGIBLE":
+                    raise researchstore.ResearchValidation("; ".join(available["issues"]) if available else "This method is unavailable for the selected measurements")
+                cohort = researchstore.freeze_cohort(cohort["id"])
+                plan = researchstore.create_plan(study_id, {**payload, "cohort_id": cohort["id"]})
+                plan = researchstore.freeze_plan(plan["id"])
+            # Use the captured entity even if another revision becomes active during computation.
+            return researchanalysis.execute(entity, cohort, plan, payload["method_id"], payload["outcome_metric_id"],
+                                            plan["parameters"], payload.get("excluded_subject_ids"))
         cohort = researchstore.get_cohort(entity.get("cohort_id") or "")
         if cohort is None:
             raise researchstore.ResearchNotFound(f"Study {study_id} has no cohort")
@@ -1227,7 +1283,9 @@ def _table_names(snapshot: dict[str, Any]) -> list[str]:
 
 
 def _table_path(snapshot_id: str, table_name: str, snapshot: dict[str, Any]) -> Path:
-    if snapshot.get("admitted_source"):
+    if snapshot.get("workspace_snapshot"):
+        path = paths()["research"] / "data" / snapshot_id / f"{table_name}.parquet"
+    elif snapshot.get("admitted_source"):
         path = paths()["admitted"] / snapshot_id / f"{table_name}.parquet"
     elif snapshot.get("synthetic"):
         path = PARQUET_DIR / f"{table_name}.parquet"
