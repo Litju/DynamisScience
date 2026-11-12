@@ -1318,7 +1318,17 @@ def _materialize_revision(revision_id: str, previous: dict[str, Any], snapshot: 
         tables[table] = {"file": path.name, "rows": frame.height}
         checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     family = snapshot.get("measurement_family") if append and previous["snapshot"].get("measurement_family") != "LINKED" else "LINKED"
-    return {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables, "measurement_family": family,
+    measurement_sources = {}
+    for item in [*previous["inputs"], snapshot]:
+        for table in _table_names(item):
+            if table != "subjects":
+                measurement_sources.setdefault(table, []).append({"snapshot_id": item["id"], "source": item.get("source"),
+                    "rights_status": item.get("rights_status"), "checksum": item.get("checksums", {}).get(f"{table}.parquet")})
+    source = snapshot.get("source") if family != "LINKED" else {
+        "id": "LINKED_INPUTS", "name": "Linked measurement families; source and rights retained separately per table",
+        "measurement_sources": measurement_sources}
+    return {**snapshot, "source": source, "measurement_sources": measurement_sources,
+            "id": revision_id, "workspace_snapshot": True, "tables": tables, "measurement_family": family,
             "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
 
 
@@ -2933,7 +2943,9 @@ def report_section_label(run: dict[str, Any]) -> str:
     scope = run.get("scope") or {"kind": "COHORT"}
     if scope["kind"] != "INDIVIDUAL":
         return "Cohort research"
-    investigation = get_investigation(scope.get("investigation_id") or "") or {}
+    investigation_id = scope.get("investigation_id") or ""
+    investigation = (next((v for v in investigation_versions(investigation_id) if v["version"] == scope["investigation_version"]), {})
+                     if scope.get("investigation_version") else get_investigation(investigation_id) or {})
     return f"Individual investigation · participant {scope['subject_id']} · {investigation.get('title', scope.get('investigation_id'))}"
 
 
@@ -2946,7 +2958,10 @@ def research_sections(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         section = sections.setdefault(label, {"label": label, "scope": scope, "run_ids": []})
         section["run_ids"].append(run["id"])
         if scope["kind"] == "INDIVIDUAL" and "investigation" not in section:
-            investigation = get_investigation(scope["investigation_id"]) or {}
+            versions = investigation_versions(scope["investigation_id"])
+            captured_version = scope.get("investigation_version")
+            investigation = next((v for v in versions if v["version"] == captured_version), {}) if captured_version else (get_investigation(scope["investigation_id"]) or {})
+            section["investigation_context"] = "Captured at analysis execution" if captured_version else "Legacy run: investigation version was not captured; export-time context"
             latest = {item["id"]: item for item in investigation.get("scenarios", [])}
             section["investigation"] = {key: investigation.get(key) for key in ("id", "title", "version", "question", "protocol")}
             section["scenarios"] = list(latest.values())

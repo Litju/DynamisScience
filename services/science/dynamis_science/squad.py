@@ -183,6 +183,7 @@ def evaluate_records(snapshot_id: str, rules: list[dict[str, Any]], data_revisio
                     "value": value, "operator": condition["operator"], "threshold": condition["value"],
                     "threshold2": condition.get("value2"), "met": ok, "source": snapshot.get("source"),
                     "snapshot_id": snapshot_id, "data_revision_id": data_revision_id,
+                    "measurement_sources": snapshot.get("measurement_sources", {}).get((metric or {}).get("table"), []),
                     "observations": [{"point": p, "value": v} for p, v in rows],
                     "missing_occasions": [p for p in points if p not in {r[0] for r in rows}],
                     "qc_eligibility": "Finite admitted values; quality_state VALID where recorded",

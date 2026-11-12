@@ -326,3 +326,15 @@ def test_individual_excludes_nonfinite_and_qc_ineligible_trials(monkeypatch):
     result = longitudinal.individual_trajectory("test", {"table": "cmj_trials", "column": "height", "unit": "cm", "id": "height"}, "A")
     assert result["change_first_to_last"] == 5
     assert result["n_observations"] == 3 and result["missing_occasions"] == [3]
+
+
+def test_reports_bind_original_investigation_version(service, study, tmp_path):
+    inv = service.create_individual_investigation(study["id"], "P01", "Original question")
+    saved = run(service, study["id"], study["rev1"], "METH-U-INDIVIDUAL", {"kind": "INDIVIDUAL", "investigation_id": inv["id"]})
+    researchstore.update_investigation_fields(inv["id"], {"question": "Changed after analysis"}, inv["version"], "edited")
+    service.export_workspace_report(study["id"], saved["id"], str(tmp_path/"version.html"))
+    report = researchstore.get_report_version(study["id"], researchstore.report_versions(study["id"])[0]["version"])
+    section = report["frozen_content"]["research_sections"][0]
+    assert section["investigation"]["version"] == inv["version"]
+    assert section["investigation"]["question"] == inv["question"]
+    assert section["investigation_context"] == "Captured at analysis execution"

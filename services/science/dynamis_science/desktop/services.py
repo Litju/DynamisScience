@@ -73,7 +73,8 @@ class DynamisAppService:
         subject_id = investigation["scope"]["subject_id"]
         if scope.get("subject_id") not in (None, subject_id):
             raise researchstore.ResearchConflict("The selected participant changed; select the investigation again")
-        return {"kind": "INDIVIDUAL", "subject_id": subject_id, "investigation_id": investigation["id"]}
+        return {"kind": "INDIVIDUAL", "subject_id": subject_id, "investigation_id": investigation["id"],
+                "investigation_version": investigation["version"]}
 
     # RES-647 longitudinal research: thin delegation keeps the native UI and tests on one contract.
     def participant_catalogue(self, workspace_id: str, query: str = "") -> dict[str, Any]:

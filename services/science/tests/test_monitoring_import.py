@@ -74,6 +74,11 @@ def test_link_cmj_and_monitoring_then_flag_and_simulate_across_measures(service,
     rev3 = service.attach_workspace_data(identity, later, append=True, confirm_participant_ids=True, base_revision=rev2)["active_data_revision_id"]
     snapshot = researchstore.get_data_revision(rev3)["snapshot"]
     assert snapshot["row_counts"]["monitoring"] == 12 * 42 and snapshot["row_counts"]["cmj_trials"] == researchstore.read_snapshot_table(cmj, "cmj_trials").height
+    linked = researchstore.get_snapshot(rev3)
+    assert linked["source"]["id"] == "LINKED_INPUTS"
+    assert len(linked["measurement_sources"]["cmj_trials"]) == 1
+    assert len(linked["measurement_sources"]["monitoring"]) == 2
+    assert all(s["checksum"] and s["source"] for values in linked["measurement_sources"].values() for s in values)
     metrics = {m["id"] for m in researchstore.dataset_metrics(rev3)}
     assert {"MET-CMJ-HEIGHT", "MET-MON-LOAD", "MET-MON-SLEEP", "MET-MON-WELLNESS"} <= metrics
     with pytest.raises(researchstore.ResearchValidation, match="Overlapping"):
