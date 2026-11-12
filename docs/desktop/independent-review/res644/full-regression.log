@@ -1,0 +1,36 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-8.4.2, pluggy-1.6.0
+PySide6 6.12.0 -- Qt runtime 6.12.0 -- Qt compiled 6.12.0
+rootdir: D:\SWE_HOME\codex_home\worktrees\res644-independent\DynamisScience\services\science
+configfile: pyproject.toml
+testpaths: tests
+plugins: qt-4.5.0
+collected 292 items
+
+tests\test_admission.py ....................                             [  6%]
+tests\test_data_root.py ...                                              [  7%]
+tests\test_data_workspace.py ...................                         [ 14%]
+tests\test_desktop.py ....................                               [ 21%]
+tests\test_extract_movesmart.py .........                                [ 24%]
+tests\test_formats.py .........                                          [ 27%]
+tests\test_import_review.py .....................                        [ 34%]
+tests\test_importer.py ......................                            [ 42%]
+tests\test_integrity_636.py ......                                       [ 44%]
+tests\test_performance.py ............                                   [ 48%]
+tests\test_persistent_workspace.py .........                             [ 51%]
+tests\test_real_admission.py ......                                      [ 53%]
+tests\test_research_authoring.py ...                                     [ 54%]
+tests\test_research_lifecycle.py ................                        [ 59%]
+tests\test_science.py ......................                             [ 67%]
+tests\test_sqlite_recovery.py ..                                         [ 68%]
+tests\test_storage_isolation.py .                                        [ 68%]
+tests\test_storage_isolation_probe.py .                                  [ 68%]
+tests\test_traces.py ................                                    [ 74%]
+tests\test_workbench_integration.py .......                              [ 76%]
+tests\test_workbench_interactive.py .............                        [ 81%]
+tests\test_workbench_panes.py ...................                        [ 87%]
+tests\test_workbench_results.py ..........                               [ 91%]
+tests\test_workbench_spec.py ..................                          [ 97%]
+tests\test_workbench_theme.py ........                                   [100%]
+
+======================= 292 passed in 347.60s (0:05:47) =======================
