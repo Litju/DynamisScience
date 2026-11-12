@@ -139,6 +139,11 @@ def test_report_freeze_failure_rolls_back_and_historical_export_ignores_current_
     identity = service.create_workspace("Export transaction")["study"]["id"]
     revision = service.attach_workspace_data(identity, batch(tmp_path, 1))["active_data_revision_id"]
     saved = run(service, identity, revision)
+    with monkeypatch.context() as patch:
+        patch.setattr(researchstore, "get_run", lambda _: {**saved, "plan_alignment": "EXPLORATORY"})
+        with pytest.raises(researchstore.ResearchValidation, match="Exploratory"):
+            service.export_workspace_report(identity, saved["id"], str(tmp_path / "exploratory.html"))
+    assert not researchstore.list_evidence(identity)
     freeze = researchstore.freeze_report
     def failure(*args):
         raise RuntimeError("Injected freeze failure")
@@ -154,8 +159,7 @@ def test_report_freeze_failure_rolls_back_and_historical_export_ignores_current_
     assert researchstore.export_html(identity, version) == original
 
 
-def test_workspace_native_controls_and_stale_completion(service, tmp_path, qtbot):
-    from PySide6.QtWidgets import QMessageBox
+def test_workspace_native_controls_and_stale_completion(service, tmp_path, qtbot, monkeypatch):
     from dynamis_science.desktop.main_window import MainWindow
 
     window = MainWindow(service)
@@ -182,4 +186,14 @@ def test_workspace_native_controls_and_stale_completion(service, tmp_path, qtbot
     qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
     assert window.research.latest_run["id"] == saved["id"]
     assert window.current_study_id == identity
+    from dynamis_science.desktop.workbench.spec import AnalysisSpec
+    callbacks = []
+    rendered = []
+    monkeypatch.setattr(window.runner, "submit", lambda operation, finish, failed: callbacks.append(finish))
+    monkeypatch.setattr(window.results_doc, "show_blocks", lambda *args: rendered.append(args))
+    spec = AnalysisSpec("descriptives", {"outcome": ["jump_height_cm"]}, snapshot_id=first, table="cmj_trials")
+    window._run_descriptive(spec)
+    window.current_study["active_data_revision_id"] = "CHANGED"
+    callbacks[0](None)
+    assert not rendered
     window.close()

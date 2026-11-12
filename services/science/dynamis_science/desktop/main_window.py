@@ -620,6 +620,7 @@ class MainWindow(QMainWindow):
         from .workbench import descriptive
 
         snapshot, table = spec.snapshot_id, spec.table
+        workspace_context = (self.current_study_id, self.current_study.get("active_data_revision_id"))
         provenance = {"source": "synthetic" if self.data_pane._detail.get("synthetic") else "real",
                       "snapshot_id": snapshot, "table": table}
         units = {v.name: v.unit for v in self.data_pane.variables() if v.unit}
@@ -644,7 +645,8 @@ class MainWindow(QMainWindow):
         def finish(frame) -> None:
             self.progress.setVisible(False)
             self.status_text.setText("Ready")
-            if (self.data_pane.snapshot_id, self.data_pane.table) != (snapshot, table):
+            if ((self.data_pane.snapshot_id, self.data_pane.table) != (snapshot, table)
+                    or (self.current_study_id, self.current_study.get("active_data_revision_id")) != workspace_context):
                 return  # the dataset changed while the rows were loading
             try:
                 self.results_doc.show_blocks(lambda: build(frame), spec, descriptive.DESCRIPTIVE_STATE)
@@ -719,6 +721,8 @@ class MainWindow(QMainWindow):
                     break
             try:
                 explore = self.service.explore_longitudinal(study_id, metric, excluded) if metric else None
+                if explore and explore.get("provenance", {}).get("snapshot_id") != snapshot_id:
+                    explore = None
             except Exception:  # noqa: BLE001 - the interactive views are optional; the run stands alone
                 explore = None
             return rows, explore
@@ -2195,9 +2199,12 @@ class ResearchWorkbench(QWidget):
         snapshot_id = self.snapshot_id
         metric = self.metric_picker.currentData()
         reference = self.reference_picker.currentText()
+        revision = self.detail.get("active_data_revision_id")
         self.window.run_task(
             lambda: self.service.explore_longitudinal(study_id, metric, reference=reference),
-            lambda result: self._exploration_completed(study_id, snapshot_id, result),
+            lambda result: self._exploration_completed(study_id, snapshot_id, result)
+            if self.detail.get("active_data_revision_id") == revision
+            and result.get("provenance", {}).get("snapshot_id", snapshot_id) == snapshot_id else None,
             "Computing longitudinal summaries",
         )
 
