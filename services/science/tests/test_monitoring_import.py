@@ -92,15 +92,14 @@ def test_link_cmj_and_monitoring_then_flag_and_simulate_across_measures(service,
     acwr = next(a for g in board["groups"] for a in g["athletes"] if a["subject_id"] == "P03")["flags"][0]["evidence"][0]["value"]
     recent = [load(3, d) for d in range(35, 42)]
     chronic = [load(3, d) for d in range(14, 42)]
-    assert acwr == pytest.approx(round((sum(recent) / 7) / (sum(chronic) / 28), 3))
+    assert acwr == pytest.approx((sum(recent) / 7) / (sum(chronic) / 28))
 
     # "Load +20%/step" with an assumed CMJ effect: researcher-defined driver and effect.
     result = squad.simulate(identity, {"name": "Load push", "steps": 2, "outcome_metric_id": "MET-CMJ-HEIGHT",
                                        "drivers": [{"metric_id": "MET-MON-LOAD", "change_pct_per_step": {"best": 10, "expected": 20, "worst": 30}}],
                                        "effects": [{"driver_metric_id": "MET-MON-LOAD", "outcome_pct_per_driver_pct": {"best": 0.05, "expected": -0.05, "worst": -0.1}}]})
-    p01 = next(a for a in result["athletes"] if a["subject_id"] == "P01")
-    assert p01["projection"]["worst"][-1] == pytest.approx(p01["start"] * 0.97 ** 2, rel=1e-4)
-    assert p01["drivers"]["MET-MON-LOAD"]["expected"][0] == pytest.approx(load(1, 41) * 1.2, rel=1e-4)
+    assert result["numerical_result"] is None and result["athletes"] == []
+    assert result["qualification"]["status"] == "NOT_QUALIFIED"
     assert pl.DataFrame(researchstore.read_snapshot_table(rev3, "subjects"))["position"].null_count() == 0
 
 
@@ -116,9 +115,9 @@ def test_events_feed_reports_flag_changes_between_revisions_and_follow_ups(servi
                                                 {"metric_id": "MET-MON-WELLNESS", "measure": "change_from_baseline_pct", "operator": "<", "value": -20}]}])
     feed = squad.events(identity)
     titles = [item["title"] for item in feed["events"]]
-    assert titles.count("P03 entered In danger") == 1  # only when the final weeks arrive (revision 3)
-    entered = next(item for item in feed["events"] if item["title"] == "P03 entered In danger")
-    assert entered["revision"] == 3 and "acute:chronic ratio (7 vs 28)" in entered["detail"]
+    assert titles.count("Retrospective: P03 entered In danger") == 1  # only when the final weeks arrive (revision 3)
+    entered = next(item for item in feed["events"] if item["title"] == "Retrospective: P03 entered In danger")
+    assert entered["revision"] == 3 and "record mean ratio (7 vs 28 records)" in entered["detail"]
     assert {"New data attached · revision 1", "New kind of measurement linked · revision 2", "New measurements appended · revision 3"} <= set(titles)
     assert [item["subject_id"] for item in feed["attention"]] == ["P03"]
     service.create_individual_investigation(identity, "P03", "Load spike follow-up")

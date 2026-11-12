@@ -9,6 +9,7 @@ and are never stored as observations.
 
 from __future__ import annotations
 
+import math
 import secrets
 from typing import Any
 
@@ -23,8 +24,8 @@ MEASURES = {
     "change_from_previous_pct": "% change from previous test",
     "vs_squad_sd": "Latest vs squad (SD units)",
     "rolling_mean": "Rolling mean of last N records",
-    "acute_chronic_ratio": "Acute:chronic ratio (last A vs last C records)",
-    "missed_tests": "Missed tests",
+    "acute_chronic_ratio": "Record mean ratio (last A / last C records; not calendar ACWR)",
+    "missed_tests": "Missing measured occasions in revision",
 }
 OPERATORS = ("<", "<=", ">", ">=", "between", "outside")
 TONES = ("negative", "positive", "neutral")
@@ -51,7 +52,9 @@ def athlete_series(snapshot_id: str, metric: dict[str, Any]) -> tuple[dict[str, 
     axis = _axis(frame)
     if axis is None:
         raise researchstore.ResearchValidation(f"{metric['label']} has no measured time axis")
-    valid = frame.filter(pl.col(metric["column"]).is_not_null() & pl.col(axis).is_not_null())
+    valid = frame.filter(pl.col(metric["column"]).is_not_null() & pl.col(metric["column"]).is_finite() & pl.col(axis).is_not_null())
+    if "quality_state" in valid.columns:
+        valid = valid.filter(pl.col("quality_state") == "VALID")
     means = valid.group_by(["subject_id", axis]).agg(pl.col(metric["column"]).mean().alias("value")).sort(axis)
     series: dict[str, list[tuple[Any, float]]] = {}
     for row in means.iter_rows(named=True):
@@ -75,11 +78,11 @@ def _measure(kind: str, values: list[float], squad_latest: list[float], points_t
         sd = float(np.std(squad_latest, ddof=1)) if len(squad_latest) > 2 else 0.0
         return (latest - float(np.mean(squad_latest))) / sd if sd else None
     if kind == "rolling_mean":
-        window = int(condition.get("window") or 3)
+        window = int(condition.get("window", 3))
         return float(np.mean(values[-window:])) if len(values) >= window else None
     if kind == "acute_chronic_ratio":
-        acute, chronic = int(condition.get("acute") or 1), int(condition.get("chronic") or 4)
-        if len(values) < chronic or acute >= chronic:
+        acute, chronic = int(condition.get("acute", 1)), int(condition.get("chronic", 4))
+        if acute < 1 or chronic < 2 or len(values) < chronic or acute >= chronic:
             return None
         base = float(np.mean(values[-chronic:]))
         return float(np.mean(values[-acute:])) / base if base else None
@@ -115,6 +118,14 @@ def validate_rule(rule: dict[str, Any], metrics: dict[str, dict[str, Any]]) -> d
                 float(condition["value2"])
         except (KeyError, TypeError, ValueError) as error:
             raise researchstore.ResearchValidation(f"{name}: thresholds must be numbers") from error
+        for key, default in (("window", 3), ("acute", 1), ("chronic", 4)):
+            raw = condition.get(key, default)
+            if not isinstance(raw, int) or isinstance(raw, bool) or raw < 1:
+                raise researchstore.ResearchValidation(f"{name}: record windows must be positive integers")
+        if condition.get("measure") == "acute_chronic_ratio" and condition.get("acute", 1) >= condition.get("chronic", 4):
+            raise researchstore.ResearchValidation(f"{name}: short record window must be less than long window")
+        if not all(math.isfinite(float(condition[k])) for k in ("value", "value2") if k in condition):
+            raise researchstore.ResearchValidation(f"{name}: thresholds must be finite")
     return {"id": rule.get("id") or f"RULE-{secrets.token_hex(3).upper()}", "name": name, "category": category,
             "tone": rule.get("tone", "neutral"), "match": "any" if rule.get("match") == "any" else "all",
             "enabled": rule.get("enabled", True), "conditions": conditions}
@@ -126,48 +137,71 @@ def save_rules(workspace_id: str, rules: list[dict[str, Any]], base_version: int
         raise researchstore.ResearchValidation("Add data before defining flag rules")
     metrics = _metrics(entity["dataset_snapshot_id"])
     validated = [validate_rule(rule, metrics) for rule in rules]
-    return researchstore.update_entity(workspace_id, {"flag_rules": validated}, base_version, change_type="FLAG_RULES_SAVED")
+    previous = {r["id"]: r for r in entity.get("flag_rules", [])}
+    for rule in validated:
+        rule["version"] = previous.get(rule["id"], {}).get("version", 0) + 1
+    evaluations = evaluate_records(entity["dataset_snapshot_id"], validated, entity.get("active_data_revision_id"))
+    return researchstore.update_entity(workspace_id, {"flag_rules": validated,
+        "recorded_flag_evaluations": [*entity.get("recorded_flag_evaluations", []),
+            {"at": researchstore._now(), "data_revision_id": entity.get("active_data_revision_id"),
+             "rules": validated, "evaluations": evaluations}]}, base_version, change_type="FLAG_RULES_SAVED")
 
 
-def evaluate(snapshot_id: str, rules: list[dict[str, Any]], overrides: dict[str, dict[str, list[float]]] | None = None) -> dict[str, list[dict[str, Any]]]:
-    """Rule hits per athlete. ``overrides`` replaces a metric's series (used to test simulated values)."""
+def evaluate_records(snapshot_id: str, rules: list[dict[str, Any]], data_revision_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    """All descriptive evaluations, including unavailable values; never classify missing data as normal."""
     metrics = _metrics(snapshot_id)
-    cache: dict[str, tuple[dict[str, list[float]], int]] = {}
-
-    def series(metric_id: str) -> tuple[dict[str, list[float]], int]:
-        if metric_id not in cache:
-            observed, points = athlete_series(snapshot_id, metrics[metric_id])
-            values = {subject: [value for _, value in rows] for subject, rows in observed.items()}
-            values.update((overrides or {}).get(metric_id, {}))
-            cache[metric_id] = (values, len(points))
-        return cache[metric_id]
-
-    subjects = [str(item) for item in researchstore.read_snapshot_table(snapshot_id, "subjects")["subject_id"].to_list()]
-    hits: dict[str, list[dict[str, Any]]] = {subject: [] for subject in subjects}
+    snapshot = researchstore.get_snapshot(snapshot_id) or {}
+    subjects = [str(s) for s in researchstore.read_snapshot_table(snapshot_id, "subjects")["subject_id"].to_list()]
+    records = {subject: [] for subject in subjects}
+    cache = {}
+    at = researchstore._now()
     for rule in rules:
-        if not rule.get("enabled", True) or any(c["metric_id"] not in metrics for c in rule["conditions"]):
-            continue  # a rule on measures this revision does not hold is not evaluable here
+        if not rule.get("enabled", True):
+            continue
         for subject in subjects:
-            evidence, matched = [], []
+            evidence, states = [], []
             for condition in rule["conditions"]:
-                values, total = series(condition["metric_id"])
-                squad = [rows[-1] for rows in values.values() if rows]
-                value = _measure(condition["measure"], values.get(subject, []), squad, total, condition)
-                ok = value is not None and _compare(value, condition)
-                matched.append(ok)
-                metric = metrics[condition["metric_id"]]
+                metric = metrics.get(condition["metric_id"])
+                rows, points, observed = [], [], {}
+                if metric:
+                    if metric["id"] not in cache:
+                        cache[metric["id"]] = athlete_series(snapshot_id, metric)
+                    observed, points = cache[metric["id"]]
+                    rows = observed.get(subject, [])
+                values = [v for _, v in rows]
+                value = _measure(condition["measure"], values, [v[-1][1] for v in observed.values() if v], len(points), condition) if metric else None
+                ok = None if value is None else _compare(value, condition)
+                states.append(ok)
                 label = MEASURES[condition["measure"]]
                 if condition["measure"] == "rolling_mean":
-                    label = f"Rolling mean of last {condition.get('window') or 3}"
+                    label = f"Rolling mean of last {condition.get('window', 3)} records"
                 elif condition["measure"] == "acute_chronic_ratio":
-                    label = f"Acute:chronic ratio ({condition.get('acute') or 1} vs {condition.get('chronic') or 4})"
-                evidence.append({"metric": metric["label"], "unit": metric["unit"], "measure": label,
-                                 "value": None if value is None else round(value, 3), "operator": condition["operator"],
-                                 "threshold": condition["value"], "threshold2": condition.get("value2"), "met": ok})
-            if (all(matched) if rule["match"] == "all" else any(matched)):
-                hits[subject].append({"rule_id": rule["id"], "rule": rule["name"], "category": rule["category"],
-                                      "tone": rule["tone"], "evidence": evidence})
-    return hits
+                    label = f"Record mean ratio ({condition.get('acute', 1)} vs {condition.get('chronic', 4)} records); not calendar ACWR"
+                transformed_unit = "%" if condition["measure"].endswith("_pct") else "ratio" if condition["measure"] == "acute_chronic_ratio" else "SD units" if condition["measure"] == "vs_squad_sd" else "occasions" if condition["measure"] == "missed_tests" else (metric or {}).get("unit")
+                evidence.append({"metric_id": condition["metric_id"], "metric": (metric or {}).get("label", condition["metric_id"]),
+                    "unit": (metric or {}).get("unit"), "statistic_unit": transformed_unit, "measure": label,
+                    "value": value, "operator": condition["operator"], "threshold": condition["value"],
+                    "threshold2": condition.get("value2"), "met": ok, "source": snapshot.get("source"),
+                    "snapshot_id": snapshot_id, "data_revision_id": data_revision_id,
+                    "observations": [{"point": p, "value": v} for p, v in rows],
+                    "missing_occasions": [p for p in points if p not in {r[0] for r in rows}],
+                    "qc_eligibility": "Finite admitted values; quality_state VALID where recorded",
+                    "eligibility": "ELIGIBLE" if value is not None else "NOT_EVALUABLE",
+                    "limitation": "Record windows use valid session means, include the short window in the long window, and do not imply elapsed days. Incomplete windows and zero denominators are unavailable; no risk interpretation."})
+            if rule["match"] == "all":
+                matched = False if False in states else None if None in states else True
+            else:
+                matched = True if True in states else None if None in states else False
+            records[subject].append({"rule_id": rule["id"], "rule": rule["name"], "rule_version": rule.get("version", 1),
+                "category": rule["category"], "tone": rule["tone"], "classification": "RESEARCHER_DEFINED",
+                "evaluated_at": at, "data_revision_id": data_revision_id,
+                "status": "NOT_EVALUABLE" if matched is None else "MATCH" if matched else "NO_MATCH", "evidence": evidence})
+    return records
+
+
+def evaluate(snapshot_id: str, rules: list[dict[str, Any]], *, data_revision_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    return {subject: [r for r in records if r["status"] == "MATCH"]
+            for subject, records in evaluate_records(snapshot_id, rules, data_revision_id).items()}
 
 
 def squad_board(workspace_id: str, group_by: str = "category", metric_id: str | None = None) -> dict[str, Any]:
@@ -185,7 +219,8 @@ def squad_board(workspace_id: str, group_by: str = "category", metric_id: str | 
     frame_columns = researchstore.read_snapshot_table(snapshot_id, metric["table"]).columns
     time_word = "days" if _axis(pl.DataFrame(schema=dict.fromkeys(frame_columns, pl.Utf8))) in ("day", "date") else "tests"
     rules = entity.get("flag_rules") or []
-    hits = evaluate(snapshot_id, rules)
+    evaluations = evaluate_records(snapshot_id, rules, entity.get("active_data_revision_id"))
+    hits = {subject: [r for r in rows if r["status"] == "MATCH"] for subject, rows in evaluations.items()}
     subjects = researchstore.read_snapshot_table(snapshot_id, "subjects").to_dicts()
     athletes = []
     for subject in subjects:
@@ -198,6 +233,7 @@ def squad_board(workspace_id: str, group_by: str = "category", metric_id: str | 
                          "attributes": {key: value for key, value in subject.items() if key not in ("subject_id", "display_id")},
                          "tests": len(values), "tests_expected": len(points), "latest": values[-1] if values else None,
                          "change_from_baseline_pct": change, "trend": trend, "flags": hits.get(subject_id, []),
+                         "rule_evaluations": evaluations.get(subject_id, []),
                          "series": [{"point": point, "value": value} for point, value in rows]})
     def group_of(athlete: dict[str, Any]) -> str:
         if group_by == "category":
@@ -212,7 +248,8 @@ def squad_board(workspace_id: str, group_by: str = "category", metric_id: str | 
             "metric": metric, "metrics": list(metrics.values()), "rules": rules, "group_by": group_by, "time_word": time_word,
             "group_options": ["category", "trend", *sorted({key for athlete in athletes for key in athlete["attributes"]})],
             "groups": [{"name": name, "athletes": members} for name, members in groups.items()],
-            "note": "Flags show which of your rules fired on observed data; they are not diagnoses."}
+            "title": entity["title"],
+            "note": "Researcher-defined descriptive rules; thresholds are not scientifically validated. Missing or QC-ineligible measurements are unavailable, not normal. No diagnoses or athlete-risk classification."}
 
 
 # --------------------------------------------------------------------------- #
@@ -293,19 +330,25 @@ def events(workspace_id: str) -> dict[str, Any]:
         items.append({"at": revision["created_at"], "kind": "data", "tone": "neutral", "subject_id": None,
                       "title": f"{REVISION_MODES.get(revision['mode'], 'Data')} · revision {revision['number']}",
                       "detail": f"{tables} · {sum(n for t, n in revision['snapshot'].get('row_counts', {}).items() if t != 'subjects'):,} measurement rows"})
-        hits = evaluate(revision["snapshot_id"], rules) if rules else {}
+        hits = evaluate(revision["snapshot_id"], rules, data_revision_id=revision["id"]) if rules else {}
         state = {subject: {(hit["category"], hit["tone"]) for hit in subject_hits} for subject, subject_hits in hits.items()}
         for subject, categories in state.items():
             before = previous.get(subject, set())
             for category, tone in sorted(categories - before):
                 hit = next(h for h in hits[subject] if h["category"] == category)
                 items.append({"at": revision["created_at"], "kind": "flag", "tone": tone, "subject_id": subject,
-                              "title": f"{subject} entered {category}", "detail": _evidence_text(hit), "revision": revision["number"]})
+                              "title": f"Retrospective: {subject} entered {category}", "detail": "Current rules re-evaluated now; not recorded at the revision date. " + _evidence_text(hit), "revision": revision["number"], "evaluation_kind": "RETROSPECTIVE", "evaluated_at": researchstore._now()})
             for category, _ in sorted(before - categories):
                 items.append({"at": revision["created_at"], "kind": "flag", "tone": "neutral", "subject_id": subject,
-                              "title": f"{subject} is no longer {category}", "detail": f"Data revision {revision['number']}",
+                              "title": f"Retrospective: {subject} no longer meets {category}", "detail": f"Data revision {revision['number']}",
                               "revision": revision["number"]})
         previous, current_hits = state, hits
+    active_revision = researchstore.get_data_revision(entity.get("active_data_revision_id"))
+    current_hits = evaluate(active_revision["snapshot_id"], rules, data_revision_id=active_revision["id"]) if active_revision and rules else {}
+    for record in entity.get("recorded_flag_evaluations", []):
+        items.append({"at": record["at"], "kind": "rule_evaluation", "tone": "neutral", "subject_id": None,
+                      "title": "Recorded researcher-defined rule evaluation", "detail": f"Revision {record['data_revision_id']}; original rule versions retained.",
+                      "evaluation_kind": "RECORDED", "evaluations": record["evaluations"]})
     for run in researchstore.list_runs(workspace_id):
         scope = run.get("scope") or {"kind": "COHORT"}
         who = f"participant {scope['subject_id']}" if scope["kind"] == "INDIVIDUAL" else "cohort"

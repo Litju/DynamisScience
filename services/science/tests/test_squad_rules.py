@@ -71,8 +71,34 @@ def test_scenarios_preserve_definitions_without_forecasts_or_flag_crossings(work
     assert after["simulations"][0]["summary"] == {}
     assert after["dataset_snapshot_id"] == before["dataset_snapshot_id"]
     assert after["active_data_revision_id"] == before["active_data_revision_id"]
-    assert squad.squad_board(workspace)["groups"] == board["groups"]
+    assert [(a["subject_id"], a["latest"], a["series"]) for g in squad.squad_board(workspace)["groups"] for a in g["athletes"]] == [(a["subject_id"], a["latest"], a["series"]) for g in board["groups"] for a in g["athletes"]]
     assert not researchstore.list_runs(workspace) and not researchstore.list_evidence(workspace)
     assert all("would meet" not in e["detail"] for e in squad.events(workspace)["events"])
     with pytest.raises(researchstore.ResearchValidation, match="not measured"):
         squad.simulate(workspace, {**scenario, "drivers": [{"metric_id": "MET-LOAD", "change_pct_per_step": 10}]})
+
+
+def test_flag_missingness_versions_and_record_windows(workspace):
+    rule = {"name": "Records", "category": "Review", "conditions": [{"metric_id": "MET-CMJ-HEIGHT",
+            "measure": "acute_chronic_ratio", "acute": 2, "chronic": 6, "operator": ">", "value": 0.5}]}
+    squad.save_rules(workspace, [rule])
+    entity = researchstore.get_entity(workspace)
+    original = entity["recorded_flag_evaluations"][0]
+    records = original["evaluations"]
+    assert records["P03"][0]["status"] == "NOT_EVALUABLE"
+    assert records["P01"][0]["status"] == "MATCH"
+    ev = records["P01"][0]["evidence"][0]
+    assert ev["data_revision_id"] == entity["active_data_revision_id"]
+    assert ev["source"] and ev["snapshot_id"] and ev["observations"]
+    assert ev["statistic_unit"] == "ratio" and "not calendar ACWR" in ev["measure"]
+    saved = entity["flag_rules"][0]
+    squad.save_rules(workspace, [{**saved, "conditions": [{**saved["conditions"][0], "value": 99}]}])
+    after = researchstore.get_entity(workspace)
+    assert after["flag_rules"][0]["version"] == 2
+    assert after["recorded_flag_evaluations"][0] == original
+    assert all(e.get("evaluation_kind") in ("RETROSPECTIVE", "RECORDED") for e in squad.events(workspace)["events"] if e["kind"] in ("flag", "rule_evaluation"))
+    assert squad._measure("acute_chronic_ratio", [0]*6, [], 6, {"acute": 2, "chronic": 6}) is None
+    assert squad._measure("rolling_mean", [1, 2], [], 2, {"window": 3}) is None
+    for changes in ({"acute": 0}, {"chronic": -2}, {"value": float("nan")}):
+        with pytest.raises(researchstore.ResearchValidation):
+            squad.save_rules(workspace, [{**rule, "conditions": [{**rule["conditions"][0], **changes}]}])

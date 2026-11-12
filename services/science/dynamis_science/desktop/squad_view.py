@@ -71,7 +71,7 @@ def flag_text(flag: dict[str, Any]) -> str:
     for item in flag["evidence"]:
         threshold = f"{item['threshold']}–{item['threshold2']}" if item["operator"] in ("between", "outside") else item["threshold"]
         parts.append(f"{item['metric']} · {item['measure'].lower()} = {item['value']} ({item['operator']} {threshold})")
-    return f"{flag['category']} — rule “{flag['rule']}”: " + "; ".join(parts)
+    return f"Researcher-defined {flag['category']} — rule “{flag['rule']}” v{flag.get('rule_version', 1)} · revision {flag.get('data_revision_id')} · {flag.get('evaluated_at', 'not recorded')}: " + "; ".join(parts)
 
 
 class AthleteTile(QToolButton):
@@ -85,7 +85,7 @@ class AthleteTile(QToolButton):
         if len(athlete["flags"]) > 1:
             lines[1] += f" +{len(athlete['flags']) - 1}"
         self.setText("\n".join(lines))
-        self.setToolTip("\n".join(flag_text(item) for item in athlete["flags"]) or "No rule fired on the observed data.")
+        self.setToolTip("\n".join(flag_text(item) for item in athlete["flags"]) or "No rule matched. Missing or QC-ineligible values may be unavailable; this is not a normal/risk classification.")
         self.setAccessibleName(f"Athlete {athlete['display_id']}: {lines[1]}")
         self.setFixedWidth(TILE_WIDTH)
         self.setMinimumHeight(62)
@@ -538,7 +538,7 @@ class AthletePage(QWidget):
             card.setFrameShape(QFrame.Shape.StyledPanel)
             card.setMargin(6)
             self.cards.addWidget(card)
-        self.flags.setPlainText("\n".join(flag_text(flag) for flag in athlete["flags"]) or "None of your rules fired for this athlete.")
+        self.flags.setPlainText("\n".join(flag_text(flag) + f" [{flag.get('status', 'MATCH')}]" for flag in athlete.get("rule_evaluations", athlete["flags"])) or "No researcher-defined rules. No athlete-risk assessment is made.")
         self._plot(athlete)
         self.branch_picker.clear()
         self.branch_picker.addItem("Main line · observed data", None)
