@@ -84,6 +84,8 @@ class MainWindow(QMainWindow):
         self.runner.idle.connect(self._close_if_idle)
         self.current_study_id: str | None = None
         self.current_study: dict[str, Any] = {}
+        self.research_context: dict[str, Any] = {"scope": "COHORT"}
+        self.investigations: list[dict[str, Any]] = []
         self.current_snapshot_id: str | None = None
         self.current_target: dict[str, str] | None = None
         self.current_project: dict[str, Any] | None = None
@@ -202,6 +204,27 @@ class MainWindow(QMainWindow):
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
             action = workspace_bar.addAction(label)
             action.triggered.connect(callback)
+        # RES-647 research context: one workspace identity, cohort or individual scope within it.
+        context_bar = QToolBar("Research Context", self)
+        context_bar.setObjectName("ResearchContext")
+        self.addToolBar(context_bar)
+        self.context_title = QLabel("No workspace")
+        self.context_title.setAccessibleName("Workspace title and active data revision")
+        self.scope_picker = QComboBox()
+        self.scope_picker.setAccessibleName("Research scope")
+        self.scope_picker.addItem("Cohort", "COHORT")
+        self.scope_picker.addItem("Individual", "INDIVIDUAL")
+        self.investigation_picker = QComboBox()
+        self.investigation_picker.setAccessibleName("Individual investigation")
+        self.investigation_picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.investigation_picker.setMinimumContentsLength(14)
+        for widget in (self.context_title, self.scope_picker, self.investigation_picker):
+            context_bar.addWidget(widget)
+        context_bar.addAction("Individuals…").triggered.connect(self._open_individuals)
+        context_bar.addAction("Combined report").triggered.connect(self._export_combined_report)
+        self.scope_picker.activated.connect(lambda _: self._scope_changed())
+        self.investigation_picker.activated.connect(lambda _: self._scope_changed())
+        self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
         export_action.triggered.connect(self.research.export_report)
@@ -1088,6 +1111,109 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.research)
         if detail.get("workspace"):
             self._set_record_view(True)
+        self._load_research_context(study_id, detail)
+
+    # ------------------------------------------------------------------ RES-647 research context
+
+    def _load_research_context(self, study_id: str, detail: dict[str, Any]) -> None:
+        self.research_context = dict(detail.get("study", {}).get("research_context") or {"scope": "COHORT"})
+        self.investigations = []
+        self._sync_context_bar()
+        if not detail.get("workspace") or not detail.get("metrics"):
+            self.research.individual.set_investigation(None, None)
+            return
+        revision = detail.get("active_data_revision_id")
+
+        def loaded(investigations: list[dict[str, Any]]) -> None:
+            if (self.current_study_id, self.current_study.get("active_data_revision_id")) != (study_id, revision):
+                return
+            self.investigations = investigations
+            if not any(item["id"] == self.research_context.get("investigation_id") for item in investigations):
+                self.research_context = {"scope": "COHORT"}
+            self._sync_context_bar()
+            self._apply_research_context()
+
+        self.run_task(lambda: self.service.individual_investigations(study_id), loaded, "Loading individual investigations")
+
+    def _sync_context_bar(self) -> None:
+        detail = self.current_study if self.current_study.get("workspace") else {}
+        number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == detail.get("active_data_revision_id")), None)
+        title = detail.get("study", {}).get("title")
+        self.context_title.setText(f"{title} · {'Data revision ' + str(number) if number else 'no data'}  " if title else "No workspace  ")
+        context = getattr(self, "research_context", {"scope": "COHORT"})
+        self.scope_picker.setCurrentIndex(max(0, self.scope_picker.findData(context.get("scope", "COHORT"))))
+        self.investigation_picker.clear()
+        for item in getattr(self, "investigations", []):
+            self.investigation_picker.addItem(f"{item['scope']['subject_id']} · {item['title']}", item["id"])
+        index = self.investigation_picker.findData(context.get("investigation_id"))
+        self.investigation_picker.setCurrentIndex(index)
+        enabled = bool(detail.get("metrics"))
+        self.scope_picker.setEnabled(enabled)
+        self.investigation_picker.setEnabled(enabled and context.get("scope") == "INDIVIDUAL")
+
+    def _apply_research_context(self) -> None:
+        context = self.research_context
+        individual = context.get("scope") == "INDIVIDUAL" and context.get("investigation_id")
+        self.research.individual.set_investigation(self.current_study_id, context["investigation_id"] if individual else None)
+        if individual:
+            self._set_record_view(True)
+            self.research.tabs.setCurrentWidget(self.research.individual)
+
+    def _select_scope(self, kind: str, investigation_id: str | None = None) -> None:
+        identity = self.current_study_id
+        investigation = next((item for item in self.investigations if item["id"] == investigation_id), None)
+        self.research_context = {"scope": kind, "investigation_id": investigation_id,
+                                 "subject_id": investigation["scope"]["subject_id"] if investigation else None}
+        self._sync_context_bar()
+        self._apply_research_context()
+        self.run_task(lambda: self.service.select_research_scope(identity, kind, investigation_id), lambda _: None, "Saving research context")
+
+    def _scope_changed(self) -> None:
+        if not self.current_study.get("workspace"):
+            return
+        if self.scope_picker.currentData() == "COHORT":
+            self._select_scope("COHORT")
+        elif self.investigation_picker.currentData():
+            self._select_scope("INDIVIDUAL", self.investigation_picker.currentData())
+        else:
+            self._open_individuals()
+
+    def _open_individuals(self) -> None:
+        if not self.current_study.get("workspace") or not self.current_study.get("metrics"):
+            self.workbench.show_toast("Add longitudinal data to the workspace before opening individuals.")
+            self._sync_context_bar()
+            return
+        from .individual_research import IndividualsExplorer
+
+        identity = self.current_study_id
+        dialog = IndividualsExplorer(self.service, self.run_task, identity, self)
+
+        def opened(investigation_id: str) -> None:
+            def refreshed(investigations: list[dict[str, Any]]) -> None:
+                if self.current_study_id != identity:
+                    return
+                self.investigations = investigations
+                self._select_scope("INDIVIDUAL", investigation_id)
+
+            self.run_task(lambda: self.service.individual_investigations(identity), refreshed, "Opening individual research")
+
+        dialog.investigation_opened.connect(opened)
+        dialog.finished.connect(lambda _: self._sync_context_bar())
+        dialog.open()
+        self.individuals_dialog = dialog
+
+    def _export_combined_report(self) -> None:
+        cohort = self.research.latest_run
+        individual = self.research.individual_run()
+        if not cohort or not individual:
+            self.workbench.show_toast("Run a cohort analysis and an individual analysis on this data revision first.")
+            return
+        identity = self.current_study_id
+        path, _ = QFileDialog.getSaveFileName(self, "Export combined report", f"{identity}-combined-report.html", "HTML report (*.html)")
+        if path:
+            self.run_task(lambda: self.service.export_workspace_report(identity, [cohort["id"], individual["id"]], path),
+                          lambda output: self.statusBar().showMessage(f"Report exported: {output}", 8000),
+                          "Saving and exporting combined report")
 
     def _new_workspace(self) -> None:
         title, accepted = QInputDialog.getText(self, "Create research workspace", "Title")
@@ -1144,6 +1270,10 @@ class MainWindow(QMainWindow):
             self.workbench.show_toast("Add data to your workspace before analyzing.")
             return
         self._set_record_view(True)
+        if getattr(self, "research_context", {}).get("scope") == "INDIVIDUAL":
+            self.research.tabs.setCurrentWidget(self.research.individual)
+            self.research.individual.tabs.setCurrentIndex(1)
+            return
         self.research.tabs.setCurrentIndex(3)
 
     def _workspace_history(self) -> None:
@@ -1152,7 +1282,7 @@ class MainWindow(QMainWindow):
         identity = self.current_study_id
         from .. import researchstore
         def show(values):
-            revisions, runs, reports = values
+            revisions, runs, reports, investigations = values
             dialog = QDialog(self)
             dialog.setWindowTitle("Workspace history")
             available = self.screen().availableGeometry()
@@ -1163,7 +1293,11 @@ class MainWindow(QMainWindow):
             for revision in revisions:
                 picker.addItem(f"Data revision {revision['number']} · {revision['mode'].lower()} · {revision['created_at']}", ("data", revision))
             for run in runs:
-                picker.addItem(f"Analysis · {run['method_id']} · {run['id']}", ("run", run))
+                scope = run.get("scope") or {"kind": "COHORT"}
+                label = f"individual {scope['subject_id']}" if scope["kind"] == "INDIVIDUAL" else "cohort"
+                picker.addItem(f"Analysis · {label} · {run['method_id']} · {run['id']}", ("run", run))
+            for version in investigations:
+                picker.addItem(f"Investigation · {version['scope']['subject_id']} · {version['title']} v{version['version']}", ("investigation", version))
             for report in reports:
                 picker.addItem(f"Report v{report['version']} · frozen", ("report", report))
             detail = QTextBrowser()
@@ -1180,7 +1314,9 @@ class MainWindow(QMainWindow):
                 dialog.accept()
                 def open_selected():
                     researchstore.select_data_revision(identity, revision_id)
-                    if kind == "run":
+                    if kind == "run" and (selected.get("scope") or {}).get("kind") == "INDIVIDUAL":
+                        self.service.select_research_scope(identity, "INDIVIDUAL", selected["investigation_id"])
+                    elif kind == "run":
                         researchstore.select_workspace_run(identity, selected["id"])
                     return self.service.get_study_detail(identity)
                 self.run_task(open_selected,
@@ -1191,7 +1327,9 @@ class MainWindow(QMainWindow):
             changed()
             dialog.exec()
         self.run_task(lambda: (researchstore.data_revisions(identity), researchstore.list_runs(identity),
-                              [researchstore.get_report_version(identity, item["version"]) for item in researchstore.report_versions(identity)]), show, "Loading history")
+                              [researchstore.get_report_version(identity, item["version"]) for item in researchstore.report_versions(identity)],
+                              [version for item in self.service.individual_investigations(identity)
+                               for version in researchstore.investigation_versions(item["id"])]), show, "Loading history")
 
     def _show_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
         if self.current_study.get("workspace"):
@@ -1720,11 +1858,16 @@ class ResearchWorkbench(QWidget):
             "Evidence & Report",
         ):
             self.tabs.addTab(QWidget(), label)
+        from .individual_research import IndividualResearchPanel
+
+        # RES-647: individual research is a scope of this workspace, not a separate application.
+        self.individual = IndividualResearchPanel(self.service, window.run_task, self)
+        self.tabs.addTab(self.individual, "Individual Research")
         self.tabs.currentChanged.connect(self._ensure_tab)
         self._ensure_tab(0)
 
     def _ensure_tab(self, index: int) -> None:
-        if index < 0 or index in self._built_tabs:
+        if index < 0 or index >= len(self._builders) or index in self._built_tabs:
             return
         self._builders[index]()
         self._built_tabs.add(index)
@@ -1963,7 +2106,8 @@ class ResearchWorkbench(QWidget):
         self._load_runs_and_report()
         if detail.get("workspace"):
             revision = detail.get("active_data_revision_id")
-            runs = [run for run in detail.get("runs", []) if run.get("data_revision_id") == revision]
+            runs = [run for run in detail.get("runs", []) if run.get("data_revision_id") == revision
+                    and (run.get("scope") or {}).get("kind", "COHORT") == "COHORT"]
             self.latest_run = next((run for run in runs if run["id"] == detail["study"].get("selected_run_id")), runs[-1] if runs else None)
             if self.latest_run:
                 self.run_output.setPlainText(json.dumps(self.latest_run, indent=2, default=str))
@@ -1972,6 +2116,7 @@ class ResearchWorkbench(QWidget):
             self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\nData revision {number} · {self.snapshot_id}\n\n{len(runs)} saved analyses on this revision.\nUse Add data, Analyze, Export report or History above to continue.")
 
     def select_project(self, project: dict[str, Any]) -> None:
+        self.individual.set_investigation(None, None)
         self._ensure_tab(0)
         self._clear_study_views()
         self.study_id = None
@@ -1989,6 +2134,7 @@ class ResearchWorkbench(QWidget):
         self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        self.individual.set_investigation(None, None)
         for index in range(1, len(self._builders)):  # method_picker etc. live in later lazy tabs
             self._ensure_tab(index)
         self._clear_study_views()
@@ -2560,12 +2706,20 @@ class ResearchWorkbench(QWidget):
             "Saving report draft",
         )
 
+    def individual_run(self) -> dict[str, Any] | None:
+        """Latest saved analysis of the open individual investigation on the active revision."""
+        payload = self.individual.payload
+        runs = [run for run in payload.get("runs", []) if run.get("data_revision_id") == payload.get("data_revision_id")]
+        return runs[-1] if runs and self.individual.investigation_id else None
+
     def export_report(self) -> None:
         if getattr(self, "detail", {}).get("workspace"):
-            if not self.latest_run:
+            individual = getattr(self.window, "research_context", {}).get("scope") == "INDIVIDUAL"
+            run = self.individual_run() if individual else self.latest_run
+            if not run:
                 self.window.workbench.show_toast("Analyze this data revision before exporting a report.")
                 return
-            identity, run_id = self.study_id, self.latest_run["id"]
+            identity, run_id = self.study_id, run["id"]
             path, _ = QFileDialog.getSaveFileName(self, "Export scientific report", f"{identity}-report.html", "HTML report (*.html)")
             if path:
                 self.window.run_task(lambda: self.service.export_workspace_report(identity, run_id, path),

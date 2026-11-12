@@ -156,7 +156,8 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     assert window.frameGeometry().width() <= available.width()
     assert window.frameGeometry().height() <= available.height()
 
-    assert window.research.tabs.count() == 5
+    # Five research workspaces plus the RES-647 Individual Research scope of the same workspace.
+    assert window.research.tabs.count() == 6 and window.research.tabs.tabText(5) == "Individual Research"
     study_parent = window.navigator.topLevelItem(1)
     synthetic = next(
         study_parent.child(index)
