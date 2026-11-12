@@ -145,8 +145,8 @@ def evaluate(snapshot_id: str, rules: list[dict[str, Any]], overrides: dict[str,
     subjects = [str(item) for item in researchstore.read_snapshot_table(snapshot_id, "subjects")["subject_id"].to_list()]
     hits: dict[str, list[dict[str, Any]]] = {subject: [] for subject in subjects}
     for rule in rules:
-        if not rule.get("enabled", True):
-            continue
+        if not rule.get("enabled", True) or any(c["metric_id"] not in metrics for c in rule["conditions"]):
+            continue  # a rule on measures this revision does not hold is not evaluable here
         for subject in subjects:
             evidence, matched = [], []
             for condition in rule["conditions"]:
@@ -300,3 +300,65 @@ def save_simulation(workspace_id: str, scenario: dict[str, Any], base_version: i
     researchstore.update_entity(workspace_id, {"simulations": simulations}, base_version, change_type="SIMULATION_SAVED")
     return {**result, "record": record}
 
+
+
+# --------------------------------------------------------------------------- #
+# Events feed
+# --------------------------------------------------------------------------- #
+
+REVISION_MODES = {"SEPARATE": "New data attached", "APPEND": "New measurements appended", "LINK": "New kind of measurement linked"}
+
+
+def events(workspace_id: str) -> dict[str, Any]:
+    """What happened in the workspace, newest first, plus who needs attention now.
+
+    Flag changes compare the researcher's *current* rules between consecutive data revisions, so a rule edit
+    re-reads history consistently instead of mixing old and new standards.
+    """
+    entity = _workspace(workspace_id)
+    rules = entity.get("flag_rules") or []
+    revisions = researchstore.data_revisions(workspace_id)
+    items: list[dict[str, Any]] = []
+    previous: dict[str, set[tuple[str, str]]] = {}
+    current_hits: dict[str, list[dict[str, Any]]] = {}
+    for revision in revisions:
+        tables = ", ".join(sorted(t for t in revision["snapshot"].get("tables", {}) if t != "subjects"))
+        items.append({"at": revision["created_at"], "kind": "data", "tone": "neutral", "subject_id": None,
+                      "title": f"{REVISION_MODES.get(revision['mode'], 'Data')} · revision {revision['number']}",
+                      "detail": f"{tables} · {sum(n for t, n in revision['snapshot'].get('row_counts', {}).items() if t != 'subjects'):,} measurement rows"})
+        hits = evaluate(revision["snapshot_id"], rules) if rules else {}
+        state = {subject: {(hit["category"], hit["tone"]) for hit in subject_hits} for subject, subject_hits in hits.items()}
+        for subject, categories in state.items():
+            before = previous.get(subject, set())
+            for category, tone in sorted(categories - before):
+                hit = next(h for h in hits[subject] if h["category"] == category)
+                items.append({"at": revision["created_at"], "kind": "flag", "tone": tone, "subject_id": subject,
+                              "title": f"{subject} entered {category}", "detail": _evidence_text(hit), "revision": revision["number"]})
+            for category, _ in sorted(before - categories):
+                items.append({"at": revision["created_at"], "kind": "flag", "tone": "neutral", "subject_id": subject,
+                              "title": f"{subject} is no longer {category}", "detail": f"Data revision {revision['number']}",
+                              "revision": revision["number"]})
+        previous, current_hits = state, hits
+    for run in researchstore.list_runs(workspace_id):
+        scope = run.get("scope") or {"kind": "COHORT"}
+        who = f"participant {scope['subject_id']}" if scope["kind"] == "INDIVIDUAL" else "cohort"
+        items.append({"at": run["created_at"], "kind": "analysis", "tone": "neutral", "subject_id": scope.get("subject_id"),
+                      "title": f"Analysis saved · {who}", "detail": f"{run['id']} · {run['method_id']} · {run['method_status']['state'].lower()}"})
+    for simulation in entity.get("simulations") or []:
+        worst = simulation["summary"].get("worst", [])
+        items.append({"at": simulation["created_at"], "kind": "simulation", "tone": "neutral", "subject_id": None,
+                      "title": f"Simulation saved · {simulation['definition']['name']}",
+                      "detail": f"Worst case: {len(worst)} athlete(s) would meet your flag rules ({', '.join(worst) or 'none'}). Hypothetical."})
+    items.sort(key=lambda item: item["at"], reverse=True)
+    branched = {(item.get("scope") or {}).get("subject_id") for item in researchstore.list_investigations(workspace_id)}
+    attention = [{"kind": "attention", "tone": "negative", "subject_id": subject,
+                  "title": f"{subject} · {', '.join(sorted({h['category'] for h in subject_hits if h['tone'] == 'negative'}))}",
+                  "detail": "No follow-up branch yet. " + "; ".join(_evidence_text(h) for h in subject_hits if h["tone"] == "negative")}
+                 for subject, subject_hits in sorted(current_hits.items())
+                 if any(h["tone"] == "negative" for h in subject_hits) and subject not in branched]
+    return {"workspace_id": workspace_id, "data_revision_id": entity.get("active_data_revision_id"),
+            "attention": attention, "events": items, "rules": len(rules)}
+
+
+def _evidence_text(hit: dict[str, Any]) -> str:
+    return f"Rule “{hit['rule']}”: " + "; ".join(f"{e['metric']} {e['measure'].lower()} = {e['value']}" for e in hit["evidence"])

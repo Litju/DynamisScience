@@ -176,6 +176,12 @@ class MainWindow(QMainWindow):
         self.squad.board.research_requested.connect(self._show_research_mode)
         self.squad.athlete_page.investigation_selected.connect(self._branch_selected)
         self.perspectives.addWidget(self.squad)
+        from .squad_view import EventsFeed
+
+        self.events_view = EventsFeed(self.service, self.run_task)
+        self.events_view.athlete_requested.connect(self._open_athlete)
+        self.events_view.follow_up_requested.connect(self._start_follow_up)
+        self.perspectives.addWidget(self.events_view)
         self.performance = None
         self.performance_header = None
         self.performance_rail = None
@@ -208,7 +214,7 @@ class MainWindow(QMainWindow):
         workspace_bar = QToolBar("Research Workspace", self)
         workspace_bar.setObjectName("PersistentWorkspaceActions")
         self.addToolBar(workspace_bar)
-        for label, callback in (("Squad", self._show_squad_mode), ("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
+        for label, callback in (("Squad", self._show_squad_mode), ("Events", self._show_events_mode), ("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
                                 ("Add data", self._add_workspace_data), ("Analyze", self._analyze_workspace),
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
             action = workspace_bar.addAction(label)
@@ -587,12 +593,33 @@ class MainWindow(QMainWindow):
         self.perspectives.setCurrentWidget(self.squad)
         self._perspective = "squad"
 
+    def _show_events_mode(self) -> None:
+        if not self.events_view.workspace_id:
+            self.workbench.show_toast("Open a research workspace with data to see its events.")
+            return
+        self._show_research_mode()
+        self.perspectives.setCurrentWidget(self.events_view)
+        self._perspective = "events"
+        self.events_view.reload()
+
+    def _start_follow_up(self, subject_id: str) -> None:
+        title, accepted = QInputDialog.getText(self, "Start follow-up", f"What do you want to follow up for {subject_id}?")
+        if not accepted or not title.strip():
+            return
+        identity = self.current_study_id
+
+        def created(investigation: dict[str, Any]) -> None:
+            self._branch_selected(investigation["id"])
+            self.events_view.reload()
+
+        self.run_task(lambda: self.service.create_individual_investigation(identity, subject_id, title), created, "Creating follow-up branch")
+
     def _show_research_mode(self) -> None:
         self.menuBar().show()
         if self.performance_toolbar is not None:
             self.performance_toolbar.hide()
         self.perspectives.setCurrentWidget(self.workbench)
-        if self._perspective not in ("research", "squad"):
+        if self._perspective not in ("research", "squad", "events"):
             # The navigator lives in the Data pane; raw inspector detail is behind View > Advanced.
             self._perspective = "research"
             self.navigator_dock.hide()
@@ -1127,6 +1154,7 @@ class MainWindow(QMainWindow):
         self._sync_context_bar()
         squad = self.squad
         squad.setCurrentWidget(squad.board)
+        self.events_view.set_workspace(study_id if detail.get("workspace") and detail.get("metrics") else None)
         if not detail.get("workspace") or not detail.get("metrics"):
             squad.board.set_workspace(None)
             self.research.individual.set_investigation(None, None)

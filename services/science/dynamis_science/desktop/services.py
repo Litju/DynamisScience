@@ -120,6 +120,10 @@ class DynamisAppService:
         self.ensure_initialized()
         return squad.squad_board(workspace_id, group_by, metric_id)
 
+    def workspace_events(self, workspace_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.events(workspace_id)
+
     def save_flag_rules(self, workspace_id: str, rules: list[dict[str, Any]]) -> dict[str, Any]:
         self.ensure_initialized()
         return squad.save_rules(workspace_id, rules)

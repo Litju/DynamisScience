@@ -6,6 +6,7 @@ Tapping a tile opens the athlete; from there the researcher opens or branches in
 
 from __future__ import annotations
 
+import html
 from datetime import date
 from typing import Any, Callable
 
@@ -588,3 +589,104 @@ class SquadHome(QStackedWidget):
         self.addWidget(self.board)
         self.addWidget(self.athlete_page)
         self.athlete_page.back_requested.connect(lambda: self.setCurrentWidget(self.board))
+
+
+class EventsFeed(QWidget):
+    """What changed in the workspace, newest first, with the athletes who need a follow-up on top."""
+
+    athlete_requested = Signal(str)
+    follow_up_requested = Signal(str)
+    FILTERS = (("All events", None), ("Flag changes", "flag"), ("New data", "data"), ("Analyses", "analysis"), ("Simulations", "simulation"))
+
+    def __init__(self, service: DynamisAppService, run_task: RunTask, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.service, self.run_task = service, run_task
+        self.workspace_id: str | None = None
+        self.feed: dict[str, Any] = {}
+        self.generation = 0
+        layout = QVBoxLayout(self)
+        bar = QHBoxLayout()
+        self.title = QLabel("Open a workspace with data to see its events.")
+        self.filter = QComboBox()
+        self.filter.setAccessibleName("Filter events")
+        for label, kind in self.FILTERS:
+            self.filter.addItem(label, kind)
+        self.filter.activated.connect(lambda _: self._render())
+        refresh = QPushButton("Refresh")
+        refresh.clicked.connect(self.reload)
+        bar.addWidget(self.title, 1)
+        bar.addWidget(self.filter)
+        bar.addWidget(refresh)
+        layout.addLayout(bar)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        layout.addWidget(self.scroll, 1)
+
+    def set_workspace(self, workspace_id: str | None) -> None:
+        self.workspace_id, self.feed = workspace_id, {}
+        self.scroll.takeWidget()
+        if workspace_id:
+            self.reload()
+
+    def reload(self) -> None:
+        if not self.workspace_id:
+            return
+        self.generation += 1
+        generation, workspace_id = self.generation, self.workspace_id
+        self.run_task(lambda: self.service.workspace_events(workspace_id),
+                      lambda feed: self._loaded(feed) if (generation, workspace_id) == (self.generation, self.workspace_id) else None,
+                      "Loading events")
+
+    def _loaded(self, feed: dict[str, Any]) -> None:
+        self.feed = feed
+        self._render()
+
+    def _card(self, item: dict[str, Any], action: str | None = None) -> QFrame:
+        colors = theme.tokens()
+        edge = _tone_color(item["tone"]) if item["kind"] in ("flag", "attention") else colors["line2"]
+        card = QFrame()
+        card.setObjectName("EventCard")
+        card.setStyleSheet(f"QFrame#EventCard {{ background: {colors['base']}; border: 1px solid {colors['line2']};"
+                           f" border-left: 4px solid {edge}; border-radius: 6px; }}")
+        row = QHBoxLayout(card)
+        when = f"<br><span style='color:{colors['dim']}; font-size:11px'>{item['at'][:16].replace('T', ' ')}</span>" if item.get("at") else ""
+        text = QLabel(f"<b>{html.escape(item['title'])}</b><br><span style='color:{colors['muted']}'>{html.escape(item['detail'])}</span>{when}")
+        text.setWordWrap(True)
+        text.setTextFormat(Qt.TextFormat.RichText)
+        row.addWidget(text, 1)
+        if item.get("subject_id"):
+            open_button = QPushButton("Open athlete")
+            open_button.clicked.connect(lambda _=False, subject=item["subject_id"]: self.athlete_requested.emit(subject))
+            row.addWidget(open_button)
+        if action:
+            follow = QPushButton(action)
+            follow.setProperty("primary", True)
+            follow.clicked.connect(lambda _=False, subject=item["subject_id"]: self.follow_up_requested.emit(subject))
+            row.addWidget(follow)
+        return card
+
+    def _render(self) -> None:
+        if not self.feed:
+            return
+        kind = self.filter.currentData()
+        events = [item for item in self.feed["events"] if kind is None or item["kind"] == kind]
+        self.title.setText(f"<b>Events</b> · {len(self.feed['attention'])} need attention · {len(self.feed['events'])} events"
+                           + ("" if self.feed["rules"] else " · define flag rules on Squad to track flag changes"))
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        if self.feed["attention"]:
+            layout.addWidget(QLabel("<b>Needs attention</b> · your concern rules fired and there is no follow-up branch yet"))
+            for item in self.feed["attention"]:
+                layout.addWidget(self._card(item, "Start follow-up"))
+        layout.addWidget(QLabel("<b>Timeline</b>"))
+        for item in events:
+            layout.addWidget(self._card(item))
+        if not events:
+            layout.addWidget(QLabel("Nothing here yet."))
+        layout.addStretch(1)
+        self.scroll.setWidget(content)
+
+    def cards(self) -> list[QFrame]:
+        widget = self.scroll.widget()
+        return widget.findChildren(QFrame, "EventCard") if widget else []

@@ -102,3 +102,68 @@ def test_link_cmj_and_monitoring_then_flag_and_simulate_across_measures(service,
     assert p01["projection"]["worst"][-1] == pytest.approx(p01["start"] * 0.97 ** 2, rel=1e-4)
     assert p01["drivers"]["MET-MON-LOAD"]["expected"][0] == pytest.approx(load(1, 41) * 1.2, rel=1e-4)
     assert pl.DataFrame(researchstore.read_snapshot_table(rev3, "subjects"))["position"].null_count() == 0
+
+
+def test_events_feed_reports_flag_changes_between_revisions_and_follow_ups(service, tmp_path):
+    identity = service.create_workspace("Events")["study"]["id"]
+    rev1 = service.attach_workspace_data(identity, admit(study_file(tmp_path, range(1, 7), "cmj.csv"), importer.build_context(FIXTURE)))["active_data_revision_id"]
+    rev2 = service.attach_workspace_data(identity, admit(monitoring_file(tmp_path, range(0, 28), "a.csv"), monitoring_context()),
+                                         link=True, confirm_participant_ids=True, base_revision=rev1)["active_data_revision_id"]
+    service.attach_workspace_data(identity, admit(monitoring_file(tmp_path, range(28, 42), "b.csv"), monitoring_context()),
+                                  append=True, confirm_participant_ids=True, base_revision=rev2)
+    squad.save_rules(identity, [{"name": "Load spike with poor wellness", "category": "In danger", "tone": "negative",
+                                 "conditions": [{"metric_id": "MET-MON-LOAD", "measure": "acute_chronic_ratio", "acute": 7, "chronic": 28, "operator": ">", "value": 1.3},
+                                                {"metric_id": "MET-MON-WELLNESS", "measure": "change_from_baseline_pct", "operator": "<", "value": -20}]}])
+    feed = squad.events(identity)
+    titles = [item["title"] for item in feed["events"]]
+    assert titles.count("P03 entered In danger") == 1  # only when the final weeks arrive (revision 3)
+    entered = next(item for item in feed["events"] if item["title"] == "P03 entered In danger")
+    assert entered["revision"] == 3 and "acute:chronic ratio (7 vs 28)" in entered["detail"]
+    assert {"New data attached · revision 1", "New kind of measurement linked · revision 2", "New measurements appended · revision 3"} <= set(titles)
+    assert [item["subject_id"] for item in feed["attention"]] == ["P03"]
+    service.create_individual_investigation(identity, "P03", "Load spike follow-up")
+    assert not squad.events(identity)["attention"]
+
+
+def test_native_events_screen_opens_athletes_and_starts_follow_ups(service, tmp_path, qtbot, monkeypatch):
+    from PySide6.QtWidgets import QInputDialog, QPushButton
+
+    from dynamis_science.desktop.main_window import MainWindow
+
+    identity = service.create_workspace("Native events")["study"]["id"]
+    rev1 = service.attach_workspace_data(identity, admit(study_file(tmp_path, range(1, 7), "cmj.csv"), importer.build_context(FIXTURE)))["active_data_revision_id"]
+    service.attach_workspace_data(identity, admit(monitoring_file(tmp_path, range(0, 42), "m.csv"), monitoring_context()),
+                                  link=True, confirm_participant_ids=True, base_revision=rev1)
+    squad.save_rules(identity, [{"name": "Load spike with poor wellness", "category": "In danger", "tone": "negative",
+                                 "conditions": [{"metric_id": "MET-MON-LOAD", "measure": "acute_chronic_ratio", "acute": 7, "chronic": 28, "operator": ">", "value": 1.3},
+                                                {"metric_id": "MET-MON-WELLNESS", "measure": "change_from_baseline_pct", "operator": "<", "value": -20}]}])
+    window = MainWindow(service)
+    qtbot.addWidget(window)
+    idle = lambda: qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    idle()
+    window._show_study(identity, service.get_study_detail(identity))
+    idle()
+    window._show_events_mode()
+    idle()
+    feed = window.events_view
+    assert window.perspectives.currentWidget() is feed and "1 need attention" in feed.title.text()
+    attention = feed.cards()[0]
+    assert "P03" in attention.findChild(type(feed.title)).text()
+    feed.filter.setCurrentIndex(feed.filter.findData("flag"))
+    feed._render()
+    assert all("entered" in card.findChild(type(feed.title)).text() or "no longer" in card.findChild(type(feed.title)).text()
+               for card in feed.cards()[1:])
+    next(b for b in feed.cards()[0].findChildren(QPushButton) if b.text() == "Open athlete").click()
+    idle()
+    assert window.perspectives.currentWidget() is window.squad and "P03" in window.squad.athlete_page.header.text()
+    window._show_events_mode()
+    idle()
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Load spike follow-up", True))
+    next(b for b in feed.cards()[0].findChildren(QPushButton) if b.text() == "Start follow-up").click()
+    idle()
+    assert "Participant P03" in window.research.individual.header.text()
+    assert window.squad.athlete_page.branch_picker.currentText() == "Branch · Load spike follow-up"
+    window._show_events_mode()
+    idle()
+    assert "0 need attention" in feed.title.text()
+    window.close()
