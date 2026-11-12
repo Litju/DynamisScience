@@ -219,7 +219,7 @@ class IndividualResearchPanel(QWidget):
                    "scope": {"kind": "INDIVIDUAL", "subject_id": subject, "investigation_id": investigation_id}}
 
         def finished(run: dict[str, Any]) -> None:
-            if (workspace_id, investigation_id) != self.context()[:2]:
+            if (workspace_id, investigation_id, revision) != self.context() or run.get("data_revision_id") != revision:
                 return  # The researcher moved to another participant; the run stays in its own history.
             self.analysis_saved.emit(run)
             self.reload()
@@ -482,10 +482,11 @@ class IndividualResearchPanel(QWidget):
     def compare(self) -> None:
         if not self.payload:
             return
-        workspace_id, investigation_id, _ = self.context()
+        expected = self.context()
+        workspace_id, investigation_id, revision = expected
         subject = self.payload["investigation"]["scope"]["subject_id"]
         self.run_task(lambda: self.service.compare_with_cohort(workspace_id, subject),
-                      lambda value: self._compared(value) if investigation_id == self.investigation_id else None, "Comparing with cohort")
+                      lambda value: self._compared(value) if expected == self.context() and value.get("data_revision_id") == revision else None, "Comparing with cohort")
 
     def _compared(self, value: dict[str, Any]) -> None:
         axis = value["axis"]

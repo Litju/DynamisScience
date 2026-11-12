@@ -338,3 +338,19 @@ def test_reports_bind_original_investigation_version(service, study, tmp_path):
     assert section["investigation"]["version"] == inv["version"]
     assert section["investigation"]["question"] == inv["question"]
     assert section["investigation_context"] == "Captured at analysis execution"
+
+
+def test_individual_comparison_discards_completion_after_revision_change(service, study, qtbot, monkeypatch):
+    from dynamis_science.desktop.individual_research import IndividualResearchPanel
+    inv = service.create_individual_investigation(study["id"], "P01", "Revision guard")
+    callbacks = []
+    panel = IndividualResearchPanel(service, lambda op, done, label: callbacks.append(done))
+    qtbot.addWidget(panel)
+    panel.workspace_id, panel.investigation_id = study["id"], inv["id"]
+    panel.payload = {"data_revision_id": study["rev1"], "investigation": inv}
+    rendered=[]
+    monkeypatch.setattr(panel, "_compared", rendered.append)
+    panel.compare()
+    panel.payload = {**panel.payload, "data_revision_id": "new-revision"}
+    callbacks[0]({"data_revision_id": study["rev1"]})
+    assert not rendered

@@ -275,8 +275,11 @@ def outstanding(mapping: dict[str, Any]) -> list[str]:
     supplied = lambda key: bool(str(constants.get(key, "")).strip())  # noqa: E731
     if family == FAMILIES["MON"]:
         missing = [] if "subject_id" in columns else ["subject_id column"]
-        if not any(axis in columns for axis in MONITORING_AXES):
+        axes = [axis for axis in MONITORING_AXES if axis in columns]
+        if not axes:
             missing.append("a date, day or week column (the time axis is never assumed)")
+        elif len(axes) > 1:
+            missing.append("multiple monitoring time axes: use Edit mapping to retain exactly one date, day or week axis")
         return missing
     if family == traces.FAMILY:
         missing = [f"{k} (a column, or one value you supply for a single-trace file)" for k in ("subject_id", "trial_id")

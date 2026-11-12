@@ -189,3 +189,12 @@ def test_mixed_file_has_targeted_explicit_family_recovery(service, tmp_path, qtb
     cmj = importer.edit_mapping(plan, dialog.edits(), {"session_id": "S1", "sampling_hz": 1000})
     assert cmj["mapping"]["family"] == "CMJ_FORCE_PLATFORM"
     assert not any(importer.COLUMNS[c][0] == "MON" for c in cmj["mapping"]["columns"])
+
+
+def test_monitoring_requires_explicit_choice_between_measured_axes(service, tmp_path):
+    path = tmp_path / "axes.csv"
+    path.write_text("Athlete,Date,week,Training Load (AU)\nP01,2026-01-01,1,300\n")
+    plan = importer.probe_file(path)
+    assert "multiple monitoring time axes" in " ".join(plan["needs"])
+    recovered = importer.edit_mapping(plan, {"week": None})
+    assert recovered["state"] == "READY"
