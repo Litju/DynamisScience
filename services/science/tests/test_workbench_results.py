@@ -235,3 +235,23 @@ def test_promote_add_to_report_and_export(app, real, tmp_path):
     doc.show_run(runs["mixed"], _mixed_spec())
     assert [path.name for path in doc.export(tmp_path / "mm.svg")] == ["mm-trajectory.svg", "mm-residuals.svg"]
     assert "EXPLORATORY" in (tmp_path / "mm-residuals.svg").read_text(encoding="utf-8")
+
+
+def test_workspace_reliability_honors_selected_activity(real):
+    from dynamis_science import researchstore
+
+    service, previous, _ = real
+    detail = service.create_workspace("Activity-specific workspace")
+    identity = detail["study"]["id"]
+    detail = service.attach_workspace_data(identity, previous["rel"]["snapshot_id"])
+    run = service.execute_analysis_run(identity, {
+        "method_id": "METH-REAL-RELIABILITY", "outcome_metric_id": "MET-REAL-FZ-PEAK",
+        "parameters": {"activity": "Running", "max_trials": 2},
+        "data_revision_id": detail["active_data_revision_id"],
+    })
+    assert researchstore.get_cohort(run["cohort_id"])["activity"] == "Running"
+    assert run["parameters"]["activity"] == "Running"
+    assert run["result"]["activity"] == "Running"
+    assert run["result"]["n_subjects"] == 8
+    assert run["plan_alignment"] == "PLANNED"
+    assert run["data_revision_id"] == detail["active_data_revision_id"]

@@ -1,0 +1,14 @@
+{
+  "source_commit": "ed5f54a98bcce159a10bfc1628551dffada11946",
+  "command": "uv run pytest",
+  "environment": {
+    "QT_QPA_PLATFORM": "offscreen",
+    "TEMP": "C:/Users/Usuario/AppData/Local/Temp",
+    "TMP": "C:/Users/Usuario/AppData/Local/Temp",
+    "TMPDIR": "C:/Users/Usuario/AppData/Local/Temp"
+  },
+  "passed": 289,
+  "failed": 0,
+  "seconds": 403.32,
+  "log_sha256": "0fbfe80b4076e82c1260795aca91e83fa1d4f34b583168f6fc56d7ec538a5e20"
+}

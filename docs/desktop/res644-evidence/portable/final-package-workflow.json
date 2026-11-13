@@ -1,0 +1,167 @@
+{
+  "exe_sha256": "3ffb0b2dd77db0b0e1035a20ce1d8424fa5d573d0bb89efc3f1060461168972b",
+  "source_commit": "ed5f54a98bcce159a10bfc1628551dffada11946",
+  "before": {
+    "run_hashes": {
+      "RUN-U-0001": "d0d7eda48fdb53693692721a5ae7d2493d9c4469711f80daf026259cdda5a2ae",
+      "RUN-U-0002": "2da2665df63b34ff3b2a5aa2bd8a35b146b0c55ef182e45af75911ecbd8b82d1"
+    },
+    "report_hashes": {
+      "4": "13969b463e4c4ca5e1db6dd0aefd060854e76e9437e45f9b52523f2315a2546b",
+      "9": "9b8c64cd22cd8302195845980cf6d20d2012b1a2f4c0c4bd9c614b18d046d35f"
+    },
+    "revision_count": 2
+  },
+  "workspace_id": "STUDY-U-4EB94E4E",
+  "final_process_150": 264,
+  "restart_process_125": 3980,
+  "incompatible_append_rejected": true,
+  "reason": "Incompatible protocol_id after changed sampling rate; dataset remains separately available",
+  "original_runs_and_reports_byte_unchanged": true,
+  "active_revision": "DATA-U-BF99451F",
+  "latest_run": "RUN-U-0003",
+  "revision_count": 2,
+  "run_count": 3,
+  "frozen_report_count": 3,
+  "integrity": "ok",
+  "restart_process_100": 13968,
+  "verified_scales": [
+    1,
+    1.25,
+    1.5
+  ],
+  "all_qualification_windows_closed": true,
+  "screenshots": {
+    "01-empty.png": {
+      "sha256": "e87d046048351578d0e20ff2c4d333da4c5db93b995b58c08adca79bf09d03c4",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "02-first-import.png": {
+      "sha256": "2f92052386c7aa2863c372753f1432eccc63656f961f55a2680ca247eab428e5",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "03-first-analysis.png": {
+      "sha256": "f8e6b4d366160bf52d057b5897ced1f357f37a97351aac3ad2c0c54b1d11f0c4",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "04-second-import.png": {
+      "sha256": "33024a83c2765f8f9b1aa7f9124cf30000b9e1bbd1ea5ff469a15406944b05db",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "05-second-analysis.png": {
+      "sha256": "42f417ff4c3ca8120dfef8f85dd78f47260b89dc7a8e1349989c676864f6d24d",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "06-reopened-150-dark.png": {
+      "sha256": "41ca708c7702dad424842f2f0cdded03139c1ee3880e64e4c32031c1d216ee60",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "07-restored-analysis-150.png": {
+      "sha256": "c31e31ba7d71b33373edc891e3cc89f5fb589b1caae335076726f03e827d1261",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "08-history-150-dark.png": {
+      "sha256": "cf47de0866fe9c9f71def0292c1d79b184f9a7939c1827dd331a7a4e0a4266a9",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "09-frozen-baseline-history.png": {
+      "sha256": "0b7f27a5dcec20265da9c075e9b49baed65be39155086d23e13fb8af75398255",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "10-earlier-revision-150.png": {
+      "sha256": "f4314b629b932afad07dfd42c32e9e1834478e33144752e1731c71125d181544",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "11-final-compatibility.png": {
+      "sha256": "88af7698ea84e80f3e74d6a12cd1b32e0058473fc751000171918404c365d2f4",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "12-final-history-fit-150.png": {
+      "sha256": "6ef4a856d57055527cacaae35cbe3fcd81e5a035483587ed70060190a6c0e5c1",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "13-final-run-and-export.png": {
+      "sha256": "6c44b992f01b8f95aec4ab2f629808e4fa4acd5c0efa608708190feee8037024",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "14-final-reopened-125.png": {
+      "sha256": "12e1a3741de6f3463eb279ff781d0a502795b3946da2455d74e3899a0820a240",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "15-final-history-125.png": {
+      "sha256": "a01947c9c2596eab25538ee251a59a52c31324ac9803da475511996fb826c75f",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "16-final-reopened-100.png": {
+      "sha256": "c7419cb90a0ef5dc4c206993f095473d531da25efc0de648d049da0e7db52d10",
+      "size": [
+        6291456,
+        4292542531
+      ]
+    },
+    "baseline-report-rendered.png": {
+      "sha256": "35d319c0baf20eba1041a8e4213ab891f3253aa1d6edf04a914767a4f5826949",
+      "size": [
+        1100,
+        650
+      ]
+    },
+    "followup-report-rendered.png": {
+      "sha256": "af336b01ddd6db9d0dc1b6a7b54d7195558050c1e843d2da1ad93aaa53e0f1e3",
+      "size": [
+        1100,
+        650
+      ]
+    }
+  },
+  "export_hashes": {
+    "baseline-report.html": "45ec6f450b5e51e43e2245038ddeb3997c6935d10972185066376e93e1e2b5c2",
+    "final-release-report.html": "fae24d416a9d1167a976a0afe575791f1ddd257bdae6aff7cab40154c200ca09",
+    "followup-report.html": "f579c690b435ce74b33c4d633820a18f63bf2677a13f06ad82b83b94150739ff"
+  }
+}

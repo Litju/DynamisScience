@@ -1,0 +1,77 @@
+{
+  "workspace_id": "STUDY-U-4EB94E4E",
+  "active_revision": "DATA-U-BF99451F",
+  "revisions": [
+    {
+      "id": "DATA-U-90EDEEA6",
+      "inputs": [
+        "DS-ADMITTED-6CCA68E59B54"
+      ],
+      "mode": "SEPARATE"
+    },
+    {
+      "id": "DATA-U-BF99451F",
+      "inputs": [
+        "DS-ADMITTED-6CCA68E59B54",
+        "DS-ADMITTED-9F06B0BE5FD7"
+      ],
+      "mode": "APPEND"
+    }
+  ],
+  "runs": [
+    {
+      "id": "RUN-U-0001",
+      "data_revision_id": "DATA-U-90EDEEA6",
+      "snapshot_id": "DS-ADMITTED-6CCA68E59B54",
+      "result_digest": "f865c3472f85c4ef",
+      "plan_id": "PLAN-40CDF0D1",
+      "cohort_id": "COHORT-U-89F2D54A"
+    },
+    {
+      "id": "RUN-U-0002",
+      "data_revision_id": "DATA-U-BF99451F",
+      "snapshot_id": "DATA-U-BF99451F",
+      "result_digest": "8d0b4441ff1fc2c5",
+      "plan_id": "PLAN-3E61E686",
+      "cohort_id": "COHORT-U-0928FB12"
+    }
+  ],
+  "reports": [
+    {
+      "version": 4,
+      "content_hash": "bc2c92b368dcb857c6569e0bd784a8a4e3da071b40b07ce9899af677390d53a6",
+      "data_revision_id": "DATA-U-90EDEEA6"
+    },
+    {
+      "version": 9,
+      "content_hash": "083bfc335e25276cfc595a5e6977718a54226c6afafca50ce4dc6611817b78f1",
+      "data_revision_id": "DATA-U-BF99451F"
+    }
+  ],
+  "integrity": "ok",
+  "first_process_id": 13876,
+  "before_restart": true,
+  "second_process_id": 5100,
+  "actual_process_restart_verified": true,
+  "reopened_at_scale": 1.5,
+  "theme": "dark",
+  "historical_selection_without_recompute": true,
+  "active_historical_revision": "DATA-U-90EDEEA6",
+  "selected_historical_run": "RUN-U-0001",
+  "screenshots": {
+    "01-empty.png": "e87d046048351578d0e20ff2c4d333da4c5db93b995b58c08adca79bf09d03c4",
+    "02-first-import.png": "2f92052386c7aa2863c372753f1432eccc63656f961f55a2680ca247eab428e5",
+    "03-first-analysis.png": "f8e6b4d366160bf52d057b5897ced1f357f37a97351aac3ad2c0c54b1d11f0c4",
+    "04-second-import.png": "33024a83c2765f8f9b1aa7f9124cf30000b9e1bbd1ea5ff469a15406944b05db",
+    "05-second-analysis.png": "42f417ff4c3ca8120dfef8f85dd78f47260b89dc7a8e1349989c676864f6d24d",
+    "06-reopened-150-dark.png": "41ca708c7702dad424842f2f0cdded03139c1ee3880e64e4c32031c1d216ee60",
+    "07-restored-analysis-150.png": "c31e31ba7d71b33373edc891e3cc89f5fb589b1caae335076726f03e827d1261",
+    "08-history-150-dark.png": "cf47de0866fe9c9f71def0292c1d79b184f9a7939c1827dd331a7a4e0a4266a9",
+    "09-frozen-baseline-history.png": "0b7f27a5dcec20265da9c075e9b49baed65be39155086d23e13fb8af75398255",
+    "10-earlier-revision-150.png": "f4314b629b932afad07dfd42c32e9e1834478e33144752e1731c71125d181544"
+  },
+  "export_hashes": {
+    "baseline-report.html": "45ec6f450b5e51e43e2245038ddeb3997c6935d10972185066376e93e1e2b5c2",
+    "followup-report.html": "f579c690b435ce74b33c4d633820a18f63bf2677a13f06ad82b83b94150739ff"
+  }
+}

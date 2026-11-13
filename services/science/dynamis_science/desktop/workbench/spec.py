@@ -284,6 +284,7 @@ class AnalysisSpec:
             method = "METH-REAL-RELIABILITY"
             params = {"activity": o["activity"], "max_trials": o["max_trials"]}
         return {
+            **({"data_revision_id": o["data_revision_id"]} if o.get("data_revision_id") else {}),
             "method_id": method,
             "outcome_metric_id": self.outcome_metric_id(),
             "excluded_subject_ids": list(o["excluded_subject_ids"]),

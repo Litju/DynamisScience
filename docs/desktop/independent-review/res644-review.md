@@ -1,0 +1,11 @@
+# RES-644 independent engineering review — 2026-11-12
+
+Reviewed the eight-commit stack against `origin/main` (`2e9f53c`), including persistence, facade, worker guards, native History and qualification reports. PR #3 targets main; RES-647 remains separate above it. No statistical algorithm or acceptance threshold changed.
+
+Confirmed defect: append created derived Parquet directories before the SQLite reference and left them behind after a validation, materialization or transaction exception. The repair removes only the generated directory for an uncommitted attempt. Existing committed revisions and admitted inputs remain byte-identical. Injected Parquet and audit/transaction failures both roll back; retry succeeds. Abrupt process termination can still leave an unreferenced directory; it cannot be selected as a revision. Automatic deletion on startup is deliberately avoided because another process may be materializing there.
+
+Reviewed contracts: additive transactional schema v2; versioned entity documents; explicit participant-ID confirmation; source/rights/schema/instrument/calibration/timebase compatibility; separate attachments without pooling; captured revisions and frozen cohort/plan versions; computation outside the preparation transaction; stale completion rejection; transactional report freezing and rendering from frozen context. Historical runs and reports are not rewritten.
+
+Validation: nine targeted workspace tests passed. Full Python/scientific/Qt regression on repaired source: **292 passed in 347.60 seconds**; `QT_QPA_PLATFORM=offscreen`, Python 3.12.13, Qt 6.12.0, disposable roots and generated synthetic fixture on C:. See `res644/full-regression.log`. The first isolated full-suite attempt lacked ignored synthetic fixtures and was stopped; it is not a passing qualification run.
+
+Disposition: engineering repair verified by full regression. No new portable/native RES-644 build is claimed; original evidence remains historical. RES-647 will exercise the inherited repaired source through current native/portable workflows. Owner merge authorization remains required. Operational database was read only by existing copy/verification tests. The owner manifest remains untouched, SHA-256 `835398DA594421BC9F04647992B0E9CEFD5DC844FD931D1964896B2E164A2587`.

@@ -1,0 +1,31 @@
+{
+  "source_commit": "18494d5eb3afe8831a8c1de6f09c5bac5ec67630",
+  "exe_sha256": "30af38e4388719dba92d30fadbd64e9f6b59cc4b5b679b7242cd8c778143538d",
+  "invocation": "DynamisScience.exe --worker request.json response.json",
+  "exit_code": 0,
+  "workspace_id": "STUDY-U-6E2D9628",
+  "data_revision_id": "DATA-U-E9D3CAC6",
+  "snapshot_id": "DS-REAL-MOVESMART-805259588272",
+  "method_id": "METH-REAL-RELIABILITY",
+  "method_version": "1.1.0",
+  "activity": "Running",
+  "cohort_participants": 8,
+  "result_participants": 8,
+  "plan_alignment": "PLANNED",
+  "cohort_version": 2,
+  "plan_version": 2,
+  "result_digest": "d12056c289e563de",
+  "copy_verification": {
+    "snapshot_id": "DS-REAL-MOVESMART-805259588272",
+    "checksums_verified": {
+      "force_signals.parquet": "6294904e675d19349529922705d14605420e315cbba905267f717617cceaf9b9",
+      "imu_signals.parquet": "7a3b93df710416a039f8156fde3b43ad92f47f140d3f051c95d21b3cce59f8be",
+      "imu_trials.parquet": "3f1cfdb46bb386671706b6d5de87096e4b7d7fc1f247c10e25fca6285c76b1ae",
+      "signal_trials.parquet": "7b97c0a26510772988f5ccc106568d558481182f9e783266d0fb5ee194e924be",
+      "subjects.parquet": "543f66fbe43740a04910b9c51d401cef6dddb330e4c2871bb84af67b5fd4c385"
+    },
+    "source_read_only": true,
+    "root": "C:\\Users\\Usuario\\AppData\\Local\\Temp\\res644-packaged-activity\\private"
+  },
+  "integrity": "ok"
+}

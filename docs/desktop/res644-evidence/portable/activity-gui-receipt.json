@@ -1,0 +1,32 @@
+{
+  "source_commit": "18494d5eb3afe8831a8c1de6f09c5bac5ec67630",
+  "exe_sha256": "30af38e4388719dba92d30fadbd64e9f6b59cc4b5b679b7242cd8c778143538d",
+  "before_runs": {
+    "RUN-U-0001": "d0d7eda48fdb53693692721a5ae7d2493d9c4469711f80daf026259cdda5a2ae",
+    "RUN-U-0002": "2da2665df63b34ff3b2a5aa2bd8a35b146b0c55ef182e45af75911ecbd8b82d1",
+    "RUN-U-0003": "5d6a98eb51eb3d01e5e33e3dad83605ec4b4506dfa5f150ff044aff45ed3cb72"
+  },
+  "before_reports": {
+    "4": "13969b463e4c4ca5e1db6dd0aefd060854e76e9437e45f9b52523f2315a2546b",
+    "9": "9b8c64cd22cd8302195845980cf6d20d2012b1a2f4c0c4bd9c614b18d046d35f",
+    "14": "1aa09784c97a84cc90bf47b4bf9c21b728da00a5ed15166d964689943e0d243c"
+  },
+  "process_id": 1260,
+  "scale": 1.5,
+  "theme": "dark",
+  "workspace_id": "STUDY-U-4EB94E4E",
+  "active_revision": "DATA-U-BF99451F",
+  "latest_run": "RUN-U-0004",
+  "workspace_count": 1,
+  "data_revision_count": 2,
+  "run_count": 4,
+  "frozen_report_count": 4,
+  "all_previous_run_report_documents_byte_unchanged": true,
+  "baseline_historical_html_regenerated_with_same_windows_export_sha256": true,
+  "integrity": "ok",
+  "qualification_window_closed": true,
+  "screenshots": {
+    "17-final-build-run-export.png": "c41386860f6a551e70d7f4042f91485a945c768ee66e4f08bc28b4f004998d28",
+    "18-final-build-retained-baseline.png": "634bb45ba31f9415836270784500fa5ccc5ab782bdaffadcce2183e192391114"
+  }
+}

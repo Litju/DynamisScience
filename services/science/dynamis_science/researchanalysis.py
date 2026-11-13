@@ -383,6 +383,11 @@ def execute(
         }
     )[:24]
     run = {
+        "workspace_id": entity["id"] if entity.get("workspace") else None,
+        "data_revision_id": entity.get("active_data_revision_id"),
+        "input_snapshot_ids": (researchstore.get_data_revision(entity["active_data_revision_id"]) or {}).get("input_snapshot_ids", []) if entity.get("workspace") else [snapshot_id],
+        "cohort_version": cohort.get("version"),
+        "plan_version": plan.get("version") if plan else None,
         "analysis_spec_id": spec["id"],
         "project_id": entity["project_id"],
         "study_id": entity["id"],
@@ -408,7 +413,13 @@ def execute(
         "execution": {"analysis_spec": spec, "cohort": resolved["cohort"]},
         "figure_data": figure_data,
     }
-    return researchstore.append_run(run)
+    saved = researchstore.append_run(run)
+    if entity.get("workspace"):
+        try:
+            researchstore.select_workspace_run(entity["id"], saved["id"])
+        except researchstore.ResearchConflict:
+            pass  # The run stays on its captured revision when data changed during execution.
+    return saved
 
 
 def promote(run_id: str) -> dict[str, Any]:

@@ -24,8 +24,10 @@ import json
 import math
 import os
 import secrets
+import shutil
 import sqlite3
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -37,7 +39,8 @@ from . import realstore
 from .data_root import paths
 
 SCHEMA_VERSION = "dynamis-science.research@1.0.0"
-DB_SCHEMA_VERSION = 1
+DB_SCHEMA_VERSION = 2
+_transaction_connection: ContextVar[Any] = ContextVar("research_transaction", default=None)
 
 STUDY_STATES = ("DRAFT", "READY", "ACTIVE", "ANALYSIS", "COMPLETED", "ARCHIVED")
 ALLOWED_TRANSITIONS = {
@@ -298,6 +301,10 @@ def _db_path() -> Path:
 
 
 _SCHEMA = (
+    """CREATE TABLE IF NOT EXISTS workspace_revisions (
+        id TEXT PRIMARY KEY, entity_id TEXT NOT NULL, number INTEGER NOT NULL,
+        document TEXT NOT NULL, UNIQUE(entity_id, number)
+    )""",
     """CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
         version INTEGER NOT NULL,
@@ -472,6 +479,10 @@ def _ensure_schema(connection: sqlite3.Connection) -> None:
 
 @contextmanager
 def _connect():
+    active = _transaction_connection.get()
+    if active is not None:
+        yield active
+        return
     connection = sqlite3.connect(str(_db_path()), timeout=30, isolation_level=None)
     connection.row_factory = sqlite3.Row
     try:
@@ -486,14 +497,20 @@ def _connect():
 
 @contextmanager
 def _tx():
+    if _transaction_connection.get() is not None:
+        yield _transaction_connection.get()
+        return
     with _connect() as connection:
         connection.execute("BEGIN IMMEDIATE")
+        token = _transaction_connection.set(connection)
         try:
             yield connection
             connection.execute("COMMIT")
         except Exception:
             connection.execute("ROLLBACK")
             raise
+        finally:
+            _transaction_connection.reset(token)
 
 
 def _audit(connection: sqlite3.Connection, action: str, object_type: str, object_id: str, detail: Any = None) -> None:
@@ -554,6 +571,9 @@ def _real_snapshot(snapshot_id: str) -> dict[str, Any] | None:
 
 
 def get_snapshot(snapshot_id: str) -> dict[str, Any] | None:
+    if snapshot_id and snapshot_id.startswith("DATA-U-"):
+        revision = get_data_revision(snapshot_id)
+        return revision.get("snapshot") if revision else None
     real = _real_snapshot(snapshot_id)
     if real is not None:
         return {
@@ -584,6 +604,11 @@ def list_snapshots() -> list[dict[str, Any]]:
 
 
 def read_snapshot_table(snapshot_id: str, table: str) -> pl.DataFrame:
+    if snapshot_id.startswith("DATA-U-"):
+        snapshot = get_snapshot(snapshot_id)
+        if snapshot is None or table not in _table_names(snapshot):
+            raise ResearchNotFound(f"Table {table} is unavailable in {snapshot_id}")
+        return pl.read_parquet(paths()["research"] / "data" / snapshot_id / f"{table}.parquet")
     real = _real_snapshot(snapshot_id)
     if real is not None:
         if real.get("admitted_source"):
@@ -682,7 +707,7 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
     if snapshot.get("admitted_source"):
         import pyarrow.parquet as pq
 
-        path = paths()["admitted"] / snapshot_id / "cmj_trials.parquet"
+        path = (paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]) / snapshot_id / "cmj_trials.parquet"
         columns = set(pq.ParquetFile(path).schema_arrow.names)
         result = [item for item in result if item["column"] in columns]
     return result
@@ -1074,6 +1099,192 @@ def _validate_design(design: str, table: str) -> None:
         raise ResearchValidation(f"Unsupported study design: {design}")
     if table not in DESIGN_ALLOWED_TABLES[design]:
         raise ResearchValidation(f"Design {design} is not supported by observation table {table}")
+
+
+def create_workspace(title: str) -> dict[str, Any]:
+    title = title.strip()
+    if not title:
+        raise ResearchValidation("A workspace title is required")
+    identity, now = _new_id("STUDY-U"), _now()
+    document = {
+        "id": identity, "project_id": identity, "kind": "STUDY", "workspace": True,
+        "title": title, "short_title": title, "version": 1, "state": "DRAFT",
+        "design": "DESCRIPTIVE", "research_question": "", "question": {"estimand": "", "statement": "Research question not specified."},
+        "dataset_snapshot_id": None, "active_data_revision_id": None,
+        "cohort_id": None, "analysis_plan_id": None, "outcomes": {"primary": [], "secondary": []},
+        "created_at": now, "updated_at": now, "archived_at": None,
+    }
+    with _tx() as connection:
+        connection.execute(
+            "INSERT INTO entities VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (identity, identity, "STUDY", 1, "DRAFT", _canonical(document), now, now, None),
+        )
+        connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
+                           (identity, 1, "CREATED", _canonical(document), now))
+        _audit(connection, "workspace.created", "study", identity)
+    return study_detail(identity)
+
+
+def get_data_revision(revision_id: str) -> dict[str, Any] | None:
+    with _connect() as connection:
+        row = connection.execute("SELECT document FROM workspace_revisions WHERE id = ?", (revision_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def data_revisions(entity_id: str) -> list[dict[str, Any]]:
+    with _connect() as connection:
+        rows = connection.execute("SELECT document FROM workspace_revisions WHERE entity_id = ? ORDER BY number", (entity_id,)).fetchall()
+    return [json.loads(row[0]) for row in rows]
+
+
+def select_data_revision(entity_id: str, revision_id: str) -> dict[str, Any]:
+    with _tx() as connection:
+        entity = get_entity(entity_id)
+        revision = get_data_revision(revision_id)
+        if not entity or not revision or revision["workspace_id"] != entity_id:
+            raise ResearchValidation("This data revision does not belong to the workspace")
+        if entity["state"] == "ARCHIVED":
+            raise ResearchConflict("Restore the workspace before selecting data")
+        snapshot_id = revision["snapshot_id"]
+        metrics = dataset_metrics(snapshot_id)
+        runs = [run for run in list_runs(entity_id) if run.get("data_revision_id") == revision_id]
+        latest = runs[-1] if runs else {}
+        entity.update({"active_data_revision_id": revision_id, "dataset_snapshot_id": snapshot_id,
+                       "design": "MEASUREMENT_REPEATED_TRIALS" if metrics and metrics[0]["table"] == "signal_trials" else "OBSERVATIONAL_LONGITUDINAL",
+                       "cohort_id": latest.get("cohort_id"), "analysis_plan_id": latest.get("plan_id"),
+                       "selected_run_id": latest.get("id"),
+                       "outcomes": {"primary": metrics[:1], "secondary": []},
+                       "version": entity["version"] + 1, "updated_at": _now()})
+        connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                           (entity["version"], _canonical(entity), entity["updated_at"], entity_id))
+        connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
+                           (entity_id, entity["version"], "DATA_SELECTED", _canonical(entity), entity["updated_at"]))
+        _audit(connection, "workspace.data_selected", "study", entity_id, revision_id)
+    return study_detail(entity_id)
+
+
+def select_workspace_run(entity_id: str, run_id: str) -> dict[str, Any]:
+    with _tx() as connection:
+        entity, run = get_entity(entity_id), get_run(run_id)
+        if not entity or not entity.get("workspace") or not run or run.get("study_id") != entity_id:
+            raise ResearchValidation("Select an analysis from this workspace")
+        if entity.get("active_data_revision_id") != run.get("data_revision_id"):
+            raise ResearchConflict("The analysis belongs to another data revision")
+        entity.update({"selected_run_id": run_id, "version": entity["version"] + 1, "updated_at": _now()})
+        connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                           (entity["version"], _canonical(entity), entity["updated_at"], entity_id))
+        connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
+                           (entity_id, entity["version"], "ANALYSIS_SELECTED", _canonical(entity), entity["updated_at"]))
+    return entity
+
+
+def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False,
+                          confirm_participant_ids: bool = False, base_revision: str | None = None) -> dict[str, Any]:
+    """Append a revision; separate attachments never imply analytical pooling."""
+    entity = get_entity(entity_id)
+    if not entity or not entity.get("workspace"):
+        raise ResearchValidation("Open a research workspace before attaching data")
+    if entity["state"] == "ARCHIVED":
+        raise ResearchConflict("Restore this workspace before adding data")
+    if entity.get("active_data_revision_id") != base_revision:
+        raise ResearchConflict("The selected data revision changed; select data again")
+    snapshot = get_snapshot(snapshot_id)
+    if not snapshot or snapshot.get("workspace_snapshot"):
+        raise ResearchValidation("Select an admitted input dataset")
+    previous = get_data_revision(base_revision) if base_revision else None
+    inputs = [snapshot]
+    if append:
+        if not previous or not confirm_participant_ids:
+            raise ResearchValidation("Confirm that participant identifiers have the same meaning before appending")
+        inputs = [*previous["inputs"], *inputs]
+        if len({item["id"] for item in inputs}) != len(inputs):
+            raise ResearchValidation("This batch is already in the selected data revision")
+        _validate_workspace_append(inputs)
+    revision_id = _new_id("DATA-U")
+    directory = paths()["research"] / "data" / revision_id
+    try:
+        analytical = snapshot
+        if append:
+            # Derived Parquet is written once, before the transactional reference becomes visible.
+            directory = paths()["research"] / "data" / revision_id
+            directory.mkdir(parents=True)
+            tables, checksums = {}, {}
+            for table in sorted(set(_table_names(snapshot)) | {"subjects"}):
+                frames = [read_snapshot_table(item["id"], table) for item in inputs]
+                frame = pl.concat(frames, how="vertical")
+                if table == "subjects":
+                    frame = frame.unique(maintain_order=True)
+                    if frame["subject_id"].n_unique() != frame.height:
+                        raise ResearchValidation("Participant metadata conflicts; attach the batch separately")
+                elif "trial_id" in frame.columns and frame["trial_id"].n_unique() != frame.height:
+                    raise ResearchValidation("Overlapping trial identifiers; attach the batch separately")
+                path = directory / f"{table}.parquet"
+                frame.write_parquet(path)
+                tables[table] = {"file": path.name, "rows": frame.height}
+                checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            analytical = {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables,
+                          "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
+        metrics = dataset_metrics(snapshot_id)
+        metric = next((item for item in metrics if item.get("role") == "PRIMARY"), metrics[0] if metrics else None)
+        number = len(data_revisions(entity_id)) + 1
+        revision = {
+            "id": revision_id, "workspace_id": entity_id, "number": number, "created_at": _now(),
+            "parent_revision_id": base_revision, "mode": "APPEND" if append else "SEPARATE",
+            "input_snapshot_ids": [item["id"] for item in inputs], "inputs": inputs,
+            "snapshot_id": analytical["id"], "snapshot": analytical,
+            "compatibility": {"pooled": append, "participant_ids_confirmed": confirm_participant_ids,
+                              "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append else "Separate analytical selection; no pooling"},
+        }
+        with _tx() as connection:
+            current = _row_document(connection.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone())
+            if current["version"] != entity["version"]:
+                raise ResearchConflict("Workspace changed while adding data; retry")
+            entity.update({"dataset_snapshot_id": analytical["id"], "active_data_revision_id": revision_id,
+                           "selected_run_id": None,
+                           "cohort_id": None, "analysis_plan_id": None, "outcomes": {"primary": [metric] if metric else [], "secondary": []},
+                           "design": ("MEASUREMENT_REPEATED_TRIALS" if metric["table"] == "signal_trials" else "OBSERVATIONAL_LONGITUDINAL") if metric else "DESCRIPTIVE",
+                           "version": entity["version"] + 1, "updated_at": _now()})
+            connection.execute("INSERT INTO workspace_revisions VALUES (?, ?, ?, ?)", (revision_id, entity_id, number, _canonical(revision)))
+            connection.execute("UPDATE entities SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                               (entity["version"], _canonical(entity), entity["updated_at"], entity_id))
+            connection.execute("INSERT INTO entity_versions VALUES (?, ?, ?, ?, ?)",
+                               (entity_id, entity["version"], "DATA_ATTACHED", _canonical(entity), entity["updated_at"]))
+            _audit(connection, "workspace.data_attached", "study", entity_id, revision)
+    except BaseException:
+        # Only this attempt owns this generated directory; committed revisions are retained.
+        if directory.exists() and get_data_revision(revision_id) is None:
+            shutil.rmtree(directory)
+        raise
+    return study_detail(entity_id)
+
+
+def _validate_workspace_append(inputs: list[dict[str, Any]]) -> None:
+    from . import admission
+
+    first = inputs[0]
+    if not first.get("admitted_source") or first.get("measurement_family") != "CMJ_FORCE_PLATFORM":
+        raise ResearchValidation("Append is supported for admitted CMJ summaries; attach other data separately")
+    for item in inputs:
+        for field in ("source", "measurement_family", "rights_status"):
+            if item.get(field) != first.get(field):
+                raise ResearchValidation(f"Incompatible {field}; attach separately")
+        if not item.get("checksums") or not item.get("admission"):
+            raise ResearchValidation("Missing QC or immutable checksums; attach separately")
+        if item.get("provenance", {}).get("instrument_metadata") != first.get("provenance", {}).get("instrument_metadata"):
+            raise ResearchValidation("Incompatible captured instrument or calibration metadata; attach separately")
+        frame = read_snapshot_table(item["id"], "cmj_trials")
+        reference = read_snapshot_table(first["id"], "cmj_trials")
+        if frame.schema != reference.schema:
+            raise ResearchValidation("Incompatible columns or physical units; attach separately")
+        for column, lookup in (("instrument_id", admission.get_instrument), ("protocol_id", admission.get_protocol)):
+            if column not in frame.columns:
+                raise ResearchValidation(f"Missing {column}; attach separately")
+            ids = sorted(frame[column].unique().to_list())
+            if not ids or ids != sorted(reference[column].unique().to_list()) or any(not lookup(key) for key in ids):
+                raise ResearchValidation(f"Incompatible or missing {column}; attach separately")
+        for column in ("sampling_hz", "timebase", "time_unit"):
+            if column in frame.columns and set(frame[column]) != set(reference[column]):
+                raise ResearchValidation(f"Incompatible {column}; attach separately")
 
 
 def create_study(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -2283,11 +2494,23 @@ def study_detail(entity_id: str) -> dict[str, Any]:
     if entity is None:
         raise ResearchNotFound(f"Research object {entity_id} not found")
     project = get_project(entity["project_id"])
+    if project is None and entity.get("workspace"):
+        project = {"id": entity["id"], "title": entity["title"], "description": "Persistent research workspace"}
+    if entity.get("workspace") and (not entity.get("dataset_snapshot_id") or not entity.get("outcomes", {}).get("primary")):
+        return {"study": entity, "project": project, "workspace": True, "research": True,
+                "snapshot": get_snapshot(entity["dataset_snapshot_id"]) if entity.get("dataset_snapshot_id") else {},
+                "question": entity["question"], "kind": "STUDY", "cohort": {}, "plan": {},
+                "runs": list_runs(entity_id), "evidence": list_evidence(entity_id), "figures": list_figures(entity_id),
+                "data_revisions": data_revisions(entity_id), "active_data_revision_id": entity.get("active_data_revision_id"),
+                "eligibility": [], "methods": [], "metrics": []}
     snapshot = get_snapshot(entity["dataset_snapshot_id"])
     if snapshot is None:
         raise ResearchNotFound(f"Snapshot {entity['dataset_snapshot_id']} is not admitted")
     cohorts = list_cohorts(entity_id)
-    current_cohort = get_cohort(entity.get("cohort_id") or "") if entity.get("cohort_id") else (cohorts[-1] if cohorts else None)
+    current_cohort = get_cohort(entity.get("cohort_id") or "") if entity.get("cohort_id") else (cohorts[-1] if cohorts and not entity.get("workspace") else None)
+    if current_cohort is None and entity.get("workspace"):
+        metric = entity["outcomes"]["primary"][0]
+        current_cohort = {**_default_cohort_definition(metric, snapshot["id"]), "id": "PREVIEW", "status": "DRAFT", "name": "All eligible participants"}
     if current_cohort is None:
         raise ResearchNotFound(f"No cohort exists for {entity_id}")
     resolved = resolve_cohort(current_cohort, snapshot["id"])
@@ -2333,6 +2556,9 @@ def study_detail(entity_id: str) -> dict[str, Any]:
     else:
         end_week = max(1, len(schedule.get("points", [])))
     study_summary = {
+        "selected_run_id": entity.get("selected_run_id"),
+        "workspace": bool(entity.get("workspace")),
+        "active_data_revision_id": entity.get("active_data_revision_id"),
         "id": entity["id"],
         "title": entity["title"],
         "short_title": entity.get("short_title", entity["title"]),
@@ -2361,6 +2587,9 @@ def study_detail(entity_id: str) -> dict[str, Any]:
     investigations = list_investigations(entity_id)
     eligibility = method_eligibility(entity, current_cohort, resolved, current_plan)
     detail = {
+        "workspace": bool(entity.get("workspace")),
+        "data_revisions": data_revisions(entity_id) if entity.get("workspace") else [],
+        "active_data_revision_id": entity.get("active_data_revision_id"),
         "study": study_summary,
         "project": project,
         "kind": entity["kind"],
@@ -2425,6 +2654,11 @@ def method_eligibility(entity: dict[str, Any], cohort: dict[str, Any], resolved:
         issues: list[str] = []
         if table not in method["required_tables"]:
             issues.append(f"Requires {', '.join(method['required_tables'])}; selected outcome is in {table}.")
+        if table in method["required_tables"] and method["id"] in {"METH-U-DESC", "METH-U-CHANGE", "METH-REAL-DESC", "METH-REAL-TREND"}:
+            frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
+            axis = "occasion" if table == "cmj_occasions" else "week" if table == "cmj_trials" else "activity"
+            if axis not in frame.columns or frame[axis].drop_nulls().is_empty():
+                issues.append(f"Missing {axis} metadata; map the measured time axis during import.")
         if resolved["n"] < 3 and method["id"] in {"METH-REAL-TREND", "METH-REAL-RELIABILITY"}:
             issues.append("At least three included participants are required.")
         if method["id"] == "METH-REAL-TREND":
@@ -2565,6 +2799,7 @@ def report_payload(entity_id: str) -> dict[str, Any]:
     report["plan"] = detail["plan"]
     report["cohort"] = detail["cohort"]
     report["snapshot"] = detail["snapshot"]
+    report["data_revision"] = get_data_revision(detail.get("active_data_revision_id") or "") if detail.get("workspace") else None
     report["groups"] = detail["groups"]
     report["data_health"] = detail["data_health"]
     report["research"] = {
@@ -2676,6 +2911,7 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
     with _tx() as connection:
         report = _ensure_report_row(connection, entity)
         content = {
+            "data_revision": payload.get("data_revision"),
             "title": payload["title"],
             "summary": payload.get("summary", ""),
             "conclusion": payload.get("conclusion", ""),
@@ -2893,19 +3129,26 @@ def _report_evidence_unit(item: dict[str, Any], run: dict[str, Any] | None) -> s
 
 
 def export_html(entity_id: str, version: int | None = None) -> str:
-    payload = report_payload(entity_id)
     generated_at = _now()
     legacy_context = False
+    frozen = None
     if version is not None:
         frozen = get_report_version(entity_id, version)
         if frozen is None:
             raise ResearchNotFound(f"Report version {version} not found")
-        # Frozen content is authoritative for historical exports.
-        content = frozen.get("frozen_content", {})
+    content = frozen.get("frozen_content", {}) if frozen else {}
+    context_keys = ("study", "project", "question", "hypotheses", "snapshot", "plan", "cohort")
+    if frozen and all(key in content for key in context_keys):
+        # Historical exports must remain readable even when current data is unavailable.
+        payload = {**frozen, **content}
+        detail = {key: content[key] for key in context_keys}
+    else:
+        payload = report_payload(entity_id)
+        detail = study_detail(entity_id)
+    if frozen:
         legacy_context = not all(key in content for key in ("study", "project", "question", "hypotheses", "snapshot"))
         payload = {**payload, **content, "status": "FROZEN", "version": version}
         generated_at = frozen.get("created_at") or frozen.get("frozen_at") or generated_at
-    detail = study_detail(entity_id)
     for key in ("study", "project", "question", "hypotheses", "snapshot", "plan", "cohort"):
         detail[key] = payload.get(key, detail[key])
     snapshot = detail["snapshot"]
@@ -2938,6 +3181,7 @@ def export_html(entity_id: str, version: int | None = None) -> str:
                          + html.escape(", ".join(unverified))
                          + ' is shown for audit only and is not currently qualified evidence.</div>')
     manifest = {
+        "data_revision": payload.get("data_revision"),
         "report_id": payload.get("id"),
         "study_id": entity_id,
         "project_id": detail["project"]["id"],

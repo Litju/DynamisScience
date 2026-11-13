@@ -1,0 +1,51 @@
+........................................................................ [ 24%]
+........................................................................ [ 49%]
+........................................................................ [ 74%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+290 passed in 360.84s (0:06:00)
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-457db5c4-e42d-4308-b85d-45774bc07b7d
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-457db5c4-e42d-4308-b85d-45774bc07b7d'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-3752884a-0931-4da3-96f3-aa16a979d26c
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-3752884a-0931-4da3-96f3-aa16a979d26c'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-7754a1ab-8417-4c0d-a452-c8065cace960
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-7754a1ab-8417-4c0d-a452-c8065cace960'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-1566cf3e-0867-4d00-b3dd-a6e828234fb7\test_folder_import_is_bounded_0\batch
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-1566cf3e-0867-4d00-b3dd-a6e828234fb7\\test_folder_import_is_bounded_0\\batch'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-1566cf3e-0867-4d00-b3dd-a6e828234fb7\test_folder_import_is_bounded_0
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-1566cf3e-0867-4d00-b3dd-a6e828234fb7\\test_folder_import_is_bounded_0'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-1566cf3e-0867-4d00-b3dd-a6e828234fb7
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-1566cf3e-0867-4d00-b3dd-a6e828234fb7'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-66d84a02-86db-4e57-a324-de2fee3d5ee2\test_folder_import_is_bounded_0\batch
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-66d84a02-86db-4e57-a324-de2fee3d5ee2\\test_folder_import_is_bounded_0\\batch'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-66d84a02-86db-4e57-a324-de2fee3d5ee2\test_folder_import_is_bounded_0
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-66d84a02-86db-4e57-a324-de2fee3d5ee2\\test_folder_import_is_bounded_0'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-66d84a02-86db-4e57-a324-de2fee3d5ee2
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-66d84a02-86db-4e57-a324-de2fee3d5ee2'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-bd85dcc3-bed8-46a5-b3fc-6be6b82b773b
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-bd85dcc3-bed8-46a5-b3fc-6be6b82b773b'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-79642364-b868-4e52-b1a3-2eddd0d0f4c3
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-79642364-b868-4e52-b1a3-2eddd0d0f4c3'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-fbc5c6af-12f5-47fe-bcff-4c729ea3680a\test_folder_import_is_bounded_0\batch
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-fbc5c6af-12f5-47fe-bcff-4c729ea3680a\\test_folder_import_is_bounded_0\\batch'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-fbc5c6af-12f5-47fe-bcff-4c729ea3680a\test_folder_import_is_bounded_0
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-fbc5c6af-12f5-47fe-bcff-4c729ea3680a\\test_folder_import_is_bounded_0'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-fbc5c6af-12f5-47fe-bcff-4c729ea3680a
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-fbc5c6af-12f5-47fe-bcff-4c729ea3680a'
+  warnings.warn(
+D:\projects\DynamisScience\services\science\.venv\Lib\site-packages\_pytest\pathlib.py:96: PytestWarning: (rm_rf) error removing \\?\C:\Users\Usuario\AppData\Local\temp\pytest-of-Usuario\garbage-3118aa4b-f0e4-4e62-8e27-b90f6d6151f2
+<class 'OSError'>: [WinError 145] The directory is not empty: '\\\\?\\C:\\Users\\Usuario\\AppData\\Local\\temp\\pytest-of-Usuario\\garbage-3118aa4b-f0e4-4e62-8e27-b90f6d6151f2'
+  warnings.warn(
