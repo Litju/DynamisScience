@@ -1182,14 +1182,22 @@ class PerformanceWorkbench(QWidget):
                     f"Loading audit force trial · {trial_id}",
                 )
             self.athlete_picker.blockSignals(True)
+            selected_athlete = self.athlete_picker.currentText()
             self.athlete_picker.clear()
             self.athlete_picker.addItems([row["display_id"] for row in self.athletes])
+            selected_index = self.athlete_picker.findText(selected_athlete)
+            if selected_index >= 0:
+                self.athlete_picker.setCurrentIndex(selected_index)
             self.athlete_picker.blockSignals(False)
         elif page == "athlete":
             self.athletes = values["athletes"]
             self.athlete_picker.blockSignals(True)
+            selected_athlete = self.athlete_picker.currentText()
             self.athlete_picker.clear()
             self.athlete_picker.addItems([row["display_id"] for row in self.athletes])
+            selected_index = self.athlete_picker.findText(selected_athlete)
+            if selected_index >= 0:
+                self.athlete_picker.setCurrentIndex(selected_index)
             self.athlete_picker.blockSignals(False)
             if self.athlete_picker.count():
                 self._load_athlete(self.athlete_picker.currentText())
@@ -1329,6 +1337,8 @@ class PerformanceWorkbench(QWidget):
         )
 
     def _athlete_loaded(self, detail: dict[str, Any]) -> None:
+        if detail["subject"]["display_id"] != self.athlete_picker.currentText():
+            return
         self.athlete_detail.setPlainText(_pretty(detail))
         weeks = detail["weeks"]
         self.athlete_trend.clear()
