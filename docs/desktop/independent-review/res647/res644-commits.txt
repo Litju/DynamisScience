@@ -1,0 +1,2 @@
+2bdf638305e62137b10fc42520de5701b2c90495 RES-644 Verify additive v1 migration and transactional DDL recovery
+2bfa41ef82b7460a7f0133df942d537047a8d85b RES-644 Roll back uncommitted derived data after failed append

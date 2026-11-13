@@ -1,0 +1,33 @@
+name: Native scientific regression
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  python-qt-science:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: services/science
+        shell: pwsh
+    env:
+      QT_QPA_PLATFORM: offscreen
+      DYNAMISSCIENCE_FIXTURE_DIR: ${{ github.workspace }}/../dynamis-ci-fixture
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run python -m dynamis_science.generate
+      - run: uv run python -m compileall -q dynamis_science scripts tests
+      - name: Changed-source whitespace hygiene
+        if: github.event_name == 'pull_request'
+        run: git -c core.whitespace=cr-at-eol diff --check '${{ github.event.pull_request.base.sha }}...HEAD' -- '*.py' '*.yml'
+      - name: Unit, migration, integration, Qt and scientific regression
+        run: uv run pytest --junitxml=scientific-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scientific-regression-results
+          path: services/science/scientific-results.xml

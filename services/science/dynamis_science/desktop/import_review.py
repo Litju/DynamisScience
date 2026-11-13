@@ -24,8 +24,8 @@ TEXT_FIELDS = (  # (key, label, required)
     ("source_name", "Source name", True), ("publisher", "Publisher / lab", False),
     ("dataset_identity", "Dataset identity / DOI", False), ("license_or_agreement", "Licence or agreement", True),
     ("redistribution_restrictions", "Redistribution restrictions", True),
-    ("manufacturer", "Instrument manufacturer", True), ("model", "Instrument model", True),
-    ("serial_number", "Instrument serial number", True), ("calibration_status", "Calibration status", False),
+    ("manufacturer", "Instrument or app manufacturer", True), ("model", "Instrument or app model", True),
+    ("serial_number", "Instrument serial / app version", True), ("calibration_status", "Calibration status", False),
     ("protocol_name", "Protocol name", True), ("protocol_version", "Protocol version", True),
     ("subject_id", "Subject ID (single-trace file)", False), ("trial_id", "Trial ID (single-trace file)", False),
     ("session_id", "Session ID (if not in file)", False), ("sampling_hz", "Sampling rate Hz (if not in file)", False),
@@ -48,10 +48,21 @@ class MappingEditor(QDialog):
         layout.addWidget(QLabel("Choose the file column and unit for each target. Units are converted deterministically; "
                                 "nothing is assumed."))
         form = QFormLayout()
+        self.family = QComboBox()
+        for label, value in (("Choose measurement family", None), ("CMJ summaries", "CMJ_FORCE_PLATFORM"),
+                             ("Monitoring records", "ATHLETE_MONITORING"), ("Sprint timing", "SPRINT_TIMING"),
+                             ("Force recordings", importer.traces.FAMILY)):
+            self.family.addItem(label, value)
+        self.family.setCurrentIndex(max(0, self.family.findData(plan["mapping"].get("family"))))
+        self.family.setAccessibleName("Measurement family to import")
+        form.addRow("Import as", self.family)
+        note = QLabel("For mixed CMJ and monitoring columns, explicitly choose one family per import. Import the original again for the other family, then link by confirmed participant IDs. Monitoring must have one record per participant and time point; repeated trials are not silently averaged.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
         names = [c["name"] for c in plan["columns"]]
         family = plan["mapping"].get("family")
         for target, (group, units, _) in importer.COLUMNS.items():
-            wanted = {"CMJ_FORCE_PLATFORM": ("CMJ",), "SPRINT_TIMING": ("SPRINT",), importer.traces.FAMILY: ("TRACE",)}.get(family, ("CMJ",))
+            wanted = {"CMJ_FORCE_PLATFORM": ("CMJ",), "SPRINT_TIMING": ("SPRINT",), importer.traces.FAMILY: ("TRACE",), "ATHLETE_MONITORING": ("MON",), None: ("CMJ", "MON", "SPRINT", "TRACE")}.get(family, ("CMJ",))
             if group not in ("ANY", *wanted) and not (target == "time_s" and family == importer.traces.FAMILY):
                 continue
             source, unit = QComboBox(), QComboBox()
@@ -91,6 +102,15 @@ class MappingEditor(QDialog):
                     out[target] = None
             elif target not in current or (current[target]["source"], current[target]["unit"]) != (chosen, unit.currentText()):
                 out[target] = {"source": chosen, "unit": unit.currentText()}
+        chosen_family = self.family.currentData()
+        if chosen_family:
+            group = next(g for g, f in importer.FAMILIES.items() if f == chosen_family)
+            for target in current:
+                if importer.COLUMNS[target][0] not in ("ANY", group):
+                    out[target] = None
+            for target in list(out):
+                if importer.COLUMNS[target][0] not in ("ANY", group):
+                    out[target] = None
         return out
 
 

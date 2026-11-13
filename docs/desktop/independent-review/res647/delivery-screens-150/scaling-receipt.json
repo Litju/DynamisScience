@@ -1,0 +1,61 @@
+{
+  "scale": 1.5,
+  "theme": "dark",
+  "available": [
+    911,
+    480
+  ],
+  "checks": {
+    "01-athlete-branch": {
+      "frame": [
+        911,
+        480
+      ],
+      "fits": true
+    },
+    "01b-athlete-trajectory": {
+      "frame": [
+        911,
+        480
+      ],
+      "fits": true
+    },
+    "02-squad-board": {
+      "frame": [
+        911,
+        480
+      ],
+      "fits": true
+    },
+    "03-events": {
+      "frame": [
+        911,
+        480
+      ],
+      "fits": true
+    },
+    "04-flag-rules": {
+      "frame": [
+        879,
+        437
+      ],
+      "fits": true
+    },
+    "05-simulation": {
+      "frame": [
+        879,
+        437
+      ],
+      "fits": true
+    }
+  },
+  "source_commit": "e748962a8a0c3fc264959549cb10dc967e779c25",
+  "screenshots": {
+    "01-athlete-branch.png": "e52ab35c748340b87614793f2f5bd48f5da47801f853e14abc438c104b59cc58",
+    "01b-athlete-trajectory.png": "8270ec45771acda8f475806acd7dc963e4030177e7e4b407b4e21f466ca7fd52",
+    "02-squad-board.png": "0f131f25d9de6301d1ecab3266b2e2cdc4e57c186f3a14945c25ea77bb06d6e1",
+    "03-events.png": "ca0d63dabd68dd7d9e84f9a96be2059a143c4f11c78272b8cc1c729afd13f5a4",
+    "04-flag-rules.png": "84bece3079058f3b3ea6928acb19569e1b0dd52f202092a33d337888b4cb41c5",
+    "05-simulation.png": "ebe3034820b294a42af095cac97554241297785589278b68f39fe06120ee6d77"
+  }
+}

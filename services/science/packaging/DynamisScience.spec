@@ -30,6 +30,7 @@ a = Analysis(
     datas=datas,
     hiddenimports=[
         "dynamis_science.desktop.worker",
+        "scripts.res647_walkthrough",
         "dynamis_science.qualification_real",
         "dynamis_science.performance",
         "scripts.sqlite_recovery",

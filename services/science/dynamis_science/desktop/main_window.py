@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QToolBar,
     QSplitter,
     QStackedWidget,
@@ -66,6 +67,13 @@ from .workbench.results import DESCRIPTIVE_KINDS, ENGINE_KINDS, ResultsDocument,
 from .workbench.shell import COMPACT_WIDTH, WorkbenchShell
 
 
+class ResearchPerspectives(QStackedWidget):
+    def heightForWidth(self, width: int) -> int:
+        # Hidden workbench forms must not set the height of the active Squad page.
+        page = self.currentWidget()
+        return page.minimumSizeHint().height() if page is not None else 0
+
+
 class MainWindow(QMainWindow):
     catalogue_loaded = Signal()
 
@@ -84,6 +92,9 @@ class MainWindow(QMainWindow):
         self.runner.idle.connect(self._close_if_idle)
         self.current_study_id: str | None = None
         self.current_study: dict[str, Any] = {}
+        self.research_context: dict[str, Any] = {"scope": "COHORT"}
+        self.investigations: list[dict[str, Any]] = []
+        self._pending_athlete: str | None = None
         self.current_snapshot_id: str | None = None
         self.current_target: dict[str, str] | None = None
         self.current_project: dict[str, Any] | None = None
@@ -163,16 +174,32 @@ class MainWindow(QMainWindow):
         self.data_pane.dataset_changed.connect(
             lambda *_: self._analysis_selected(self.workbench.current_analysis() or ""))
         self._sync_result_actions()
-        self.perspectives = QStackedWidget()
+        self.perspectives = ResearchPerspectives()
         self.perspectives.addWidget(self.workbench)
+        from .squad_view import SquadHome
+
+        self.squad = SquadHome(self.service, self.run_task, self.research.individual)
+        self.squad.board.athlete_opened.connect(self._athlete_opened)
+        self.squad.board.loaded.connect(self._board_loaded)
+        self.squad.board.research_requested.connect(self._show_research_mode)
+        self.squad.athlete_page.investigation_selected.connect(self._branch_selected)
+        self.perspectives.addWidget(self.squad)
+        from .squad_view import EventsFeed
+
+        self.events_view = EventsFeed(self.service, self.run_task)
+        self.events_view.athlete_requested.connect(self._open_athlete)
+        self.events_view.follow_up_requested.connect(self._start_follow_up)
+        self.perspectives.addWidget(self.events_view)
         self.performance = None
         self.performance_header = None
         self.performance_rail = None
         self.performance_toolbar = None
+        self.perspectives.currentChanged.connect(self._fit_perspective)
+        self._fit_perspective()
         screen = self.screen()
         available = screen.availableGeometry() if screen is not None else None
         # shortcut: compact layout follows the startup screen, reevaluate when supporting live monitor changes
-        if available is not None and (available.width() < 1100 or available.height() < 650):
+        if available is not None and (available.width() < 1100 or available.height() < 850):
             perspectives_scroll = QScrollArea()
             perspectives_scroll.setWidgetResizable(True)
             perspectives_scroll.setWidget(self.perspectives)
@@ -197,15 +224,35 @@ class MainWindow(QMainWindow):
         workspace_bar = QToolBar("Research Workspace", self)
         workspace_bar.setObjectName("PersistentWorkspaceActions")
         self.addToolBar(workspace_bar)
-        for label, callback in (("Create workspace", self._new_workspace), ("Open workspace", self._choose_workspace),
+        for label, callback in (("Research Workbench", self._show_research_mode), ("Squad", self._show_squad_mode), ("Events", self._show_events_mode), ("New", self._new_workspace), ("Open", self._choose_workspace),
                                 ("Add data", self._add_workspace_data), ("Analyze", self._analyze_workspace),
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
             action = workspace_bar.addAction(label)
             action.triggered.connect(callback)
+            shortcut = {"Research Workbench": "Ctrl+Shift+R", "Squad": "Ctrl+Shift+S", "Events": "Ctrl+Shift+E", "New": "Ctrl+N", "Open": "Ctrl+O"}.get(label)
+            if shortcut:
+                action.setShortcut(shortcut)
+            action.setToolTip(f"{label} ({shortcut})" if shortcut else label)
+            workspace_bar.widgetForAction(action).setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        # RES-647 research context: one workspace identity, cohort or individual scope within it.
+        context_bar = QToolBar("Research Context", self)
+        context_bar.setObjectName("ResearchContext")
+        self.addToolBarBreak()
+        self.addToolBar(context_bar)
+        context_bar.setFixedHeight(24)
+        context_bar.layout().setContentsMargins(4, 0, 4, 0)
+        self.context_title = QLabel("No workspace")
+        self.context_title.setAccessibleName("Workspace title and active data revision")
+        self.context_title.setMaximumWidth(560)
+        context_bar.addWidget(self.context_title)
+
+        self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
         export_action.triggered.connect(self.research.export_report)
         file_menu.addAction(export_action)
+        combined = file_menu.addAction("Export combined report…")
+        combined.triggered.connect(self._export_combined_report)
         file_menu.addSeparator()
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self.close)
@@ -559,12 +606,53 @@ class MainWindow(QMainWindow):
         self.performance_header.set_context(context)
         self.performance_rail.set_context(context)
 
+    def _fit_perspective(self, *_args) -> None:
+        for index in range(self.perspectives.count()):
+            policy = QSizePolicy.Policy.Preferred if index == self.perspectives.currentIndex() else QSizePolicy.Policy.Ignored
+            self.perspectives.widget(index).setSizePolicy(policy, policy)
+
+    def _show_squad_mode(self) -> None:
+        if not self.squad.board.workspace_id:
+            self.workbench.show_toast("Open a research workspace with data to see the squad.")
+            return
+        self._show_research_mode()
+        self.perspectives.setCurrentWidget(self.squad)
+        self._perspective = "squad"
+        self._scroll_to_top()
+
+    def _scroll_to_top(self) -> None:
+        central = self.centralWidget()
+        if isinstance(central, QScrollArea):
+            central.verticalScrollBar().setValue(0)
+
+    def _show_events_mode(self) -> None:
+        if not self.events_view.workspace_id:
+            self.workbench.show_toast("Open a research workspace with data to see its events.")
+            return
+        self._show_research_mode()
+        self.perspectives.setCurrentWidget(self.events_view)
+        self._perspective = "events"
+        self._scroll_to_top()
+        self.events_view.reload()
+
+    def _start_follow_up(self, subject_id: str) -> None:
+        title, accepted = QInputDialog.getText(self, "Start follow-up", f"What do you want to follow up for {subject_id}?")
+        if not accepted or not title.strip():
+            return
+        identity = self.current_study_id
+
+        def created(investigation: dict[str, Any]) -> None:
+            self._branch_selected(investigation["id"])
+            self.events_view.reload()
+
+        self.run_task(lambda: self.service.create_individual_investigation(identity, subject_id, title), created, "Creating follow-up branch")
+
     def _show_research_mode(self) -> None:
         self.menuBar().show()
         if self.performance_toolbar is not None:
             self.performance_toolbar.hide()
         self.perspectives.setCurrentWidget(self.workbench)
-        if self._perspective != "research":
+        if self._perspective not in ("research", "squad", "events"):
             # The navigator lives in the Data pane; raw inspector detail is behind View > Advanced.
             self._perspective = "research"
             self.navigator_dock.hide()
@@ -1088,6 +1176,112 @@ class MainWindow(QMainWindow):
         self.workspace.setCurrentWidget(self.research)
         if detail.get("workspace"):
             self._set_record_view(True)
+        self._load_research_context(study_id, detail)
+
+    # ------------------------------------------------------------------ RES-647 research context
+
+    def _load_research_context(self, study_id: str, detail: dict[str, Any]) -> None:
+        self.research_context = dict(detail.get("study", {}).get("research_context") or {"scope": "COHORT"})
+        self.investigations = []
+        self._pending_athlete = None
+        self._sync_context_bar()
+        squad = self.squad
+        squad.setCurrentWidget(squad.board)
+        self.events_view.set_workspace(study_id if detail.get("workspace") and detail.get("metrics") else None)
+        if not detail.get("workspace") or not detail.get("metrics"):
+            squad.board.set_workspace(None)
+            self.research.individual.set_investigation(None, None)
+            return
+        squad.board.set_workspace(study_id)
+        self._show_squad_mode()
+        revision = detail.get("active_data_revision_id")
+
+        def loaded(investigations: list[dict[str, Any]]) -> None:
+            if (self.current_study_id, self.current_study.get("active_data_revision_id")) != (study_id, revision):
+                return
+            self.investigations = investigations
+            if not any(item["id"] == self.research_context.get("investigation_id") for item in investigations):
+                self.research_context = {"scope": "COHORT"}
+            self._apply_research_context()
+
+        self.run_task(lambda: self.service.individual_investigations(study_id), loaded, "Loading individual investigations")
+
+    def _sync_context_bar(self) -> None:
+        detail = self.current_study if self.current_study.get("workspace") else {}
+        number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == detail.get("active_data_revision_id")), None)
+        title = detail.get("study", {}).get("title")
+        self.context_title.setText(f"{title} · {'Data revision ' + str(number) if number else 'no data'}  " if title else "No workspace  ")
+
+    def _apply_research_context(self) -> None:
+        context = self.research_context
+        investigation_id = context.get("investigation_id") if context.get("scope") == "INDIVIDUAL" else None
+        self.research.individual.set_investigation(self.current_study_id, investigation_id)
+        if investigation_id:
+            self._open_athlete(context["subject_id"])
+
+    def _open_athlete(self, subject_id: str) -> None:
+        squad = self.squad
+        athlete = next((item for group in squad.board.board.get("groups", []) for item in group["athletes"]
+                        if item["subject_id"] == subject_id), None)
+        if athlete is None:
+            self._pending_athlete = subject_id  # opened once the squad board has loaded
+            return
+        self._pending_athlete = None
+        branches = [item for item in self.investigations if item["scope"]["subject_id"] == subject_id]
+        current = self.research_context.get("investigation_id") if self.research_context.get("subject_id") == subject_id else None
+        squad.athlete_page.set_athlete(self.current_study_id, athlete, branches, current)
+        self._show_squad_mode()
+        squad.setCurrentWidget(squad.athlete_page)
+        self._scroll_to_top()
+
+    def _board_loaded(self) -> None:
+        if self._pending_athlete:
+            self._open_athlete(self._pending_athlete)
+
+    def _athlete_opened(self, athlete: dict[str, Any]) -> None:
+        subject = athlete["subject_id"]
+        branches = [item for item in self.investigations if item["scope"]["subject_id"] == subject]
+        if self.research_context.get("subject_id") == subject:
+            self._open_athlete(subject)
+        elif branches:
+            self._select_scope("INDIVIDUAL", branches[-1]["id"])
+        else:
+            self._select_scope("COHORT")
+            self._open_athlete(subject)
+
+    def _branch_selected(self, investigation_id: str) -> None:
+        identity = self.current_study_id
+        if not investigation_id:
+            self._select_scope("COHORT")
+            return
+
+        def refreshed(investigations: list[dict[str, Any]]) -> None:
+            if self.current_study_id == identity:
+                self.investigations = investigations
+                self._select_scope("INDIVIDUAL", investigation_id)
+
+        self.run_task(lambda: self.service.individual_investigations(identity), refreshed, "Opening branch")
+
+    def _select_scope(self, kind: str, investigation_id: str | None = None) -> None:
+        identity = self.current_study_id
+        investigation = next((item for item in self.investigations if item["id"] == investigation_id), None)
+        self.research_context = {"scope": kind, "investigation_id": investigation_id,
+                                 "subject_id": investigation["scope"]["subject_id"] if investigation else None}
+        self._apply_research_context()
+        self.run_task(lambda: self.service.select_research_scope(identity, kind, investigation_id), lambda _: None, "Saving research context")
+
+    def _export_combined_report(self) -> None:
+        cohort = self.research.latest_run
+        individual = self.research.individual_run()
+        if not cohort or not individual:
+            self.workbench.show_toast("Run a cohort analysis and an individual analysis on this data revision first.")
+            return
+        identity = self.current_study_id
+        path, _ = QFileDialog.getSaveFileName(self, "Export combined report", f"{identity}-combined-report.html", "HTML report (*.html)")
+        if path:
+            self.run_task(lambda: self.service.export_workspace_report(identity, [cohort["id"], individual["id"]], path),
+                          lambda output: self.statusBar().showMessage(f"Report exported: {output}", 8000),
+                          "Saving and exporting combined report")
 
     def _new_workspace(self) -> None:
         title, accepted = QInputDialog.getText(self, "Create research workspace", "Title")
@@ -1126,24 +1320,31 @@ class MainWindow(QMainWindow):
     def _attach_workspace_dataset(self, snapshot_id: str, workspace_id: str | None = None) -> None:
         identity = workspace_id or self.current_study_id
         revision = self.current_study.get("active_data_revision_id")
-        append = False
+        append = link = False
         if revision:
             choice, accepted = QInputDialog.getItem(self, "Attach data", "How should these measurements be used?",
-                ["Attach separately (no pooling)", "Append compatible measurements (same participant identifiers)"], 0, False)
+                ["Append compatible measurements (same participant identifiers)",
+                 "Link a different kind of measurement to the same participants (e.g. load, sleep, wellness)",
+                 "Attach separately (no pooling)"], 0, False)
             if not accepted:
                 return
-            append = choice.startswith("Append")
+            append, link = choice.startswith("Append"), choice.startswith("Link")
         def attached(detail):
             if self.current_study_id == identity:
                 self.refresh_catalogue({"type": "study", "id": identity})
-        self.run_task(lambda: self.service.attach_workspace_data(identity, snapshot_id, append=append,
-                      confirm_participant_ids=append, base_revision=revision), attached, "Attaching data to workspace")
+        self.run_task(lambda: self.service.attach_workspace_data(identity, snapshot_id, append=append, link=link,
+                      confirm_participant_ids=append or link, base_revision=revision), attached, "Attaching data to workspace")
 
     def _analyze_workspace(self) -> None:
         if not self.current_study.get("workspace") or not self.current_snapshot_id:
             self.workbench.show_toast("Add data to your workspace before analyzing.")
             return
+        self._show_research_mode()
         self._set_record_view(True)
+        if getattr(self, "research_context", {}).get("scope") == "INDIVIDUAL":
+            self._show_squad_mode()
+            self.research.individual.tabs.setCurrentIndex(1)
+            return
         self.research.tabs.setCurrentIndex(3)
 
     def _workspace_history(self) -> None:
@@ -1152,7 +1353,7 @@ class MainWindow(QMainWindow):
         identity = self.current_study_id
         from .. import researchstore
         def show(values):
-            revisions, runs, reports = values
+            revisions, runs, reports, investigations = values
             dialog = QDialog(self)
             dialog.setWindowTitle("Workspace history")
             available = self.screen().availableGeometry()
@@ -1163,7 +1364,11 @@ class MainWindow(QMainWindow):
             for revision in revisions:
                 picker.addItem(f"Data revision {revision['number']} · {revision['mode'].lower()} · {revision['created_at']}", ("data", revision))
             for run in runs:
-                picker.addItem(f"Analysis · {run['method_id']} · {run['id']}", ("run", run))
+                scope = run.get("scope") or {"kind": "COHORT"}
+                label = f"individual {scope['subject_id']}" if scope["kind"] == "INDIVIDUAL" else "cohort"
+                picker.addItem(f"Analysis · {label} · {run['method_id']} · {run['id']}", ("run", run))
+            for version in investigations:
+                picker.addItem(f"Investigation · {version['scope']['subject_id']} · {version['title']} v{version['version']}", ("investigation", version))
             for report in reports:
                 picker.addItem(f"Report v{report['version']} · frozen", ("report", report))
             detail = QTextBrowser()
@@ -1180,7 +1385,9 @@ class MainWindow(QMainWindow):
                 dialog.accept()
                 def open_selected():
                     researchstore.select_data_revision(identity, revision_id)
-                    if kind == "run":
+                    if kind == "run" and (selected.get("scope") or {}).get("kind") == "INDIVIDUAL":
+                        self.service.select_research_scope(identity, "INDIVIDUAL", selected["investigation_id"])
+                    elif kind == "run":
                         researchstore.select_workspace_run(identity, selected["id"])
                     return self.service.get_study_detail(identity)
                 self.run_task(open_selected,
@@ -1191,7 +1398,9 @@ class MainWindow(QMainWindow):
             changed()
             dialog.exec()
         self.run_task(lambda: (researchstore.data_revisions(identity), researchstore.list_runs(identity),
-                              [researchstore.get_report_version(identity, item["version"]) for item in researchstore.report_versions(identity)]), show, "Loading history")
+                              [researchstore.get_report_version(identity, item["version"]) for item in researchstore.report_versions(identity)],
+                              [version for item in self.service.individual_investigations(identity)
+                               for version in researchstore.investigation_versions(item["id"])]), show, "Loading history")
 
     def _show_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
         if self.current_study.get("workspace"):
@@ -1720,11 +1929,15 @@ class ResearchWorkbench(QWidget):
             "Evidence & Report",
         ):
             self.tabs.addTab(QWidget(), label)
+        from .individual_research import IndividualResearchPanel
+
+        # RES-647: individual research is a scope of this workspace, not a separate application.
+        self.individual = IndividualResearchPanel(self.service, window.run_task)  # hosted by the Squad athlete page
         self.tabs.currentChanged.connect(self._ensure_tab)
         self._ensure_tab(0)
 
     def _ensure_tab(self, index: int) -> None:
-        if index < 0 or index in self._built_tabs:
+        if index < 0 or index >= len(self._builders) or index in self._built_tabs:
             return
         self._builders[index]()
         self._built_tabs.add(index)
@@ -1963,7 +2176,8 @@ class ResearchWorkbench(QWidget):
         self._load_runs_and_report()
         if detail.get("workspace"):
             revision = detail.get("active_data_revision_id")
-            runs = [run for run in detail.get("runs", []) if run.get("data_revision_id") == revision]
+            runs = [run for run in detail.get("runs", []) if run.get("data_revision_id") == revision
+                    and (run.get("scope") or {}).get("kind", "COHORT") == "COHORT"]
             self.latest_run = next((run for run in runs if run["id"] == detail["study"].get("selected_run_id")), runs[-1] if runs else None)
             if self.latest_run:
                 self.run_output.setPlainText(json.dumps(self.latest_run, indent=2, default=str))
@@ -1972,6 +2186,7 @@ class ResearchWorkbench(QWidget):
             self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\nData revision {number} · {self.snapshot_id}\n\n{len(runs)} saved analyses on this revision.\nUse Add data, Analyze, Export report or History above to continue.")
 
     def select_project(self, project: dict[str, Any]) -> None:
+        self.individual.set_investigation(None, None)
         self._ensure_tab(0)
         self._clear_study_views()
         self.study_id = None
@@ -1989,6 +2204,7 @@ class ResearchWorkbench(QWidget):
         self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        self.individual.set_investigation(None, None)
         for index in range(1, len(self._builders)):  # method_picker etc. live in later lazy tabs
             self._ensure_tab(index)
         self._clear_study_views()
@@ -2560,12 +2776,20 @@ class ResearchWorkbench(QWidget):
             "Saving report draft",
         )
 
+    def individual_run(self) -> dict[str, Any] | None:
+        """Latest saved analysis of the open individual investigation on the active revision."""
+        payload = self.individual.payload
+        runs = [run for run in payload.get("runs", []) if run.get("data_revision_id") == payload.get("data_revision_id")]
+        return runs[-1] if runs and self.individual.investigation_id else None
+
     def export_report(self) -> None:
         if getattr(self, "detail", {}).get("workspace"):
-            if not self.latest_run:
+            individual = getattr(self.window, "research_context", {}).get("scope") == "INDIVIDUAL"
+            run = self.individual_run() if individual else self.latest_run
+            if not run:
                 self.window.workbench.show_toast("Analyze this data revision before exporting a report.")
                 return
-            identity, run_id = self.study_id, self.latest_run["id"]
+            identity, run_id = self.study_id, run["id"]
             path, _ = QFileDialog.getSaveFileName(self, "Export scientific report", f"{identity}-report.html", "HTML report (*.html)")
             if path:
                 self.window.run_task(lambda: self.service.export_workspace_report(identity, run_id, path),

@@ -29,6 +29,11 @@ def _database_smoke(data_root: str, response_path: str) -> int:
 
 
 def main() -> int:
+    if len(sys.argv) > 2 and sys.argv[1] == "--qualification-walkthrough":
+        import runpy
+        sys.argv = ["res647_walkthrough", *sys.argv[2:]]
+        runpy.run_module("scripts.res647_walkthrough", run_name="__main__")
+        return 0
     if len(sys.argv) == 4 and sys.argv[1] == "--worker":
         from dynamis_science.desktop.worker import run_files
 

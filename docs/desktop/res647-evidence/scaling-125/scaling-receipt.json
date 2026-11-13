@@ -1,0 +1,45 @@
+{
+  "scale": 1.25,
+  "theme": "dark",
+  "available": [
+    1093,
+    576
+  ],
+  "checks": {
+    "01-athlete-branch": {
+      "frame": [
+        1093,
+        576
+      ],
+      "fits": true
+    },
+    "02-squad-board": {
+      "frame": [
+        1093,
+        576
+      ],
+      "fits": true
+    },
+    "03-events": {
+      "frame": [
+        1093,
+        576
+      ],
+      "fits": true
+    },
+    "04-flag-rules": {
+      "frame": [
+        980,
+        537
+      ],
+      "fits": true
+    },
+    "05-simulation": {
+      "frame": [
+        960,
+        537
+      ],
+      "fits": true
+    }
+  }
+}

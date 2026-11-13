@@ -16,7 +16,7 @@ from typing import Any
 import polars as pl
 import pyarrow.parquet as pq
 
-from .. import admission, dataworkspace, importer, realanalysis, realstore, researchanalysis, researchstore
+from .. import admission, dataworkspace, importer, longitudinal, realanalysis, realstore, researchanalysis, researchstore, squad
 from ..data_root import DataRootConfigurationError, data_root, ensure_layout, paths
 from ..generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
@@ -26,33 +26,120 @@ class DynamisAppService:
         self.ensure_initialized()
         return researchstore.create_workspace(title)
 
-    def export_workspace_report(self, workspace_id: str, run_id: str, target_path: str) -> Path:
+    def export_workspace_report(self, workspace_id: str, run_id: str | list[str], target_path: str) -> Path:
+        """Freeze and export one report; several runs (cohort and individual) become separate labeled sections."""
         self.ensure_initialized()
+        run_ids = [run_id] if isinstance(run_id, str) else list(run_id)
         with researchstore._tx():
             entity = researchstore.get_entity(workspace_id)
-            run = researchstore.get_run(run_id)
-            if not entity or not entity.get("workspace") or not run or run.get("study_id") != workspace_id:
+            runs = [researchstore.get_run(identity) for identity in run_ids]
+            if not entity or not entity.get("workspace") or not runs or any(not run or run.get("study_id") != workspace_id for run in runs):
                 raise researchstore.ResearchValidation("Select a saved workspace analysis to export")
-            if run.get("data_revision_id") != entity.get("active_data_revision_id"):
-                raise researchstore.ResearchConflict("This result belongs to an earlier data revision; select that revision in History")
-            researchstore.ensure_current(run, "export evidence")
-            if run.get("plan_alignment") != "PLANNED":
-                raise researchstore.ResearchValidation("Exploratory results cannot be automatically promoted to report evidence")
-            researchstore.update_entity(workspace_id, {"cohort_id": run["cohort_id"], "analysis_plan_id": run["plan_id"]})
-            promoted = researchanalysis.promote(run_id)
+            for run in runs:
+                if run.get("data_revision_id") != entity.get("active_data_revision_id"):
+                    raise researchstore.ResearchConflict("This result belongs to an earlier data revision; select that revision in History")
+                researchstore.ensure_current(run, "export evidence")
+                if run.get("plan_alignment") != "PLANNED":
+                    raise researchstore.ResearchValidation("Exploratory results cannot be automatically promoted to report evidence")
+            binding = {"cohort_id": entity.get("cohort_id"), "analysis_plan_id": entity.get("analysis_plan_id")}
+            researchstore.update_entity(workspace_id, {"cohort_id": runs[0]["cohort_id"], "analysis_plan_id": runs[0]["plan_id"]})
             researchstore.update_report(workspace_id, {})
             report = researchstore.get_report_document(workspace_id)
             for artifact in [*report.get("evidence_ids", []), *report.get("figure_ids", [])]:
                 researchstore.uncite_artifact(workspace_id, artifact)
-            researchstore.cite_artifact(workspace_id, promoted["evidence_artifact"]["id"])
-            if promoted.get("figure_artifact"):
-                researchstore.cite_artifact(workspace_id, promoted["figure_artifact"]["id"])
+            for run in runs:
+                promoted = researchanalysis.promote(run["id"])
+                section = researchstore.report_section_label(run)
+                researchstore.cite_artifact(workspace_id, promoted["evidence_artifact"]["id"], section)
+                if promoted.get("figure_artifact"):
+                    researchstore.cite_artifact(workspace_id, promoted["figure_artifact"]["id"], section)
             frozen = researchstore.freeze_report(workspace_id)
+            if (runs[0].get("scope") or {}).get("kind") == "INDIVIDUAL":
+                # An individual report does not replace the workspace's cohort selection.
+                researchstore.update_entity(workspace_id, binding)
         return self.export_report_html(workspace_id, target_path, frozen["version"])
 
     def attach_workspace_data(self, workspace_id: str, snapshot_id: str, **options) -> dict[str, Any]:
         self.ensure_initialized()
         return researchstore.attach_workspace_data(workspace_id, snapshot_id, **options)
+
+    @staticmethod
+    def _analysis_scope(workspace_id: str, scope: dict[str, Any] | None) -> dict[str, Any]:
+        if not scope or scope.get("kind", "COHORT") == "COHORT":
+            return {"kind": "COHORT"}
+        investigation = longitudinal.get_individual_investigation(scope.get("investigation_id") or "")
+        if investigation["study_id"] != workspace_id:
+            raise researchstore.ResearchValidation("The investigation belongs to another workspace")
+        subject_id = investigation["scope"]["subject_id"]
+        if scope.get("subject_id") not in (None, subject_id):
+            raise researchstore.ResearchConflict("The selected participant changed; select the investigation again")
+        return {"kind": "INDIVIDUAL", "subject_id": subject_id, "investigation_id": investigation["id"],
+                "investigation_version": investigation["version"]}
+
+    # RES-647 longitudinal research: thin delegation keeps the native UI and tests on one contract.
+    def participant_catalogue(self, workspace_id: str, query: str = "") -> dict[str, Any]:
+        self.ensure_initialized()
+        return longitudinal.participant_catalogue(workspace_id, query)
+
+    def individual_investigations(self, workspace_id: str, subject_id: str | None = None) -> list[dict[str, Any]]:
+        self.ensure_initialized()
+        return longitudinal.individual_investigations(workspace_id, subject_id)
+
+    def create_individual_investigation(self, workspace_id: str, subject_id: str, title: str, question: str = "") -> dict[str, Any]:
+        self.ensure_initialized()
+        return longitudinal.create_individual_investigation(workspace_id, subject_id, title, question)
+
+    def select_research_scope(self, workspace_id: str, kind: str, investigation_id: str | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return longitudinal.select_research_scope(workspace_id, kind, investigation_id)
+
+    def individual_research(self, investigation_id: str) -> dict[str, Any]:
+        """Everything the Individual Research screen shows, read against the active revision."""
+        self.ensure_initialized()
+        investigation = longitudinal.get_individual_investigation(investigation_id)
+        entity, snapshot_id, metric = longitudinal._context(investigation["study_id"])
+        axis, points = longitudinal.individual_points(snapshot_id, metric, investigation["scope"]["subject_id"])
+        revision = researchstore.get_data_revision(entity.get("active_data_revision_id") or "") or {}
+        return {"investigation": investigation, "data_revision_id": entity.get("active_data_revision_id"),
+                "data_revision_number": revision.get("number"),
+                "snapshot_id": snapshot_id, "metric": metric, "axis": axis, "points": points,
+                "runs": longitudinal.investigation_runs(investigation_id),
+                "periods": longitudinal.protocol_observations(investigation_id),
+                "scenarios": longitudinal.current_scenarios(investigation),
+                "eligibility": longitudinal.individual_eligibility(investigation_id),
+                "versions": researchstore.investigation_versions(investigation_id)}
+
+    def save_protocol(self, investigation_id: str, protocol: dict[str, Any], base_version: int | None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return longitudinal.save_protocol(investigation_id, protocol, base_version)
+
+    def save_scenario(self, investigation_id: str, scenario: dict[str, Any], base_version: int | None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return longitudinal.save_scenario(investigation_id, scenario, base_version)
+
+    def squad_board(self, workspace_id: str, group_by: str = "category", metric_id: str | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.squad_board(workspace_id, group_by, metric_id)
+
+    def workspace_events(self, workspace_id: str) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.events(workspace_id)
+
+    def save_flag_rules(self, workspace_id: str, rules: list[dict[str, Any]]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.save_rules(workspace_id, rules)
+
+    def simulate(self, workspace_id: str, scenario: dict[str, Any], subject_ids: list[str] | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.simulate(workspace_id, scenario, subject_ids)
+
+    def save_simulation(self, workspace_id: str, scenario: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_initialized()
+        return squad.save_simulation(workspace_id, scenario)
+
+    def compare_with_cohort(self, workspace_id: str, subject_id: str, metric_id: str | None = None) -> dict[str, Any]:
+        self.ensure_initialized()
+        return longitudinal.compare_with_cohort(workspace_id, subject_id, metric_id)
 
     """Direct Python access to the existing scientific and persistence modules."""
 
@@ -598,7 +685,13 @@ class DynamisAppService:
                 definition = researchstore._default_cohort_definition(metric, entity["dataset_snapshot_id"])
                 if metric["table"] == "signal_trials" and payload.get("parameters", {}).get("activity"):
                     definition["activity"] = payload["parameters"]["activity"]
-                cohort = researchstore.create_cohort(study_id, "Analysis selection", definition)
+                scope = self._analysis_scope(study_id, payload.get("scope"))
+                if scope["kind"] == "INDIVIDUAL":
+                    definition.update({"include_subject_ids": [scope["subject_id"]], "scope": scope})
+                    # Frozen at creation so an individual selection never replaces the workspace cohort binding.
+                    cohort = researchstore.create_cohort(study_id, f"Individual selection · {scope['subject_id']}", definition, freeze=True)
+                else:
+                    cohort = researchstore.create_cohort(study_id, "Analysis selection", definition)
                 selection = {**entity, "outcomes": {"primary": [metric]}}
                 resolved = researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"])
                 eligibility = researchstore.method_eligibility(selection, cohort, resolved, {"parameters": payload.get("parameters", {})})
@@ -608,6 +701,8 @@ class DynamisAppService:
                 cohort = researchstore.freeze_cohort(cohort["id"])
                 plan = researchstore.create_plan(study_id, {**payload, "cohort_id": cohort["id"]})
                 plan = researchstore.freeze_plan(plan["id"])
+                if scope["kind"] == "INDIVIDUAL":
+                    researchstore.update_entity(study_id, {"analysis_plan_id": entity.get("analysis_plan_id")})
             # Use the captured entity even if another revision becomes active during computation.
             return researchanalysis.execute(entity, cohort, plan, payload["method_id"], payload["outcome_metric_id"],
                                             plan["parameters"], payload.get("excluded_subject_ids"))
@@ -762,7 +857,8 @@ class DynamisAppService:
                 for record in realanalysis.list_investigations()
                 if record.get("study_id") == study_id
             ]
-        return researchstore.list_investigations(study_id)
+        # Individual investigations have their own screen; the block editor keeps the study-level ones.
+        return [item for item in researchstore.list_investigations(study_id) if not item.get("scope")]
 
     def create_investigation(
         self, study_id: str, title: str, blocks: list[dict[str, Any]] | None = None

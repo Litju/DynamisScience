@@ -1,0 +1,59 @@
+[
+  {
+    "scale": "100",
+    "workspace_id": "STUDY-U-CFD02E30",
+    "one_workspace": true,
+    "revisions": [
+      "DATA-U-20232C4B",
+      "DATA-U-E34CEF06"
+    ],
+    "run_count": 5,
+    "reports_identical_through_internal_and_external_restart": true,
+    "historical_participant_run_unchanged": true,
+    "scenario_is_definition_only": true,
+    "retained_tables_sha256": {
+      "runs": "710fcc81c2f5502b98b7ad9d1a16bfe3499803f5f3dcfb29e85ebbd69bc0ba42",
+      "workspace_revisions": "5dfaad7e9781bd71eb16eca3b433ee9f0b1a41e13059c3473a00117df48b94f9",
+      "report_versions": "1abb1c2053906cd952b6c32e6361859d1b363d2e5421c696b4778b338320afb8",
+      "investigation_versions": "35624e7e6729655d43539a3e9b9434ca3cf879779f88d680d072f9876e0dcc55"
+    }
+  },
+  {
+    "scale": "125",
+    "workspace_id": "STUDY-U-F50CD731",
+    "one_workspace": true,
+    "revisions": [
+      "DATA-U-A6E55C5C",
+      "DATA-U-29802832"
+    ],
+    "run_count": 5,
+    "reports_identical_through_internal_and_external_restart": true,
+    "historical_participant_run_unchanged": true,
+    "scenario_is_definition_only": true,
+    "retained_tables_sha256": {
+      "runs": "c8b64e927452f8553fac8d902b79a0ff5b05e88e8e4abdd4f7b2d8f0b9fbca05",
+      "workspace_revisions": "3d7f907c75fbdf8e6d078afa1317fd89d1c5a18db6091c33099b43838d55f673",
+      "report_versions": "4cb445689aed03a095748c6caa76600d786030191759fca515c518166aee6234",
+      "investigation_versions": "290afa2b7a7accccc98dbbe7a07ba52db7f8a3e4067214c42238a214fa12f95f"
+    }
+  },
+  {
+    "scale": "150",
+    "workspace_id": "STUDY-U-DEB5B520",
+    "one_workspace": true,
+    "revisions": [
+      "DATA-U-EAA69D72",
+      "DATA-U-79B403D4"
+    ],
+    "run_count": 5,
+    "reports_identical_through_internal_and_external_restart": true,
+    "historical_participant_run_unchanged": true,
+    "scenario_is_definition_only": true,
+    "retained_tables_sha256": {
+      "runs": "72166d2055eb8083bb2a5057bf439f3bc9ad3f28746c2a355944036b46d58372",
+      "workspace_revisions": "f2f229863e7309625739596300a3fe7eeca081b02adc884540f57f54c3b55b65",
+      "report_versions": "82f6c911a15336eb868196c29b144b8b1b4184c71e1d6788aaa2ba1dec6c7062",
+      "investigation_versions": "d2baae15129e8ff9b8cf1f37c3154fdcdb509d9480fc2a5b531693253ad54cea"
+    }
+  }
+]

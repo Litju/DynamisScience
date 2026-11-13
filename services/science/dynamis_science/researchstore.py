@@ -160,6 +160,21 @@ METHODS: dict[str, dict[str, Any]] = {
         "diagnostics": ["sampling rate", "saturation", "plate coverage", "NaN trials", "device clock offset", "body-weight comparison"],
         "output_schema": ["activity-level summaries", "IMU sampling and gravity checks", "body-weight bias and limits of agreement"],
     },
+    "METH-U-INDIVIDUAL": {
+        "id": "METH-U-INDIVIDUAL",
+        "name": "Individual observed trajectory with repeated-trial error context",
+        "version": "1.0.0",
+        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "QUAL-U-INDIVIDUAL", "reference": "Independent NumPy recomputation (RES-647)", "basis": "Session means, within-session trial SD, pooled within-session SD and the trial-noise standard error of the first-to-last change recomputed from the selected revision."},
+        "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
+        "required_tables": ["cmj_occasions", "cmj_trials"],
+        "required_shape": "One participant with a numeric outcome on at least two measured occasions/weeks; repeated same-session trials are optional.",
+        "constraints": ["Individual scope only.", "Observational description; not a personalized causal or forecast estimate.", "Trial error excludes day-to-day biological variation."],
+        "missingness": "Missing occasions and empty values are listed; no imputation.",
+        "parameter_schema": {},
+        "assumptions": ["Repeated trials within a session are exchangeable measurements of the same state."],
+        "diagnostics": ["observed and missing occasions", "trials per occasion", "pooled within-session SD and degrees of freedom", "quality flags"],
+        "output_schema": ["session means", "within-session SD", "first-to-last change", "trial-noise standard error of the change"],
+    },
     "METH-U-DESC": {
         "id": "METH-U-DESC",
         "name": "Descriptive longitudinal summary",
@@ -614,7 +629,7 @@ def read_snapshot_table(snapshot_id: str, table: str) -> pl.DataFrame:
         if real.get("admitted_source"):
             if table == "subjects" and table not in _table_names(real):
                 observation_table = next(
-                    (name for name in ("cmj_trials", "sprint_trials") if name in _table_names(real)),
+                    (name for name in ("cmj_trials", "sprint_trials", "monitoring") if name in _table_names(real)),
                     None,
                 )
                 if observation_table is None:
@@ -689,8 +704,6 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
         return result
     # Synthetic fixture: keep the same metric identities used by the accepted UI.
     tables = set(_table_names(snapshot))
-    if snapshot.get("admitted_source") and not (tables & {"cmj_trials"}):
-        return []
     candidates = [
         ("MET-CMJ-IMPULSE", "Concentric impulse", "N·s·kg⁻¹", "concentric_impulse_n_s_kg", "cmj_trials", "PRIMARY"),
         ("MET-CMJ-HEIGHT", "Jump height (flight time)", "cm", "jump_height_cm", "cmj_trials", "SECONDARY"),
@@ -698,6 +711,15 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
         ("MET-CMJ-POWER", "Peak power", "W·kg⁻¹", "peak_power_w_kg", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-DEPTH", "Countermovement depth", "cm", "countermovement_depth_cm", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-RSI-MOD", "RSI-mod", "cm·s⁻¹", "rsi_mod", "cmj_trials", "CONTEXT"),
+        # RES-647 athlete monitoring; questionnaire items keep the scale the source used.
+        ("MET-MON-LOAD", "Training load", "AU", "training_load_au", "monitoring", "SECONDARY"),
+        ("MET-MON-SLEEP", "Sleep duration", "h", "sleep_hours", "monitoring", "SECONDARY"),
+        ("MET-MON-SLEEP-QUALITY", "Sleep quality", "score", "sleep_quality", "monitoring", "SECONDARY"),
+        ("MET-MON-WELLNESS", "Wellness", "score", "wellness_score", "monitoring", "SECONDARY"),
+        ("MET-MON-FATIGUE", "Fatigue", "score", "fatigue", "monitoring", "SECONDARY"),
+        ("MET-MON-SORENESS", "Muscle soreness", "score", "soreness", "monitoring", "SECONDARY"),
+        ("MET-MON-STRESS", "Stress", "score", "stress", "monitoring", "SECONDARY"),
+        ("MET-MON-MOOD", "Mood", "score", "mood", "monitoring", "SECONDARY"),
     ]
     result = [
         {"id": metric_id, "metric_id": metric_id, "label": label, "unit": unit, "column": column, "table": table, "definition_id": metric_id, "status": "ACTIVE", "role": role}
@@ -707,9 +729,9 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
     if snapshot.get("admitted_source"):
         import pyarrow.parquet as pq
 
-        path = (paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]) / snapshot_id / "cmj_trials.parquet"
-        columns = set(pq.ParquetFile(path).schema_arrow.names)
-        result = [item for item in result if item["column"] in columns]
+        root = (paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]) / snapshot_id
+        columns = {table: set(pq.ParquetFile(root / f"{table}.parquet").schema_arrow.names) for table in {item["table"] for item in result}}
+        result = [item for item in result if item["column"] in columns[item["table"]]]
     return result
 
 
@@ -922,6 +944,8 @@ def _axis_for_table(table: str) -> tuple[str, str]:
         return "week", "Week"
     if table == "signal_trials":
         return "activity", "Activity"
+    if table == "monitoring":
+        return "date", "Date"
     return "row", "Observation"
 
 
@@ -1178,9 +1202,13 @@ def select_workspace_run(entity_id: str, run_id: str) -> dict[str, Any]:
     return entity
 
 
-def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False,
+def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False, link: bool = False,
                           confirm_participant_ids: bool = False, base_revision: str | None = None) -> dict[str, Any]:
-    """Append a revision; separate attachments never imply analytical pooling."""
+    """Append a revision; separate attachments never imply analytical pooling.
+
+    ``link`` keeps the current measurements and adds a different kind of measurement (e.g. monitoring next to CMJ)
+    as its own table for the same participants. Rows are never pooled across tables.
+    """
     entity = get_entity(entity_id)
     if not entity or not entity.get("workspace"):
         raise ResearchValidation("Open a research workspace before attaching data")
@@ -1193,47 +1221,45 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
         raise ResearchValidation("Select an admitted input dataset")
     previous = get_data_revision(base_revision) if base_revision else None
     inputs = [snapshot]
+    if append and link:
+        raise ResearchValidation("Choose either append or link")
+    if link:
+        if not previous or not confirm_participant_ids:
+            raise ResearchValidation("Confirm that participant identifiers have the same meaning before linking")
+        shared = (set(_table_names(previous["snapshot"])) & set(_table_names(snapshot))) - {"subjects"}
+        if shared:
+            raise ResearchValidation(f"This revision already has {', '.join(sorted(shared))}; append compatible batches instead")
+        inputs = [*previous["inputs"], snapshot]
+        if len({item["id"] for item in inputs}) != len(inputs):
+            raise ResearchValidation("This batch is already in the selected data revision")
     if append:
         if not previous or not confirm_participant_ids:
             raise ResearchValidation("Confirm that participant identifiers have the same meaning before appending")
         inputs = [*previous["inputs"], *inputs]
         if len({item["id"] for item in inputs}) != len(inputs):
             raise ResearchValidation("This batch is already in the selected data revision")
-        _validate_workspace_append(inputs)
+        _validate_workspace_append([item for item in inputs if item.get("measurement_family") == snapshot.get("measurement_family")])
     revision_id = _new_id("DATA-U")
     directory = paths()["research"] / "data" / revision_id
     try:
         analytical = snapshot
-        if append:
+        if link or append:
             # Derived Parquet is written once, before the transactional reference becomes visible.
-            directory = paths()["research"] / "data" / revision_id
-            directory.mkdir(parents=True)
-            tables, checksums = {}, {}
-            for table in sorted(set(_table_names(snapshot)) | {"subjects"}):
-                frames = [read_snapshot_table(item["id"], table) for item in inputs]
-                frame = pl.concat(frames, how="vertical")
-                if table == "subjects":
-                    frame = frame.unique(maintain_order=True)
-                    if frame["subject_id"].n_unique() != frame.height:
-                        raise ResearchValidation("Participant metadata conflicts; attach the batch separately")
-                elif "trial_id" in frame.columns and frame["trial_id"].n_unique() != frame.height:
-                    raise ResearchValidation("Overlapping trial identifiers; attach the batch separately")
-                path = directory / f"{table}.parquet"
-                frame.write_parquet(path)
-                tables[table] = {"file": path.name, "rows": frame.height}
-                checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
-            analytical = {**snapshot, "id": revision_id, "workspace_snapshot": True, "tables": tables,
-                          "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
+            analytical = _materialize_revision(revision_id, previous, snapshot, append)
         metrics = dataset_metrics(snapshot_id)
         metric = next((item for item in metrics if item.get("role") == "PRIMARY"), metrics[0] if metrics else None)
+        if link:  # the outcome being studied stays the same; the linked measures are additional
+            metric = (entity.get("outcomes", {}).get("primary") or [metric])[0]
         number = len(data_revisions(entity_id)) + 1
         revision = {
             "id": revision_id, "workspace_id": entity_id, "number": number, "created_at": _now(),
-            "parent_revision_id": base_revision, "mode": "APPEND" if append else "SEPARATE",
+            "parent_revision_id": base_revision, "mode": "APPEND" if append else "LINK" if link else "SEPARATE",
             "input_snapshot_ids": [item["id"] for item in inputs], "inputs": inputs,
             "snapshot_id": analytical["id"], "snapshot": analytical,
-            "compatibility": {"pooled": append, "participant_ids_confirmed": confirm_participant_ids,
-                              "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append else "Separate analytical selection; no pooling"},
+            "compatibility": {"pooled": append, "linked": link, "participant_ids_confirmed": confirm_participant_ids,
+                              "decision": "Matching source, rights, protocol, instrument, schema and timebase" if append
+                              else "Different measurement kinds linked by confirmed participant identifiers; tables are not pooled" if link
+                              else "Separate analytical selection; no pooling"},
         }
         with _tx() as connection:
             current = _row_document(connection.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone())
@@ -1258,12 +1284,61 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
     return study_detail(entity_id)
 
 
+def _materialize_revision(revision_id: str, previous: dict[str, Any], snapshot: dict[str, Any], append: bool) -> dict[str, Any]:
+    """Carry every table of the previous revision forward and add the new batch: appended rows of the same table,
+    or a linked table of a different measurement kind. One participant roster is rebuilt from the observations."""
+    directory = paths()["research"] / "data" / revision_id
+    directory.mkdir(parents=True)
+    frames = {table: read_snapshot_table(previous["snapshot_id"], table) for table in _table_names(previous["snapshot"]) if table != "subjects"}
+    for table in _table_names(snapshot):
+        if table == "subjects":
+            continue
+        frame = read_snapshot_table(snapshot["id"], table)
+        if append:
+            frame = pl.concat([frames[table], frame], how="vertical")
+            key = ["trial_id"] if "trial_id" in frame.columns else ["subject_id", next(a for a in ("date", "day", "week") if a in frame.columns)]
+            if frame.select(pl.struct(key).is_duplicated().any()).item():
+                raise ResearchValidation(f"Overlapping {' and '.join(key)} records; attach the batch separately")
+        frames[table] = frame
+    roster = pl.concat([frame.select("subject_id", *(["position"] if "position" in frame.columns else []))
+                        .with_columns(pl.col("subject_id").cast(pl.Utf8)) for frame in frames.values() if "subject_id" in frame.columns],
+                       how="diagonal_relaxed")
+    if "position" in roster.columns:
+        known = roster.drop_nulls("position").unique()
+        if known["subject_id"].n_unique() != known.height:
+            raise ResearchValidation("Participant metadata conflicts (different positions); correct the roster first")
+        roster = roster.group_by("subject_id", maintain_order=True).agg(pl.col("position").drop_nulls().first())
+    else:
+        roster = roster.unique(maintain_order=True)
+    frames["subjects"] = roster.with_columns(pl.col("subject_id").alias("display_id"))
+    tables, checksums = {}, {}
+    for table, frame in frames.items():
+        path = directory / f"{table}.parquet"
+        frame.write_parquet(path)
+        tables[table] = {"file": path.name, "rows": frame.height}
+        checksums[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    family = snapshot.get("measurement_family") if append and previous["snapshot"].get("measurement_family") != "LINKED" else "LINKED"
+    measurement_sources = {}
+    for item in [*previous["inputs"], snapshot]:
+        for table in _table_names(item):
+            if table != "subjects":
+                measurement_sources.setdefault(table, []).append({"snapshot_id": item["id"], "source": item.get("source"),
+                    "rights_status": item.get("rights_status"), "checksum": item.get("checksums", {}).get(f"{table}.parquet")})
+    source = snapshot.get("source") if family != "LINKED" else {
+        "id": "LINKED_INPUTS", "name": "Linked measurement families; source and rights retained separately per table",
+        "measurement_sources": measurement_sources}
+    return {**snapshot, "source": source, "measurement_sources": measurement_sources,
+            "id": revision_id, "workspace_snapshot": True, "tables": tables, "measurement_family": family,
+            "row_counts": {key: value["rows"] for key, value in tables.items()}, "checksums": checksums}
+
+
 def _validate_workspace_append(inputs: list[dict[str, Any]]) -> None:
     from . import admission
 
     first = inputs[0]
-    if not first.get("admitted_source") or first.get("measurement_family") != "CMJ_FORCE_PLATFORM":
-        raise ResearchValidation("Append is supported for admitted CMJ summaries; attach other data separately")
+    table = {"CMJ_FORCE_PLATFORM": "cmj_trials", "ATHLETE_MONITORING": "monitoring"}.get(first.get("measurement_family"))
+    if not first.get("admitted_source") or table is None:
+        raise ResearchValidation("Append is supported for admitted CMJ summaries and athlete monitoring; attach other data separately")
     for item in inputs:
         for field in ("source", "measurement_family", "rights_status"):
             if item.get(field) != first.get(field):
@@ -1272,8 +1347,8 @@ def _validate_workspace_append(inputs: list[dict[str, Any]]) -> None:
             raise ResearchValidation("Missing QC or immutable checksums; attach separately")
         if item.get("provenance", {}).get("instrument_metadata") != first.get("provenance", {}).get("instrument_metadata"):
             raise ResearchValidation("Incompatible captured instrument or calibration metadata; attach separately")
-        frame = read_snapshot_table(item["id"], "cmj_trials")
-        reference = read_snapshot_table(first["id"], "cmj_trials")
+        frame = read_snapshot_table(item["id"], table)
+        reference = read_snapshot_table(first["id"], table)
         if frame.schema != reference.schema:
             raise ResearchValidation("Incompatible columns or physical units; attach separately")
         for column, lookup in (("instrument_id", admission.get_instrument), ("protocol_id", admission.get_protocol)):
@@ -1543,7 +1618,7 @@ def update_entity(entity_id: str, patch: dict[str, Any], base_version: int | Non
         allowed = {
             "title", "short_title", "research_question", "design", "population", "eligibility", "exclusions",
             "intervention", "arms", "outcomes", "protocols", "schedule", "hypotheses", "cohort_id", "analysis_plan_id",
-            "dataset_snapshot_id",
+            "dataset_snapshot_id", "research_context", "flag_rules", "simulations", "recorded_flag_evaluations",
         }
         if "dataset_snapshot_id" in patch and patch["dataset_snapshot_id"] != document.get("dataset_snapshot_id"):
             if list_cohorts(entity_id) or list_plans(entity_id):
@@ -2233,7 +2308,8 @@ def _create_default_investigation(entity: dict[str, Any]) -> dict[str, Any]:
     return create_investigation(entity["id"], "Primary investigation", blocks=blocks)
 
 
-def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]] | None = None, parent_id: str | None = None) -> dict[str, Any]:
+def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]] | None = None, parent_id: str | None = None,
+                         fields: dict[str, Any] | None = None) -> dict[str, Any]:
     blocks = blocks or []
     validate_investigation_blocks(blocks)
     entity = get_entity(entity_id)
@@ -2253,6 +2329,7 @@ def create_investigation(entity_id: str, title: str, blocks: list[dict[str, Any]
         "created_at": now,
         "updated_at": now,
         "schema_version": SCHEMA_VERSION,
+        **(fields or {}),
     }
     with _tx() as connection:
         connection.execute(
@@ -2303,6 +2380,33 @@ def update_investigation_research(investigation_id: str, blocks: list[dict[str, 
         )
         _audit(connection, "investigation.updated", "investigation", investigation_id, {"blocks": len(blocks)})
     return document
+
+
+def update_investigation_fields(investigation_id: str, fields: dict[str, Any], base_version: int | None, action: str) -> dict[str, Any]:
+    """Versioned update of non-block investigation fields (protocol, scenarios); earlier versions stay readable."""
+    with _tx() as connection:
+        row = connection.execute("SELECT * FROM investigations WHERE id = ?", (investigation_id,)).fetchone()
+        if row is None:
+            raise ResearchNotFound(f"Investigation {investigation_id} not found")
+        document = _row_document(row)
+        if base_version is not None and int(base_version) != int(document["version"]):
+            raise ResearchConflict(f"Investigation is at version {document['version']}, not {base_version}")
+        document.update(fields)
+        document["version"] = int(document["version"]) + 1
+        document["updated_at"] = _now()
+        connection.execute("UPDATE investigations SET version = ?, document = ?, updated_at = ? WHERE id = ?",
+                           (document["version"], _canonical(document), document["updated_at"], investigation_id))
+        connection.execute("INSERT INTO investigation_versions (investigation_id, version, document, created_at) VALUES (?, ?, ?, ?)",
+                           (investigation_id, document["version"], _canonical(document), document["updated_at"]))
+        _audit(connection, action, "investigation", investigation_id, sorted(fields))
+    return document
+
+
+def investigation_versions(investigation_id: str) -> list[dict[str, Any]]:
+    with _connect() as connection:
+        rows = connection.execute("SELECT document FROM investigation_versions WHERE investigation_id = ? ORDER BY version",
+                                  (investigation_id,)).fetchall()
+    return [json.loads(row[0]) for row in rows]
 
 
 def fork_investigation(investigation_id: str, title: str | None = None) -> dict[str, Any]:
@@ -2557,6 +2661,7 @@ def study_detail(entity_id: str) -> dict[str, Any]:
         end_week = max(1, len(schedule.get("points", [])))
     study_summary = {
         "selected_run_id": entity.get("selected_run_id"),
+        "research_context": entity.get("research_context"),
         "workspace": bool(entity.get("workspace")),
         "active_data_revision_id": entity.get("active_data_revision_id"),
         "id": entity["id"],
@@ -2649,12 +2754,27 @@ def method_eligibility(entity: dict[str, Any], cohort: dict[str, Any], resolved:
     table_by_metric = {item["id"]: item["table"] for item in metrics}
     outcome = (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id") or (plan or {}).get("outcome_metric_id")
     table = table_by_metric.get(outcome)
+    scope = cohort.get("scope") or {"kind": "COHORT"}
     results = []
     for method in methods_for_snapshot(entity["dataset_snapshot_id"]):
         issues: list[str] = []
+        individual_method = method["id"] == "METH-U-INDIVIDUAL"
+        if scope["kind"] == "INDIVIDUAL" and not individual_method:
+            issues.append("Cohort-level method; an individual investigation has one participant and is analysed with the individual trajectory method.")
+        if scope["kind"] != "INDIVIDUAL" and individual_method:
+            issues.append("Individual-scope method; select a participant investigation to use it.")
+        if individual_method and scope["kind"] == "INDIVIDUAL" and table in method["required_tables"]:
+            frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
+            axis = "occasion" if table == "cmj_occasions" else "week"
+            column = next((item["column"] for item in metrics if item["id"] == outcome), None)
+            if axis in frame.columns and column in frame.columns:
+                own = frame.filter((pl.col("subject_id") == scope["subject_id"]) & pl.col(column).is_not_null() & pl.col(axis).is_not_null())
+                observed = own[axis].n_unique()
+                if observed < 2:
+                    issues.append(f"Only {observed} measured {axis}(s) for this participant; at least two are required for a within-person trajectory.")
         if table not in method["required_tables"]:
             issues.append(f"Requires {', '.join(method['required_tables'])}; selected outcome is in {table}.")
-        if table in method["required_tables"] and method["id"] in {"METH-U-DESC", "METH-U-CHANGE", "METH-REAL-DESC", "METH-REAL-TREND"}:
+        if table in method["required_tables"] and method["id"] in {"METH-U-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL", "METH-REAL-DESC", "METH-REAL-TREND"}:
             frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
             axis = "occasion" if table == "cmj_occasions" else "week" if table == "cmj_trials" else "activity"
             if axis not in frame.columns or frame[axis].drop_nulls().is_empty():
@@ -2792,6 +2912,8 @@ def report_payload(entity_id: str) -> dict[str, Any]:
     report["evidence"] = evidence
     report["figures"] = [{**figure, "data": figure.get("data")} for figure in figures]
     report["runs"] = [runs_by_id[item["analysis_run_id"]] for item in evidence if item["analysis_run_id"] in runs_by_id]
+    cited = sorted(evidence, key=lambda item: report["evidence_ids"].index(item["id"]))  # sections follow citation order
+    report["research_sections"] = research_sections([runs_by_id[item["analysis_run_id"]] for item in cited if item["analysis_run_id"] in runs_by_id]) if detail.get("workspace") else []
     report["study"] = detail["study"]
     report["project"] = detail["project"]
     report["question"] = detail["question"]
@@ -2815,6 +2937,35 @@ def report_payload(entity_id: str) -> dict[str, Any]:
     report["provenance_note"] = report["research"]["provenance_note"]
     report["export_url"] = f"/research/studies/{entity_id}/report/export"
     return report
+
+
+def report_section_label(run: dict[str, Any]) -> str:
+    scope = run.get("scope") or {"kind": "COHORT"}
+    if scope["kind"] != "INDIVIDUAL":
+        return "Cohort research"
+    investigation_id = scope.get("investigation_id") or ""
+    investigation = (next((v for v in investigation_versions(investigation_id) if v["version"] == scope["investigation_version"]), {})
+                     if scope.get("investigation_version") else get_investigation(investigation_id) or {})
+    return f"Individual investigation · participant {scope['subject_id']} · {investigation.get('title', scope.get('investigation_id'))}"
+
+
+def research_sections(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One labeled section per research scope; individual sections freeze the investigation version they cite."""
+    sections: dict[str, dict[str, Any]] = {}
+    for run in runs:
+        scope = run.get("scope") or {"kind": "COHORT"}
+        label = report_section_label(run)
+        section = sections.setdefault(label, {"label": label, "scope": scope, "run_ids": []})
+        section["run_ids"].append(run["id"])
+        if scope["kind"] == "INDIVIDUAL" and "investigation" not in section:
+            versions = investigation_versions(scope["investigation_id"])
+            captured_version = scope.get("investigation_version")
+            investigation = next((v for v in versions if v["version"] == captured_version), {}) if captured_version else (get_investigation(scope["investigation_id"]) or {})
+            section["investigation_context"] = "Captured at analysis execution" if captured_version else "Legacy run: investigation version was not captured; export-time context"
+            latest = {item["id"]: item for item in investigation.get("scenarios", [])}
+            section["investigation"] = {key: investigation.get(key) for key in ("id", "title", "version", "question", "protocol")}
+            section["scenarios"] = list(latest.values())
+    return list(sections.values())
 
 
 def report_limitations(detail: dict[str, Any]) -> list[str]:
@@ -2934,6 +3085,7 @@ def freeze_report(entity_id: str) -> dict[str, Any]:
             "snapshot_id": payload["snapshot"]["id"],
             "snapshot_checksums": payload["snapshot"].get("checksums", {}),
             "limitations": payload["research"]["limitations"],
+            "research_sections": payload["research_sections"],
         }
         content_hash = _digest(content)
         version = int(report["version"])
@@ -3128,6 +3280,32 @@ def _report_evidence_unit(item: dict[str, Any], run: dict[str, Any] | None) -> s
     return unit
 
 
+def _research_sections_html(sections: list[dict[str, Any]]) -> str:
+    """Separate labeled cohort/individual sections; hypothetical scenarios never appear as results."""
+    if not sections:
+        return ""  # Reports frozen before RES-647 keep their original HTML.
+    parts = ["<h2>Research scopes</h2>"]
+    for section in sections:
+        parts.append(f"<h3>{html.escape(section['label'])}</h3><p class=\"meta\">Runs {html.escape(', '.join(section['run_ids']))}</p>")
+        investigation = section.get("investigation")
+        if not investigation:
+            continue
+        protocol = investigation.get("protocol") or {}
+        parts.append(f"<p>{html.escape(str(investigation.get('question') or 'No question recorded.'))} "
+                     f"<span class=\"meta\">{html.escape(str(investigation.get('id')))} v{html.escape(str(investigation.get('version')))}</span></p>")
+        parts.append(f"<p><span class=\"badge\">{html.escape(str(protocol.get('design_label', '')))}</span></p>")
+        periods = "".join(f"<li>{html.escape(item['label'])} ({html.escape(item['kind'].lower())}) · {item['start']}–{item['end']}</li>"
+                          for item in protocol.get("periods", []))
+        if periods:
+            parts.append(f"<ul>{periods}</ul>")
+        for scenario in section.get("scenarios", []):
+            parts.append(f"<div class=\"warning\"><strong>HYPOTHETICAL · {html.escape(scenario['kind_label'])}</strong> "
+                         f"{html.escape(scenario['title'])} (v{scenario['version']}). {html.escape(scenario['qualification']['message'])} "
+                         f"Assumptions: {html.escape('; '.join(scenario['assumptions']))}.</div>")
+        parts.append("<p class=\"muted\">Observational within-person description; not a personalized causal estimate or forecast.</p>")
+    return "".join(parts)
+
+
 def export_html(entity_id: str, version: int | None = None) -> str:
     generated_at = _now()
     legacy_context = False
@@ -3211,6 +3389,7 @@ def export_html(entity_id: str, version: int | None = None) -> str:
         for item in figures
     )
     limitation_html = "".join(f"<li>{html.escape(item)}</li>" for item in limitations)
+    sections_html = _research_sections_html(payload.get("research_sections") or [])
     source = snapshot.get("source", {})
     title = html.escape(payload.get("title", "Research report"))
     narrative = "".join(
@@ -3261,6 +3440,7 @@ pre {{ white-space:pre-wrap; background:#161718; padding:12px; border:1px solid 
 <h2>4. Results</h2>
 {'<p class="muted">No evidence is cited. Promote a run and add it to the report.</p>' if not evidence else f'<table><thead><tr><th>Evidence</th><th>Result</th><th>Estimate</th><th>Interval</th><th>Run</th><th>Method status</th><th>Computed interpretation</th></tr></thead><tbody>{rows}</tbody></table>'}
 {figure_html}
+{sections_html}
 {narrative}
 <h2>5. Limitations</h2><ul>{limitation_html}</ul>
 <h2>6. Provenance and reproducibility</h2>

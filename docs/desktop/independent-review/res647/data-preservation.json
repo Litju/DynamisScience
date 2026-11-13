@@ -1,0 +1,33 @@
+{
+  "file_count_before": 1930,
+  "file_count_after": 1930,
+  "metadata_differences": [
+    {
+      "FullName": "D:\\datasets\\DynamisScience\\research\\research.db-shm",
+      "Length": 32768,
+      "LastWriteTimeUtc": "2026-11-12T15:56:31.0824404Z",
+      "SideIndicator": "=>"
+    },
+    {
+      "FullName": "D:\\datasets\\DynamisScience\\research\\research.db-shm",
+      "Length": 32768,
+      "LastWriteTimeUtc": "2026-11-12T14:56:54.795882Z",
+      "SideIndicator": "<="
+    }
+  ],
+  "research_files": [
+    {
+      "Path": "D:\\datasets\\DynamisScience\\research\\research.db",
+      "Hash": "93EBB1EEA705AC879F02DAB56B499397780ACC75E8AB45FE39C06AA21F35EAEA"
+    },
+    {
+      "Path": "D:\\datasets\\DynamisScience\\research\\research.db-shm",
+      "Hash": "FD4C9FDA9CD3F9AE7C962B0DDF37232294D55580E1AA165AA06129B8549389EB"
+    },
+    {
+      "Path": "D:\\datasets\\DynamisScience\\research\\research.db-wal",
+      "Hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    }
+  ],
+  "owner_manifest": "835398DA594421BC9F04647992B0E9CEFD5DC844FD931D1964896B2E164A2587"
+}

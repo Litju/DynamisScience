@@ -66,6 +66,17 @@ CMJ_RANGES = {
     "peak_power_w_kg": (0.0, 100.0),
     "rsi_mod": (0.0, 200.0),
 }
+# Broad physical/scale limits only; questionnaire scales differ (1–5, 1–7, 1–10, 0–100), so they are not rescaled.
+MONITORING_RANGES = {
+    "training_load_au": (0.0, 20000.0),
+    "sleep_hours": (0.0, 24.0),
+    "sleep_quality": (0.0, 100.0),
+    "wellness_score": (0.0, 100.0),
+    "fatigue": (0.0, 100.0),
+    "soreness": (0.0, 100.0),
+    "stress": (0.0, 100.0),
+    "mood": (0.0, 100.0),
+}
 SPRINT_RANGES = {
     "distance_m": (1.0, 100.0),
     "time_s": (0.3, 30.0),
@@ -604,6 +615,35 @@ def validate_sprint(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[
     return _quality_result(artifact, "SPRINT_TIMING", metadata, status, errors, warnings, rejected, quarantined, counts)
 
 
+def validate_monitoring(artifact: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+    """Athlete monitoring (load, sleep, wellness items): identity, a measured time axis, plausible values."""
+    family, errors, warnings = "ATHLETE_MONITORING", [], []
+    try:
+        frame = _read_frame(artifact)
+    except Exception as exc:
+        return _quality_result(artifact, family, metadata, "REJECTED", [f"corrupt or unreadable file: {type(exc).__name__}"], [], [], [], {})
+    axis = next((name for name in ("date", "day", "week") if name in frame.columns), None)
+    measures = [name for name in MONITORING_RANGES if name in frame.columns]
+    if "subject_id" not in frame.columns or axis is None or not measures:
+        errors.append("monitoring data need subject_id, a date/day/week column and at least one monitoring measure")
+    elif frame.is_empty() or frame["subject_id"].null_count() or frame[axis].null_count():
+        errors.append("missing subject or time-axis values")
+    elif frame.select(pl.struct("subject_id", axis).is_duplicated().any()).item():
+        errors.append(f"duplicate subject_id and {axis} records")
+    if errors:
+        return _quality_result(artifact, family, metadata, "REJECTED", errors, warnings, [], [], {"rows": frame.height})
+    quarantined = []
+    for column in measures:
+        low, high = MONITORING_RANGES[column]
+        bad = frame.filter((pl.col(column) < low) | (pl.col(column) > high))
+        if bad.height:
+            warnings.append(f"implausible {column} in {bad.height} records")
+            quarantined.append(column)
+    status = "QUARANTINED" if quarantined else "ADMITTED"
+    counts = {"rows": frame.height, "subjects": int(frame["subject_id"].n_unique()), "time_points": int(frame[axis].n_unique())}
+    return _quality_result(artifact, family, metadata, status, errors, warnings, [], quarantined, counts)
+
+
 def _quality_result(artifact, family, metadata, status, errors, warnings, rejected, quarantined, counts):
     assessment = {
         "source_artifact_id": artifact["id"],
@@ -738,6 +778,9 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
 
         assessment = traces.validate_trace(artifact, metadata)
         family_name = family
+    elif family == "ATHLETE_MONITORING":
+        assessment = validate_monitoring(artifact, metadata)
+        family_name = family
     else:
         raise ValueError(f"Unsupported measurement family: {family}")
 
@@ -756,8 +799,11 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             table_name, row_count, hashes = traces.TRIALS, written["rows"][traces.TRIALS], written["hashes"]
             tables = {name: {"file": f"{name}.parquet", "rows": rows} for name, rows in written["rows"].items()}
         else:
-            frame = harmonize_cmj(artifact, metadata) if family == "CMJ_FORCE_PLATFORM" else harmonize_sprint(artifact, metadata)
-            table_name = "cmj_trials" if family == "CMJ_FORCE_PLATFORM" else "sprint_trials"
+            if family == "ATHLETE_MONITORING":  # already canonical; only provenance is added
+                frame = _read_frame(artifact).with_columns(pl.lit(artifact["id"]).alias("source_artifact_id"))
+            else:
+                frame = harmonize_cmj(artifact, metadata) if family == "CMJ_FORCE_PLATFORM" else harmonize_sprint(artifact, metadata)
+            table_name = {"CMJ_FORCE_PLATFORM": "cmj_trials", "SPRINT_TIMING": "sprint_trials"}.get(family, "monitoring")
             out_path = snapshot_dir / f"{table_name}.parquet"
             frame.write_parquet(out_path, compression="zstd")
             row_count, hashes = frame.height, {f"{table_name}.parquet": hashlib.sha256(out_path.read_bytes()).hexdigest()}
@@ -860,7 +906,7 @@ def get_admitted_snapshot(snapshot_id: str) -> dict[str, Any] | None:
         return None
     directory = _admitted_dir() / snapshot["id"]
     table = snapshot.get("table", "")
-    if table not in {"cmj_trials", "sprint_trials", "trace_index"}:
+    if table not in {"cmj_trials", "sprint_trials", "trace_index", "monitoring"}:
         return None
     tables = snapshot.get("tables") or {table: {"file": f"{table}.parquet", "rows": snapshot.get("row_count", 0)}}
     if not all((directory / f"{name}.parquet").is_file() for name in tables):
