@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 import importlib.util
+import os
 from pathlib import Path
+import stat
 import sys
 from types import SimpleNamespace
 
@@ -216,4 +218,34 @@ def test_runner_retains_locked_or_unknown_run_created_worktrees(tmp_path, monkey
         "retained: Git reports a lock",
         "retained: dirty or unknown status",
     ]
+
+
+def test_disposable_source_copy_preserves_content_without_readonly_attributes(tmp_path):
+    qa_run = _load_qa_run_module()
+    source = tmp_path / "source"
+    destination_parent = tmp_path / "scratch"
+    destination = destination_parent / "copy"
+    source.mkdir()
+    destination_parent.mkdir()
+    nested = source / "snapshots" / "DS-REAL-SYNTHETIC"
+    nested.mkdir(parents=True)
+    source_file = nested / "observations.parquet"
+    source_file.write_bytes(b"synthetic fixture bytes")
+    original_mode = source_file.stat().st_mode
+    source_file.chmod(original_mode & ~stat.S_IWUSR)
+    try:
+        copied = qa_run._copy_source(source, destination)
+        copied_file = destination / "snapshots" / "DS-REAL-SYNTHETIC" / "observations.parquet"
+
+        assert copied["file_count"] == 1
+        assert copied["bytes"] == len(b"synthetic fixture bytes")
+        assert copied_file.read_bytes() == source_file.read_bytes()
+        assert copied_file.stat().st_mode & stat.S_IWUSR
+        assert not source_file.stat().st_mode & stat.S_IWUSR
+        # Writable test copies can be purged normally; the source attribute stays unchanged.
+        assert os.access(copied_file, os.W_OK)
+    finally:
+        # This is an artificial read-only test fixture under pytest basetemp.
+        # Restore its initial mode so the bounded scratch purger can remove it normally.
+        source_file.chmod(original_mode)
 

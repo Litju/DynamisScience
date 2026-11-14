@@ -170,12 +170,27 @@ def _copy_source(source: Path, destination: Path) -> dict[str, Any]:
         raise QaRunError("The authorized test source root is missing or unsafe.")
     if tree_bytes(source) > shutil.disk_usage(destination.parent).free:
         raise QaRunError("Insufficient free space for one disposable research source copy.")
-    shutil.copytree(source, destination, symlinks=False)
+    _copy_tree_contents(source, destination)
     source_count, source_bytes, source_hash = _hash_tree(source)
     copy_count, copy_bytes, copy_hash = _hash_tree(destination)
     if (source_count, source_bytes, source_hash) != (copy_count, copy_bytes, copy_hash):
         raise QaRunError("Disposable research source copy failed full file-hash verification.")
     return {"file_count": source_count, "bytes": source_bytes, "tree_sha256": source_hash}
+
+
+def _copy_tree_contents(source: Path, destination: Path) -> None:
+    """Copy files into a writable disposable tree without cloning source attributes."""
+    destination.mkdir()
+    for source_entry in source.iterdir():
+        if source_entry.is_symlink():
+            raise QaRunError(f"Research source contains a symbolic link: {source_entry}")
+        target = destination / source_entry.name
+        if source_entry.is_dir():
+            _copy_tree_contents(source_entry, target)
+        elif source_entry.is_file():
+            shutil.copyfile(source_entry, target)
+        else:
+            raise QaRunError(f"Research source contains an unsupported entry: {source_entry}")
 
 
 def _terminate_tree(process: subprocess.Popen[bytes]) -> None:

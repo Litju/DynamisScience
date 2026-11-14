@@ -170,10 +170,22 @@ real_root = Path(os.environ["DYNAMISSCIENCE_REAL_TEST_ROOT"])
 (real_root / "snapshots").mkdir(parents=True)
 (real_root / "manifests").mkdir()
 (real_root / "research").mkdir()
-shutil.copy2(source_root / "manifests" / "admissions.json", real_root / "manifests")
+shutil.copyfile(source_root / "manifests" / "admissions.json", real_root / "manifests" / "admissions.json")
+def copy_data_tree(source, destination):
+    destination.mkdir()
+    for source_entry in source.iterdir():
+        if source_entry.is_symlink():
+            raise RuntimeError(f"Research source contains a symbolic link: {source_entry}")
+        target = destination / source_entry.name
+        if source_entry.is_dir():
+            copy_data_tree(source_entry, target)
+        elif source_entry.is_file():
+            shutil.copyfile(source_entry, target)
+        else:
+            raise RuntimeError(f"Unsupported research source entry: {source_entry}")
 for source_snapshot in sorted((source_root / "snapshots").glob("DS-REAL-*")):
     copied = real_root / "snapshots" / source_snapshot.name
-    shutil.copytree(source_snapshot, copied)
+    copy_data_tree(source_snapshot, copied)
     manifest = json.loads((copied / "snapshot.json").read_text(encoding="utf-8"))
     for filename, expected in manifest.get("checksums", {}).items():
         with (copied / filename).open("rb") as handle:
@@ -217,7 +229,7 @@ for activity, prefix in {"Walking": "walk", "Running": "run", "Heel drop": "heel
     destination.mkdir(parents=True, exist_ok=True)
     for source_file in files:
         target_file = destination / source_file.name
-        shutil.copy2(source_file, target_file)
+        shutil.copyfile(source_file, target_file)
         with source_file.open("rb") as handle:
             source_digest = hashlib.file_digest(handle, "sha256").hexdigest()
         with target_file.open("rb") as handle:
