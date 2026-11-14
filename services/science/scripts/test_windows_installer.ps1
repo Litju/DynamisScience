@@ -1,12 +1,29 @@
 param([switch]$TestIdentity)
 $ErrorActionPreference = "Stop"
 $serviceRoot = Split-Path -Parent $PSScriptRoot
-$repoRoot = Split-Path -Parent (Split-Path -Parent $serviceRoot)
-$sourceDataRoot = if ($env:DYNAMISSCIENCE_DATA_ROOT) { $env:DYNAMISSCIENCE_DATA_ROOT } else { "D:\datasets\DynamisScience" }
+$qaRunRoot = $env:DYNAMISSCIENCE_QA_RUN_ROOT
+$qaRunId = $env:DYNAMISSCIENCE_QA_RUN_ID
+if (-not $qaRunRoot -or -not $qaRunId) {
+    throw "Use scripts\qa_run.py run to allocate an owned, bounded scratch root before installer verification."
+}
+$qaRunRoot = [System.IO.Path]::GetFullPath($qaRunRoot).TrimEnd([char] '\', [char] '/')
+$runMarkerPath = Join-Path $qaRunRoot ".dynamisscience-qa-run.json"
+if (-not (Test-Path -LiteralPath $runMarkerPath)) { throw "QA scratch ownership marker is missing." }
+$runMarker = Get-Content -LiteralPath $runMarkerPath -Raw | ConvertFrom-Json
+if ($runMarker.run_id -ne $qaRunId -or $runMarker.state -ne "RUNNING") {
+    throw "QA scratch ownership marker does not match the active run."
+}
+$sourceDataRoot = $env:DYNAMISSCIENCE_DATA_ROOT
+if (-not $sourceDataRoot) { throw "A disposable research source copy is required for installer verification." }
+$sourceDataRoot = [System.IO.Path]::GetFullPath($sourceDataRoot).TrimEnd([char] '\', [char] '/')
+if (-not $sourceDataRoot.StartsWith($qaRunRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Installer verification research input must be copied beneath the active QA scratch root."
+}
 if (-not (Test-Path -LiteralPath (Join-Path $sourceDataRoot "research\research.db"))) {
     throw "Verified Mendeley/MoveSmart source data is required for packaged scientific regression."
 }
-$packagingRecord = Get-ChildItem -LiteralPath (Join-Path $serviceRoot "build") -Directory |
+$packagingRoot = Join-Path $qaRunRoot "build"
+$packagingRecord = Get-ChildItem -LiteralPath $packagingRoot -Directory |
     Where-Object { $_.Name -like "res604-*" } |
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 1
@@ -416,10 +433,10 @@ finally {
         $testRootName -notmatch '^dynamis-g4-installer-[0-9a-f]{32}$') {
         throw "Refusing to remove an unexpected installer test directory."
     }
-    Remove-Item -LiteralPath $testRootPath -Recurse -Force
+    Remove-Item -LiteralPath $testRootPath -Recurse
 }
 $benchmarks.temporary_test_root_removed = -not (Test-Path -LiteralPath $testRootPath)
 if (-not $benchmarks.temporary_test_root_removed) { throw "The disposable installer test data was not removed." }
-$outputPath = Join-Path $repoRoot "docs\desktop\evidence\g4-packaging-benchmarks.json"
+$outputPath = Join-Path $qaRunRoot "installer-test-result.json"
 $benchmarks | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $outputPath -Encoding utf8
 Get-Content -LiteralPath $outputPath -Raw

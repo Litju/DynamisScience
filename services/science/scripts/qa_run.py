@@ -85,6 +85,7 @@ def _worktree_snapshot() -> list[dict[str, Any]]:
             "path": path,
             "head": fields.get("HEAD"),
             "branch": fields.get("branch"),
+            "locked": fields.get("locked"),
             "primary": Path(path).resolve() == REPOSITORY_ROOT.resolve(),
             "detached": "detached" in fields,
         }
@@ -102,6 +103,45 @@ def _worktree_snapshot() -> list[dict[str, Any]]:
         entry["cleanup"] = "retained: not created by this run"
         records.append(entry)
     return records
+
+
+def _cleanup_run_created_worktrees(
+    before: list[dict[str, Any]], after: list[dict[str, Any]], run_root: Path
+) -> list[dict[str, str]]:
+    """Remove only clean, unlocked worktrees created beneath this run's scratch root."""
+    known_paths = {str(Path(item["path"]).resolve()) for item in before if item.get("path")}
+    actions: list[dict[str, str]] = []
+    for item in after:
+        raw_path = item.get("path")
+        if not raw_path:
+            continue
+        path = Path(raw_path).resolve(strict=False)
+        if str(path) in known_paths:
+            continue
+        record = {"path": str(path)}
+        if not path.is_relative_to(run_root.resolve()):
+            record["action"] = "retained: outside this run's owned scratch"
+        elif item.get("primary"):
+            record["action"] = "retained: primary repository worktree"
+        elif item.get("locked") is not None:
+            record["action"] = "retained: Git reports a lock"
+        elif item.get("status") != "clean":
+            record["action"] = "retained: dirty or unknown status"
+        else:
+            completed = subprocess.run(
+                ["git", "-C", str(REPOSITORY_ROOT), "worktree", "remove", str(path)],
+                cwd=REPOSITORY_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if completed.returncode == 0:
+                record["action"] = "removed: clean run-created worktree via git worktree remove"
+            else:
+                reason = completed.stderr.strip() or f"git exited {completed.returncode}"
+                record["action"] = f"retained: Git refused worktree removal ({reason})"
+        actions.append(record)
+    return actions
 
 
 def _hash_tree(root: Path) -> tuple[int, int, str]:
@@ -223,6 +263,7 @@ def run_command(args: argparse.Namespace) -> int:
             "source_state": _source_state(),
             "initial_scratch_bytes": tree_bytes(run_root),
             "source_copy": None,
+            "protected_root_fingerprint_before": None,
         }
     )
     child_env = os.environ.copy()
@@ -251,6 +292,7 @@ def run_command(args: argparse.Namespace) -> int:
                 )
             marker["source_copy"] = _copy_source(dataset_root, source_copy)
             child_env["DYNAMISSCIENCE_TEST_SOURCE_ROOT"] = str(source_copy)
+            child_env["DYNAMISSCIENCE_DATA_ROOT"] = str(source_copy)
         except Exception as exc:
             marker["setup_error"] = f"{type(exc).__name__}: {exc}"
             marker["state"] = "AWAITING_LINEAR_RECORD"
@@ -264,6 +306,25 @@ def run_command(args: argparse.Namespace) -> int:
             return 125
     else:
         child_env.pop("DYNAMISSCIENCE_TEST_SOURCE_ROOT", None)
+    if dataset_root.is_dir():
+        try:
+            count, size, digest = _hash_tree(dataset_root)
+            marker["protected_root_fingerprint_before"] = {
+                "file_count": count,
+                "bytes": size,
+                "tree_sha256": digest,
+            }
+        except Exception as exc:
+            marker["setup_error"] = f"{type(exc).__name__}: {exc}"
+            marker["state"] = "AWAITING_LINEAR_RECORD"
+            marker["exit_code"] = 125
+            marker["finished_at"] = datetime.now(UTC).isoformat()
+            marker["peak_bytes"] = tree_bytes(run_root)
+            marker["bytes_reclaimable"] = marker["peak_bytes"]
+            marker["free_bytes_end_before_purge"] = shutil.disk_usage(run_root).free
+            write_marker(run_root, marker)
+            print(json.dumps(_summary(marker, run_root), indent=2))
+            return 125
     child_command = _command_with_pytest_scratch(command, run_root)
     if args.copy_source:
         marker["source_copy"] = marker.get("source_copy")
@@ -274,6 +335,7 @@ def run_command(args: argparse.Namespace) -> int:
     spawn_error: str | None = None
     started = time.monotonic()
     process: subprocess.Popen[bytes] | None = None
+    worktrees_before = _worktree_snapshot()
     try:
         with RunLock(run_root), log_path.open("wb") as log:
             try:
@@ -332,6 +394,16 @@ def run_command(args: argparse.Namespace) -> int:
             os.fsync(log.fileno())
         peak = max(peak, tree_bytes(run_root))
         log_hash = hashlib.sha256(log_path.read_bytes()).hexdigest() if log_path.exists() else None
+        worktree_actions = _cleanup_run_created_worktrees(
+            worktrees_before, _worktree_snapshot(), run_root
+        )
+        if dataset_root.is_dir():
+            count, size, digest = _hash_tree(dataset_root)
+            marker["protected_root_fingerprint_after"] = {
+                "file_count": count,
+                "bytes": size,
+                "tree_sha256": digest,
+            }
         marker.update(
             {
                 "state": "AWAITING_LINEAR_RECORD",
@@ -346,6 +418,7 @@ def run_command(args: argparse.Namespace) -> int:
                 "log_sha256": log_hash,
                 "test_summary": _pytest_summary(log_path),
                 "worktrees": _worktree_snapshot(),
+                "worktree_actions": worktree_actions,
             }
         )
         write_marker(run_root, marker)
@@ -353,6 +426,18 @@ def run_command(args: argparse.Namespace) -> int:
         return return_code if budget_reason is None else (return_code or 124)
     except Exception:
         # Preserve a marked failure for its compact Linear disposition and guarded purge.
+        if dataset_root.is_dir():
+            try:
+                count, size, digest = _hash_tree(dataset_root)
+                marker["protected_root_fingerprint_after"] = {
+                    "file_count": count,
+                    "bytes": size,
+                    "tree_sha256": digest,
+                }
+            except Exception as fingerprint_error:
+                marker["protected_root_fingerprint_error"] = (
+                    f"{type(fingerprint_error).__name__}: {fingerprint_error}"
+                )
         marker.update(
             {
                 "state": "AWAITING_LINEAR_RECORD",
@@ -390,11 +475,19 @@ def _summary(marker: dict[str, Any], run_root: Path) -> dict[str, Any]:
         "free_bytes_start": marker.get("free_bytes_start"),
         "free_bytes_end_before_purge": marker.get("free_bytes_end_before_purge"),
         "source_copy": marker.get("source_copy"),
+        "protected_root_fingerprint_before": marker.get("protected_root_fingerprint_before"),
+        "protected_root_fingerprint_after": marker.get("protected_root_fingerprint_after"),
+        "protected_root_mutated": (
+            marker.get("protected_root_fingerprint_before") != marker.get("protected_root_fingerprint_after")
+            if marker.get("protected_root_fingerprint_before") is not None
+            and marker.get("protected_root_fingerprint_after") is not None
+            else None
+        ),
         "log_sha256": marker.get("log_sha256"),
         "log_path": marker.get("log_path"),
         "worktrees": marker.get("worktrees", _worktree_snapshot()),
+        "worktree_actions": marker.get("worktree_actions", []),
         "linear_record_required_before_purge": True,
-        "owner_data_root_mutated": False,
     }
 
 

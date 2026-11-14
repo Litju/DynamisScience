@@ -22,8 +22,29 @@ function Invoke-Native {
 
 $serviceRoot = Split-Path -Parent $PSScriptRoot
 $repoRoot = Split-Path -Parent (Split-Path -Parent $serviceRoot)
+$qaRunRoot = $env:DYNAMISSCIENCE_QA_RUN_ROOT
+$qaRunId = $env:DYNAMISSCIENCE_QA_RUN_ID
+if (-not $qaRunRoot -or -not $qaRunId) {
+    throw "Use scripts\qa_run.py run to allocate an owned, bounded scratch root before packaging."
+}
+$qaRunRoot = [System.IO.Path]::GetFullPath($qaRunRoot).TrimEnd([char] '\', [char] '/')
+$repositoryFullPath = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd([char] '\', [char] '/')
+$datasetRoot = [System.IO.Path]::GetFullPath('D:\datasets\DynamisScience').TrimEnd([char] '\', [char] '/')
+foreach ($protectedRoot in @($repositoryFullPath, $datasetRoot)) {
+    if ($qaRunRoot.Equals($protectedRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $qaRunRoot.StartsWith($protectedRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $protectedRoot.StartsWith($qaRunRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "QA package root overlaps a protected path: $protectedRoot"
+    }
+}
+$runMarkerPath = Join-Path $qaRunRoot ".dynamisscience-qa-run.json"
+if (-not (Test-Path -LiteralPath $runMarkerPath)) { throw "QA scratch ownership marker is missing." }
+$runMarker = Get-Content -LiteralPath $runMarkerPath -Raw | ConvertFrom-Json
+if ($runMarker.run_id -ne $qaRunId -or $runMarker.state -ne "RUNNING") {
+    throw "QA scratch ownership marker does not match the active run."
+}
 $buildName = "res604-" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
-$buildRoot = Join-Path (Join-Path $serviceRoot "build") $buildName
+$buildRoot = Join-Path (Join-Path $qaRunRoot "build") $buildName
 $fixtureRoot = Join-Path $buildRoot "fixture-data"
 $thirdPartyNotices = Join-Path $buildRoot "THIRD_PARTY_NOTICES.txt"
 $distRoot = Join-Path $buildRoot "dist"
@@ -43,13 +64,13 @@ $env:DYNAMISSCIENCE_FIXTURE_DIR = $fixtureRoot
 $env:DYNAMISSCIENCE_THIRD_PARTY_NOTICES = $thirdPartyNotices
 Push-Location $serviceRoot
 try {
-    Invoke-Native "Generating the bundled synthetic fixture" { uv run python -m dynamis_science.generate } | Out-Host
+    Invoke-Native "Generating the bundled synthetic fixture" { uv run --locked python -m dynamis_science.generate } | Out-Host
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot "artifacts\dataset_snapshot.json"))) {
         throw "The generated synthetic snapshot manifest is missing."
     }
 
     Invoke-Native "Collecting third-party license notices" {
-        uv run python scripts\build_third_party_notices.py --output $thirdPartyNotices } | Out-Host
+        uv run --locked python scripts\build_third_party_notices.py --output $thirdPartyNotices } | Out-Host
 
     $originalPath = $env:PATH
     $uvDirectory = Split-Path -Parent (Get-Command uv.exe).Source
@@ -65,7 +86,7 @@ try {
     try {
         $env:PATH = $cleanBuildPath
         Invoke-Native "PyInstaller (onedir application)" {
-            uv run python -m PyInstaller packaging\DynamisScience.spec --noconfirm --clean --log-level WARN --distpath $distRoot --workpath $workRoot } | Out-Host
+            uv run --locked python -m PyInstaller packaging\DynamisScience.spec --noconfirm --clean --log-level WARN --distpath $distRoot --workpath $workRoot } | Out-Host
     }
     finally {
         $env:PATH = $originalPath
@@ -104,8 +125,8 @@ try {
         source_status = $sourceStatus
         source_diff_sha256 = $sourceDiffSha256
         app_version = $AppVersion
-        python_version = (Invoke-Native "Python version" { uv run python --version }) -join " "
-        pyinstaller_version = (Invoke-Native "PyInstaller version" { uv run python -m PyInstaller --version }) -join " "
+        python_version = (Invoke-Native "Python version" { uv run --locked python --version }) -join " "
+        pyinstaller_version = (Invoke-Native "PyInstaller version" { uv run --locked python -m PyInstaller --version }) -join " "
         inno_setup = $isccPath
         fixture = "DS-SYNTH-001 generated in an isolated build directory"
         bundle_bytes = [long]$bundleBytes

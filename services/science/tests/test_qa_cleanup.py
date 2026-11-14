@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import importlib.util
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
 
 from dynamis_science import qa_cleanup
+
+
+def _load_qa_run_module():
+    script = Path(__file__).resolve().parents[1] / "scripts" / "qa_run.py"
+    spec = importlib.util.spec_from_file_location("dynamis_science_qa_run_test", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _allocate(tmp_path: Path) -> tuple[Path, dict[str, object]]:
@@ -138,4 +150,70 @@ def test_unmarked_directory_cannot_be_purged(tmp_path):
         qa_cleanup.finalize_purge(
             target, issue_id="RES-648", linear_recording_reference="comment-id"
         )
+
+
+def test_runner_removes_only_clean_run_created_scratch_worktrees(tmp_path, monkeypatch):
+    qa_run = _load_qa_run_module()
+
+    run_root = tmp_path / "scratch" / "dynamisscience-qa-run"
+    run_root.mkdir(parents=True)
+    old_path = tmp_path / "existing-clean-worktree"
+    primary_path = tmp_path / "repo"
+    dirty_path = run_root / "dirty-worktree"
+    clean_path = run_root / "clean-worktree"
+    before = [
+        {"path": str(old_path), "status": "clean", "primary": False},
+        {"path": str(primary_path), "status": "clean", "primary": True},
+    ]
+    after = [
+        *before,
+        {"path": str(dirty_path), "status": "dirty-or-unknown", "primary": False},
+        {"path": str(clean_path), "status": "clean", "primary": False},
+    ]
+    removed = []
+
+    def fake_run(command, **_kwargs):
+        removed.append(command[-1])
+        return SimpleNamespace(returncode=0, stderr="")
+
+    monkeypatch.setattr(qa_run, "REPOSITORY_ROOT", primary_path)
+    monkeypatch.setattr(qa_run.subprocess, "run", fake_run)
+
+    actions = qa_run._cleanup_run_created_worktrees(before, after, run_root)
+
+    assert removed == [str(clean_path.resolve())]
+    assert [item["action"] for item in actions] == [
+        "retained: dirty or unknown status",
+        "removed: clean run-created worktree via git worktree remove",
+    ]
+
+
+def test_runner_retains_locked_or_unknown_run_created_worktrees(tmp_path, monkeypatch):
+    qa_run = _load_qa_run_module()
+
+    run_root = tmp_path / "scratch" / "dynamisscience-qa-run"
+    run_root.mkdir(parents=True)
+    before = []
+    locked = run_root / "locked"
+    unknown = run_root / "unknown"
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("Git removal must not be attempted for locked or unknown worktrees")
+
+    monkeypatch.setattr(qa_run, "REPOSITORY_ROOT", tmp_path / "repo")
+    monkeypatch.setattr(qa_run.subprocess, "run", fail_if_called)
+
+    actions = qa_run._cleanup_run_created_worktrees(
+        before,
+        [
+            {"path": str(locked), "status": "clean", "primary": False, "locked": "user"},
+            {"path": str(unknown), "status": "unknown", "primary": False},
+        ],
+        run_root,
+    )
+
+    assert [item["action"] for item in actions] == [
+        "retained: Git reports a lock",
+        "retained: dirty or unknown status",
+    ]
 
