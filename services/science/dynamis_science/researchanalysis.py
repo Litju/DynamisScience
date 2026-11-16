@@ -243,7 +243,16 @@ def execute(
                                 entity.get("active_data_revision_id"), cohort_ids, excluded_subject_ids or [])
     diagnostics: dict[str, Any] = {}
     figure_data: dict[str, Any] | None = None
-    if method_id == "METH-REAL-TREND":
+    if method_id == 'METH-EXPERIMENT-DESC':
+        from . import experiments
+        context = experiments.analysis_context(entity, cohort['scope'], parameters)
+        result = experiments.describe(context)
+        binding['experiment'] = {key: result[key] for key in ('subject_id', 'protocol_version', 'protocol',
+            'investigation_version', 'source_data_revision_ids', 'source_revisions', 'observations')}
+        diagnostics = dict(status='COMPUTED', limitations=result['limitations'],
+                           phases=[{'period': f['period']['id'], 'limitations': f['limitations']} for f in result['phases']])
+        figure_data = dict(kind='EXPERIMENT', unit=metric['unit'], observations=result['observations'])
+    elif method_id == "METH-REAL-TREND":
         frame = researchstore.read_snapshot_table(snapshot_id, "cmj_occasions")
         result = realanalysis._fit_trend(
             frame,

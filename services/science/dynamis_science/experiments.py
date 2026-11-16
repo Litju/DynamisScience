@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import math
 import secrets
+import copy
 from datetime import datetime
-from statistics import mean
+from statistics import mean, median, stdev
 
 from . import longitudinal as long, researchstore as store
 from .method_catalogue import method_spec
@@ -152,8 +153,8 @@ def record_visit(investigation_id: str, visit: dict, base_version: int) -> dict:
                                             inv['version'] if base_version is None else base_version, 'experiment.visit_recorded')
 
 
-def timeline(investigation_id: str, protocol_version: int | None = None) -> dict:
-    inv = long.get_individual_investigation(investigation_id)
+def timeline(investigation_id: str, protocol_version: int | None = None, *, investigation: dict | None = None) -> dict:
+    inv = investigation if investigation is not None else long.get_individual_investigation(investigation_id)
     plans = inv.get('experiment_protocols', [])
     plan = next((p for p in plans if p['version'] == protocol_version), None) if protocol_version else (plans[-1] if plans else None)
     method = method_spec('METH-EXPERIMENT')
@@ -185,3 +186,127 @@ def timeline(investigation_id: str, protocol_version: int | None = None) -> dict
             change_from_baseline=average-reference if average is not None and reference is not None else None,
             unit=plan['unit'], interpretation='Descriptive observed change only; no causal estimate'))
     return result
+
+
+def analysis_context(entity: dict, scope: dict, parameters: dict) -> dict:
+    """Read the captured investigation version, never a newer correction during execution."""
+    identity = scope.get('investigation_id')
+    if scope.get('kind') != 'INDIVIDUAL' or not identity:
+        return {'issues': ['Select an individual experiment investigation.']}
+    inv = store.get_investigation(identity)
+    version = scope.get('investigation_version')
+    if version is not None:
+        inv = next((v for v in store.investigation_versions(identity) if v['version'] == version), None)
+    if not inv or inv['study_id'] != entity['id'] or inv.get('scope', {}).get('subject_id') != scope.get('subject_id'):
+        return {'issues': ['The investigation, participant or workspace binding is incompatible.']}
+    version = parameters.get('protocol_version')
+    if version is not None and (type(version) is not int or version < 1):
+        return {'issues': ['protocol_version must be a positive integer.']}
+    data = timeline(identity, version, investigation=inv)
+    p = data['protocol']
+    if not p:
+        return {'issues': ['No saved prospective experimental protocol at the selected version.']}
+    revision = store.get_data_revision(entity.get('active_data_revision_id') or '')
+    issues = []
+    if not revision or revision['workspace_id'] != entity['id']:
+        issues.append('Pin an admitted data revision in this workspace.')
+    source_ids = {r['visit']['data_revision_id'] for r in data['rows'] if r['visit']}
+    sources = [store.get_data_revision(r) for r in sorted(source_ids)]
+    if revision:
+        for source in sources:
+            if (not source or source['workspace_id'] != entity['id'] or source['number'] > revision['number']
+                    or not set(source['input_snapshot_ids']) <= set(revision['input_snapshot_ids'])):
+                issues.append('Visit revisions are incompatible with the pinned data revision; select a revision containing their source data.')
+                break
+    for row in data['rows']:
+        v = row['visit']
+        if not v:
+            continue
+        if v['subject_id'] != p['subject_id'] or v['outcome_metric_id'] != p['outcome_metric_id'] or v['unit'] != p['unit']:
+            issues.append('Visit participant, outcome or units differ from the saved protocol.')
+        if v.get('measurement') and (not math.isfinite(v['measurement']['mean']) or v['measurement']['n_trials'] < 1):
+            issues.append('A measured visit has no finite QC-eligible session mean.')
+    return dict(issues=issues, investigation=inv, timeline=data, revision=revision,
+                sources=sources, subject_id=p['subject_id'])
+
+
+def analysis_eligibility(method: dict, metric: dict, subjects: list[str], scope: dict,
+                         parameters: dict, context: dict | None) -> dict:
+    context = context or {'issues': ['Experimental protocol and recorded-visit context is required.']}
+    issues = list(context.get('issues', []))
+    data = context.get('timeline') or {}
+    p = data.get('protocol') or {}
+    if scope.get('kind') != 'INDIVIDUAL' or subjects != [p.get('subject_id')]:
+        issues.append('This method describes exactly one pinned athlete; cross-subject comparisons are unsupported.')
+    if p.get('design') not in method['supported_designs'] or not p.get('prespecified'):
+        issues.append('Incompatible experimental design: a saved prospective N-of-1 protocol is required.')
+    if metric['table'] not in method['required_tables'] or metric['id'] != p.get('outcome_metric_id') or metric.get('unit') != p.get('unit'):
+        issues.append('Outcome and units must match the experimental protocol.')
+    if set(parameters) - {'protocol_version'}:
+        issues.append('Unsupported comparison or parameter; this method provides phase descriptions only.')
+    observed = sum(r['mean'] is not None for r in data.get('rows', []))
+    if not observed:
+        issues.append('At least one recorded QC-eligible measurement is required; planned or missing visits are not observations.')
+    return {**copy.deepcopy(method), 'method_id': method['id'], 'status': 'INELIGIBLE' if issues else 'ELIGIBLE',
+            'issues': issues, 'population': {'subjects': len(subjects), 'observed_sessions': observed},
+            'protocol_version': p.get('version'), 'limitations': [*method['limitations'], *DESCRIPTION_LIMITS]}
+
+
+DESCRIPTION_LIMITS = [
+    'Descriptive observed changes only. Causal experimental inference is NOT_QUALIFIED; no effect estimate, confidence interval or p-value is supplied.',
+    'Phase differences may reflect time trends, order, carryover, testing changes or other exposures; they cannot be attributed to treatment.',
+    'Serial dependence between visits is not modeled. Slopes and sample SD describe the recorded data, not independent-sample uncertainty.',
+    'Unequal phase durations and informative missingness can distort phase summaries; missing or unrecorded visits are never imputed.',
+    'Phase membership uses the actual ordinal occasion; date-based trends use actual elapsed days. Documented exposure is not inferred from the planned phase.',
+    'Phase SD is variation between session means, not measurement error or a response threshold. Each visit has equal weight regardless of trial count.',
+]
+
+
+def describe(context: dict) -> dict:
+    """Pure phase arithmetic on a frozen, eligibility-checked visit ledger."""
+    data, inv = context['timeline'], context['investigation']
+    p = data['protocol']
+    rows = copy.deepcopy(data['rows'])
+    phases = []
+    baseline = [r['mean'] for r in rows if r['mean'] is not None and r['observed_period']
+                and r['observed_period']['kind'] == 'BASELINE']
+    baseline_mean = mean(baseline) if baseline else None
+    for phase in p['periods']:
+        scheduled = [r for r in rows if r['period']['id'] == phase['id']]
+        observed = [r for r in rows if r['observed_period'] and r['observed_period']['id'] == phase['id'] and r['mean'] is not None]
+        observed.sort(key=lambda r: datetime.fromisoformat(r['visit']['occurred_at']))
+        values = [r['mean'] for r in observed]
+        dates = [datetime.fromisoformat(r['visit']['occurred_at']) for r in observed]
+        n = len(values)
+        days = [(d-dates[0]).total_seconds()/86400 for d in dates] if dates else []
+        distinct = len(set(days))
+        slope = None
+        if n >= 3 and distinct >= 3:
+            center = mean(days)
+            slope = sum((x-center)*(y-mean(values)) for x, y in zip(days, values))/sum((x-center)**2 for x in days)
+        limitations = []
+        if n < 2:
+            limitations.append('Insufficient observations: within-phase SD and first-to-last change need at least two sessions on distinct dates.')
+        if n < 3 or distinct < 3:
+            limitations.append('Insufficient distinct visit dates: descriptive trend needs at least three sessions on three dates.')
+        if n > distinct:
+            limitations.append('Repeated timestamps: within-day order is unknown; tied endpoints do not support a first-to-last change.')
+        if baseline_mean is None:
+            limitations.append('No observed baseline; change from baseline is unavailable.')
+        endpoint_unique = n >= 2 and days.count(days[0]) == 1 and days.count(days[-1]) == 1
+        phases.append(dict(period=phase, n_sessions=n, n_trials=sum(r['visit']['measurement']['n_trials'] for r in observed),
+            scheduled_n=len(scheduled), scheduled_measured_n=sum(r['status']=='MEASURED' for r in scheduled),
+            missing_n=sum(r['status']=='MISSING' for r in scheduled), unrecorded_n=sum(r['status']=='PLANNED' for r in scheduled),
+            mean=mean(values) if values else None, median=median(values) if values else None,
+            sd=stdev(values) if n >= 2 else None, minimum=min(values) if values else None, maximum=max(values) if values else None,
+            first_date=dates[0].isoformat() if dates else None, last_date=dates[-1].isoformat() if dates else None,
+            observed_change=values[-1]-values[0] if endpoint_unique else None,
+            change_from_baseline=mean(values)-baseline_mean if values and baseline_mean is not None else None,
+            slope_per_day=slope, limitations=limitations))
+    return dict(method='Individual experimental phase descriptions', status='COMPUTED', subject_id=p['subject_id'],
+        protocol_version=p['version'], protocol=copy.deepcopy(p), investigation_version=inv['version'],
+        data_revision_id=context['revision']['id'], source_data_revision_ids=[s['id'] for s in context['sources']],
+        source_revisions=copy.deepcopy(context['sources']), unit=p['unit'], outcome=p['outcome_metric_id'],
+        n_subjects=1, n_observations=sum(f['n_sessions'] for f in phases), baseline_mean=baseline_mean,
+        phases=phases, observations=rows, outside_phase_n=sum(r['mean'] is not None and not r['observed_period'] for r in rows),
+        limitations=list(DESCRIPTION_LIMITS), inference_status='NOT_QUALIFIED')

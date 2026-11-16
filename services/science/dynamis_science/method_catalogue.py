@@ -9,10 +9,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-CATALOGUE_VERSION = "1.0.0"
+CATALOGUE_VERSION = "1.1.0"
 
 # Estimands and limits follow the RES-619 matrix, not menu labels.
 DETAILS = {
+    "METH-EXPERIMENT-DESC": ("Session-weighted descriptions by actual protocol phase; observed change and date-based slope",
+                             "Outcome units; SD in outcome units; slope in outcome units/day", "No confidence interval, p-value or causal effect",
+                             "experiments.py:describe", "tests/test_experiment_analysis.py"),
     "METH-REAL-TREND": ("Population mean within-athlete change per ordinal occasion and selected contrast",
                         "Outcome unit per occasion; contrast in outcome units", "ML Wald 95% z interval; no small-sample correction",
                         "realanalysis.py:_fit_trend", "R lme4 ML comparison: docs/science/res619-evidence/r-mixedlm-summary.csv"),
@@ -43,11 +46,13 @@ def catalogue() -> list[dict[str, Any]]:
         item.update(catalogue_version=CATALOGUE_VERSION, estimand=estimand, units=units,
                     uncertainty=uncertainty, implementation=implementation,
                     evidence_references=["docs/science/RES-619_METHODOLOGY.md", evidence],
-                    scopes=["INDIVIDUAL" if identity == "METH-U-INDIVIDUAL" else "COHORT"],
-                    method_class="DESCRIPTIVE" if identity in {"METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL"} else "QUALIFIED",
+                    scopes=["INDIVIDUAL" if identity in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else "COHORT"],
+                    method_class="DESCRIPTIVE" if identity in {"METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else "QUALIFIED",
                     execution_route="researchanalysis.execute", report_outputs=meta["output_schema"],
                     timebase="Ordinal occasion/week; no equal calendar spacing assumed" if "signal_trials" not in meta["required_tables"] else "Activity / acquisition-ordered trials; native signals 1000 Hz")
         item["limitations"] = [*item["constraints"], "Qualification is numerical and scope-specific; no independent human statistical approval is implied."]
+        if identity == 'METH-EXPERIMENT-DESC':
+            item['timebase'] = 'Actual timezone-aware visit timestamps; elapsed 24-hour days, not ordinal occasions'
         if identity == "METH-REAL-TREND":
             item["assumptions"] += ["Independent, homoscedastic within-athlete errors; outcome missingness is ignorable (MAR assumed)."]
             item["limitations"] += ["Wald intervals have no Satterthwaite/Kenward–Roger correction; fallback to random intercept changes the SE basis."]
@@ -92,9 +97,12 @@ def method_spec(identity: str) -> dict[str, Any]:
 
 
 def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[str],
-                scope: dict, design: str, parameters: dict | None = None) -> dict:
+                scope: dict, design: str, parameters: dict | None = None, experiment: dict | None = None) -> dict:
     """Check actual selected rows, before any fit or persistence. Missing outcomes stay missing."""
     p = parameters or {}
+    if method['id'] == 'METH-EXPERIMENT-DESC':
+        from .experiments import analysis_eligibility
+        return analysis_eligibility(method, metric, subject_ids, scope, p, experiment)
     identity, table, column = method["id"], metric["table"], metric["column"]
     issues = []
     if method.get("reason"):
@@ -185,7 +193,7 @@ def execution_binding(identity: str, metric: dict, parameters: dict, snapshot: d
                       revision: str | None, subjects: list[str], excluded: list[str]) -> dict:
     """Capture contract and implementation bytes, including uncommitted source changes."""
     root = Path(__file__).resolve().parent
-    sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py")]
+    sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py", "experiments.py")]
     digest = hashlib.sha256()
     for path in sources:
         digest.update(path.name.encode())

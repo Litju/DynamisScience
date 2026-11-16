@@ -160,6 +160,19 @@ METHODS: dict[str, dict[str, Any]] = {
         "diagnostics": ["sampling rate", "saturation", "plate coverage", "NaN trials", "device clock offset", "body-weight comparison"],
         "output_schema": ["activity-level summaries", "IMU sampling and gravity checks", "body-weight bias and limits of agreement"],
     },
+    "METH-EXPERIMENT-DESC": {
+        "id": "METH-EXPERIMENT-DESC", "name": "Individual experimental phase descriptions", "version": "1.0.0",
+        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "RES-717-DESC",
+                          "reference": "tests/test_experiment_analysis.py", "basis": "Independent arithmetic checks of session-weighted phase summaries and elapsed-day slopes; no causal estimator or inferential interval."},
+        "supported_designs": ["N_OF_1_EXPERIMENT"], "required_tables": ["cmj_trials", "cmj_occasions"],
+        "required_shape": "One athlete, a saved prospective protocol and at least one QC-eligible recorded visit in a compatible revision.",
+        "constraints": ["Descriptive only; experimental causal inference is NOT_QUALIFIED.", "One session mean per recorded visit; repeated trials do not increase the number of sessions."],
+        "missingness": "Explicit missing visits and unrecorded schedule entries are counted separately; no imputation.",
+        "parameter_schema": {"protocol_version": {"type": "integer", "minimum": 1}},
+        "assumptions": ["Actual visit dates, exposure records and phase boundaries were documented correctly."],
+        "diagnostics": ["per-phase session and trial counts", "QC exclusions", "missing and unrecorded visits", "date coverage and deviations"],
+        "output_schema": ["phase mean, median, sample SD and range", "observed first-to-last and baseline-mean changes", "descriptive slope per elapsed day", "dated visit ledger and limitations"],
+    },
     "METH-U-INDIVIDUAL": {
         "id": "METH-U-INDIVIDUAL",
         "name": "Individual observed trajectory with repeated-trial error context",
@@ -2758,9 +2771,11 @@ def method_eligibility(entity: dict[str, Any], cohort: dict[str, Any], resolved:
     if metric is None:
         return []
     rows = read_snapshot_table(snapshot_id, metric["table"]).to_dicts()
+    from .experiments import analysis_context
+    context = analysis_context(entity, cohort.get('scope') or {}, (plan or {}).get('parameters', {}))
     return [eligibility(method, metric, rows, resolved["cohort"]["subject_ids"],
                         cohort.get("scope") or {"kind": "COHORT"}, entity.get("design", ""),
-                        (plan or {}).get("parameters", {})) for method in catalogue()]
+                        (plan or {}).get("parameters", {}), experiment=context) for method in catalogue()]
 
 
 # --------------------------------------------------------------------------- #
