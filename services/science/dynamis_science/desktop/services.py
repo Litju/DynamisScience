@@ -100,7 +100,12 @@ class DynamisAppService:
         entity, snapshot_id, metric = longitudinal._context(investigation["study_id"])
         axis, points = longitudinal.individual_points(snapshot_id, metric, investigation["scope"]["subject_id"])
         revision = researchstore.get_data_revision(entity.get("active_data_revision_id") or "") or {}
-        return {"investigation": investigation, "data_revision_id": entity.get("active_data_revision_id"),
+        from .. import experiments
+        return {"experiment": experiments.timeline(investigation_id),
+                "experiment_history": [experiments.timeline(investigation_id, p['version'])
+                                       for p in investigation.get('experiment_protocols', [])],
+                "data_revisions": researchstore.data_revisions(investigation['study_id']),
+                "investigation": investigation, "data_revision_id": entity.get("active_data_revision_id"),
                 "data_revision_number": revision.get("number"),
                 "snapshot_id": snapshot_id, "metric": metric, "axis": axis, "points": points,
                 "runs": longitudinal.investigation_runs(investigation_id),
@@ -111,7 +116,17 @@ class DynamisAppService:
 
     def save_protocol(self, investigation_id: str, protocol: dict[str, Any], base_version: int | None) -> dict[str, Any]:
         self.ensure_initialized()
+        from .. import experiments
+        if protocol.get('prospective'):
+            return experiments.save_protocol(investigation_id, protocol, base_version)
+        if longitudinal.get_individual_investigation(investigation_id).get('experiment_protocols'):
+            raise researchstore.ResearchValidation('Use a prospective protocol amendment for this experiment')
         return longitudinal.save_protocol(investigation_id, protocol, base_version)
+
+    def record_experimental_visit(self, investigation_id: str, visit: dict, base_version: int) -> dict:
+        self.ensure_initialized()
+        from .. import experiments
+        return experiments.record_visit(investigation_id, visit, base_version)
 
     def save_scenario(self, investigation_id: str, scenario: dict[str, Any], base_version: int | None) -> dict[str, Any]:
         self.ensure_initialized()
