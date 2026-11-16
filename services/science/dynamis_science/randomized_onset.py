@@ -91,10 +91,19 @@ def evaluate(context: dict) -> dict:
         issues.append('A saved app-generated prospective randomized-onset contract is required; free-text assignment is insufficient.')
     starts = c.get('permissible_starts', [])
     schedule = c.get('testing_occasions', [])
-    if (len(starts) < 2 or a.get('assigned_start') not in starts or schedule != p.get('testing_occasions')
+    if (not 2 <= len(starts) <= 1000 or any(type(s) is not int for s in starts) or starts != sorted(set(starts))
+            or not 6 <= len(schedule) <= 5000 or any(type(s) is not int for s in schedule) or schedule != sorted(set(schedule))
+            or a.get('assigned_start') not in starts or any(s not in schedule for s in starts) or schedule != p.get('testing_occasions')
             or len(c.get('testing_dates', [])) != len(schedule) or c.get('statistic') != 'ABS_POST_MINUS_PRE'
             or c.get('alternative') != 'TWO_SIDED' or c.get('lag') != 0 or c.get('persistence') != 'THROUGH_FINAL_VISIT'):
         issues.append('Allocation support, schedule or fixed analysis rule is incompatible.')
+    try:
+        allocated = _date(a.get('allocated_at'))
+        dates = [_date(d) for d in c.get('testing_dates', [])]
+        if any(d <= allocated for d in dates) or any(x >= y for x,y in zip(dates, dates[1:])):
+            issues.append('All scheduled timestamps must increase and follow the prospective allocation.')
+    except store.ResearchValidation as error:
+        issues.append(str(error))
     if issues:
         return dict(status='NOT_QUALIFIED', issues=issues, p_value=None, limitations=LIMITS)
     rows = data['rows']
@@ -107,8 +116,13 @@ def evaluate(context: dict) -> dict:
         qc = v.get('qc') or {}
         if not math.isfinite(row['mean']) or qc.get('empty_values') or qc.get('quality_flags'):
             return dict(status='NOT_ESTIMABLE', issues=['Finite complete QC-eligible session measurements required; exclusions need scientific review.'], p_value=None, limitations=LIMITS)
-        if (row['scheduled_occasion'] != at or v['occasion'] != at or _date(v['occurred_at']) != _date(date)
-                or _date(v['occurred_at']) <= _date(a['allocated_at']) or v.get('actual_condition') != condition
+        try:
+            actual = _date(v['occurred_at'])
+        except store.ResearchValidation as error:
+            issues.append(str(error))
+            continue
+        if (row['scheduled_occasion'] != at or v['occasion'] != at or actual != _date(date)
+                or actual <= allocated or v.get('actual_condition') != condition
                 or v.get('deviations') or (condition == 'INTERVENTION' and v.get('adherence_percent') != 100)):
             issues.append('Recorded timing, condition, adherence or deviations violate the frozen allocation; inspect the visit ledger.')
     if issues:
@@ -163,14 +177,14 @@ def result_html(result, *, chart=False):
     r = result['inference']
     esc = lambda v: html.escape(str(v))
     a = result['protocol']['allocation']
-    body = (f"<h3>Exact randomized onset · {esc(r['status'])}</h3><p>{esc(NULL)}</p>"
+    body = (f"<h3>Exact randomized onset · {esc(r['status'])}</h3><p><b>Null hypothesis:</b> {esc(NULL)}</p>"
             f"<p>Allocation {esc(a['id'])} · onset {a['assigned_start']} · drawn {esc(a['allocated_at'])}<br>"
             f"Permitted starts: {esc(a['configuration']['permissible_starts'])}</p>")
     if r['p_value'] is not None:
         body += (f"<p>Descriptive post-minus-pre difference: <b>{r['descriptive_difference']:.6g} {esc(result['unit'])}</b> (no causal interval).<br>"
                  f"Two-sided exact p = <b>{r['tail_count']}/{r['assignment_count']} = {r['p_value']:.6g}</b>; "
                  f"resolution {r['p_resolution']:.6g}; statistic |post mean − pre mean| = {r['statistic']:.6g}.</p>"
-                 '<p>This tests the sharp null under the saved design assumptions. It does not establish a causal effect magnitude.</p>')
+                 '<p>The p-value is the probability under the sharp null and saved assignment mechanism of a statistic at least this extreme. It is not the probability that the null is true. This does not establish a causal effect magnitude.</p>')
     else:
         body += '<p>' + esc('; '.join(r['issues'])) + '</p>'
     return body + descriptions(result, chart=chart)

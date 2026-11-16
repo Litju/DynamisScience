@@ -54,8 +54,10 @@ def catalogue() -> list[dict[str, Any]]:
                     execution_route="researchanalysis.execute", report_outputs=meta["output_schema"],
                     timebase="Ordinal occasion/week; no equal calendar spacing assumed" if "signal_trials" not in meta["required_tables"] else "Activity / acquisition-ordered trials; native signals 1000 Hz")
         item["limitations"] = [*item["constraints"], "Qualification is numerical and scope-specific; no independent human statistical approval is implied."]
-        if identity == 'METH-EXPERIMENT-DESC':
+        if identity in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             item['timebase'] = 'Actual timezone-aware visit timestamps; elapsed 24-hour days, not ordinal occasions'
+        if identity == 'METH-ONSET-EXACT':
+            item['timebase'] = 'Fixed increasing timezone-aware timestamps, exact schedule required; ordinal keys define the permissible onset support'
         if identity == "METH-REAL-TREND":
             item["assumptions"] += ["Independent, homoscedastic within-athlete errors; outcome missingness is ignorable (MAR assumed)."]
             item["limitations"] += ["Wald intervals have no Satterthwaite/Kenward–Roger correction; fallback to random intercept changes the SE basis."]

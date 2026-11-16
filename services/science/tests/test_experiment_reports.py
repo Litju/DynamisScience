@@ -70,6 +70,7 @@ def test_native_experiment_analysis_chart_and_report(qtbot, service, experiment_
     panel.method_picker.setCurrentIndex(index)
     panel.tabs.setCurrentIndex(1)
     assert panel.run_button.isEnabled() and panel.analysis_protocol.count()==1
+    panel.method_advanced.setChecked(True)
     assert 'Serial dependence' in panel.method_detail.toPlainText()
     qtbot.mouseClick(panel.run_button, Qt.MouseButton.LeftButton)
     idle()

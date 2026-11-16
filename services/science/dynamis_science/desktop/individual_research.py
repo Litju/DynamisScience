@@ -124,6 +124,7 @@ class IndividualResearchPanel(QWidget):
     def set_investigation(self, workspace_id: str | None, investigation_id: str | None) -> None:
         self.workspace_id, self.investigation_id = workspace_id, investigation_id
         self.payload = {}
+        self.result_diagnostics.clear()
         # Clear first so another participant's measurements are never shown while loading.
         for table in (self.data_table, self.period_table, self.compare_table, self.timeline_table, self.visit_history):
             table.setRowCount(0)
@@ -144,8 +145,12 @@ class IndividualResearchPanel(QWidget):
         self.visit_supersedes.clear()
         for field in (self.protocol_question, self.assignment, self.blinding, self.testing_occasions,
                       self.amendment_reason, self.visit_exposure, self.visit_adherence, self.visit_missing,
-                      self.visit_deviations, self.visit_occasion):
+                      self.visit_deviations, self.visit_occasion, self.onset_starts, self.onset_baseline,
+                      self.onset_intervention, self.onset_suitability):
             field.clear()
+        self.onset_dates.clear()
+        self.onset_acknowledge.setChecked(False)
+        self.visit_condition.setCurrentIndex(0)
         self.prespecified.setChecked(False)
         self.changes.clear()
         self.setEnabled(bool(investigation_id))
@@ -219,7 +224,7 @@ class IndividualResearchPanel(QWidget):
                       "personalized causal estimates, forecasts or injury-risk assessments.")
         note.setWordWrap(True)
         layout.addWidget(note)
-        inference_note = QLabel('Experimental effect inference: NOT_QUALIFIED. The RES-716 catalogue has no qualified individual causal estimator.')
+        inference_note = QLabel('Randomized-onset inference requires a saved prospective allocation and complete faithful conduct. Phase differences remain descriptive.')
         inference_note.setWordWrap(True)
         layout.addWidget(inference_note)
         self.method_picker = QComboBox()
@@ -230,6 +235,9 @@ class IndividualResearchPanel(QWidget):
         self.analysis_protocol.setAccessibleName('Experimental analysis protocol version')
         self.analysis_protocol.currentIndexChanged.connect(self._method_changed)
         layout.addWidget(self.analysis_protocol)
+        self.method_advanced = QCheckBox('Show full statistical contract and assumptions')
+        self.method_advanced.toggled.connect(self._method_changed)
+        layout.addWidget(self.method_advanced)
         self.method_detail = QTextBrowser()
         layout.addWidget(self.method_detail, 1)
         self.run_button = QPushButton("Run individual analysis on the active revision")
@@ -239,18 +247,27 @@ class IndividualResearchPanel(QWidget):
 
     def _selected_method(self) -> dict | None:
         method = self.method_picker.currentData()
-        if method and method['method_id'] == 'METH-EXPERIMENT-DESC' and self.analysis_protocol.currentData():
-            return self.analysis_protocol.currentData()['eligibility']
+        if method and method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'} and self.analysis_protocol.currentData():
+            timeline = self.analysis_protocol.currentData()
+            return timeline.get('onset_eligibility') if method['method_id'] == 'METH-ONSET-EXACT' else timeline['eligibility']
         return method
 
     def _method_changed(self) -> None:
         method = self._selected_method()
-        self.analysis_protocol.setVisible(bool(method and method['method_id'] == 'METH-EXPERIMENT-DESC'))
+        self.analysis_protocol.setVisible(bool(method and method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}))
         self.run_button.setEnabled(bool(method and method["status"] == "ELIGIBLE"))
         if not method:
             self.method_detail.clear()
             return
-        self.method_detail.setHtml(method_html(method))
+        if self.method_advanced.isChecked():
+            self.method_detail.setHtml(method_html(method))
+        else:
+            p = (self.analysis_protocol.currentData() or {}).get('protocol', {})
+            issues = '<br>'.join(html.escape(s) for s in method['issues']) or 'Eligible on the captured protocol and active data revision.'
+            self.method_detail.setHtml(f"<h3>{html.escape(method['name'])}</h3>"
+                f"<p>{html.escape(p.get('question', ''))}<br>{html.escape(p.get('design_label', ''))} · protocol v{p.get('version', '—')}</p>"
+                f"<p><b>{html.escape(method.get('inference_status', method['status']))}</b><br>{issues}</p>"
+                f"<p>{html.escape(method['estimand'])}</p><p>{html.escape(method['uncertainty'])}</p>")
 
     def execute(self) -> None:
         method = self._selected_method()
@@ -262,7 +279,7 @@ class IndividualResearchPanel(QWidget):
                    "data_revision_id": revision,
                    "scope": {"kind": "INDIVIDUAL", "subject_id": subject, "investigation_id": investigation_id,
                              "investigation_version":self.payload['investigation']['version']}}
-        if method['method_id'] == 'METH-EXPERIMENT-DESC':
+        if method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             request['parameters'] = {'protocol_version':method['protocol_version']}
 
         def finished(run: dict[str, Any]) -> None:
@@ -286,9 +303,11 @@ class IndividualResearchPanel(QWidget):
         self.result_tabs = QTabWidget()
         self.result_view = QTextBrowser()
         self.result_tabs.addTab(self.result_view, "Result")
+        self.result_diagnostics = QTextBrowser()
         self.figure_holder = QWidget()
         QVBoxLayout(self.figure_holder)
         self.result_tabs.addTab(self.figure_holder, "Trajectory")
+        self.result_tabs.addTab(self.result_diagnostics, 'Diagnostics and provenance')
         layout.addWidget(self.result_tabs, 1)
         self.tabs.addTab(self.results_page, "Results")
 
@@ -297,11 +316,14 @@ class IndividualResearchPanel(QWidget):
         if not run:
             return
         result, diagnostics = run["result"], run.get("diagnostics", {})
-        if run['method_id'] == 'METH-EXPERIMENT-DESC':
+        self.result_diagnostics.setHtml('<pre>' + html.escape(json.dumps(diagnostics, indent=2, default=str)) + '</pre>' + binding_html(run))
+        if run['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             from ..experiments import result_html
+            if run['method_id'] == 'METH-ONSET-EXACT':
+                from ..randomized_onset import result_html
             self.result_view.setHtml(f"<p>{html.escape(run['id'])} · {html.escape(run['method_id'])} "
                 f"v{html.escape(run['method_version'])} · {html.escape(run['method_status']['state'])}</p>"
-                + result_html(result) + binding_html(run))
+                + result_html(result))
             self._show_run_figure(run)
             return
         axis = result.get("axis", "week")
@@ -333,8 +355,7 @@ class IndividualResearchPanel(QWidget):
     def _build_protocol(self) -> None:
         page = QWidget()
         layout = QVBoxLayout(page)
-        self.protocol_note = QLabel("A repeated-measurement history alone is retrospective observational tracking. An N-of-1 "
-                                    "experiment needs prespecified, replicated intervention and comparison periods with documented assignment.")
+        self.protocol_note = QLabel('Choose a design suited to the intervention. Randomized onset draws a future start once and keeps treatment persistent; crossover requires replicated comparator periods. Saved allocations cannot be redrawn.')
         self.protocol_note.setWordWrap(True)
         layout.addWidget(self.protocol_note)
         form = QFormLayout()
@@ -360,6 +381,24 @@ class IndividualResearchPanel(QWidget):
         form.addRow("Blinding", self.blinding)
         form.addRow("Testing occasions", self.testing_occasions)
         layout.addLayout(form)
+        self.onset_fields = QWidget()
+        onset_form = QFormLayout(self.onset_fields)
+        self.onset_starts = QLineEdit()
+        self.onset_starts.setAccessibleName('Permissible randomized intervention starts')
+        self.onset_dates = QPlainTextEdit()
+        self.onset_dates.setMaximumHeight(95)
+        self.onset_dates.setPlaceholderText('One future ISO timestamp with timezone per scheduled occasion, in the same order')
+        self.onset_dates.setAccessibleName('Prespecified measurement timestamps')
+        self.onset_baseline = QLineEdit()
+        self.onset_intervention = QLineEdit()
+        self.onset_suitability = QLineEdit()
+        self.onset_acknowledge = QCheckBox('No anticipation/interference; stable measurements; no assignment-dependent co-intervention or missingness')
+        self.onset_acknowledge.setToolTip('Required scientific assumptions. Persistent intervention; immediate-level statistic fixed in advance. Delayed effects may be missed.')
+        for label,widget in [('Permitted starts (occasions)',self.onset_starts),('Scheduled timestamps',self.onset_dates),
+                             ('Baseline condition',self.onset_baseline),('Persistent intervention / dose',self.onset_intervention),
+                             ('Suitability / feasibility',self.onset_suitability),('Assumptions',self.onset_acknowledge)]:
+            onset_form.addRow(label,widget)
+        layout.addWidget(self.onset_fields)
         self.period_table = _table(["Kind", "Label", "Start", "End", "Adherence %", "Deviations", "Notes"], "Experimental periods")
         self.period_table.setColumnHidden(4, True)
         self.period_table.setColumnHidden(5, True)
@@ -379,6 +418,8 @@ class IndividualResearchPanel(QWidget):
         layout.addWidget(self.changes)
         self.save_protocol_button = QPushButton("Save protocol version")
         self.save_protocol_button.clicked.connect(self.save_protocol)
+        self.design_picker.currentIndexChanged.connect(self._design_changed)
+        self._design_changed()
         layout.addWidget(self.save_protocol_button)
         self.period_view = QTextBrowser()
         self.period_view.setMaximumHeight(90)
@@ -387,6 +428,13 @@ class IndividualResearchPanel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(page)
         self.tabs.addTab(scroll, "Protocol")
+
+    def _design_changed(self) -> None:
+        randomized = self.design_picker.currentData() == 'RANDOMIZED_ONSET'
+        self.onset_fields.setVisible(randomized)
+        self.period_table.setEnabled(not randomized)
+        saved = ((self.payload or {}).get('investigation', {}).get('protocol') or {}).get('allocation')
+        self.save_protocol_button.setText('Save prospective protocol and draw onset' if randomized and not saved else 'Save protocol version')
 
     def _add_period(self, period: dict[str, Any], adherence: dict[str, Any] | None = None) -> None:
         row = self.period_table.rowCount()
@@ -409,6 +457,14 @@ class IndividualResearchPanel(QWidget):
         self.assignment.setText(protocol.get("assignment", ""))
         self.prespecified.setChecked(bool(protocol.get("prespecified")))
         self.blinding.setText(protocol.get("blinding", ""))
+        c = protocol.get('allocation', {}).get('configuration', {})
+        self.onset_starts.setText(', '.join(map(str,c.get('permissible_starts', []))))
+        self.onset_dates.setPlainText('\n'.join(c.get('testing_dates', [])))
+        self.onset_baseline.setText(c.get('baseline_condition', ''))
+        self.onset_intervention.setText(c.get('intervention_condition', ''))
+        self.onset_suitability.setText(protocol.get('suitability', ''))
+        self.onset_acknowledge.setChecked(c.get('assumptions_confirmed', False))
+        self._design_changed()
         self.testing_occasions.setText(", ".join(map(str, protocol.get("testing_occasions", []))))
         self.period_table.setRowCount(0)
         adherence = {item["period"]: item for item in protocol.get("adherence", [])}
@@ -437,7 +493,11 @@ class IndividualResearchPanel(QWidget):
                 changes.append({"at": int(at), "description": description})
         occasions = [int(value) for value in self.testing_occasions.text().replace(",", " ").split()]
         return {"design": self.design_picker.currentData(), "periods": periods, "adherence": adherence, "changes": changes,
-                "prospective": self.design_picker.currentData() == 'N_OF_1_EXPERIMENT',
+                "prospective": self.design_picker.currentData() in {'N_OF_1_EXPERIMENT', 'RANDOMIZED_ONSET'},
+                'permissible_starts':[int(v) for v in self.onset_starts.text().replace(',', ' ').split()],
+                'testing_dates':[v.strip() for v in self.onset_dates.toPlainText().splitlines() if v.strip()],
+                'baseline_condition':self.onset_baseline.text(), 'intervention_condition':self.onset_intervention.text(),
+                'suitability':self.onset_suitability.text(), 'assumptions_confirmed':self.onset_acknowledge.isChecked(),
                 "question": self.protocol_question.text(), "outcome_metric_id": self.payload['metric']['id'],
                 "unit": self.payload['metric']['unit'], "amendment_reason": self.amendment_reason.text(),
                 "testing_occasions": occasions, "assignment": self.assignment.text(), "prespecified": self.prespecified.isChecked(),
@@ -460,11 +520,11 @@ class IndividualResearchPanel(QWidget):
     def _build_experiment(self) -> None:
         page = QWidget()
         layout = QVBoxLayout(page)
-        note = QLabel('Save a prospective N-of-1 protocol in Protocol first. Import later measurements into this same '
+        note = QLabel('Save a prospective experimental protocol in Protocol first. Import later measurements into this same '
                       'workspace, then link each actual visit here. Planned exposure is never treated as observed exposure.')
         note.setWordWrap(True)
         layout.addWidget(note)
-        inference_note = QLabel('Experimental effect inference: NOT_QUALIFIED. Descriptive changes do not establish a treatment effect.')
+        inference_note = QLabel('Compare the planned timeline with actual condition, timing and measurements before analysis. Descriptive changes do not establish a treatment effect.')
         inference_note.setWordWrap(True)
         layout.addWidget(inference_note)
         self.protocol_history = QComboBox()
@@ -479,6 +539,9 @@ class IndividualResearchPanel(QWidget):
         self.experiment_summary = QTextBrowser()
         self.experiment_summary.setMinimumHeight(130)
         layout.addWidget(self.experiment_summary)
+        self.analyze_experiment_button = QPushButton('Analyze this protocol')
+        self.analyze_experiment_button.clicked.connect(self._analyze_experiment)
+        layout.addWidget(self.analyze_experiment_button)
         form = QFormLayout()
         self.visit_schedule = QComboBox()
         self.visit_schedule.setAccessibleName('Scheduled experimental measurement')
@@ -491,6 +554,11 @@ class IndividualResearchPanel(QWidget):
         self.visit_status = QComboBox()
         self.visit_status.addItems(['MEASURED', 'MISSING'])
         self.visit_exposure = QLineEdit()
+        self.visit_condition = QComboBox()
+        self.visit_condition.addItem('Unknown / not recorded', None)
+        self.visit_condition.addItem('Baseline condition', 'BASELINE')
+        self.visit_condition.addItem('Persistent intervention', 'INTERVENTION')
+        self.visit_condition.setAccessibleName('Actually recorded experimental condition')
         self.visit_adherence = QLineEdit()
         self.visit_adherence.setPlaceholderText('0–100; blank means unknown')
         self.visit_missing = QLineEdit()
@@ -499,6 +567,7 @@ class IndividualResearchPanel(QWidget):
         for label, widget in [('Scheduled measurement', self.visit_schedule), ('Actual occasion', self.visit_occasion),
                 ('Actual time (ISO, timezone)', self.visit_time), ('Measurement revision', self.visit_revision),
                 ('Measurement status', self.visit_status), ('Actual exposure', self.visit_exposure),
+                ('Actual condition (record explicitly)',self.visit_condition),
                 ('Adherence %', self.visit_adherence), ('Missing reason', self.visit_missing),
                 ('Deviations / correction reason', self.visit_deviations), ('Correct prior visit', self.visit_supersedes)]:
             form.addRow(label, widget)
@@ -516,6 +585,7 @@ class IndividualResearchPanel(QWidget):
         self.tabs.addTab(scroll, 'Visits and timeline')
 
     def _show_experiment(self, payload: dict) -> None:
+        self.visit_condition.setCurrentIndex(0)
         self.protocol_history.clear()
         for timeline in payload.get('experiment_history', []):
             p = timeline['protocol']
@@ -555,19 +625,42 @@ class IndividualResearchPanel(QWidget):
             v = r['visit'] or {}
             m = v.get('measurement') or v.get('qc') or {}
             rows.append([r['scheduled_occasion'], f"{r['period']['label']} ({r['period']['kind']})",
-                f"{v.get('occasion', '—')} / {v.get('occurred_at', '—')}", r['status'], v.get('exposure', '—'),
+                f"{v.get('occasion', '—')} / {v.get('occurred_at', '—')}", r['status'],
+                (f"{v.get('actual_condition') or 'Unknown condition'} · " if plan.get('allocation') and v else '') + v.get('exposure', '—'),
                 v.get('adherence_percent'), ' / '.join(filter(None, [v.get('deviations'), v.get('missing_reason')])),
                 r['mean'], f"{m.get('n_trials', 0)} valid; {', '.join(m.get('quality_flags', [])) or 'no flags'}; {m.get('empty_values', 0)} excluded",
                 v.get('data_revision_id', '—'), (r['observed_period'] or {}).get('label', 'Outside plan' if v else '—')])
         _fill(self.timeline_table, rows)
+        if plan.get('allocation'):
+            dates = plan['allocation']['configuration']['testing_dates']
+            for row,date in enumerate(dates):
+                self.timeline_table.item(row,0).setText(f"{plan['testing_occasions'][row]} / {date}")
         changes = ''.join(f"<li>{html.escape(c['period'])}: n={c['n']}, mean {_number(c['mean'])}, "
                           f"change from baseline {_number(c['change_from_baseline'])} {html.escape(c['unit'])}</li>"
                           for c in timeline['changes'])
+        receipt = timeline.get('onset_eligibility') or {}
+        inference = (f"{receipt.get('inference_status', 'NOT_QUALIFIED')} · " + ('; '.join(receipt.get('issues', [])) or 'Sharp-null test only, conditional on the saved scientific assumptions.')) if plan.get('allocation') else ('NOT_QUALIFIED · ' + timeline['inference']['reason'])
         self.experiment_summary.setHtml(f"<b>{html.escape(plan['question'])}</b><br>"
             f"{html.escape(plan['outcome_label'])} ({html.escape(plan['unit'])}) · participant {html.escape(plan['subject_id'])}<br>"
             f"Assignment: {html.escape(plan['assignment'])}<br>Amendment: {html.escape(plan['amendment_reason'])}<br>"
             f"Descriptive session means by actual occasion period; actual exposure is recorded separately. No causal estimate.<ul>{changes}</ul>"
-            f"<b>NOT_QUALIFIED</b> · {html.escape(timeline['inference']['reason'])}")
+            f"Protocol v{plan['version']} · {html.escape(plan['design_label'])}<br><b>{html.escape(inference)}</b>")
+
+    def _analyze_experiment(self) -> None:
+        timeline = self.protocol_history.currentData()
+        if not timeline:
+            return
+        version = timeline['protocol']['version']
+        for i in range(self.analysis_protocol.count()):
+            if self.analysis_protocol.itemData(i)['protocol']['version'] == version:
+                self.analysis_protocol.setCurrentIndex(i)
+                break
+        identity = 'METH-ONSET-EXACT' if timeline['protocol'].get('allocation') else 'METH-EXPERIMENT-DESC'
+        for i in range(self.method_picker.count()):
+            if self.method_picker.itemData(i)['method_id'] == identity:
+                self.method_picker.setCurrentIndex(i)
+                break
+        self.tabs.setCurrentIndex(next(i for i in range(self.tabs.count()) if self.tabs.tabText(i) == 'Analysis'))
 
     def save_visit(self) -> None:
         timeline = self.protocol_history.currentData()
@@ -579,6 +672,7 @@ class IndividualResearchPanel(QWidget):
                 scheduled_occasion=self.visit_schedule.currentData(), occasion=int(self.visit_occasion.text()),
                 occurred_at=self.visit_time.text(), data_revision_id=self.visit_revision.currentData(),
                 measurement_status=self.visit_status.currentText(), exposure=self.visit_exposure.text(),
+                actual_condition=self.visit_condition.currentData(),
                 adherence_percent=float(percent) if percent else None, missing_reason=self.visit_missing.text(),
                 deviations=self.visit_deviations.text(), supersedes=self.visit_supersedes.currentData())
         except ValueError:

@@ -86,6 +86,9 @@ def test_irregular_prespecified_dates_and_delayed_response_keep_fixed_statistic(
     (lambda c: c['timeline']['rows'][0]['visit'].update(occurred_at='2090-03-01T00:00:00+00:00'), 'NOT_QUALIFIED'),
     (lambda c: c['timeline']['rows'][0]['visit'].update(deviations='Extra training'), 'NOT_QUALIFIED'),
     (lambda c: c['timeline']['rows'][0]['visit']['qc'].update(empty_values=1), 'NOT_ESTIMABLE'),
+    (lambda c: c['timeline']['protocol']['allocation']['configuration'].update(permissible_starts=[4,4,5]), 'NOT_QUALIFIED'),
+    (lambda c: c['timeline']['protocol']['allocation'].update(allocated_at='2099-01-01T00:00:00+00:00'), 'NOT_QUALIFIED'),
+    (lambda c: c['timeline']['rows'][0]['visit'].update(occurred_at='bad date'), 'NOT_QUALIFIED'),
 ])
 def test_precise_insufficient_states(mutation,status):
     c = context([0]*4+[10]*4)
