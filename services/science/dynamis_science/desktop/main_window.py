@@ -2822,10 +2822,13 @@ class ResearchWorkbench(QWidget):
         )
 
     def individual_run(self) -> dict[str, Any] | None:
-        """Latest saved analysis of the open individual investigation on the active revision."""
+        """Export the result selected in individual history, with its captured revision."""
         payload = self.individual.payload
-        runs = [run for run in payload.get("runs", []) if run.get("data_revision_id") == payload.get("data_revision_id")]
-        return runs[-1] if runs and self.individual.investigation_id else None
+        selected = self.individual.run_picker.currentData()
+        if (selected and selected.get('data_revision_id') == payload.get('data_revision_id')
+                and selected.get('investigation_id') == self.individual.investigation_id):
+            return selected
+        return None
 
     def export_report(self) -> None:
         if getattr(self, "detail", {}).get("workspace"):

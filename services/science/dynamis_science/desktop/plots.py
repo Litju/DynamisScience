@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from datetime import datetime
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -56,7 +57,38 @@ def run_figure(run: dict[str, Any]) -> Figure:
     diagnostic_axis = axes[1] if len(axes) > 1 else None
     kind = data.get("kind")
     title = result.get("method", run.get("method_id", "Scientific result"))
-    if kind == "LINE" and data.get("series"):
+    if kind == 'EXPERIMENT':
+        from ..experiments import PHASE_COLORS
+        import matplotlib.dates as mdates
+        observations = result['observations']
+        used = set()
+        for row in observations:
+            visit = row['visit']
+            if not visit:
+                continue
+            date = datetime.fromisoformat(visit['occurred_at'])
+            qc = visit.get('qc') or {}
+            if row['mean'] is None:
+                axis.plot([date], [.02], marker='x', color='#777777', linestyle='none',
+                          transform=axis.get_xaxis_transform(), label='Missing (no outcome value)' if 'missing' not in used else None)
+                used.add('missing')
+                continue
+            phase = (row['observed_period'] or {}).get('kind', 'OUTSIDE_PLAN')
+            flagged = bool(qc.get('quality_flags'))
+            axis.plot([date], [row['mean']], marker='x' if flagged else 'o', linestyle='none',
+                      color=PHASE_COLORS.get(phase, '#777777'), label=phase if phase not in used else None)
+            used.add(phase)
+            if flagged or visit['deviations']:
+                axis.annotate(f"! visit {row['scheduled_occasion']}", (date, row['mean']), xytext=(3,6),
+                              textcoords='offset points', fontsize=7)
+        locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+        axis.xaxis.set_major_locator(locator)
+        axis.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
+        axis.set_xlabel('Actual visit date (UTC); timezone-aware timestamps in visit ledger')
+        axis.set_ylabel(f"Session mean ({result['unit']})")
+        axis.legend(frameon=False, fontsize=7)
+        title = f"Participant {result['subject_id']} · protocol v{result['protocol_version']} · descriptive only"
+    elif kind == "LINE" and data.get("series"):
         series = data["series"]
         x = [point.get("week", index + 1) for index, point in enumerate(series)]
         y = [point.get("mean") for point in series]

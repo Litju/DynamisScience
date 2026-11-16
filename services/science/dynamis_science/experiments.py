@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import secrets
 import copy
+import html
 from datetime import datetime
 from statistics import mean, median, stdev
 
@@ -307,6 +308,87 @@ def describe(context: dict) -> dict:
         protocol_version=p['version'], protocol=copy.deepcopy(p), investigation_version=inv['version'],
         data_revision_id=context['revision']['id'], source_data_revision_ids=[s['id'] for s in context['sources']],
         source_revisions=copy.deepcopy(context['sources']), unit=p['unit'], outcome=p['outcome_metric_id'],
-        n_subjects=1, n_observations=sum(f['n_sessions'] for f in phases), baseline_mean=baseline_mean,
+        n_subjects=1, n_observations=sum(r['mean'] is not None for r in rows), baseline_mean=baseline_mean,
         phases=phases, observations=rows, outside_phase_n=sum(r['mean'] is not None and not r['observed_period'] for r in rows),
         limitations=list(DESCRIPTION_LIMITS), inference_status='NOT_QUALIFIED')
+
+
+PHASE_COLORS = {'BASELINE':'#176b87', 'INTERVENTION':'#bd572b', 'COMPARISON':'#53804d',
+                'WASHOUT':'#8866aa', 'FOLLOW_UP':'#747474', 'EXPOSURE':'#bd572b'}
+
+
+def result_html(result: dict, *, chart: bool = False) -> str:
+    """The same frozen result content is readable in native Results and exported reports."""
+    def cell(value):
+        return html.escape('—' if value is None else f'{value:.4g}' if isinstance(value, float) else str(value))
+    p = result['protocol']
+    headers = ['Phase', 'Sessions / trials', 'Scheduled / measured / missing / unrecorded', 'Mean', 'Median', 'SD',
+               'Range', 'Observed change', 'Change from baseline mean', 'Slope / day']
+    phase_rows = ''
+    warnings = []
+    for f in result['phases']:
+        values = [f['period']['label'], f"{f['n_sessions']} / {f['n_trials']}",
+            f"{f['scheduled_n']} / {f['scheduled_measured_n']} / {f['missing_n']} / {f['unrecorded_n']}",
+            f['mean'], f['median'], f['sd'], f"{cell(f['minimum'])} to {cell(f['maximum'])}",
+            f['observed_change'], f['change_from_baseline'], f['slope_per_day']]
+        phase_rows += '<tr>' + ''.join(f'<td>{cell(v)}</td>' for v in values) + '</tr>'
+        warnings.extend(f"{f['period']['label']}: {warning}" for warning in f['limitations'])
+    visits = ''
+    for r in result['observations']:
+        v = r['visit'] or {}
+        qc = v.get('qc') or v.get('measurement') or {}
+        values = [r['scheduled_occasion'], r['period']['label'], (r['observed_period'] or {}).get('label'),
+            v.get('occurred_at'), r['status'], r['mean'], v.get('exposure'), v.get('adherence_percent'),
+            ', '.join(qc.get('quality_flags', [])) or ('VALID' if r['mean'] is not None else 'No eligible reading'),
+            qc.get('empty_values'), v.get('deviations'), v.get('missing_reason'), v.get('id'), v.get('data_revision_id')]
+        visits += '<tr>' + ''.join(f'<td>{cell(v)}</td>' for v in values) + '</tr>'
+    visit_headers = ['Scheduled', 'Planned phase', 'Actual phase', 'Actual date/time', 'Status', 'Mean', 'Actual exposure',
+                     'Adherence %', 'QC', 'Excluded trials', 'Deviations', 'Missing reason', 'Visit ID', 'Source revision']
+    table = lambda labels, rows: '<table border="1" cellpadding="4"><tr>' + ''.join(f'<th>{cell(h)}</th>' for h in labels) + '</tr>' + rows + '</table>'
+    return (f"<h3>Experimental phase descriptions · participant {cell(result['subject_id'])}</h3>"
+        f"<p><b>{cell(p['question'])}</b><br>Protocol v{p['version']} · investigation v{result['investigation_version']} · "
+        f"revision {cell(result['data_revision_id'])}<br>{cell(p['outcome_label'])} ({cell(result['unit'])})<br>"
+        f"Assignment: {cell(p['assignment'])}<br>Source revisions: {cell(', '.join(result['source_data_revision_ids']))}</p>"
+        '<p><b>NOT_QUALIFIED</b> — causal inference unavailable. All changes and slopes below are descriptive.</p>'
+        + (result_svg(result) if chart else '') + table(headers, phase_rows)
+        + '<p>Means, SD, range and changes use outcome units; slopes use outcome units per elapsed 24-hour day. '
+          'Counts of missing and unrecorded visits use the planned schedule; session statistics use actual phase membership. '
+        f"Measurements outside all phases: {result['outside_phase_n']}.</p>"
+        + '<h4>Actual visit ledger</h4>' + table(visit_headers, visits)
+        + '<h4>Limitations</h4><ul>' + ''.join(f'<li>{cell(l)}</li>' for l in [*result['limitations'], *warnings]) + '</ul>')
+
+
+def result_svg(result: dict) -> str:
+    """Dated scatter, without interpolation or causal contrasts; missing values have no outcome coordinate."""
+    rows = [r for r in result['observations'] if r['visit']]
+    if not rows:
+        return ''
+    dates = [datetime.fromisoformat(r['visit']['occurred_at']) for r in rows]
+    xs = [d.timestamp() for d in dates]
+    ys = [r['mean'] for r in rows if r['mean'] is not None]
+    lo, hi = min(xs), max(xs)
+    ymin, ymax = (min(ys), max(ys)) if ys else (0,1)
+    sx = lambda x: 50+(x-lo)/(hi-lo or 1)*650
+    sy = lambda y: 225-(y-ymin)/(ymax-ymin or 1)*170
+    marks = []
+    for r, date, x in zip(rows, dates, xs):
+        v = r['visit']
+        qc = v.get('qc') or {}
+        title = html.escape(f"{date.isoformat()} | {r['mean']} {result['unit']} | {r['status']} | QC {qc.get('quality_flags', [])} | {v['exposure']} | {v['deviations']} | {v['missing_reason']}")
+        color = PHASE_COLORS.get((r['observed_period'] or {}).get('kind'), '#888888')
+        if r['mean'] is None:
+            marks.append(f"<text x='{sx(x):.1f}' y='248' fill='#888888'>×<title>{title}</title></text>")
+        else:
+            marks.append(f"<circle cx='{sx(x):.1f}' cy='{sy(r['mean']):.1f}' r='4' fill='{color}'><title>{title}</title></circle>")
+            if qc.get('quality_flags') or v['deviations']:
+                marks.append(f"<text x='{sx(x)+5:.1f}' y='{sy(r['mean'])-5:.1f}' fill='{color}'>!<title>{title}</title></text>")
+    unique = sorted(set(dates))
+    labels = unique if len(unique)<=4 else [unique[0],unique[len(unique)//3],unique[2*len(unique)//3],unique[-1]]
+    ticks = ''.join(f"<text x='{sx(d.timestamp()):.1f}' y='272' font-size='11' text-anchor='middle' fill='#888888'>{d.date()}</text>" for d in labels)
+    unit = html.escape(result['unit'])
+    legend = ' · '.join(f"{kind}: {color}" for kind,color in PHASE_COLORS.items() if any((r['observed_period'] or {}).get('kind')==kind for r in rows))
+    return (f"<svg viewBox='0 0 750 310' width='100%' role='img' aria-label='Dated experimental observations ({unit})'>"
+        f"<text x='20' y='20' fill='#888888'>Session mean ({unit}); actual dates (UTC offsets in ledger)</text>"
+        f"<line x1='45' y1='235' x2='710' y2='235' stroke='#888888'/><line x1='45' y1='45' x2='45' y2='235' stroke='#888888'/>"
+        f"<text x='5' y='60' fill='#888888'>{ymax:.3g}</text><text x='5' y='225' fill='#888888'>{ymin:.3g}</text>"
+        + ''.join(marks)+ticks+f"<text x='50' y='300' font-size='10' fill='#888888'>{html.escape(legend)} · ! QC/deviation · × missing (no outcome value)</text></svg>")

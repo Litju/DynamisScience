@@ -1122,6 +1122,8 @@ def _metric_ids_for_method(method_id: str, snapshot_id: str) -> set[str]:
 
 
 def _estimand_for_method(method_id: str, metric: dict[str, Any]) -> str:
+    if method_id == 'METH-EXPERIMENT-DESC':
+        return f"Session-weighted phase descriptions of {metric['label'].lower()}: variation, observed change and elapsed-day slope; no causal estimand."
     if method_id == "METH-REAL-TREND":
         return f"Within-subject change in {metric['label'].lower()} per testing occasion."
     if method_id == "METH-REAL-RELIABILITY":
@@ -2907,6 +2909,11 @@ def research_sections(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         label = report_section_label(run)
         section = sections.setdefault(label, {"label": label, "scope": scope, "run_ids": []})
         section["run_ids"].append(run["id"])
+        if run['method_id'] == 'METH-EXPERIMENT-DESC':
+            section.setdefault('experimental_results', []).append({
+                'run_id': run['id'], 'method_id': run['method_id'], 'method_version': run['method_version'],
+                'result': run['result'], 'result_digest': run['result_digest'],
+                'reproducibility_key': run['reproducibility_key']})
         if scope["kind"] == "INDIVIDUAL" and "investigation" not in section:
             versions = investigation_versions(scope["investigation_id"])
             captured_version = scope.get("investigation_version")
@@ -3237,6 +3244,14 @@ def _research_sections_html(sections: list[dict[str, Any]]) -> str:
     parts = ["<h2>Research scopes</h2>"]
     for section in sections:
         parts.append(f"<h3>{html.escape(section['label'])}</h3><p class=\"meta\">Runs {html.escape(', '.join(section['run_ids']))}</p>")
+        for experimental in section.get('experimental_results', []):
+            from .experiments import result_html
+            parts.append(f"<p>{html.escape(experimental['run_id'])} · {html.escape(experimental['method_id'])} "
+                         f"v{html.escape(experimental['method_version'])} · digest {html.escape(experimental['result_digest'])} · "
+                         f"reproducibility {html.escape(experimental['reproducibility_key'])}</p>")
+            parts.append(result_html(experimental['result'], chart=True))
+        if len(section.get('experimental_results', [])) == len(section['run_ids']):
+            continue
         investigation = section.get("investigation")
         if not investigation:
             continue

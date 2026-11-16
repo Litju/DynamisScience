@@ -135,6 +135,7 @@ class IndividualResearchPanel(QWidget):
             if widget:
                 widget.deleteLater()
         self.run_picker.clear()
+        self.analysis_protocol.clear()
         self.protocol_history.clear()
         self.visit_revision.clear()
         self.experiment_summary.clear()
@@ -190,6 +191,12 @@ class IndividualResearchPanel(QWidget):
         self._show_protocol(investigation.get("protocol") or {})
         self._show_periods(payload["periods"])
         self._show_experiment(payload)
+        self.analysis_protocol.clear()
+        for timeline in payload.get('experiment_history', []):
+            p = timeline['protocol']
+            self.analysis_protocol.addItem(f"Experimental protocol v{p['version']} · {p['question']}", timeline)
+        self.analysis_protocol.setCurrentIndex(self.analysis_protocol.count()-1)
+        self._method_changed()
         self._show_scenarios(payload["scenarios"])
         self.model_picker.clear()
         self.model_picker.addItem("No model referenced", None)
@@ -219,6 +226,10 @@ class IndividualResearchPanel(QWidget):
         self.method_picker.setAccessibleName("Individual analysis method")
         self.method_picker.currentIndexChanged.connect(self._method_changed)
         layout.addWidget(self.method_picker)
+        self.analysis_protocol = QComboBox()
+        self.analysis_protocol.setAccessibleName('Experimental analysis protocol version')
+        self.analysis_protocol.currentIndexChanged.connect(self._method_changed)
+        layout.addWidget(self.analysis_protocol)
         self.method_detail = QTextBrowser()
         layout.addWidget(self.method_detail, 1)
         self.run_button = QPushButton("Run individual analysis on the active revision")
@@ -226,8 +237,15 @@ class IndividualResearchPanel(QWidget):
         layout.addWidget(self.run_button)
         self.tabs.addTab(page, "Analysis")
 
-    def _method_changed(self) -> None:
+    def _selected_method(self) -> dict | None:
         method = self.method_picker.currentData()
+        if method and method['method_id'] == 'METH-EXPERIMENT-DESC' and self.analysis_protocol.currentData():
+            return self.analysis_protocol.currentData()['eligibility']
+        return method
+
+    def _method_changed(self) -> None:
+        method = self._selected_method()
+        self.analysis_protocol.setVisible(bool(method and method['method_id'] == 'METH-EXPERIMENT-DESC'))
         self.run_button.setEnabled(bool(method and method["status"] == "ELIGIBLE"))
         if not method:
             self.method_detail.clear()
@@ -235,14 +253,17 @@ class IndividualResearchPanel(QWidget):
         self.method_detail.setHtml(method_html(method))
 
     def execute(self) -> None:
-        method = self.method_picker.currentData()
+        method = self._selected_method()
         if not method or method["status"] != "ELIGIBLE" or not self.payload:
             return
         workspace_id, investigation_id, revision = self.context()
         subject = self.payload["investigation"]["scope"]["subject_id"]
         request = {"method_id": method["method_id"], "outcome_metric_id": self.payload["metric"]["id"], "parameters": {},
                    "data_revision_id": revision,
-                   "scope": {"kind": "INDIVIDUAL", "subject_id": subject, "investigation_id": investigation_id}}
+                   "scope": {"kind": "INDIVIDUAL", "subject_id": subject, "investigation_id": investigation_id,
+                             "investigation_version":self.payload['investigation']['version']}}
+        if method['method_id'] == 'METH-EXPERIMENT-DESC':
+            request['parameters'] = {'protocol_version':method['protocol_version']}
 
         def finished(run: dict[str, Any]) -> None:
             if (workspace_id, investigation_id, revision) != self.context() or run.get("data_revision_id") != revision:
@@ -276,6 +297,13 @@ class IndividualResearchPanel(QWidget):
         if not run:
             return
         result, diagnostics = run["result"], run.get("diagnostics", {})
+        if run['method_id'] == 'METH-EXPERIMENT-DESC':
+            from ..experiments import result_html
+            self.result_view.setHtml(f"<p>{html.escape(run['id'])} · {html.escape(run['method_id'])} "
+                f"v{html.escape(run['method_version'])} · {html.escape(run['method_status']['state'])}</p>"
+                + result_html(result) + binding_html(run))
+            self._show_run_figure(run)
+            return
         axis = result.get("axis", "week")
         rows = "".join(f"<tr><td>{point[axis]}</td><td>{point['status']}</td><td>{point['n_trials']}</td><td>{_number(point['mean'])}</td>"
                        f"<td>{_number(point['within_session_sd'])}</td></tr>" for point in result.get("points", []))
@@ -290,6 +318,9 @@ class IndividualResearchPanel(QWidget):
             f"<p>{html.escape(result.get('error_note', ''))}</p><p>Missing occasions: {html.escape(', '.join(map(str, result.get('missing_occasions', []))) or 'none')}</p>"
             f"<p>Limitations:</p><ul>{limitations}</ul><p class='meta'>Digest {html.escape(run.get('result_digest', ''))} · "
             f"reproducibility {html.escape(run.get('reproducibility_key', ''))}</p><pre>{html.escape(json.dumps(diagnostics, indent=2, default=str))}</pre>" + binding_html(run))
+        self._show_run_figure(run)
+
+    def _show_run_figure(self, run: dict) -> None:
         from .plots import ScientificFigureWidget, run_figure
 
         layout = self.figure_holder.layout()

@@ -71,6 +71,8 @@ class DynamisAppService:
         if investigation["study_id"] != workspace_id:
             raise researchstore.ResearchValidation("The investigation belongs to another workspace")
         subject_id = investigation["scope"]["subject_id"]
+        if scope.get('investigation_version') not in (None, investigation['version']):
+            raise researchstore.ResearchConflict('The investigation changed; refresh before running analysis')
         if scope.get("subject_id") not in (None, subject_id):
             raise researchstore.ResearchConflict("The selected participant changed; select the investigation again")
         return {"kind": "INDIVIDUAL", "subject_id": subject_id, "investigation_id": investigation["id"],
@@ -101,9 +103,19 @@ class DynamisAppService:
         axis, points = longitudinal.individual_points(snapshot_id, metric, investigation["scope"]["subject_id"])
         revision = researchstore.get_data_revision(entity.get("active_data_revision_id") or "") or {}
         from .. import experiments
+        from ..method_catalogue import eligibility, method_spec
+        history = []
+        scope = {'kind':'INDIVIDUAL', 'subject_id':investigation['scope']['subject_id'],
+                 'investigation_id':investigation_id, 'investigation_version':investigation['version']}
+        for p in investigation.get('experiment_protocols', []):
+            params = {'protocol_version':p['version']}
+            context = experiments.analysis_context(entity, scope, params)
+            item = experiments.timeline(investigation_id, p['version'], investigation=investigation)
+            item['eligibility'] = eligibility(method_spec('METH-EXPERIMENT-DESC'), metric, [],
+                [scope['subject_id']], scope, p['design'], params, experiment=context)
+            history.append(item)
         return {"experiment": experiments.timeline(investigation_id),
-                "experiment_history": [experiments.timeline(investigation_id, p['version'])
-                                       for p in investigation.get('experiment_protocols', [])],
+                "experiment_history": history,
                 "data_revisions": researchstore.data_revisions(investigation['study_id']),
                 "investigation": investigation, "data_revision_id": entity.get("active_data_revision_id"),
                 "data_revision_number": revision.get("number"),

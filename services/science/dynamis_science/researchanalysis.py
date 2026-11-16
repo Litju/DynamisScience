@@ -568,6 +568,13 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
             "This is descriptive context, not a causal individual response."
         )
         quality = "EXPLORATORY"
+    elif run['method_id'] == 'METH-EXPERIMENT-DESC':
+        protocol_id = f"{run['investigation_id']}:protocol:{result['protocol_version']}"
+        title = f"Experimental phase descriptions · participant {result['subject_id']}"
+        interpretation = (f"{len(result['phases'])} phases; {result['n_observations']} recorded sessions. "
+                          'Descriptive observed changes and elapsed-day slopes only. Causal inference is NOT_QUALIFIED; '
+                          'time trends, order, carryover and serial dependence are not controlled.')
+        quality = 'EXPLORATORY'
     elif run["method_id"] == "METH-U-INDIVIDUAL":
         value = result["change_first_to_last"]
         uncertainty = result.get("change_trial_noise_se")
@@ -605,7 +612,7 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         "interval": interval,
         "effect_size": effect_size,
         "contrast_id": contrast_id,
-        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] == "METH-U-INDIVIDUAL" else f"{entity.get('population', 'Participants')} · {entity['id']}",
+        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else f"{entity.get('population', 'Participants')} · {entity['id']}",
         "sample_size": int(result.get("n_subjects") or result.get("n_observations") or 0),
         "protocol_id": protocol_id,
         "dataset_snapshot_id": run["snapshot_id"],
