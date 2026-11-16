@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
 
 from ..longitudinal import HORIZON_UNITS, NOT_QUALIFIED, PERIOD_KINDS, PROTOCOL_DESIGNS, SCENARIO_KINDS
 from .services import DynamisAppService
+from .method_selector import method_html, binding_html
 
 RunTask = Callable[[Callable[[], Any], Callable[[Any], None], str], None]
 
@@ -157,8 +158,7 @@ class IndividualResearchPanel(QWidget):
                                  ", ".join(point["quality_flags"]) or "—"] for point in payload["points"]])
         self.method_picker.clear()
         for method in payload["eligibility"]:
-            if method["status"] != "REJECTED":
-                self.method_picker.addItem(f"{method['name']} · {method['status'].lower()}", method)
+            self.method_picker.addItem(f"{method['name']} · {method['status'].lower()}", method)
         self.method_picker.setCurrentIndex(max(0, next((i for i in range(self.method_picker.count())
                                                         if self.method_picker.itemData(i)["status"] == "ELIGIBLE"), 0)))
         self._method_changed()
@@ -209,12 +209,7 @@ class IndividualResearchPanel(QWidget):
         if not method:
             self.method_detail.clear()
             return
-        issues = "".join(f"<li>{html.escape(item)}</li>" for item in method["issues"])
-        self.method_detail.setHtml(
-            f"<p><b>{html.escape(method['name'])}</b> · {html.escape(method['qualification']['status'])}</p>"
-            + (f"<p>Unavailable for this participant:</p><ul>{issues}</ul>" if issues else "<p>Data sufficiency checks passed.</p>")
-            + f"<p>Missing data: {html.escape(method['missingness'])}</p>"
-            + "".join(f"<p>· {html.escape(item)}</p>" for item in method["constraints"]))
+        self.method_detail.setHtml(method_html(method))
 
     def execute(self) -> None:
         method = self.method_picker.currentData()
@@ -271,7 +266,7 @@ class IndividualResearchPanel(QWidget):
             f"({_number(result.get('percent_change_first_to_last'), 1)}%). Trial-noise SE: {_number(result.get('change_trial_noise_se'), 3)}.</p>"
             f"<p>{html.escape(result.get('error_note', ''))}</p><p>Missing occasions: {html.escape(', '.join(map(str, result.get('missing_occasions', []))) or 'none')}</p>"
             f"<p>Limitations:</p><ul>{limitations}</ul><p class='meta'>Digest {html.escape(run.get('result_digest', ''))} · "
-            f"reproducibility {html.escape(run.get('reproducibility_key', ''))}</p><pre>{html.escape(json.dumps(diagnostics, indent=2, default=str))}</pre>")
+            f"reproducibility {html.escape(run.get('reproducibility_key', ''))}</p><pre>{html.escape(json.dumps(diagnostics, indent=2, default=str))}</pre>" + binding_html(run))
         from .plots import ScientificFigureWidget, run_figure
 
         layout = self.figure_holder.layout()

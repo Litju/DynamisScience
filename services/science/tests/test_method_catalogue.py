@@ -1,9 +1,12 @@
 """RES-716 scientific contracts and execution using isolated synthetic imports."""
 import copy
+from statistics import NormalDist
 
+import numpy as np
+import polars as pl
 import pytest
 
-from dynamis_science import method_catalogue as mc, researchstore
+from dynamis_science import method_catalogue as mc, realanalysis, researchstore
 from test_longitudinal_research import service, study, run  # noqa: F401
 
 
@@ -40,6 +43,9 @@ def test_catalogue_is_versioned_detached_and_evidence_bounded():
     (ROWS, {"scope": {"kind": "INDIVIDUAL"}}, "Cohort-level"),
     (ROWS, {"parameters": {"reference_occasion": 1, "contrast_occasion": 9}}, "observed occasions"),
     (ROWS, {"parameters": {"alpha": 0.1}}, "fixed 95%"),
+    (ROWS, {"parameters": {"reference_occasion": "first"}}, "Invalid parameter"),
+    (ROWS, {"parameters": {"alpha": float("nan")}}, "Invalid parameter"),
+    ([{**r, "occasion": 1.5} for r in ROWS], {}, "finite integer ordinal"),
 ])
 def test_invalid_trend_inputs_are_rejected(rows, kwargs, reason):
     result = check(rows, **kwargs)
@@ -82,3 +88,39 @@ def test_saved_runs_capture_contract_source_parameters_and_data_revision(service
     with pytest.raises(researchstore.ResearchValidation):
         run(service, study["id"], study["rev1"], "METH-REAL-TREND")
     assert len(researchstore.list_runs(study["id"])) == before
+
+
+def test_existing_mixedlm_and_icc_execution_contracts_on_synthetic_rows(tmp_path, monkeypatch):
+    """Exercise the real engine boundary with synthetic inputs; no private sources or qualification run."""
+    from dynamis_science.qualification import anova_icc_reference
+    subjects = [f"S{i:02}" for i in range(12)]
+    rng = np.random.default_rng(716)
+    intercepts = rng.normal(35, 3, len(subjects))
+    slopes = rng.normal(1, 0.3, len(subjects))
+    rows = [{"subject_id": s, "occasion": t, "cmj_height_cm": intercepts[i] + slopes[i] * t + rng.normal(0, 0.5)}
+            for i, s in enumerate(subjects) for t in (1, 2, 3, 4)]
+    trial_matrix = np.array([[9, 2, 5, 8], [6, 1, 3, 2], [8, 4, 6, 8], [7, 1, 2, 6], [10, 5, 6, 9], [6, 2, 4, 7]], dtype=float)
+    trials = [{"subject_id": subjects[i], "trial_number": t + 1, "fz_peak_n": v, "activity": "Walking"}
+              for i, values in enumerate(trial_matrix) for t, v in enumerate(values)]
+    monkeypatch.setattr(realanalysis, "get_study", lambda _: {"snapshot": {"id": "SYNTHETIC-716", "checksums": {}}, "analysis_specs": []})
+    monkeypatch.setattr(realanalysis, "_cohort", lambda *_: {"cohort": {"id": "SYNTHETIC-COHORT", "subject_ids": subjects}})
+    monkeypatch.setattr(realanalysis, "read_table", lambda _, table: pl.DataFrame(rows if table == "cmj_occasions" else trials))
+    monkeypatch.setattr(realanalysis, "artifact_dir", lambda: tmp_path)
+    trend = realanalysis.execute(realanalysis.STUDY_MENDELEY, "METH-REAL-TREND", "MET-REAL-CMJ-HEIGHT", [],
+                                 {"reference_occasion": 1, "contrast_occasion": 4, "alpha": 0.05})
+    assert trend["execution"]["eligibility"]["status"] == "ELIGIBLE"
+    assert trend["diagnostics"]["converged"]
+    # Balanced athlete/occasion design: compare fixed slope with a separate OLS slope calculation.
+    x = np.array([r["occasion"] for r in rows], dtype=float)
+    y = np.array([r["cmj_height_cm"] for r in rows])
+    slope = float(np.sum((x - x.mean()) * (y - y.mean())) / np.sum((x - x.mean())**2))
+    assert trend["result"]["coefficients"]["occasion_slope"]["estimate"] == pytest.approx(slope, abs=0.02)
+    reliability = realanalysis.execute(realanalysis.STUDY_MOVESMART, "METH-REAL-RELIABILITY", "MET-REAL-FZ-PEAK", [],
+                                      {"activity": "Walking", "max_trials": 4})
+    reference = anova_icc_reference(trial_matrix)
+    assert reliability["result"]["icc_3_1"] == pytest.approx(reference["icc_3_1"], rel=1e-12)
+    assert reliability["result"]["typical_error"] == pytest.approx(reference["typical_error"], rel=1e-12)
+    assert reliability["result"]["minimal_detectable_change_95"] == pytest.approx(NormalDist().inv_cdf(0.975) * np.sqrt(2) * reference["typical_error"])
+    assert reliability["execution"]["method_binding"]["method_version"] == "1.1.0"
+    with pytest.raises(ValueError, match="peak vertical force"):
+        realanalysis.execute(realanalysis.STUDY_MOVESMART, "METH-REAL-RELIABILITY", "MET-REAL-IMU-ACCEL", [], {})

@@ -125,7 +125,8 @@ def method_status(kind: str) -> dict[str, Any]:
     from ... import researchstore
 
     method_id, claim = _METHOD[kind]
-    meta = researchstore.METHODS.get(method_id) if method_id else None
+    from ...method_catalogue import method_spec
+    meta = method_spec(method_id) if method_id else None
     if claim == QUALIFIED and not (meta and meta["qualification"]["status"] == "QUALIFIED"):
         claim = NOT_QUALIFIED  # never advertise qualification the codebase does not record
     return {
@@ -134,6 +135,7 @@ def method_status(kind: str) -> dict[str, Any]:
         "version": meta["version"] if meta else None,
         "record": meta["qualification"].get("record") if meta else None,
         "promotable": claim == QUALIFIED,
+        "contract": meta,
     }
 
 
@@ -236,6 +238,17 @@ class AnalysisSpec:
             if not str(o["activity"]).strip():
                 err("activity is required")
         if self.kind in ("mixed_model", "reliability"):
+            expected_table = "cmj_occasions" if self.kind == "mixed_model" else "signal_trials"
+            if self.table != expected_table:
+                err(f"The engine requires {expected_table}; selected table is {self.table}")
+            if self.role("subject") and self.role("subject") != ["subject_id"]:
+                err("The existing engine requires the canonical subject_id role")
+            if self.kind == "mixed_model" and self.role("occasion") and self.role("occasion") != ["occasion"]:
+                err("The existing engine requires the canonical occasion role")
+            if self.kind == "reliability" and self.role("outcome") and self.role("outcome") != ["fz_peak_n"]:
+                err("The reliability engine requires fz_peak_n in N")
+            if self.kind == "mixed_model" and o["alpha"] != 0.05:
+                err("The existing engine supplies fixed 95% intervals; alpha must be 0.05")
             if self.study_id is None:
                 err("study unknown: set table (cmj_occasions or signal_trials) or options['study_id']")
             elif self.role("outcome") and self.outcome_metric_id() is None:
@@ -248,6 +261,8 @@ class AnalysisSpec:
     def canonical(self) -> dict[str, Any]:
         return {
             "kind": self.kind,
+            "method_id": method_status(self.kind)["method_id"],
+            "method_version": method_status(self.kind)["version"],
             "snapshot_id": self.snapshot_id,
             "table": self.table,
             "roles": {r: self.role(r) for r in ROLES if self.role(r)},
@@ -286,6 +301,7 @@ class AnalysisSpec:
         return {
             **({"data_revision_id": o["data_revision_id"]} if o.get("data_revision_id") else {}),
             "method_id": method,
+            "method_version": method_status(self.kind)["version"],
             "outcome_metric_id": self.outcome_metric_id(),
             "excluded_subject_ids": list(o["excluded_subject_ids"]),
             "parameters": params,

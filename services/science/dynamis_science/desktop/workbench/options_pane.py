@@ -504,6 +504,10 @@ class OptionsPane(QWidget):
         elif st["status"] == "not qualified":
             bits.append("exploratory only; cannot be promoted")
         self.method_line.setText("  ·  ".join(bits))
+        if st.get("contract"):
+            contract = st["contract"]
+            self.method_line.setText(self.method_line.text() + "\n" + contract["estimand"] + "\n" + contract["uncertainty"])
+            self.method_line.setToolTip("\n".join([contract["required_shape"], contract["units"], *contract["limitations"], *contract["evidence_references"]]))
         self._syncing = True
         try:
             options = spec.effective_options()

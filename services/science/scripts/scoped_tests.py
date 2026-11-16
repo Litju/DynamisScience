@@ -15,6 +15,17 @@ import tempfile
 import time
 
 
+def scratch_bytes(root: Path) -> int:
+    total = 0
+    for path in root.rglob("*"):
+        try:
+            if path.is_file():
+                total += path.stat().st_size
+        except FileNotFoundError:
+            pass  # SQLite and Qt may remove transient files while sampled.
+    return total
+
+
 def main() -> int:
     parent = Path(tempfile.gettempdir()).resolve()
     service = Path(__file__).resolve().parents[1]
@@ -37,7 +48,7 @@ def main() -> int:
         process = subprocess.Popen(command, cwd=service, env=env)
         started = time.monotonic()
         while process.poll() is None:
-            peak = max(peak, sum(p.stat().st_size for p in scratch.rglob("*") if p.is_file()))
+            peak = max(peak, scratch_bytes(scratch))
             if peak > 512 * 1024**2 or time.monotonic() - started > 300:
                 raise RuntimeError("Scoped run exceeded 512 MiB scratch or 300 seconds")
             time.sleep(0.25)

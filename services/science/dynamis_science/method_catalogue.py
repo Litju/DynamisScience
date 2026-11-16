@@ -49,14 +49,17 @@ def catalogue() -> list[dict[str, Any]]:
                     timebase="Ordinal occasion/week; no equal calendar spacing assumed" if "signal_trials" not in meta["required_tables"] else "Activity / acquisition-ordered trials; native signals 1000 Hz")
         item["limitations"] = [*item["constraints"], "Qualification is numerical and scope-specific; no independent human statistical approval is implied."]
         if identity == "METH-REAL-TREND":
+            item["assumptions"] += ["Independent, homoscedastic within-athlete errors; outcome missingness is ignorable (MAR assumed)."]
             item["limitations"] += ["Wald intervals have no Satterthwaite/Kenward–Roger correction; fallback to random intercept changes the SE basis."]
+        if identity == "METH-REAL-RELIABILITY":
+            item["assumptions"] += ["Normal errors for F-based intervals; no subject × trial interaction."]
         result.append(item)
     for identity, name, status, reason, implementation in (
-        ("METH-LONG", "Synthetic arm × time reference", "QUALIFIED", "Synthetic reference study only; fallback estimator class is recorded. Not a generic cohort method.", "analysis.py:_fit_mixed"),
+        ("METH-LONG", "Synthetic arm × time reference", "QUALIFIED", "Synthetic reference study only; fallback estimator class is recorded. Not a generic cohort method.", "analysis.py:_group_longitudinal"),
         ("METH-REL", "Synthetic baseline ICC / TE / MDC95 reference", "QUALIFIED", "Synthetic baseline reference only; not device or between-day reliability.", "analysis.py:two_way_icc"),
         ("METH-EXPERIMENT", "Individual experimental effect", "UNAVAILABLE", "No qualified within-person causal estimator is available (RES-717).", "longitudinal.py:period_summaries"),
         ("METH-FORECAST", "Individual scenario forecast", "UNAVAILABLE", "No qualified forecasting model is available (RES-590).", "longitudinal.py:FORECAST_REASON"),
-        ("METH-FITNESS-FATIGUE", "Fitness–fatigue prototype", "EXPLORATORY", "Research prototype; no qualified research execution contract.", "analysis.py"),
+        ("METH-FITNESS-FATIGUE", "Fitness–fatigue prototype", "EXPLORATORY", "Research prototype; no qualified research execution contract.", "analysis.py:_training_response"),
         *[(key, value["name"], "UNAVAILABLE", value["reason"], "realanalysis.py:signal_qa") for key, value in REJECTED_METHODS.items()],
     ):
         result.append(dict(id=identity, name=name, version="1.1.0" if identity in {"METH-LONG", "METH-REL"} else "1.0.0",
@@ -69,6 +72,18 @@ def catalogue() -> list[dict[str, Any]]:
                            evidence_references=["docs/science/RES-619_METHODOLOGY.md"], implementation=implementation,
                            execution_route="synthetic reference only" if identity in {"METH-LONG", "METH-REL"} else None,
                            timebase="See reference implementation"))
+        if identity in {"METH-LONG", "METH-REL"}:
+            result[-1].update(
+                estimand="Between-arm difference in change" if identity == "METH-LONG" else "Baseline single-trial consistency ICC(3,1), TE and MDC95",
+                units="Outcome units; ICC dimensionless; CV in %",
+                supported_designs=["SYNTHETIC_REFERENCE"], required_tables=["cmj_trials"],
+                required_shape="First valid trial per athlete-week in two arms" if identity == "METH-LONG" else "At least three athletes with two valid baseline trials; balanced first k",
+                assumptions=["Linear arm-specific slopes and random athlete effects" if identity == "METH-LONG" else "Two-way ANOVA, fixed trial factor; no subject × trial interaction"],
+                uncertainty="Wald 95% interval" if identity == "METH-LONG" else "Shrout–Fleiss F-based ICC 95% CI; TE = sqrt(MSE), MDC95 = 1.96 sqrt(2) TE",
+                diagnostics=["Estimator/fallback identity", "residual summaries"] if identity == "METH-LONG" else ["Balanced trials", "excluded trials", "within-athlete CV"],
+                output_schema=["Difference-in-change contrast and SE"] if identity == "METH-LONG" else ["ICC and CI", "TE", "MDC95"],
+                missingness="Observed valid trials only; no imputation", timebase="Ordinal training week / baseline repeated trials")
+            result[-1]["report_outputs"] = result[-1]["output_schema"]
     return result
 
 
@@ -93,6 +108,18 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
         issues.append(f"Design {design} is unsupported; no treatment or causal effect is inferred.")
     if not metric.get("unit"):
         issues.append("Outcome units must be recorded in the metric registry.")
+    for key, schema in method.get("parameter_schema", {}).items():
+        if key not in p:
+            continue
+        value = p[key]
+        valid = ((type(value) is int and schema["type"] == "integer")
+                 or (type(value) in (int, float) and schema["type"] == "number" and math.isfinite(value))
+                 or (isinstance(value, str) and schema["type"] == "string" and bool(value.strip())))
+        if not valid or ("minimum" in schema and value < schema["minimum"]) or ("maximum" in schema and value > schema["maximum"]):
+            issues.append(f"Invalid parameter {key}: expected {schema['type']} within the method's declared bounds.")
+    # Invalid types must not reach comparisons, row selection or the numerical engine.
+    if any(issue.startswith("Invalid parameter") for issue in issues):
+        return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE", "issues": issues}
     selected = [r for r in rows if r.get("subject_id") in subject_ids]
     if identity == "METH-REAL-RELIABILITY":
         if column != "fz_peak_n" or metric.get("unit") != "N":
@@ -107,6 +134,11 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
     if identity in {"METH-REAL-TREND", "METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL"}:
         if any(r.get(axis) is None for r in values) or not values:
             issues.append(f"Missing {axis} metadata; map the measured time axis during import.")
+        if axis in {"occasion", "week"} and any(
+                r.get(axis) is not None and (not isinstance(r[axis], (int, float))
+                or not math.isfinite(r[axis]) or int(r[axis]) != r[axis]) for r in values):
+            issues.append(f"The {axis} axis requires finite integer ordinal values.")
+            return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE", "issues": issues}
     if identity == "METH-REAL-TREND":
         if len({r.get("subject_id") for r in values}) < 3:
             issues.append("At least three included participants with observed outcomes are required.")
@@ -141,6 +173,8 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
         keys = [(r["subject_id"], r.get("trial_number")) for r in selected]
         if any(key[1] is None for key in keys) or len(keys) != len(set(keys)):
             issues.append("Unique acquisition-ordered trial_number metadata is required per athlete.")
+        if any(type(key[1]) is not int or key[1] < 1 for key in keys):
+            issues.append("Acquisition trial numbers must be positive integers.")
         if len(values) != len(selected):
             issues.append("Reliability requires complete trial outcomes; remove or correct empty trials explicitly.")
     return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE" if issues else "ELIGIBLE", "issues": issues,

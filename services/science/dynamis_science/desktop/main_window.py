@@ -2059,7 +2059,14 @@ class ResearchWorkbench(QWidget):
         controls.addWidget(execute_button, 2, 0)
         controls.addWidget(self.show_figure_button, 2, 1)
         controls.addWidget(export_run, 2, 2)
+        self.method_details = QTextBrowser()
+        self.method_details.setAccessibleName("Scientific method contract and eligibility")
+        self.method_details.setMaximumHeight(240)
         run_layout.addLayout(controls)
+        run_layout.addWidget(self.method_details)
+        self.method_picker.currentIndexChanged.connect(self._method_selected)
+        self.analysis_metric_picker.currentIndexChanged.connect(self._refresh_method_eligibility)
+        self.parameters.textChanged.connect(self._refresh_method_eligibility)
         results = QTabWidget()
         self.run_result_tabs = results
         self.run_output = QTextBrowser()
@@ -2381,17 +2388,57 @@ class ResearchWorkbench(QWidget):
             return
         methods, metrics = values
         self.method_picker.clear()
-        for method in methods:
-            qualification = method.get("qualification", {}).get("status", "")
-            self.method_picker.addItem(f"{method['id']} · {method['name']} · {qualification}", method["id"])
-        if self.detail.get("workspace"):
-            self.method_picker.setCurrentIndex(max(0, self.method_picker.findData("METH-U-DESC")))
         self.metric_picker.clear()
+        self.analysis_metric_picker.blockSignals(True)
         self.analysis_metric_picker.clear()
         for metric in metrics:
             label = f"{metric['label']} ({metric.get('unit', '')})"
             self.metric_picker.addItem(label, metric["id"])
             self.analysis_metric_picker.addItem(label, metric["id"])
+        self.analysis_metric_picker.blockSignals(False)
+        self._refresh_method_eligibility()
+
+    def _refresh_method_eligibility(self, *_args) -> None:
+        study_id = getattr(self, "study_id", None)
+        metric = self.analysis_metric_picker.currentData()
+        if not study_id or not metric or not getattr(self, "detail", None):
+            return
+        revision = self.detail.get("active_data_revision_id")
+        generation = getattr(self, "_eligibility_generation", 0) + 1
+        self._eligibility_generation = generation
+        self._method_eligibility = {}
+        try:
+            parameters = json.loads(self.parameters.toPlainText() or "{}")
+            if not isinstance(parameters, dict):
+                raise ValueError("Parameters must be a JSON object")
+        except ValueError as error:
+            self.execute_button.setEnabled(False)
+            self.method_details.setPlainText(str(error))
+            return
+        self.execute_button.setEnabled(False)
+        self.method_details.setPlainText("Checking selected outcome, design and population…")
+        def loaded(methods):
+            if (generation != self._eligibility_generation or study_id != self.study_id
+                    or revision != self.detail.get("active_data_revision_id") or metric != self.analysis_metric_picker.currentData()):
+                return
+            previous = self.method_picker.currentData()
+            self._method_eligibility = {m["method_id"]: m for m in methods}
+            self.method_picker.blockSignals(True)
+            self.method_picker.clear()
+            for method in sorted(methods, key=lambda m: m["status"] != "ELIGIBLE"):
+                self.method_picker.addItem(f"{method['name']} · {method['method_class']} · {method['status'].lower()}", method["method_id"])
+            preferred = previous or ("METH-U-DESC" if self.detail.get("workspace") else "METH-REAL-TREND")
+            self.method_picker.setCurrentIndex(max(0, self.method_picker.findData(preferred)))
+            self.method_picker.blockSignals(False)
+            self._method_selected()
+        self.window.run_task(lambda: self.service.analysis_methods(study_id, metric, parameters, revision_id=revision),
+                             loaded, "Checking scientific method eligibility")
+
+    def _method_selected(self, *_args) -> None:
+        from .method_selector import method_html
+        method = getattr(self, "_method_eligibility", {}).get(self.method_picker.currentData())
+        self.execute_button.setEnabled(bool(method and method["status"] == "ELIGIBLE"))
+        self.method_details.setHtml(method_html(method) if method else "Choose a measured outcome to inspect methods.")
 
     def _load_signal_trials(self, snapshot_id: str) -> None:
         self.window.run_task(
@@ -2541,6 +2588,10 @@ class ResearchWorkbench(QWidget):
         if not self.method_picker.currentData() or not self.analysis_metric_picker.currentData():
             QMessageBox.information(self, "Analysis", "Select a registered method and metric first.")
             return
+        eligible = getattr(self, "_method_eligibility", {}).get(self.method_picker.currentData())
+        if not eligible or eligible["status"] != "ELIGIBLE":
+            self._method_selected()
+            return
         if self.detail.get("workspace"):
             from ..researchstore import METHODS
             parameters = {}
@@ -2587,14 +2638,8 @@ class ResearchWorkbench(QWidget):
         self.latest_run = run
         self.latest_evidence_id = None
         self.show_figure_button.setEnabled(True)
-        self.run_output.setPlainText(
-            json.dumps(
-                {key: run.get(key) for key in ("id", "method_id", "method_version", "method_status", "status", "result", "diagnostics", "result_digest", "reproducibility_key")},
-                indent=2,
-                ensure_ascii=False,
-                default=str,
-            )
-        )
+        from .method_selector import run_html
+        self.run_output.setHtml(run_html(run))
         self.window.current_study_id = self.study_id
         self.window.inspector.setPlainText(
             json.dumps(run.get("diagnostics", {}), indent=2, ensure_ascii=False, default=str)

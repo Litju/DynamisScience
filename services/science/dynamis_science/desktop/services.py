@@ -654,7 +654,45 @@ class DynamisAppService:
             raise researchstore.ResearchNotFound(f"Study {study_id} has no cohort")
         return researchanalysis.explore(entity, cohort, metric_id, excluded_subject_ids, reference)
 
+    def analysis_methods(self, study_id: str, metric_id: str, parameters: dict | None = None,
+                         scope: dict | None = None, revision_id: str | None = None,
+                         excluded_subject_ids: list[str] | None = None) -> list[dict[str, Any]]:
+        """Read-only planning for exactly the outcome, population and revision that will run."""
+        from ..method_catalogue import catalogue, eligibility
+        if study_id in realstore.real_study_ids():
+            detail = realanalysis.get_study(study_id)
+            metric = realanalysis.metric(metric_id)
+            subjects = realanalysis._cohort(study_id, excluded_subject_ids)["cohort"]["subject_ids"]
+            rows = realanalysis.read_table(detail["snapshot"]["id"], metric["table"]).to_dicts()
+            return [eligibility(m, metric, rows, subjects, {"kind": "COHORT"}, "", parameters) for m in catalogue()]
+        entity = researchstore.get_entity(study_id)
+        if entity is None or not entity.get("dataset_snapshot_id"):
+            return []
+        if revision_id and revision_id != entity.get("active_data_revision_id"):
+            raise researchstore.ResearchConflict("The data revision changed while planning; refresh the selector")
+        metric = next((m for m in researchstore.dataset_metrics(entity["dataset_snapshot_id"]) if m["id"] == metric_id), None)
+        if metric is None:
+            raise researchstore.ResearchValidation("Choose a measured outcome available in this revision")
+        definition = researchstore._default_cohort_definition(metric, entity["dataset_snapshot_id"])
+        selected_scope = self._analysis_scope(study_id, scope) if entity.get("workspace") else {"kind": "COHORT"}
+        if selected_scope["kind"] == "INDIVIDUAL":
+            definition["include_subject_ids"] = [selected_scope["subject_id"]]
+        if (parameters or {}).get("activity"):
+            definition["activity"] = parameters["activity"]
+        cohort = ({**definition, "id": "PREVIEW", "status": "DRAFT", "scope": selected_scope} if entity.get("workspace")
+                  else researchstore.get_cohort(entity.get("cohort_id") or ""))
+        if cohort is None:
+            raise researchstore.ResearchValidation("This study has no saved analysis population")
+        resolved = researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"], excluded_subject_ids=excluded_subject_ids)
+        return researchstore.method_eligibility({**entity, "outcomes": {"primary": [metric]}}, cohort, resolved,
+                                               {"parameters": parameters or {}})
+
     def execute_analysis_run(self, study_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        from ..method_catalogue import method_spec
+        if payload.get("method_version"):
+            current = method_spec(payload["method_id"])["version"]
+            if payload["method_version"] != current:
+                raise researchstore.ResearchConflict("The method version changed; refresh the analysis selector")
         self.ensure_initialized()
         if study_id in realstore.real_study_ids():
             return realanalysis.execute(

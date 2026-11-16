@@ -121,7 +121,7 @@ def test_method_status_from_codebase():
 
 def test_mixed_payload_and_syntax():
     p = mixed().to_run_payload()
-    assert p == {"method_id": "METH-REAL-TREND", "outcome_metric_id": "MET-REAL-CMJ-HEIGHT",
+    assert p == {"method_id": "METH-REAL-TREND", "method_version": "1.1.0", "outcome_metric_id": "MET-REAL-CMJ-HEIGHT",
                  "excluded_subject_ids": [],
                  "parameters": {"reference_occasion": 1, "contrast_occasion": 4, "alpha": 0.05}}
     code = mixed().to_python_syntax()
@@ -145,7 +145,7 @@ def test_payload_refused_when_invalid_or_unsupported():
 
 def test_payload_keys_match_service_contract():
     # execute_analysis_run reads method_id, outcome_metric_id, excluded_subject_ids, parameters.
-    assert set(mixed().to_run_payload()) == {"method_id", "outcome_metric_id", "excluded_subject_ids", "parameters"}
+    assert set(mixed().to_run_payload()) == {"method_id", "method_version", "outcome_metric_id", "excluded_subject_ids", "parameters"}
 
 
 def test_syntax_per_analysis():
