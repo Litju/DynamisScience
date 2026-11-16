@@ -233,6 +233,14 @@ def execute(
     cohort_ids = resolved["cohort"]["subject_ids"]
     if not cohort_ids:
         raise researchstore.ResearchValidation("The resolved cohort is empty")
+    from .method_catalogue import execution_binding, binding_digest
+    eligible = researchstore.method_eligibility(
+        {**entity, "outcomes": {"primary": [metric]}}, cohort, resolved, {"parameters": parameters})
+    check = next(item for item in eligible if item["method_id"] == method_id)
+    if check["status"] != "ELIGIBLE":
+        raise researchstore.ResearchValidation("; ".join(check["issues"]))
+    binding = execution_binding(method_id, metric, parameters, researchstore.get_snapshot(snapshot_id),
+                                entity.get("active_data_revision_id"), cohort_ids, excluded_subject_ids or [])
     diagnostics: dict[str, Any] = {}
     figure_data: dict[str, Any] | None = None
     if method_id == "METH-REAL-TREND":
@@ -398,6 +406,7 @@ def execute(
     reproducibility_key = _digest(
         {
             "snapshot_checksums": researchstore.get_snapshot(snapshot_id).get("checksums", {}),
+            "method_binding_sha256": binding_digest(binding),
             "spec_id": spec["id"],
             "cohort_id": cohort["id"],
             "parameters": parameters,
@@ -435,7 +444,7 @@ def execute(
         "output_artifact_ids": [],
         "reproducibility_key": reproducibility_key,
         "result_digest": result_digest,
-        "execution": {"analysis_spec": spec, "cohort": resolved["cohort"]},
+        "execution": {"analysis_spec": spec, "cohort": resolved["cohort"], "method_binding": binding, "eligibility": check},
         "figure_data": figure_data,
     }
     saved = researchstore.append_run(run)

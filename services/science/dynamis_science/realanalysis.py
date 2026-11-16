@@ -1087,6 +1087,15 @@ def execute(
     }[study_id]
     if method_id not in allowed:
         raise ValueError(f"Method {method_id} is not applicable to {study_id}")
+    from .method_catalogue import method_spec, eligibility, execution_binding, binding_digest
+    selected_metric = metric(outcome_metric_id)
+    snapshot = study["snapshot"]
+    check = eligibility(method_spec(method_id), selected_metric,
+                        read_table(snapshot["id"], selected_metric["table"]).to_dicts(),
+                        cohort_ids, {"kind": "COHORT"}, "", parameters)
+    if check["status"] != "ELIGIBLE":
+        raise ValueError("; ".join(check["issues"]))
+    binding = execution_binding(method_id, selected_metric, parameters, snapshot, None, cohort_ids, excluded_subject_ids or [])
     spec = _spec_for(study, method_id, outcome_metric_id, parameters)
     if method_id == "METH-REAL-TREND":
         result = _fit_trend(
@@ -1173,7 +1182,7 @@ def execute(
     result_digest = hashlib.sha256(json.dumps(result_for_digest, sort_keys=True).encode()).hexdigest()[:16]
     reproducibility_key = hashlib.sha256(
         json.dumps(
-            [study["snapshot"]["id"], spec["id"], cohort["cohort"]["id"], parameters, study["snapshot"]["checksums"]],
+            [study["snapshot"]["id"], spec["id"], cohort["cohort"]["id"], parameters, study["snapshot"]["checksums"], binding_digest(binding)],
             sort_keys=True,
         ).encode()
     ).hexdigest()[:24]
@@ -1198,7 +1207,7 @@ def execute(
         "output_artifact_ids": [],
         "reproducibility_key": reproducibility_key,
         "result_digest": result_digest,
-        "execution": {"analysis_spec": spec, "cohort": cohort["cohort"]},
+        "execution": {"analysis_spec": spec, "cohort": cohort["cohort"], "method_binding": binding, "eligibility": check},
         "evidence_ids": [],
     }
     runs.append(run)

@@ -2749,83 +2749,18 @@ def study_detail(entity_id: str) -> dict[str, Any]:
 
 
 def method_eligibility(entity: dict[str, Any], cohort: dict[str, Any], resolved: dict[str, Any], plan: dict[str, Any] | None) -> list[dict[str, Any]]:
-    snapshot = get_snapshot(entity["dataset_snapshot_id"])
-    metrics = dataset_metrics(entity["dataset_snapshot_id"])
-    table_by_metric = {item["id"]: item["table"] for item in metrics}
+    from .method_catalogue import catalogue, eligibility
+
+    snapshot_id = entity["dataset_snapshot_id"]
+    metrics = dataset_metrics(snapshot_id)
     outcome = (entity.get("outcomes", {}).get("primary") or [{}])[0].get("id") or (plan or {}).get("outcome_metric_id")
-    table = table_by_metric.get(outcome)
-    scope = cohort.get("scope") or {"kind": "COHORT"}
-    results = []
-    for method in methods_for_snapshot(entity["dataset_snapshot_id"]):
-        issues: list[str] = []
-        individual_method = method["id"] == "METH-U-INDIVIDUAL"
-        if scope["kind"] == "INDIVIDUAL" and not individual_method:
-            issues.append("Cohort-level method; an individual investigation has one participant and is analysed with the individual trajectory method.")
-        if scope["kind"] != "INDIVIDUAL" and individual_method:
-            issues.append("Individual-scope method; select a participant investigation to use it.")
-        if individual_method and scope["kind"] == "INDIVIDUAL" and table in method["required_tables"]:
-            frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
-            axis = "occasion" if table == "cmj_occasions" else "week"
-            column = next((item["column"] for item in metrics if item["id"] == outcome), None)
-            if axis in frame.columns and column in frame.columns:
-                own = frame.filter((pl.col("subject_id") == scope["subject_id"]) & pl.col(column).is_not_null() & pl.col(axis).is_not_null())
-                observed = own[axis].n_unique()
-                if observed < 2:
-                    issues.append(f"Only {observed} measured {axis}(s) for this participant; at least two are required for a within-person trajectory.")
-        if table not in method["required_tables"]:
-            issues.append(f"Requires {', '.join(method['required_tables'])}; selected outcome is in {table}.")
-        if table in method["required_tables"] and method["id"] in {"METH-U-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL", "METH-REAL-DESC", "METH-REAL-TREND"}:
-            frame = read_snapshot_table(entity["dataset_snapshot_id"], table)
-            axis = "occasion" if table == "cmj_occasions" else "week" if table == "cmj_trials" else "activity"
-            if axis not in frame.columns or frame[axis].drop_nulls().is_empty():
-                issues.append(f"Missing {axis} metadata; map the measured time axis during import.")
-        if resolved["n"] < 3 and method["id"] in {"METH-REAL-TREND", "METH-REAL-RELIABILITY"}:
-            issues.append("At least three included participants are required.")
-        if method["id"] == "METH-REAL-TREND":
-            metric = next((item for item in metrics if item["id"] == outcome), None)
-            if metric:
-                frame = read_snapshot_table(entity["dataset_snapshot_id"], metric["table"])
-                complete = 0
-                for row in frame.iter_rows(named=True):
-                    if row.get("subject_id") in set(resolved["cohort"]["subject_ids"]) and row.get(metric["column"]) is not None:
-                        complete += 1
-                if complete < 8:
-                    issues.append(f"Only {complete} complete observations; at least 8 are required.")
-        if method["id"] == "METH-REAL-RELIABILITY":
-            activity = str((plan or {}).get("parameters", {}).get("activity") or "Walking")
-            frame = read_snapshot_table(entity["dataset_snapshot_id"], "signal_trials")
-            subset = frame.filter(pl.col("activity") == activity) if "activity" in frame.columns else frame
-            counts: dict[str, int] = {}
-            for row in subset.iter_rows(named=True):
-                if row.get("subject_id") in set(resolved["cohort"]["subject_ids"]) and row.get("fz_peak_n") is not None:
-                    counts[str(row["subject_id"])] = counts.get(str(row["subject_id"]), 0) + 1
-            eligible = [subject for subject, count in counts.items() if count >= 2]
-            if len(eligible) < 3:
-                issues.append(f"Only {len(eligible)} participants have at least two {activity.lower()} trials.")
-        results.append(
-            {
-                "method_id": method["id"],
-                "name": method["name"],
-                "status": "ELIGIBLE" if not issues else "INELIGIBLE",
-                "issues": issues,
-                "qualification": method["qualification"],
-                "constraints": method["constraints"],
-                "missingness": method["missingness"],
-            }
-        )
-    for method in REJECTED_METHODS.values():
-        results.append(
-            {
-                "method_id": method["id"],
-                "name": method["name"],
-                "status": "REJECTED",
-                "issues": [method["reason"]],
-                "qualification": method["qualification"],
-                "constraints": [],
-                "missingness": "",
-            }
-        )
-    return results
+    metric = next((item for item in metrics if item["id"] == outcome), None)
+    if metric is None:
+        return []
+    rows = read_snapshot_table(snapshot_id, metric["table"]).to_dicts()
+    return [eligibility(method, metric, rows, resolved["cohort"]["subject_ids"],
+                        cohort.get("scope") or {"kind": "COHORT"}, entity.get("design", ""),
+                        (plan or {}).get("parameters", {})) for method in catalogue()]
 
 
 # --------------------------------------------------------------------------- #

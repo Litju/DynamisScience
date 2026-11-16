@@ -1,0 +1,171 @@
+"""Versioned scientific contracts for the existing engines; no estimators live here."""
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import math
+import subprocess
+from pathlib import Path
+from typing import Any
+
+CATALOGUE_VERSION = "1.0.0"
+
+# Estimands and limits follow the RES-619 matrix, not menu labels.
+DETAILS = {
+    "METH-REAL-TREND": ("Population mean within-athlete change per ordinal occasion and selected contrast",
+                        "Outcome unit per occasion; contrast in outcome units", "ML Wald 95% z interval; no small-sample correction",
+                        "realanalysis.py:_fit_trend", "R lme4 ML comparison: docs/science/res619-evidence/r-mixedlm-summary.csv"),
+    "METH-REAL-RELIABILITY": ("Within-session single-trial consistency ICC(3,1); TE = sqrt(two-way MSE); MDC95 = 1.96 sqrt(2) TE",
+                              "ICC dimensionless; TE/MDC95 in N; CV in %", "Shrout–Fleiss F-based ICC 95% CI",
+                              "realanalysis.py:reliability / analysis.py:two_way_icc", "docs/science/res619-evidence/r-reliability-icc.csv"),
+    "METH-REAL-DESC": ("Mean of athlete values per occasion (trials averaged within athlete)", "Outcome units", "Student-t 95% CI across athletes, df = n - 1",
+                       "researchanalysis.py:_descriptive", "docs/science/RES-619_METHODOLOGY.md"),
+    "METH-U-DESC": ("Mean of athlete values per axis point (trials averaged within athlete)", "Outcome units", "Student-t 95% CI across athletes; undefined with one athlete",
+                    "researchanalysis.py:_descriptive", "docs/science/RES-619_METHODOLOGY.md"),
+    "METH-U-CHANGE": ("Observed per-athlete paired change; cohort change SD", "Outcome units", "Descriptive; no causal interval. TE only from same-session repeats",
+                      "researchanalysis.py:_individual_change", "docs/science/RES-619_METHODOLOGY.md"),
+    "METH-U-INDIVIDUAL": ("One participant's observed session means and first-to-last change", "Outcome units", "Trial-noise SE excludes between-day biological variation; no causal CI",
+                          "longitudinal.py:individual_trajectory", "tests/test_longitudinal_research.py:test_individual_trajectory_independent_recomputation"),
+    "METH-REAL-SIGNAL-QA": ("Restricted summed vertical force and IMU signal quality summaries", "N, N s, Hz and clock offsets as labelled", "Descriptive QA; no cross-modality validity or body-weight recovery claim",
+                           "realanalysis.py:signal_qa", "qualification_real.py:qualify_signal"),
+}
+
+
+def catalogue() -> list[dict[str, Any]]:
+    """Detached, serializable method specs. Qualification remains bounded to recorded evidence."""
+    from .researchstore import METHODS, REJECTED_METHODS
+
+    result = []
+    for identity, meta in METHODS.items():
+        estimand, units, uncertainty, implementation, evidence = DETAILS[identity]
+        item = copy.deepcopy(meta)
+        item.update(catalogue_version=CATALOGUE_VERSION, estimand=estimand, units=units,
+                    uncertainty=uncertainty, implementation=implementation,
+                    evidence_references=["docs/science/RES-619_METHODOLOGY.md", evidence],
+                    scopes=["INDIVIDUAL" if identity == "METH-U-INDIVIDUAL" else "COHORT"],
+                    method_class="DESCRIPTIVE" if identity in {"METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL"} else "QUALIFIED",
+                    execution_route="researchanalysis.execute", report_outputs=meta["output_schema"],
+                    timebase="Ordinal occasion/week; no equal calendar spacing assumed" if "signal_trials" not in meta["required_tables"] else "Activity / acquisition-ordered trials; native signals 1000 Hz")
+        item["limitations"] = [*item["constraints"], "Qualification is numerical and scope-specific; no independent human statistical approval is implied."]
+        if identity == "METH-REAL-TREND":
+            item["limitations"] += ["Wald intervals have no Satterthwaite/Kenward–Roger correction; fallback to random intercept changes the SE basis."]
+        result.append(item)
+    for identity, name, status, reason, implementation in (
+        ("METH-LONG", "Synthetic arm × time reference", "QUALIFIED", "Synthetic reference study only; fallback estimator class is recorded. Not a generic cohort method.", "analysis.py:_fit_mixed"),
+        ("METH-REL", "Synthetic baseline ICC / TE / MDC95 reference", "QUALIFIED", "Synthetic baseline reference only; not device or between-day reliability.", "analysis.py:two_way_icc"),
+        ("METH-EXPERIMENT", "Individual experimental effect", "UNAVAILABLE", "No qualified within-person causal estimator is available (RES-717).", "longitudinal.py:period_summaries"),
+        ("METH-FORECAST", "Individual scenario forecast", "UNAVAILABLE", "No qualified forecasting model is available (RES-590).", "longitudinal.py:FORECAST_REASON"),
+        ("METH-FITNESS-FATIGUE", "Fitness–fatigue prototype", "EXPLORATORY", "Research prototype; no qualified research execution contract.", "analysis.py"),
+        *[(key, value["name"], "UNAVAILABLE", value["reason"], "realanalysis.py:signal_qa") for key, value in REJECTED_METHODS.items()],
+    ):
+        result.append(dict(id=identity, name=name, version="1.1.0" if identity in {"METH-LONG", "METH-REL"} else "1.0.0",
+                           catalogue_version=CATALOGUE_VERSION, method_class=status, estimand=name,
+                           scopes=["COHORT"] if identity in {"METH-LONG", "METH-REL"} else ["INDIVIDUAL"],
+                           supported_designs=[], required_tables=[], required_shape=reason, units="As specified in reference implementation",
+                           assumptions=[], uncertainty="No additional uncertainty claim", diagnostics=[], output_schema=[], report_outputs=[],
+                           missingness="See reference implementation", constraints=[reason], limitations=[reason], reason=reason,
+                           parameter_schema={}, qualification=copy.deepcopy(REJECTED_METHODS.get(identity, {}).get("qualification", {"status": status, "basis": reason})),
+                           evidence_references=["docs/science/RES-619_METHODOLOGY.md"], implementation=implementation,
+                           execution_route="synthetic reference only" if identity in {"METH-LONG", "METH-REL"} else None,
+                           timebase="See reference implementation"))
+    return result
+
+
+def method_spec(identity: str) -> dict[str, Any]:
+    return next(item for item in catalogue() if item["id"] == identity)
+
+
+def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[str],
+                scope: dict, design: str, parameters: dict | None = None) -> dict:
+    """Check actual selected rows, before any fit or persistence. Missing outcomes stay missing."""
+    p = parameters or {}
+    identity, table, column = method["id"], metric["table"], metric["column"]
+    issues = []
+    if method.get("reason"):
+        issues.append(method["reason"])
+    if scope.get("kind", "COHORT") not in method["scopes"]:
+        issues.append("Individual-scope method; select a participant investigation to use it." if "INDIVIDUAL" in method["scopes"]
+                      else "Cohort-level method; an individual investigation requires the individual trajectory method.")
+    if table not in method["required_tables"]:
+        issues.append(f"Requires {', '.join(method['required_tables']) or 'a dedicated qualified implementation'}; selected outcome is in {table}.")
+    if design and design not in method["supported_designs"]:
+        issues.append(f"Design {design} is unsupported; no treatment or causal effect is inferred.")
+    if not metric.get("unit"):
+        issues.append("Outcome units must be recorded in the metric registry.")
+    selected = [r for r in rows if r.get("subject_id") in subject_ids]
+    if identity == "METH-REAL-RELIABILITY":
+        if column != "fz_peak_n" or metric.get("unit") != "N":
+            issues.append("Reliability engine requires peak vertical force fz_peak_n in N; it cannot run another metric.")
+        selected = [r for r in selected if r.get("activity") == p.get("activity", "Walking")]
+    values = [r for r in selected if r.get(column) is not None]
+    if any(not isinstance(r[column], (int, float)) or not math.isfinite(r[column]) for r in values):
+        issues.append("Outcome contains non-finite or non-numeric values; correct the input before analysis.")
+    if not values:
+        issues.append("No observed outcome values remain in the selected population.")
+    axis = "occasion" if table == "cmj_occasions" else "week" if table == "cmj_trials" else "activity"
+    if identity in {"METH-REAL-TREND", "METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL"}:
+        if any(r.get(axis) is None for r in values) or not values:
+            issues.append(f"Missing {axis} metadata; map the measured time axis during import.")
+    if identity == "METH-REAL-TREND":
+        if len({r.get("subject_id") for r in values}) < 3:
+            issues.append("At least three included participants with observed outcomes are required.")
+        if len(values) < 8:
+            issues.append(f"Only {len(values)} complete observations; at least 8 are required.")
+        keys = [(r.get("subject_id"), r.get(axis)) for r in selected]
+        if len(keys) != len(set(keys)):
+            issues.append("MixedLM requires one row per athlete and occasion; duplicate rows would overweight athletes.")
+        levels = {r.get(axis) for r in values if r.get(axis) is not None}
+        ref, con = p.get("reference_occasion", min(levels) if levels else 1), p.get("contrast_occasion", max(levels) if levels else 2)
+        if ref not in levels or con not in levels or con <= ref:
+            issues.append("Select two observed occasions in increasing order for the contrast.")
+        if p.get("alpha", 0.05) != 0.05:
+            issues.append("The existing engine supplies fixed 95% intervals; alpha must be 0.05.")
+    if identity in {"METH-U-INDIVIDUAL", "METH-U-CHANGE"}:
+        levels = {r.get(axis) for r in values if r.get(axis) is not None}
+        if len(levels) < 2:
+            issues.append(f"Only {len(levels)} measured {axis}(s); at least two are required.")
+        if identity == "METH-U-CHANGE":
+            ref = p.get("reference_week", p.get("reference_occasion", 1))
+            con = p.get("contrast_week", p.get("contrast_occasion", 2))
+            paired = [s for s in subject_ids if {ref, con} <= {r.get(axis) for r in values if r["subject_id"] == s}]
+            if con <= ref or not paired:
+                issues.append("No complete pairs for the selected increasing reference/contrast occasions.")
+    if identity == "METH-REAL-RELIABILITY":
+        counts = {s: sum(r["subject_id"] == s for r in values) for s in subject_ids}
+        if sum(n >= 2 for n in counts.values()) < 3:
+            issues.append("At least three participants must have at least two repeated trials in the selected activity.")
+        k = p.get("max_trials", 8)
+        if type(k) is not int or not 2 <= k <= 8:
+            issues.append("max_trials must be an integer between 2 and 8.")
+        keys = [(r["subject_id"], r.get("trial_number")) for r in selected]
+        if any(key[1] is None for key in keys) or len(keys) != len(set(keys)):
+            issues.append("Unique acquisition-ordered trial_number metadata is required per athlete.")
+        if len(values) != len(selected):
+            issues.append("Reliability requires complete trial outcomes; remove or correct empty trials explicitly.")
+    return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE" if issues else "ELIGIBLE", "issues": issues,
+            "population": {"subjects": len(subject_ids), "observed_rows": len(values), "missing_rows": len(selected) - len(values)}}
+
+
+def execution_binding(identity: str, metric: dict, parameters: dict, snapshot: dict,
+                      revision: str | None, subjects: list[str], excluded: list[str]) -> dict:
+    """Capture contract and implementation bytes, including uncommitted source changes."""
+    root = Path(__file__).resolve().parent
+    sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py")]
+    digest = hashlib.sha256()
+    for path in sources:
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    try:
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, timeout=3, check=True).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        head = None
+    return copy.deepcopy(dict(catalogue_version=CATALOGUE_VERSION, method_spec=method_spec(identity),
+                              method_id=identity, method_version=method_spec(identity)["version"], parameters=parameters,
+                              outcome=metric, snapshot_id=snapshot["id"], snapshot_checksums=snapshot.get("checksums", {}),
+                              data_revision_id=revision, included_subject_ids=subjects, excluded_subject_ids=excluded,
+                              source_revision={"git_head": head, "implementation_sha256": digest.hexdigest()}))
+
+
+def binding_digest(binding: dict) -> str:
+    return hashlib.sha256(json.dumps(binding, sort_keys=True, default=str).encode()).hexdigest()

@@ -693,7 +693,7 @@ class DynamisAppService:
                 else:
                     cohort = researchstore.create_cohort(study_id, "Analysis selection", definition)
                 selection = {**entity, "outcomes": {"primary": [metric]}}
-                resolved = researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"])
+                resolved = researchstore.resolve_cohort(cohort, entity["dataset_snapshot_id"], excluded_subject_ids=payload.get("excluded_subject_ids"))
                 eligibility = researchstore.method_eligibility(selection, cohort, resolved, {"parameters": payload.get("parameters", {})})
                 available = next((item for item in eligibility if item["method_id"] == payload["method_id"]), None)
                 if not available or available["status"] != "ELIGIBLE":
