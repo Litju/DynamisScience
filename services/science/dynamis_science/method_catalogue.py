@@ -9,10 +9,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-CATALOGUE_VERSION = "1.1.0"
+CATALOGUE_VERSION = "1.2.0"
 
 # Estimands and limits follow the RES-619 matrix, not menu labels.
 DETAILS = {
+    "METH-ONSET-EXACT": ("Finite-schedule sharp-null test of no outcome response to any permissible onset; descriptive post-minus-pre mean separate",
+                        "Statistic and descriptive difference in outcome units; p dimensionless", "Exact finite-support p; resolution 1/M; no causal CI",
+                        "randomized_onset.py:evaluate", "docs/science/RES-716_RANDOMIZED_ONSET.md; tests/test_randomized_onset.py"),
     "METH-EXPERIMENT-DESC": ("Session-weighted descriptions by actual protocol phase; observed change and date-based slope",
                              "Outcome units; SD in outcome units; slope in outcome units/day", "No confidence interval, p-value or causal effect",
                              "experiments.py:describe", "tests/test_experiment_analysis.py"),
@@ -46,7 +49,7 @@ def catalogue() -> list[dict[str, Any]]:
         item.update(catalogue_version=CATALOGUE_VERSION, estimand=estimand, units=units,
                     uncertainty=uncertainty, implementation=implementation,
                     evidence_references=["docs/science/RES-619_METHODOLOGY.md", evidence],
-                    scopes=["INDIVIDUAL" if identity in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else "COHORT"],
+                    scopes=["INDIVIDUAL" if identity in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else "COHORT"],
                     method_class="DESCRIPTIVE" if identity in {"METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else "QUALIFIED",
                     execution_route="researchanalysis.execute", report_outputs=meta["output_schema"],
                     timebase="Ordinal occasion/week; no equal calendar spacing assumed" if "signal_trials" not in meta["required_tables"] else "Activity / acquisition-ordered trials; native signals 1000 Hz")
@@ -100,6 +103,9 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
                 scope: dict, design: str, parameters: dict | None = None, experiment: dict | None = None) -> dict:
     """Check actual selected rows, before any fit or persistence. Missing outcomes stay missing."""
     p = parameters or {}
+    if method['id'] == 'METH-ONSET-EXACT':
+        from .randomized_onset import eligibility as onset_eligibility
+        return onset_eligibility(method, metric, subject_ids, scope, p, experiment)
     if method['id'] == 'METH-EXPERIMENT-DESC':
         from .experiments import analysis_eligibility
         return analysis_eligibility(method, metric, subject_ids, scope, p, experiment)
@@ -193,7 +199,7 @@ def execution_binding(identity: str, metric: dict, parameters: dict, snapshot: d
                       revision: str | None, subjects: list[str], excluded: list[str]) -> dict:
     """Capture contract and implementation bytes, including uncommitted source changes."""
     root = Path(__file__).resolve().parent
-    sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py", "experiments.py")]
+    sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py", "experiments.py", "randomized_onset.py")]
     digest = hashlib.sha256()
     for path in sources:
         digest.update(path.name.encode())

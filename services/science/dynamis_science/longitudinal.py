@@ -21,6 +21,7 @@ PERIOD_KINDS = ("BASELINE", "INTERVENTION", "EXPOSURE", "COMPARISON", "WASHOUT",
 PROTOCOL_DESIGNS = {
     "OBSERVATIONAL_TRACKING": "Retrospective observational tracking — not an experiment",
     "N_OF_1_EXPERIMENT": "Documented N-of-1 experimental design",
+    "RANDOMIZED_ONSET": "Prospective randomized onset · persistent intervention",
 }
 SCENARIO_KINDS = {
     "REFERENCE": "Reference scenario",
@@ -250,6 +251,8 @@ def _text(value: Any) -> str:
 def save_protocol(investigation_id: str, protocol: dict[str, Any], base_version: int | None) -> dict[str, Any]:
     get_individual_investigation(investigation_id)  # validates the scope
     design = protocol.get("design", "OBSERVATIONAL_TRACKING")
+    if design == 'RANDOMIZED_ONSET':
+        raise researchstore.ResearchValidation('Use the prospective experimental allocation service for randomized onset')
     if design not in PROTOCOL_DESIGNS:
         raise researchstore.ResearchValidation(f"Unknown protocol design {design}")
     periods = []

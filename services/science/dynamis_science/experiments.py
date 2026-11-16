@@ -28,10 +28,16 @@ def save_protocol(investigation_id: str, plan: dict, base_version: int) -> dict:
         raise store.ResearchConflict('Restore this workspace before editing experiments')
     if plan.get('outcome_metric_id') != metric['id'] or plan.get('unit') != metric['unit']:
         raise store.ResearchValidation('Select a registered outcome and its recorded unit')
-    if not str(plan.get('question', '')).strip() or not str(plan.get('assignment', '')).strip():
+    if not str(plan.get('question', '')).strip() or (plan.get('design') != 'RANDOMIZED_ONSET' and not str(plan.get('assignment', '')).strip()):
         raise store.ResearchValidation('Research question and actual assignment procedure are required')
     if not plan.get('prespecified'):
         raise store.ResearchValidation('Confirm prospective prespecification; do not reconstruct allocations')
+    from . import randomized_onset as onset
+    design = plan.get('design', 'N_OF_1_EXPERIMENT')
+    if design == onset.DESIGN:
+        plan = onset.prepare(plan, inv.get('experiment_protocols', []))
+    elif any(p.get('allocation') for p in inv.get('experiment_protocols', [])):
+        raise store.ResearchValidation('The randomized allocation design is frozen; create a new investigation')
     periods = []
     for index, p in enumerate(plan.get('periods', []), 1):
         start, end = _integer(p.get('start'), 'Start'), _integer(p.get('end'), 'End')
@@ -43,9 +49,9 @@ def save_protocol(investigation_id: str, plan: dict, base_version: int) -> dict:
     if any(a['end'] >= b['start'] for a, b in zip(periods, periods[1:])):
         raise store.ResearchValidation('Planned periods overlap')
     kinds = [p['kind'] for p in periods]
-    if not {'BASELINE', 'INTERVENTION', 'COMPARISON'} <= set(kinds):
+    if design != onset.DESIGN and not {'BASELINE', 'INTERVENTION', 'COMPARISON'} <= set(kinds):
         raise store.ResearchValidation('Include baseline, intervention and comparator periods')
-    if kinds.count('INTERVENTION') < 2 or kinds.count('COMPARISON') < 2:
+    if design != onset.DESIGN and (kinds.count('INTERVENTION') < 2 or kinds.count('COMPARISON') < 2):
         raise store.ResearchValidation('An N-of-1 plan requires replicated intervention and comparator periods')
     schedule = sorted({_integer(v, 'Measurement schedule') for v in plan.get('testing_occasions', [])})
     if not schedule or any(not any(p['start'] <= v <= p['end'] for p in periods) for v in schedule):
@@ -69,14 +75,16 @@ def save_protocol(investigation_id: str, plan: dict, base_version: int) -> dict:
             raise store.ResearchValidation('Describe the reason for this protocol amendment')
     elif periods[0]['start'] <= last:
         raise store.ResearchValidation('A prospective protocol must start after the latest observed occasion')
-    record = dict(schema_version=1, version=len(previous)+1, design='N_OF_1_EXPERIMENT',
-                  design_label=long.PROTOCOL_DESIGNS['N_OF_1_EXPERIMENT'], question=plan['question'].strip(),
+    record = dict(schema_version=1, version=len(previous)+1, design=design,
+                  design_label=long.PROTOCOL_DESIGNS[design], question=plan['question'].strip(),
                   outcome_metric_id=metric['id'], outcome_label=metric['label'], unit=metric['unit'], axis=axis,
                   periods=periods, testing_occasions=schedule, assignment=plan['assignment'].strip(),
                   prespecified=True, blinding=str(plan.get('blinding', '')).strip(),
                   amendment_reason=str(plan.get('amendment_reason', '')).strip(),
                   subject_id=inv['scope']['subject_id'], data_revision_id=entity['active_data_revision_id'],
                   created_at=store._now(), adherence=[], changes=[])
+    if design == onset.DESIGN:
+        record.update(allocation=plan['allocation'], suitability=plan['suitability'].strip())
     return store.update_investigation_fields(investigation_id,
         {'protocol': record, 'experiment_protocols': [*previous, record]},
         inv['version'] if base_version is None else base_version, 'experiment.protocol_saved')
@@ -148,6 +156,7 @@ def record_visit(investigation_id: str, visit: dict, base_version: int) -> dict:
                   data_revision_id=revision['id'], snapshot_id=snapshot, outcome_metric_id=metric['id'], unit=metric['unit'],
                   measurement_status=status, missing_reason=missing_reason, exposure=exposure, adherence_percent=percent,
                   deviations=deviations, supersedes=supersedes, created_at=store._now(),
+                  actual_condition=visit.get('actual_condition'),
                   qc={key: point[key] for key in ('n_trials', 'empty_values', 'quality_flags')} if point else {},
                   measurement=point if status == 'MEASURED' else None)
     return store.update_investigation_fields(investigation_id, {'experiment_visits': [*visits, record]},
@@ -338,18 +347,18 @@ def result_html(result: dict, *, chart: bool = False) -> str:
         v = r['visit'] or {}
         qc = v.get('qc') or v.get('measurement') or {}
         values = [r['scheduled_occasion'], r['period']['label'], (r['observed_period'] or {}).get('label'),
-            v.get('occurred_at'), r['status'], r['mean'], v.get('exposure'), v.get('adherence_percent'),
+            v.get('occurred_at'), r['status'], r['mean'], v.get('exposure'), v.get('actual_condition'), v.get('adherence_percent'),
             ', '.join(qc.get('quality_flags', [])) or ('VALID' if r['mean'] is not None else 'No eligible reading'),
             qc.get('empty_values'), v.get('deviations'), v.get('missing_reason'), v.get('id'), v.get('data_revision_id')]
         visits += '<tr>' + ''.join(f'<td>{cell(v)}</td>' for v in values) + '</tr>'
-    visit_headers = ['Scheduled', 'Planned phase', 'Actual phase', 'Actual date/time', 'Status', 'Mean', 'Actual exposure',
+    visit_headers = ['Scheduled', 'Planned phase', 'Actual phase', 'Actual date/time', 'Status', 'Mean', 'Actual exposure', 'Recorded condition',
                      'Adherence %', 'QC', 'Excluded trials', 'Deviations', 'Missing reason', 'Visit ID', 'Source revision']
     table = lambda labels, rows: '<table border="1" cellpadding="4"><tr>' + ''.join(f'<th>{cell(h)}</th>' for h in labels) + '</tr>' + rows + '</table>'
     return (f"<h3>Experimental phase descriptions · participant {cell(result['subject_id'])}</h3>"
         f"<p><b>{cell(p['question'])}</b><br>Protocol v{p['version']} · investigation v{result['investigation_version']} · "
         f"revision {cell(result['data_revision_id'])}<br>{cell(p['outcome_label'])} ({cell(result['unit'])})<br>"
         f"Assignment: {cell(p['assignment'])}<br>Source revisions: {cell(', '.join(result['source_data_revision_ids']))}</p>"
-        '<p><b>NOT_QUALIFIED</b> — causal inference unavailable. All changes and slopes below are descriptive.</p>'
+        '<p>All phase changes and slopes below are descriptive; they are not causal effect magnitudes.</p>'
         + (result_svg(result) if chart else '') + table(headers, phase_rows)
         + '<p>Means, SD, range and changes use outcome units; slopes use outcome units per elapsed 24-hour day. '
           'Counts of missing and unrecorded visits use the planned schedule; session statistics use actual phase membership. '

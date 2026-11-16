@@ -160,11 +160,24 @@ METHODS: dict[str, dict[str, Any]] = {
         "diagnostics": ["sampling rate", "saturation", "plate coverage", "NaN trials", "device clock offset", "body-weight comparison"],
         "output_schema": ["activity-level summaries", "IMU sampling and gravity checks", "body-weight bias and limits of agreement"],
     },
+    "METH-ONSET-EXACT": {
+        "id": "METH-ONSET-EXACT", "name": "Exact randomized intervention-onset test", "version": "1.0.0",
+        "qualification": {"status": "QUALIFIED", "record": "RES-716-ONSET",
+                          "reference": "tests/test_randomized_onset.py", "basis": "Finite-support independent rational reference, complete-null size enumeration and adversarial prospective/persistent-history tests. Qualification limited to the saved uniform onset design."},
+        "supported_designs": ["RANDOMIZED_ONSET"], "required_tables": ["cmj_trials", "cmj_occasions"],
+        "required_shape": "One athlete; app-generated prospective allocation; complete fixed schedule; >=3 sessions per phase at every permissible start.",
+        "constraints": ["Sharp-null test only; descriptive magnitude has no causal confidence interval.", "No pooling, imported historical allocation, lag selection or missing-data inference."],
+        "missingness": "Complete prespecified schedule and QC required; otherwise NOT_ESTIMABLE, no imputation.",
+        "parameter_schema": {"protocol_version": {"type": "integer", "minimum": 1}},
+        "assumptions": ["Uniform saved assignment was followed; no anticipation or interference.", "Stable measurement; no assignment-dependent co-interventions or observation process.", "Persistent intervention; immediate-level statistic fixed before allocation."],
+        "diagnostics": ["entire assignment distribution", "tail count and p-value resolution", "timing, exposure, adherence, QC and completeness"],
+        "output_schema": ["sharp null", "exact two-sided p and resolution", "descriptive post-minus-pre mean", "allocation receipt and visit ledger"],
+    },
     "METH-EXPERIMENT-DESC": {
         "id": "METH-EXPERIMENT-DESC", "name": "Individual experimental phase descriptions", "version": "1.0.0",
         "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "record": "RES-717-DESC",
                           "reference": "tests/test_experiment_analysis.py", "basis": "Independent arithmetic checks of session-weighted phase summaries and elapsed-day slopes; no causal estimator or inferential interval."},
-        "supported_designs": ["N_OF_1_EXPERIMENT"], "required_tables": ["cmj_trials", "cmj_occasions"],
+        "supported_designs": ["N_OF_1_EXPERIMENT", "RANDOMIZED_ONSET"], "required_tables": ["cmj_trials", "cmj_occasions"],
         "required_shape": "One athlete, a saved prospective protocol and at least one QC-eligible recorded visit in a compatible revision.",
         "constraints": ["Descriptive only; experimental causal inference is NOT_QUALIFIED.", "One session mean per recorded visit; repeated trials do not increase the number of sessions."],
         "missingness": "Explicit missing visits and unrecorded schedule entries are counted separately; no imputation.",
@@ -1122,6 +1135,8 @@ def _metric_ids_for_method(method_id: str, snapshot_id: str) -> set[str]:
 
 
 def _estimand_for_method(method_id: str, metric: dict[str, Any]) -> str:
+    if method_id == 'METH-ONSET-EXACT':
+        return 'Sharp null of no scheduled outcome response to any permissible randomized onset; descriptive mean difference separate.'
     if method_id == 'METH-EXPERIMENT-DESC':
         return f"Session-weighted phase descriptions of {metric['label'].lower()}: variation, observed change and elapsed-day slope; no causal estimand."
     if method_id == "METH-REAL-TREND":
@@ -2909,7 +2924,7 @@ def research_sections(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         label = report_section_label(run)
         section = sections.setdefault(label, {"label": label, "scope": scope, "run_ids": []})
         section["run_ids"].append(run["id"])
-        if run['method_id'] == 'METH-EXPERIMENT-DESC':
+        if run['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             section.setdefault('experimental_results', []).append({
                 'run_id': run['id'], 'method_id': run['method_id'], 'method_version': run['method_version'],
                 'result': run['result'], 'result_digest': run['result_digest'],
@@ -3249,6 +3264,8 @@ def _research_sections_html(sections: list[dict[str, Any]]) -> str:
             parts.append(f"<p>{html.escape(experimental['run_id'])} · {html.escape(experimental['method_id'])} "
                          f"v{html.escape(experimental['method_version'])} · digest {html.escape(experimental['result_digest'])} · "
                          f"reproducibility {html.escape(experimental['reproducibility_key'])}</p>")
+            if experimental['method_id'] == 'METH-ONSET-EXACT':
+                from .randomized_onset import result_html
             parts.append(result_html(experimental['result'], chart=True))
         if len(section.get('experimental_results', [])) == len(section['run_ids']):
             continue

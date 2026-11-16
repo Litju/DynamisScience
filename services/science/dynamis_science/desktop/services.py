@@ -113,6 +113,8 @@ class DynamisAppService:
             item = experiments.timeline(investigation_id, p['version'], investigation=investigation)
             item['eligibility'] = eligibility(method_spec('METH-EXPERIMENT-DESC'), metric, [],
                 [scope['subject_id']], scope, p['design'], params, experiment=context)
+            item['onset_eligibility'] = eligibility(method_spec('METH-ONSET-EXACT'), metric, [],
+                [scope['subject_id']], scope, p['design'], params, experiment=context)
             history.append(item)
         return {"experiment": experiments.timeline(investigation_id),
                 "experiment_history": history,
@@ -129,7 +131,7 @@ class DynamisAppService:
     def save_protocol(self, investigation_id: str, protocol: dict[str, Any], base_version: int | None) -> dict[str, Any]:
         self.ensure_initialized()
         from .. import experiments
-        if protocol.get('prospective'):
+        if protocol.get('prospective') or protocol.get('design') == 'RANDOMIZED_ONSET':
             return experiments.save_protocol(investigation_id, protocol, base_version)
         if longitudinal.get_individual_investigation(investigation_id).get('experiment_protocols'):
             raise researchstore.ResearchValidation('Use a prospective protocol amendment for this experiment')

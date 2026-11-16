@@ -243,13 +243,17 @@ def execute(
                                 entity.get("active_data_revision_id"), cohort_ids, excluded_subject_ids or [])
     diagnostics: dict[str, Any] = {}
     figure_data: dict[str, Any] | None = None
-    if method_id == 'METH-EXPERIMENT-DESC':
+    if method_id in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
         from . import experiments
         context = experiments.analysis_context(entity, cohort['scope'], parameters)
-        result = experiments.describe(context)
+        if method_id == 'METH-ONSET-EXACT':
+            from .randomized_onset import execute as execute_onset
+            result = execute_onset(context)
+        else:
+            result = experiments.describe(context)
         binding['experiment'] = {key: result[key] for key in ('subject_id', 'protocol_version', 'protocol',
             'investigation_version', 'source_data_revision_ids', 'source_revisions', 'observations')}
-        diagnostics = dict(status='COMPUTED', limitations=result['limitations'],
+        diagnostics = dict(status=result['inference_status'], inference=result.get('inference'), limitations=result['limitations'],
                            phases=[{'period': f['period']['id'], 'limitations': f['limitations']} for f in result['phases']])
         figure_data = dict(kind='EXPERIMENT', unit=metric['unit'], observations=result['observations'])
     elif method_id == "METH-REAL-TREND":
@@ -568,6 +572,13 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
             "This is descriptive context, not a causal individual response."
         )
         quality = "EXPLORATORY"
+    elif run['method_id'] == 'METH-ONSET-EXACT':
+        protocol_id = f"{run['investigation_id']}:protocol:{result['protocol_version']}"
+        value = result['inference'].get('descriptive_difference')
+        title = f"Exact randomized onset · participant {result['subject_id']}"
+        r = result['inference']
+        interpretation = f"{r['status']}: exact two-sided p={r['p_value']}; descriptive difference={value} {metric['unit']}. Sharp null only under saved assumptions; no causal magnitude or interval."
+        quality = 'VALID' if r['status'] == 'QUALIFIED' else 'EXPLORATORY'
     elif run['method_id'] == 'METH-EXPERIMENT-DESC':
         protocol_id = f"{run['investigation_id']}:protocol:{result['protocol_version']}"
         title = f"Experimental phase descriptions · participant {result['subject_id']}"
@@ -612,7 +623,7 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         "interval": interval,
         "effect_size": effect_size,
         "contrast_id": contrast_id,
-        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else f"{entity.get('population', 'Participants')} · {entity['id']}",
+        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else f"{entity.get('population', 'Participants')} · {entity['id']}",
         "sample_size": int(result.get("n_subjects") or result.get("n_observations") or 0),
         "protocol_id": protocol_id,
         "dataset_snapshot_id": run["snapshot_id"],
