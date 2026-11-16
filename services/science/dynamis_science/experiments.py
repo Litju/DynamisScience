@@ -94,6 +94,9 @@ def record_visit(investigation_id: str, visit: dict, base_version: int) -> dict:
     if not revision or revision['workspace_id'] != inv['study_id']:
         raise store.ResearchValidation('Measurement revision must belong to this workspace')
     _, snapshot, metric = long._context(inv['study_id'], plan['outcome_metric_id'], revision['id'])
+    subjects = store.read_snapshot_table(snapshot, 'subjects')['subject_id'].cast(str).to_list()
+    if plan['subject_id'] not in subjects:
+        raise store.ResearchValidation('This athlete is absent from the referenced revision')
     if metric['id'] != plan['outcome_metric_id'] or metric['unit'] != plan['unit']:
         raise store.ResearchValidation('Revision does not contain the protocol outcome and units')
     at = _integer(visit.get('occasion'), 'Actual occasion')
@@ -131,6 +134,9 @@ def record_visit(investigation_id: str, visit: dict, base_version: int) -> dict:
     supersedes = visit.get('supersedes')
     active = [v for v in visits if v['id'] not in {r.get('supersedes') for r in visits}]
     existing = next((v for v in active if v['scheduled_occasion'] == scheduled), None)
+    if status == 'MEASURED' and any(v['measurement_status'] == 'MEASURED' and v['occasion'] == at
+                                   and v['scheduled_occasion'] != scheduled for v in active):
+        raise store.ResearchValidation('This actual measurement is already linked to another scheduled visit')
     if (existing and supersedes != existing['id']) or (supersedes and (not existing or existing['id'] != supersedes)):
         raise store.ResearchValidation('This scheduled visit already exists; explicitly supersede its latest record')
     if supersedes and not deviations:
@@ -140,6 +146,7 @@ def record_visit(investigation_id: str, visit: dict, base_version: int) -> dict:
                   data_revision_id=revision['id'], snapshot_id=snapshot, outcome_metric_id=metric['id'], unit=metric['unit'],
                   measurement_status=status, missing_reason=missing_reason, exposure=exposure, adherence_percent=percent,
                   deviations=deviations, supersedes=supersedes, created_at=store._now(),
+                  qc={key: point[key] for key in ('n_trials', 'empty_values', 'quality_flags')} if point else {},
                   measurement=point if status == 'MEASURED' else None)
     return store.update_investigation_fields(investigation_id, {'experiment_visits': [*visits, record]},
                                             inv['version'] if base_version is None else base_version, 'experiment.visit_recorded')
@@ -163,14 +170,16 @@ def timeline(investigation_id: str, protocol_version: int | None = None) -> dict
         period = next(p for p in plan['periods'] if p['start'] <= at <= p['end'])
         visit = latest.get(at)
         value = visit['measurement']['mean'] if visit and visit['measurement'] else None
-        result['rows'].append(dict(scheduled_occasion=at, period=period, visit=visit, mean=value,
+        actual_period = next((p for p in plan['periods'] if visit and p['start'] <= visit['occasion'] <= p['end']), None)
+        result['rows'].append(dict(scheduled_occasion=at, period=period, observed_period=actual_period, visit=visit, mean=value,
                                    status=visit['measurement_status'] if visit else 'PLANNED'))
-        if period['kind'] == 'BASELINE' and value is not None:
+        if actual_period and actual_period['kind'] == 'BASELINE' and value is not None:
             baseline.append(value)
     reference = mean(baseline) if baseline else None
     result['baseline_mean'] = reference
     for p in plan['periods']:
-        values = [r['mean'] for r in result['rows'] if r['period']['id'] == p['id'] and r['mean'] is not None]
+        values = [r['mean'] for r in result['rows'] if r['observed_period']
+                  and r['observed_period']['id'] == p['id'] and r['mean'] is not None]
         average = mean(values) if values else None
         result['changes'].append(dict(period=p['label'], n=len(values), mean=average,
             change_from_baseline=average-reference if average is not None and reference is not None else None,

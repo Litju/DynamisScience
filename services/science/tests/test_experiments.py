@@ -83,3 +83,37 @@ def test_experiment_validation_and_concurrency(service, study):
             service.record_experimental_visit(a['id'], {**visit(study['rev1']), **update}, saved['version'])
     with pytest.raises(researchstore.ResearchValidation, match='No QC-eligible'):
         service.record_experimental_visit(a['id'], visit(study['rev1']), saved['version'])
+
+
+def test_delayed_measurement_uses_actual_period_without_double_counting(service, study):
+    inv = service.create_individual_investigation(study['id'], 'P01', 'Delayed baseline')
+    inv = service.save_protocol(inv['id'], plan(), inv['version'])
+    rev = service.attach_workspace_data(study['id'], study['follow_up'], append=True,
+        confirm_participant_ids=True, base_revision=study['rev1'])['active_data_revision_id']
+    inv = service.record_experimental_visit(inv['id'], {**visit(rev, 4), 'occasion':5,
+        'deviations':'Baseline visit delayed into intervention period'}, inv['version'])
+    result = experiments.timeline(inv['id'])
+    assert result['rows'][0]['period']['kind'] == 'BASELINE'
+    assert result['rows'][0]['observed_period']['kind'] == 'INTERVENTION'
+    assert result['baseline_mean'] is None
+    assert result['changes'][0]['n'] == 0 and result['changes'][1]['n'] == 1
+    assert result['changes'][1]['change_from_baseline'] is None
+    with pytest.raises(researchstore.ResearchValidation, match='already linked'):
+        service.record_experimental_visit(inv['id'], visit(rev, 5), inv['version'])
+    altered = plan()
+    altered['periods'][1]['label'] = 'Rewritten observed period'
+    altered['amendment_reason'] = 'Try to change an already observed period'
+    with pytest.raises(researchstore.ResearchValidation, match='frozen'):
+        service.save_protocol(inv['id'], altered, inv['version'])
+
+
+def test_missing_visit_retains_rejected_measurement_qc(service, study, monkeypatch):
+    inv = service.create_individual_investigation(study['id'], 'P01', 'QC failures')
+    inv = service.save_protocol(inv['id'], plan(), inv['version'])
+    monkeypatch.setattr(experiments.long, 'individual_points', lambda *args: ('week', [dict(
+        week=4, n_trials=0, empty_values=2, quality_flags=['REJECTED'], mean=None)]))
+    inv = service.record_experimental_visit(inv['id'], {**visit(study['rev1']), 'measurement_status':'MISSING',
+        'missing_reason':'All trials rejected by QC'}, inv['version'])
+    row = experiments.timeline(inv['id'])['rows'][0]
+    assert row['mean'] is None and row['visit']['measurement'] is None
+    assert row['visit']['qc'] == dict(n_trials=0, empty_values=2, quality_flags=['REJECTED'])
