@@ -148,6 +148,9 @@ def test_qc_and_deviations_remain_visible_and_escaped(service, experiment_study)
     figure = run_figure(displayed)
     assert any(line.get_marker()=='x' and line.get_color()=='#176b87' for line in figure.axes[0].lines)
     assert any('! visit 4' in text.get_text() for text in figure.axes[0].texts)
+    # Rendering validates mixed actual-date/axis-fraction missingness annotations.
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    FigureCanvasAgg(figure).draw()
     rendered = experiments.result_html(displayed['result'], chart=True)
     assert 'REVIEWED_EXCLUSION' in rendered and '&lt;script&gt;documented deviation&lt;/script&gt;' in rendered
     assert '<script>documented deviation</script>' not in rendered

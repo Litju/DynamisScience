@@ -72,14 +72,20 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 axis.plot([date], [.02], marker='x', color='#777777', linestyle='none',
                           transform=axis.get_xaxis_transform(), label='Missing (no outcome value)' if 'missing' not in used else None)
                 used.add('missing')
+                axis.annotate(f"Missing {row['scheduled_occasion']}", (mdates.date2num(date), .02),
+                              xycoords=axis.get_xaxis_transform(), xytext=(3, 7),
+                              textcoords='offset points', fontsize=7)
                 continue
             phase = (row['observed_period'] or {}).get('kind', 'OUTSIDE_PLAN')
             flagged = bool(qc.get('quality_flags'))
             axis.plot([date], [row['mean']], marker='x' if flagged else '^' if phase == 'INTERVENTION' else 'o', linestyle='none',
                       color=PHASE_COLORS.get(phase, '#777777'), label=phase if phase not in used else None)
             used.add(phase)
-            if flagged or visit['deviations']:
-                axis.annotate(f"! visit {row['scheduled_occasion']}", (date, row['mean']), xytext=(3,6),
+            adherence = visit.get('adherence_percent')
+            if flagged or visit['deviations'] or adherence is not None and adherence < 100:
+                reasons = ['QC' if flagged else '', 'deviation' if visit['deviations'] else '',
+                           f'{adherence:g}% adherence' if adherence is not None and adherence < 100 else '']
+                axis.annotate(f"! visit {row['scheduled_occasion']}: " + ', '.join(filter(None, reasons)), (date, row['mean']), xytext=(3,6),
                               textcoords='offset points', fontsize=7)
         allocation = result['protocol'].get('allocation')
         if allocation:

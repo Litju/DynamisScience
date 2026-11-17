@@ -253,15 +253,21 @@ class MainWindow(QMainWindow):
         context_bar.addWidget(self.scope_picker)
         self.stage_picker = QComboBox()
         self.stage_picker.setAccessibleName('Research stage')
+        self.scope_picker.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.stage_picker.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.stage_picker.addItems(['Study', 'Data / QC', 'Protocol', 'Observations', 'Analysis',
                                     'Results', 'Series comparison', 'Reports / history'])
         self.stage_picker.activated.connect(lambda _: self._go_research_stage(self.stage_picker.currentText()))
         context_bar.addWidget(self.stage_picker)
+        QWidget.setTabOrder(self.scope_picker, self.stage_picker)
         self.context_binding = QLabel()
         self.context_binding.setAccessibleName('Selected protocol and result binding')
         self.context_binding.setMaximumWidth(420)
         context_bar.addWidget(self.context_binding)
         self.research.individual.context_changed.connect(self._sync_context_bar)
+        self.research.individual.tabs.currentChanged.connect(self._sync_workflow_stage)
+        self.research.tabs.currentChanged.connect(self._sync_workflow_stage)
+        self.perspectives.currentChanged.connect(self._sync_workflow_stage)
         self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
@@ -855,6 +861,7 @@ class MainWindow(QMainWindow):
 
     def _set_record_view(self, record: bool) -> None:
         self.results_stack.setCurrentIndex(1 if record else 0)
+        self.workbench.set_research_task_mode(record and bool(self.current_study.get('workspace')))
         if self.action_study_record.isChecked() != record:
             self.action_study_record.setChecked(record)
         if record and self.current_study.get("workspace"):
@@ -1222,7 +1229,7 @@ class MainWindow(QMainWindow):
                 self.research_context = {"scope": "COHORT"}
             self._apply_research_context()
             stage = self.settings.value(f'research-stage/{study_id}', '')
-            if stage and stage != 'Reports / history':
+            if stage:
                 self._go_research_stage(stage)
 
         self.run_task(lambda: self.service.individual_investigations(study_id), loaded, "Loading individual investigations")
@@ -1246,7 +1253,14 @@ class MainWindow(QMainWindow):
         binding = ''
         if selected and panel.investigation_id == selected and panel.payload:
             protocol = panel.payload['investigation'].get('protocol') or {}
+            tab = panel.tabs.tabText(panel.tabs.currentIndex())
+            if tab == 'Visits and timeline':
+                protocol = (panel.protocol_history.currentData() or {}).get('protocol') or protocol
+            elif tab == 'Analysis':
+                protocol = (panel.analysis_protocol.currentData() or {}).get('protocol') or protocol
             binding = f"Protocol v{protocol.get('version', '—')} · saved"
+            if panel.protocol_dirty:
+                binding += ' · unsaved edits'
             run = panel.run_picker.currentData() if panel.tabs.currentWidget() is panel.results_page else None
             if run:
                 binding = f"{run['id']} · {'active' if run['data_revision_id'] == panel.payload['data_revision_id'] else 'historical'} revision · read-only"
@@ -1256,9 +1270,23 @@ class MainWindow(QMainWindow):
         self.context_binding.setToolTip(binding)
 
     def _workflow_scope_selected(self, _index: int) -> None:
+        stage = self.stage_picker.currentText()
         selected = self.scope_picker.currentData()
         self._select_scope('INDIVIDUAL' if selected else 'COHORT', selected)
-        self._go_research_stage(self.stage_picker.currentText())
+        self._go_research_stage(stage)
+
+    def _sync_workflow_stage(self, *_args) -> None:
+        stage = None
+        if self.perspectives.currentWidget() is self.workbench and self.results_stack.currentIndex() == 1:
+            stage = {0:'Study', 1:'Data / QC', 3:'Analysis', 4:'Reports / history',
+                     5:'Series comparison', 6:'Reports / history'}.get(self.research.tabs.currentIndex())
+        elif (self.perspectives.currentWidget() is self.squad
+              and self.squad.currentWidget() is self.squad.athlete_page):
+            panel = self.research.individual
+            stage = {'Data':'Data / QC', 'Protocol':'Protocol', 'Visits and timeline':'Observations',
+                     'Analysis':'Analysis', 'Results':'Results'}.get(panel.tabs.tabText(panel.tabs.currentIndex()))
+        if stage:
+            self.stage_picker.setCurrentText(stage)
 
     def _go_research_stage(self, stage: str) -> None:
         """Navigate existing native tasks without changing revision or frozen identity."""
@@ -1268,7 +1296,13 @@ class MainWindow(QMainWindow):
         individual = self.research_context.get('scope') == 'INDIVIDUAL'
         panel = self.research.individual
         if stage == 'Reports / history':
-            self._workspace_history()
+            self._show_research_mode()
+            self._set_record_view(True)
+            self.research.history_panel.set_context(self.current_study_id, self.research_context.get('subject_id'))
+            self.research.tabs.setCurrentWidget(self.research.history_panel)
+            self.workbench.panes['data'].hide()
+            self.stage_picker.setCurrentText(stage)
+            self.settings.setValue(f'research-stage/{self.current_study_id}', stage)
             return
         if stage in {'Protocol', 'Observations'} or individual and stage in {'Analysis', 'Results'}:
             if not individual:
@@ -1277,14 +1311,14 @@ class MainWindow(QMainWindow):
             self._open_athlete(self.research_context['subject_id'])
             name = {'Observations': 'Visits and timeline'}.get(stage, stage)
             panel.tabs.setCurrentIndex(next(i for i in range(panel.tabs.count()) if panel.tabs.tabText(i) == name))
-            if stage == 'Analysis' and panel.protocol_history.currentData():
-                panel._analyze_experiment()
         else:
             self._show_research_mode()
             self._set_record_view(True)
             index = {'Study': 0, 'Data / QC': 1, 'Analysis': 3, 'Results': 3, 'Series comparison': 5}[stage]
             self.research.tabs.setCurrentIndex(index)
+            self.workbench.panes['data'].hide()
         self._sync_context_bar()
+        self.stage_picker.setCurrentText(stage)
         self._scroll_to_top()
         self.settings.setValue(f'research-stage/{self.current_study_id}', stage)
 
@@ -1309,6 +1343,7 @@ class MainWindow(QMainWindow):
         squad.athlete_page.set_athlete(self.current_study_id, athlete, branches, current)
         self._show_squad_mode()
         squad.setCurrentWidget(squad.athlete_page)
+        self._sync_workflow_stage()
         self._scroll_to_top()
 
     def _board_loaded(self) -> None:
@@ -2033,6 +2068,11 @@ class ResearchWorkbench(QWidget):
         self.series = ExperimentSeriesPanel(self.service, window.run_task)
         self.series.open_experiment.connect(window._branch_selected)
         self.tabs.addTab(self.series, 'Series of experiments')
+        from .research_history import ResearchHistoryPanel
+        self.history_panel = ResearchHistoryPanel(self.service, window.run_task)
+        self.tabs.addTab(self.history_panel, 'Frozen history')
+        self.individual.reports_requested.connect(lambda: window._go_research_stage('Reports / history'))
+        self.individual.export_requested.connect(self.export_report)
         self.tabs.currentChanged.connect(self._ensure_tab)
         self._ensure_tab(0)
 
@@ -2051,6 +2091,12 @@ class ResearchWorkbench(QWidget):
     def _build_dataset(self) -> None:
         page = self.tabs.widget(1)
         layout = QVBoxLayout(page)
+        self.data_summary = QLabel('Inspect measurements and source QC before analysis.')
+        self.data_summary.setWordWrap(True)
+        layout.addWidget(self.data_summary)
+        qc_button = QPushButton('Inspect source admission and QC receipts…')
+        qc_button.clicked.connect(self.window._open_admission_history)
+        layout.addWidget(qc_button)
         self.dataset_tabs = QTabWidget()
         preview_page = QWidget()
         preview_layout = QVBoxLayout(preview_page)
@@ -2175,6 +2221,8 @@ class ResearchWorkbench(QWidget):
         holder_layout.addWidget(QLabel("Run an analysis to create a scientific figure."))
         results.addTab(self.run_output, "Result")
         results.addTab(self.run_plot_holder, "Figure")
+        self.run_provenance = QTextBrowser()
+        results.addTab(self.run_provenance, 'Diagnostics and provenance')
         run_layout.addWidget(results, 1)
         self.analysis_tabs.addTab(run_page, "Analysis run")
         self.investigation_editor = InvestigationEditor(
@@ -2225,6 +2273,7 @@ class ResearchWorkbench(QWidget):
         layout.addWidget(self.report_preview, 2)
 
     def set_study(self, study_id: str, detail: dict[str, Any]) -> None:
+        self.history_panel.set_context(None)
         for index in range(1, len(self._builders)):
             self._ensure_tab(index)
         self._clear_study_views()
@@ -2287,12 +2336,15 @@ class ResearchWorkbench(QWidget):
                     and (run.get("scope") or {}).get("kind", "COHORT") == "COHORT"]
             self.latest_run = next((run for run in runs if run["id"] == detail["study"].get("selected_run_id")), runs[-1] if runs else None)
             if self.latest_run:
-                self.run_output.setPlainText(json.dumps(self.latest_run, indent=2, default=str))
+                from .method_selector import run_html
+                self.run_output.setHtml(run_html(self.latest_run, include_details=False))
+                self.run_provenance.setPlainText(json.dumps(self.latest_run, indent=2, default=str))
                 self.show_figure_button.setEnabled(True)
             number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == revision), "—")
             self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\nData revision {number} · {self.snapshot_id}\n\n{len(runs)} saved analyses on this revision.\nUse Add data, Analyze, Export report or History above to continue.")
 
     def select_project(self, project: dict[str, Any]) -> None:
+        self.history_panel.set_context(None)
         self.series.set_workspace(None)
         self.individual.set_investigation(None, None)
         self._ensure_tab(0)
@@ -2312,6 +2364,7 @@ class ResearchWorkbench(QWidget):
         self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        self.history_panel.set_context(None)
         self.series.set_workspace(None)
         self.individual.set_investigation(None, None)
         for index in range(1, len(self._builders)):  # method_picker etc. live in later lazy tabs
@@ -2351,6 +2404,7 @@ class ResearchWorkbench(QWidget):
             self.cohort_summary.setText("Open a study to resolve its cohort.")
         if hasattr(self, "run_output"):
             self.run_output.clear()
+            self.run_provenance.clear()
             self.parameters.clear()
             self.show_figure_button.setEnabled(False)
             self.run_result_tabs.setCurrentIndex(0)
@@ -2444,6 +2498,10 @@ class ResearchWorkbench(QWidget):
         if snapshot_id != self.snapshot_id:
             return
         self.dataset_detail = detail
+        tables = detail.get('tables', [])
+        self.data_summary.setText('Immutable measurement snapshot · '
+            + ', '.join(f"{t['name'].replace('_', ' ')}: {t['rows']:,} rows" for t in tables)
+            + '. Missing outcomes remain absent; review source QC before choosing methods.')
         self.table_picker.blockSignals(True)
         self.table_picker.clear()
         for table in detail.get("tables", []):
@@ -2747,7 +2805,8 @@ class ResearchWorkbench(QWidget):
         self.latest_evidence_id = None
         self.show_figure_button.setEnabled(True)
         from .method_selector import run_html
-        self.run_output.setHtml(run_html(run))
+        self.run_output.setHtml(run_html(run, include_details=False))
+        self.run_provenance.setPlainText(json.dumps(run, indent=2, default=str))
         self.window.current_study_id = self.study_id
         self.window.inspector.setPlainText(
             json.dumps(run.get("diagnostics", {}), indent=2, ensure_ascii=False, default=str)

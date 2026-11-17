@@ -51,7 +51,9 @@ def test_cohort_and_individual_native_method_journeys(qtbot, service, study, tmp
     assert saved["method_id"] == "METH-U-DESC"
     assert saved["result"]["n_subjects"] == 12
     assert saved["execution"]["method_binding"]["data_revision_id"] == study["rev1"]
-    assert "implementation_sha256" in panel.run_output.toPlainText()
+    panel.run_result_tabs.setCurrentWidget(panel.run_provenance)
+    assert "implementation_sha256" in panel.run_provenance.toPlainText()
+    assert "implementation_sha256" not in panel.run_output.toPlainText()
 
     inv = service.create_individual_investigation(identity, "P01", "Scientific methods demo")
     individual = panel.individual
@@ -66,7 +68,8 @@ def test_cohort_and_individual_native_method_journeys(qtbot, service, study, tmp
     assert result["method_id"] == "METH-U-INDIVIDUAL"
     assert result["scope"]["subject_id"] == "P01"
     assert result["result"]["change_first_to_last"] == pytest.approx(mean(value(1, 3, t) for t in (1, 2, 3)) - mean(value(1, 1, t) for t in (1, 2, 3)))
-    assert "Captured scientific execution contract" in individual.result_view.toPlainText()
+    individual.result_tabs.setCurrentWidget(individual.result_diagnostics)
+    assert "Captured scientific execution contract" in individual.result_diagnostics.toPlainText()
     for index in range(individual.method_picker.count()):
         if individual.method_picker.itemData(index)["method_id"] == "METH-REAL-RELIABILITY":
             individual.method_picker.setCurrentIndex(index)

@@ -338,6 +338,16 @@ class WorkbenchShell(QWidget):
         layout.addWidget(self.copy_button, 0, Qt.AlignmentFlag.AlignTop)
         return bar
 
+    def set_research_task_mode(self, enabled: bool) -> None:
+        """Task pages supply their own bound actions; hide unrelated scratch-analysis controls."""
+        self.ribbon.setVisible(not enabled)
+        self.syntax.parentWidget().setVisible(not enabled)
+        header = self.panes['results'].header_layout
+        for index in range(header.count()):
+            widget = header.itemAt(index).widget()
+            if isinstance(widget, QPushButton):
+                widget.setVisible(not enabled)
+
     def _build_status_items(self) -> None:
         """Widgets for the host's status bar: application status, then provenance."""
         self.app_status = QLabel("Starting")

@@ -40,7 +40,7 @@ def binding_html(run: dict) -> str:
     return "<h4>Captured scientific execution contract</h4><pre>" + html.escape(json.dumps(binding, indent=2, default=str)) + "</pre>"
 
 
-def run_html(run: dict) -> str:
+def run_html(run: dict, *, include_details: bool = True) -> str:
     """Readable recorded output; no statistic or uncertainty is recomputed in the UI."""
     esc = lambda value: html.escape(str(value))
     result = run.get("result", {})
@@ -58,5 +58,7 @@ def run_html(run: dict) -> str:
                                       for key in (axis, "n", "mean", "sd", "ci_low", "ci_high")) + "</tr>"
         body += f"</table><p>Units: {esc(binding.get('outcome', {}).get('unit', 'as recorded'))}. Repeated trials are averaged within athlete.</p>"
     body += "<p><b>Limitations</b></p><ul>" + "".join(f"<li>{esc(v)}</li>" for v in result.get("limitations", [])) + "</ul>"
-    body += "<h4>Recorded result and diagnostics</h4><pre>" + esc(json.dumps({"result": result, "diagnostics": run.get("diagnostics")}, indent=2, default=str)) + "</pre>"
-    return body + binding_html(run)
+    if include_details:
+        body += "<h4>Recorded result and diagnostics</h4><pre>" + esc(json.dumps({"result": result, "diagnostics": run.get("diagnostics")}, indent=2, default=str)) + "</pre>"
+        body += binding_html(run)
+    return body

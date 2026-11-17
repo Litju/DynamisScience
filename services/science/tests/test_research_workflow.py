@@ -53,6 +53,8 @@ def test_research_tasks_keep_athlete_across_data_series_append_and_restart(qtbot
         assert 'Protocol v1' in window.context_binding.text()
         assert researchstore.get_entity(identity)['active_data_revision_id'] == study['rev1']
     assert window.research.tabs.currentWidget() is window.research.series
+    assert not window.workbench.run_button.isVisible()
+    assert not window.workbench.ribbon.isVisible()
     # One import entry action; the admitted-dataset alternative remains in Research.
     opened = []
     monkeypatch.setattr(window, '_open_import', lambda: opened.append(identity))
@@ -75,6 +77,10 @@ def test_research_tasks_keep_athlete_across_data_series_append_and_restart(qtbot
                if panel.method_picker.itemData(i)['method_id'] == 'METH-ONSET-EXACT')
     panel.method_picker.setCurrentIndex(pos)
     assert not panel.run_button.isEnabled()
+    stage(window, 'Data / QC')
+    stage(window, 'Analysis')
+    assert panel.method_picker.currentData()['method_id'] == 'METH-ONSET-EXACT'
+    assert not panel.run_button.isEnabled()
     window.close()
     reopened = MainWindow(DynamisAppService())
     qtbot.addWidget(reopened)
@@ -85,3 +91,18 @@ def test_research_tasks_keep_athlete_across_data_series_append_and_restart(qtbot
     assert reopened.stage_picker.currentText() == 'Analysis'
     assert reopened.research.individual.tabs.tabText(reopened.research.individual.tabs.currentIndex()) == 'Analysis'
     reopened.close()
+
+
+def test_frozen_history_rejects_late_workspace_and_report_callbacks(qtbot):
+    from dynamis_science.desktop.research_history import ResearchHistoryPanel
+    queued = []
+    panel = ResearchHistoryPanel(None, lambda work, done, label: queued.append((work, done)))
+    qtbot.addWidget(panel)
+    panel.set_context('old-workspace', 'P01')
+    old_read = queued.pop()[1]
+    panel.set_context('new-workspace', 'P02')
+    old_read({'reports':[], 'runs':[], 'revisions':[{'number':99}]})
+    assert not panel.records and panel.picker.count() == 0
+    panel.set_context(None)
+    queued[-1][1]({'reports':[], 'runs':[], 'revisions':[{'number':88}]})
+    assert panel.picker.count() == 0
