@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
@@ -32,6 +33,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QToolBar,
+    QToolButton,
     QSplitter,
     QStackedWidget,
     QTabWidget,
@@ -226,16 +228,38 @@ class MainWindow(QMainWindow):
         workspace_bar = QToolBar("Research Workspace", self)
         workspace_bar.setObjectName("PersistentWorkspaceActions")
         self.addToolBar(workspace_bar)
+        self.workspace_actions = {}
+        navigation_menu = QMenu('Navigate', self)
+        workspace_menu = QMenu('Workspace', self)
+        for label, menu in (('&Navigate', navigation_menu), ('&Workspace', workspace_menu)):
+            button = QToolButton()
+            button.setText(label)
+            button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            button.setMenu(menu)
+            workspace_bar.addWidget(button)
         for label, callback in (("Research Workbench", self._show_research_mode), ("Squad", self._show_squad_mode), ("Events", self._show_events_mode), ("New", self._new_workspace), ("Open", self._choose_workspace),
                                 ("Add data", self._add_workspace_data), ("Analyze", self._analyze_workspace),
                                 ("Export report", self.research.export_report), ("History", self._workspace_history)):
-            action = workspace_bar.addAction(label)
+            action = QAction(label, self)
+            self.workspace_actions[label] = action
+            self.addAction(action)
+            if label in {'Research Workbench', 'Squad', 'Events'}:
+                navigation_menu.addAction(action)
+            elif label in {'New', 'Open', 'History'}:
+                workspace_menu.addAction(action)
+            else:
+                workspace_bar.addAction(action)
             action.triggered.connect(callback)
-            shortcut = {"Research Workbench": "Ctrl+Shift+R", "Squad": "Ctrl+Shift+S", "Events": "Ctrl+Shift+E", "New": "Ctrl+N", "Open": "Ctrl+O"}.get(label)
+            shortcut = {"Research Workbench": "Ctrl+Shift+R", "Squad": "Ctrl+Shift+S", "Events": "Ctrl+Shift+E", "New": "Ctrl+N", "Open": "Ctrl+O",
+                        "Add data": "Ctrl+Shift+I", "Analyze": "Ctrl+Shift+A", "Export report": "Ctrl+Shift+X", "History": "Ctrl+Shift+H"}.get(label)
             if shortcut:
                 action.setShortcut(shortcut)
             action.setToolTip(f"{label} ({shortcut})" if shortcut else label)
-            workspace_bar.widgetForAction(action).setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            if workspace_bar.widgetForAction(action):
+                workspace_bar.widgetForAction(action).setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        workspace_menu.addSeparator()
+        workspace_menu.addAction('Inspect research context…', self._inspect_research_context)
         # RES-647 research context: one workspace identity, cohort or individual scope within it.
         context_bar = QToolBar("Research Context", self)
         context_bar.setObjectName("ResearchContext")
@@ -245,16 +269,18 @@ class MainWindow(QMainWindow):
         context_bar.layout().setContentsMargins(4, 0, 4, 0)
         self.context_title = QLabel("No workspace")
         self.context_title.setAccessibleName("Workspace title and active data revision")
-        self.context_title.setMaximumWidth(380)
+        self.context_title.setMaximumWidth(190)
         context_bar.addWidget(self.context_title)
         self.scope_picker = QComboBox()
         self.scope_picker.setAccessibleName('Research cohort or athlete investigation')
-        self.scope_picker.setMinimumContentsLength(18)
-        self.scope_picker.setMaximumWidth(260)
+        self.scope_picker.setMinimumContentsLength(14)
+        self.scope_picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.scope_picker.setMaximumWidth(230)
         self.scope_picker.activated.connect(self._workflow_scope_selected)
         context_bar.addWidget(self.scope_picker)
         self.stage_picker = QComboBox()
         self.stage_picker.setAccessibleName('Research stage')
+        self.stage_picker.setMaximumWidth(180)
         self.scope_picker.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.stage_picker.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.stage_picker.addItems(['Study', 'Data / QC', 'Protocol', 'Observations', 'Analysis',
@@ -264,7 +290,7 @@ class MainWindow(QMainWindow):
         QWidget.setTabOrder(self.scope_picker, self.stage_picker)
         self.context_binding = QLabel()
         self.context_binding.setAccessibleName('Selected protocol and result binding')
-        self.context_binding.setMaximumWidth(420)
+        self.context_binding.setMaximumWidth(220)
         context_bar.addWidget(self.context_binding)
         self.research.individual.context_changed.connect(self._sync_context_bar)
         self.research.individual.tabs.currentChanged.connect(self._sync_workflow_stage)
@@ -1240,7 +1266,7 @@ class MainWindow(QMainWindow):
         detail = self.current_study if self.current_study.get("workspace") else {}
         number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == detail.get("active_data_revision_id")), None)
         title = detail.get("study", {}).get("title")
-        self.context_title.setText(f"{title} · {'Data revision ' + str(number) if number else 'no data'}  " if title else "No workspace  ")
+        self.context_title.setText(f"{'Data revision ' + str(number) if number else 'no data'} · {title}  " if title else "No workspace  ")
         self.context_title.setToolTip(self.context_title.text())
         self.scope_picker.clear()
         self.scope_picker.addItem('Cohort · all selected participants', None)
@@ -1270,6 +1296,19 @@ class MainWindow(QMainWindow):
                 binding += ' · ' + protocol.get('design_label', '')
         self.context_binding.setText(binding)
         self.context_binding.setToolTip(binding)
+
+    def _inspect_research_context(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Research context / provenance')
+        layout = QVBoxLayout(dialog)
+        view = QTextBrowser()
+        view.setPlainText('\n'.join((self.context_title.text(), self.scope_picker.currentText(),
+            self.stage_picker.currentText(), self.context_binding.text(),
+            json.dumps(self.research_context, indent=2))))
+        layout.addWidget(view)
+        from .individual_research import fit_dialog
+        fit_dialog(dialog, 850, 500)
+        dialog.exec()
 
     def _workflow_scope_selected(self, _index: int) -> None:
         stage = self.stage_picker.currentText()

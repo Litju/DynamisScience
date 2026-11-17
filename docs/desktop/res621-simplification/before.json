@@ -1,0 +1,149 @@
+{
+  "platform": "offscreen",
+  "physical_display": false,
+  "geometries": [
+    {
+      "requested": [
+        911,
+        480
+      ],
+      "actual": [
+        911,
+        480
+      ],
+      "roster_viewport": 823,
+      "roster_columns": 1335,
+      "roster_scroll": 3,
+      "toolbar_visible": {
+        "PersistentWorkspaceActions": [
+          "Research Workbench",
+          "Squad",
+          "Events",
+          "New",
+          "Open",
+          "Add data",
+          "Analyze",
+          "Export report",
+          "History"
+        ],
+        "ResearchContext": [
+          "",
+          "",
+          ""
+        ]
+      },
+      "protocol_scroll": 616,
+      "save_visible_in_protocol_viewport": false,
+      "preview_columns": [
+        "subject_id",
+        "session_id",
+        "trial_id",
+        "instrument_id",
+        "protocol_id",
+        "sampling_hz",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n",
+        "source_artifact_id",
+        "_instrument_default"
+      ]
+    },
+    {
+      "requested": [
+        1024,
+        640
+      ],
+      "actual": [
+        1024,
+        640
+      ],
+      "roster_viewport": 936,
+      "roster_columns": 1335,
+      "roster_scroll": 2,
+      "toolbar_visible": {
+        "PersistentWorkspaceActions": [
+          "Research Workbench",
+          "Squad",
+          "Events",
+          "New",
+          "Open",
+          "Add data",
+          "Analyze",
+          "Export report",
+          "History"
+        ],
+        "ResearchContext": [
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "protocol_scroll": 456,
+      "save_visible_in_protocol_viewport": false,
+      "preview_columns": [
+        "subject_id",
+        "session_id",
+        "trial_id",
+        "instrument_id",
+        "protocol_id",
+        "sampling_hz",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n",
+        "source_artifact_id",
+        "_instrument_default"
+      ]
+    },
+    {
+      "requested": [
+        1366,
+        720
+      ],
+      "actual": [
+        1366,
+        720
+      ],
+      "roster_viewport": 1278,
+      "roster_columns": 1335,
+      "roster_scroll": 1,
+      "toolbar_visible": {
+        "PersistentWorkspaceActions": [
+          "Research Workbench",
+          "Squad",
+          "Events",
+          "New",
+          "Open",
+          "Add data",
+          "Analyze",
+          "Export report",
+          "History"
+        ],
+        "ResearchContext": [
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "protocol_scroll": 359,
+      "save_visible_in_protocol_viewport": false,
+      "preview_columns": [
+        "subject_id",
+        "session_id",
+        "trial_id",
+        "instrument_id",
+        "protocol_id",
+        "sampling_hz",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n",
+        "source_artifact_id",
+        "_instrument_default"
+      ]
+    }
+  ]
+}

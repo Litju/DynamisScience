@@ -8,11 +8,23 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton,
     QScrollArea, QSplitter, QTextBrowser, QVBoxLayout, QWidget,
+    QTableWidgetItem,
 )
 
 from ..experiment_series import LIMIT, comparability
 from .individual_research import _fill, _table, fit_dialog
 from .plots import ScientificFigureWidget
+
+
+class VisitCountItem(QTableWidgetItem):
+    def __init__(self, observed, scheduled):
+        super().__init__(f'{observed} / {scheduled}')
+        self.counts = (observed, scheduled)
+        self.setToolTip(self.text())
+        self.setFlags(self.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
+    def __lt__(self, other):
+        return self.counts < other.counts
 
 
 def result_label(member):
@@ -21,12 +33,12 @@ def result_label(member):
         return 'No saved result'
     result = run['result']
     inference = result.get('inference', {})
-    summary = f"{run['id']} · {'current' if member['result_current'] else 'stale'} · {result.get('status', '')}"
+    summary = f"{'current' if member['result_current'] else 'stale'} · {result.get('status', '')}"
     if inference.get('p_value') is not None:
         summary += f" · individual p={inference['p_value']:.4g} · observed difference {inference.get('descriptive_difference')} {result.get('unit', '')}"
     else:
         summary += f" · {result.get('n_observations', 0)} observations · descriptive only"
-    return summary
+    return summary + f" · run {run['id']}"
 
 
 class ExperimentSeriesPanel(QWidget):
@@ -126,6 +138,7 @@ class ExperimentSeriesPanel(QWidget):
                            for m in payload['roster']['members']])
         for row, member in enumerate(payload['roster']['members']):
             self.roster.item(row, 0).setData(Qt.ItemDataRole.UserRole, member)
+            self.roster.setItem(row, 3, VisitCountItem(member['observed'], member['scheduled']))
         self.roster.setSortingEnabled(True)
         self.roster.blockSignals(False)
         self.history.blockSignals(True)

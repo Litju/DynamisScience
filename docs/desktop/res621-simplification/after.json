@@ -1,0 +1,159 @@
+{
+  "platform": "offscreen",
+  "physical_display": false,
+  "geometries": [
+    {
+      "requested": [
+        911,
+        480
+      ],
+      "actual": [
+        911,
+        480
+      ],
+      "roster_viewport": 813,
+      "roster_columns": 813,
+      "roster_scroll": 0,
+      "toolbar_visible": {
+        "PersistentWorkspaceActions": [
+          "",
+          "",
+          "Add data",
+          "Analyze",
+          "Export report"
+        ],
+        "ResearchContext": [
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "protocol_scroll": 0,
+      "save_visible_in_protocol_viewport": true,
+      "preview_columns": [
+        "subject_id",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n",
+        "session_id",
+        "trial_id",
+        "instrument_id",
+        "protocol_id",
+        "sampling_hz",
+        "source_artifact_id",
+        "_instrument_default"
+      ],
+      "preview_visible_columns": [
+        "subject_id",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n"
+      ]
+    },
+    {
+      "requested": [
+        1024,
+        640
+      ],
+      "actual": [
+        1024,
+        640
+      ],
+      "roster_viewport": 926,
+      "roster_columns": 926,
+      "roster_scroll": 0,
+      "toolbar_visible": {
+        "PersistentWorkspaceActions": [
+          "",
+          "",
+          "Add data",
+          "Analyze",
+          "Export report"
+        ],
+        "ResearchContext": [
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "protocol_scroll": 0,
+      "save_visible_in_protocol_viewport": true,
+      "preview_columns": [
+        "subject_id",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n",
+        "session_id",
+        "trial_id",
+        "instrument_id",
+        "protocol_id",
+        "sampling_hz",
+        "source_artifact_id",
+        "_instrument_default"
+      ],
+      "preview_visible_columns": [
+        "subject_id",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n"
+      ]
+    },
+    {
+      "requested": [
+        1366,
+        720
+      ],
+      "actual": [
+        1366,
+        720
+      ],
+      "roster_viewport": 1268,
+      "roster_columns": 1268,
+      "roster_scroll": 0,
+      "toolbar_visible": {
+        "PersistentWorkspaceActions": [
+          "",
+          "",
+          "Add data",
+          "Analyze",
+          "Export report"
+        ],
+        "ResearchContext": [
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "protocol_scroll": 0,
+      "save_visible_in_protocol_viewport": true,
+      "preview_columns": [
+        "subject_id",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n",
+        "session_id",
+        "trial_id",
+        "instrument_id",
+        "protocol_id",
+        "sampling_hz",
+        "source_artifact_id",
+        "_instrument_default"
+      ],
+      "preview_visible_columns": [
+        "subject_id",
+        "week",
+        "body_mass_kg",
+        "jump_height_cm",
+        "peak_force_n"
+      ]
+    }
+  ]
+}

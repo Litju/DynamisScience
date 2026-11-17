@@ -177,3 +177,11 @@ The owner's generator manifest stays unstaged with SHA-256
 All measurement/database writes were directed to disposable roots outside the
 checkout and `D:/datasets/DynamisScience`. No push, merge, reset, migration,
 release packaging or operational dataset mutation was performed.
+
+## Focused native simplification continuation
+
+The subsequent [RES-621 native simplification record](RES-621_NATIVE_SIMPLIFICATION.md)
+addresses the remaining roster/comparison width, technical preview, protocol-form
+and toolbar issues above. It retains native Qt before/after evidence and scoped
+regressions, including the existing 20-athlete journey. Verification remains
+offscreen Qt; no physical Windows after-acceptance is claimed.
