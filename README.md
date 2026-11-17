@@ -14,7 +14,7 @@ DynamisScience brings two local workflows into one desktop application:
 - **Research:** project and study authoring, dataset admission and quality control, cohort resolution, frozen analysis plans, qualified runs, diagnostics, evidence, lineage and versioned reports.
 - **Performance OS:** Squad Command, Athlete 360, planning, monitoring, performance tests, match/pose inspection, research links and practitioner reports.
 
-The five research workspaces are **Overview & Protocol**, **Dataset & Cohort**, **Exploration & Signals**, **Analysis Plan & Runs**, and **Evidence & Report**. The Performance OS follows **Today → Plan → Monitor → Test → Research → Report**.
+The research workspaces are **Overview & Protocol**, **Dataset & Cohort**, **Exploration & Signals**, **Analysis Plan & Runs**, **Evidence & Report**, and **Series of experiments**. The series workflow compares version-bound individual experiments descriptively, with explicit design checks and participant/report drill-down. The Performance OS follows **Today → Plan → Monitor → Test → Research → Report**.
 
 The interface uses PySide6/Qt Widgets, pyqtgraph for interactive signals, and Matplotlib for scientific figures and PNG/PDF/SVG exports. Scientific methods and persistent application logic run directly in Python. The desktop application does not require Node.js, a browser runtime, or a local HTTP server.
 

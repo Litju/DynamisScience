@@ -1181,6 +1181,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ RES-647 research context
 
     def _load_research_context(self, study_id: str, detail: dict[str, Any]) -> None:
+        self.research.series.set_workspace(study_id if detail.get('workspace') else None)
         self.research_context = dict(detail.get("study", {}).get("research_context") or {"scope": "COHORT"})
         self.investigations = []
         self._pending_athlete = None
@@ -1952,6 +1953,10 @@ class ResearchWorkbench(QWidget):
 
         # RES-647: individual research is a scope of this workspace, not a separate application.
         self.individual = IndividualResearchPanel(self.service, window.run_task)  # hosted by the Squad athlete page
+        from .experiment_series import ExperimentSeriesPanel
+        self.series = ExperimentSeriesPanel(self.service, window.run_task)
+        self.series.open_experiment.connect(window._branch_selected)
+        self.tabs.addTab(self.series, 'Series of experiments')
         self.tabs.currentChanged.connect(self._ensure_tab)
         self._ensure_tab(0)
 
@@ -2212,6 +2217,7 @@ class ResearchWorkbench(QWidget):
             self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\nData revision {number} · {self.snapshot_id}\n\n{len(runs)} saved analyses on this revision.\nUse Add data, Analyze, Export report or History above to continue.")
 
     def select_project(self, project: dict[str, Any]) -> None:
+        self.series.set_workspace(None)
         self.individual.set_investigation(None, None)
         self._ensure_tab(0)
         self._clear_study_views()
@@ -2230,6 +2236,7 @@ class ResearchWorkbench(QWidget):
         self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
+        self.series.set_workspace(None)
         self.individual.set_investigation(None, None)
         for index in range(1, len(self._builders)):  # method_picker etc. live in later lazy tabs
             self._ensure_tab(index)

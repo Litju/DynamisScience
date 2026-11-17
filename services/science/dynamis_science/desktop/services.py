@@ -22,6 +22,16 @@ from ..generate import ARTIFACT_DIR, PARQUET_DIR, SNAPSHOT_ID
 
 
 class DynamisAppService:
+    def experiment_series(self, workspace_id: str) -> dict:
+        from .. import experiment_series
+        self.ensure_initialized()
+        return {'roster': experiment_series.roster(workspace_id), 'history': experiment_series.history(workspace_id)}
+
+    def capture_experiment_series(self, workspace_id: str, bindings: dict, revision: str) -> dict:
+        from .. import experiment_series
+        self.ensure_initialized()
+        return experiment_series.capture(workspace_id, bindings, revision)
+
     def create_workspace(self, title: str) -> dict[str, Any]:
         self.ensure_initialized()
         return researchstore.create_workspace(title)

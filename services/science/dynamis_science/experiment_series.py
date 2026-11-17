@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+from datetime import datetime
 
 from . import experiments, longitudinal, randomized_onset, researchstore as store
 from .method_catalogue import CATALOGUE_VERSION, method_spec
@@ -28,7 +29,7 @@ def _member(entity: dict, inv: dict, runs: list, reports: list) -> dict:
     latest = own_runs[-1] if own_runs else None
     current = bool(latest and latest.get('data_revision_id') == entity.get('active_data_revision_id')
                    and latest.get('scope', {}).get('investigation_version') == inv['version']
-                   and latest.get('method_version') == method_spec(latest['method_id'])['version'])
+                   and store.method_status(latest)['state'] == 'CURRENT')
     own_reports = []
     for report in reports:
         sections = report['frozen_content'].get('research_sections', [])
@@ -55,11 +56,15 @@ def comparability(members: list[dict]) -> list[dict]:
     """Conservative exact definitions; no unit conversion or inferred exchangeability."""
     def period_structure(p):
         periods = p['periods']
+        schedule = p['testing_occasions']
+        offsets = [v-schedule[0] for v in schedule]
         if p['design'] == randomized_onset.DESIGN:
             # Realized onset/phase lengths may differ under the same randomized design.
             c = p['allocation']['configuration']
-            return p['design'], p['axis'], len(p['testing_occasions']), c['persistence'], c['lag']
-        return p['axis'], [(v['kind'], v['label'], v['end']-v['start']+1, v.get('notes')) for v in periods]
+            dates = [datetime.fromisoformat(v) for v in c['testing_dates']]
+            elapsed = [(v-dates[0]).total_seconds() for v in dates]
+            return p['design'], p['axis'], offsets, elapsed, c['persistence'], c['lag']
+        return p['design'], p['axis'], offsets, [(v['kind'], v['label'], v['end']-v['start']+1, v.get('notes')) for v in periods]
 
     def allocation(p):
         a = p.get('allocation')
@@ -74,13 +79,18 @@ def comparability(members: list[dict]) -> list[dict]:
         return (c.get('baseline_condition'), c.get('intervention_condition')) if c else [
             (v['kind'], v['label'], v.get('notes')) for v in p['periods']]
 
+    def method_versions(m):
+        r = m['latest_result']
+        return dict(contracts=[(c['id'], c['version'], c['catalogue_version']) for c in m['method_contracts']],
+                    saved=(r['method_id'], r.get('method_version')) if r else None)
+
     definitions = {
         'Outcome definitions': lambda m: (m['protocol']['outcome_metric_id'], m['protocol']['outcome_label']),
         'Units': lambda m: m['protocol']['unit'],
         'Period structure': lambda m: period_structure(m['protocol']),
         'Allocation mechanisms': lambda m: allocation(m['protocol']),
         'Intervention conditions': lambda m: conditions(m['protocol']),
-        'Method versions': lambda m: [(c['id'], c['version'], c['catalogue_version']) for c in m['method_contracts']],
+        'Method versions': method_versions,
     }
     checks = []
     for label, definition in definitions.items():

@@ -55,6 +55,7 @@ def test_missing_data_and_each_incompatibility(service, prospective):
         ('Outcome definitions', lambda m: m['protocol'].update(outcome_label='Different measurement definition')),
         ('Units', lambda m: m['protocol'].update(unit='m')),
         ('Period structure', lambda m: m['protocol']['testing_occasions'].append(35)),
+        ('Period structure', lambda m: m['protocol']['allocation']['configuration']['testing_dates'].__setitem__(0, '2090-01-01T00:00:00+00:00')),
         ('Allocation mechanisms', lambda m: m['protocol']['allocation'].update(mechanism='NON_RANDOM')),
         ('Intervention conditions', lambda m: m['protocol']['allocation']['configuration'].update(intervention_condition='Other dose')),
         ('Method versions', lambda m: m['method_contracts'][0].update(version='other')),
@@ -71,3 +72,29 @@ def test_missing_data_and_each_incompatibility(service, prospective):
     other = service.create_individual_investigation(prospective['id'], members[0]['subject_id'], 'Same athlete')
     with pytest.raises(store.ResearchValidation, match='distinct athletes'):
         series.capture(prospective['id'], {members[0]['investigation_id']:members[0]['investigation_version'], other['id']:other['version']}, roster['data_revision_id'])
+
+
+def test_persisted_mixed_designs_missing_visits_and_new_revision(service, prospective):
+    from test_experiments import plan as crossover_plan
+
+    s = prospective
+    a = s['athletes'][0]
+    b = service.create_individual_investigation(s['id'], 'P02', 'Replicated nonrandom crossover')
+    b = service.save_protocol(b['id'], crossover_plan(), b['version'])
+    b = service.record_experimental_visit(b['id'], dict(protocol_version=1, scheduled_occasion=4,
+        occasion=4, data_revision_id=s['rev1'], occurred_at='2026-11-17T10:00:00-03:00',
+        measurement_status='MISSING', missing_reason='Athlete unavailable', exposure='Unknown'), b['version'])
+    bindings = {a['id']:a['version'], b['id']:b['version']}
+    saved = series.capture(s['id'], bindings, s['rev1'])
+    checks = {c['check']:c['status'] for c in saved['comparison']['checks']}
+    assert checks['Period structure'] == checks['Allocation mechanisms'] == 'REVIEW_REQUIRED'
+    assert checks['Data sufficiency'] == 'INSUFFICIENT'
+    missing = next(m for m in saved['comparison']['members'] if m['investigation_id'] == b['id'])
+    assert missing['timeline']['rows'][0]['visit']['missing_reason'] == 'Athlete unavailable'
+    assert missing['timeline']['rows'][0]['mean'] is None
+    # New admitted observations and conduct cannot change an earlier captured comparison.
+    conduct(service, s)
+    with pytest.raises(store.ResearchConflict, match='Data revision changed'):
+        series.capture(s['id'], bindings, s['rev1'])
+    assert series.history(s['id']) == [saved]
+    assert all(m['observed'] == 0 for m in saved['comparison']['members'])
