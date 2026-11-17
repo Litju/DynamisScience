@@ -1360,6 +1360,7 @@ class MainWindow(QMainWindow):
             dialog.resize(min(720, available.width() - 32), min(480, available.height() - 64))
             layout = QVBoxLayout(dialog)
             picker = QComboBox()
+            picker.setAccessibleName('Workspace history selection')
             layout.addWidget(picker)
             for revision in revisions:
                 picker.addItem(f"Data revision {revision['number']} · {revision['mode'].lower()} · {revision['created_at']}", ("data", revision))
@@ -1372,15 +1373,33 @@ class MainWindow(QMainWindow):
             for report in reports:
                 picker.addItem(f"Report v{report['version']} · frozen", ("report", report))
             detail = QTextBrowser()
+            detail.setAccessibleName('Workspace history detail or frozen report')
             layout.addWidget(detail, 1)
             select = QPushButton("Open selected revision or analysis")
             layout.addWidget(select)
             def changed():
                 value = picker.currentData()
-                select.setEnabled(bool(value and value[0] in {"data", "run"}))
+                select.setEnabled(bool(value and value[0] in {"data", "run", "report"}))
+                select.setText('Export selected frozen report…' if value and value[0] == 'report'
+                               else 'Open selected revision or analysis')
+                if value and value[0] == 'report':
+                    detail.setPlainText('Loading frozen report…')
+                    self.run_task(lambda: self.service.render_report_html(identity, value[1]['version']),
+                        lambda rendered: detail.setHtml(rendered) if dialog.isVisible() and picker.currentData() == value else None,
+                        'Reading frozen report')
+                    return
                 detail.setPlainText(json.dumps(value[1] if value else {}, indent=2, default=str))
             def open_revision():
                 kind, selected = picker.currentData()
+                if kind == 'report':
+                    version = selected['version']
+                    path, _ = QFileDialog.getSaveFileName(dialog, 'Export frozen report',
+                        f'{identity}-report-v{version}.html', 'HTML report (*.html)')
+                    if path:
+                        self.run_task(lambda: self.service.export_report_html(identity, path, version),
+                            lambda output: self.statusBar().showMessage(f'Report exported: {output}', 8000),
+                            'Exporting frozen report')
+                    return
                 revision_id = selected["id"] if kind == "data" else selected["data_revision_id"]
                 dialog.accept()
                 def open_selected():
