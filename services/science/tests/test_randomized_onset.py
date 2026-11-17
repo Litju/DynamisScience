@@ -76,6 +76,20 @@ def test_irregular_prespecified_dates_and_delayed_response_keep_fixed_statistic(
     assert any('delayed' in s.lower() for s in receipt['limitations'])
 
 
+def test_two_sided_absolute_tail_is_not_doubled_one_sided_and_includes_ties():
+    # Hand-enumerated signed differences: +1/5, +1/4, -1/5.
+    # For onset 6, both +/-1/5 are tied and all three assignments count.
+    values = [0, 0, 0, 0, 1, 0, 0, 0]
+    for sign in (1, -1):
+        result = onset.evaluate(context([sign*v for v in values], assigned=6))
+        assert result['descriptive_difference'] == -sign/5
+        assert [d['exact_statistic'] for d in result['distribution']] == ['1/5', '1/4', '1/5']
+        assert result['tail_count'] == 3 and result['p_value'] == 1
+        # Doubling the smaller inclusive signed tail would incorrectly give 2/3.
+        assert result['p_value'] != 2/3
+    assert onset.evaluate(context(values, assigned=5))['p_value'] == 1/3
+
+
 @pytest.mark.parametrize('mutation,status', [
     (lambda c: c['timeline']['protocol'].pop('allocation'), 'NOT_QUALIFIED'),
     (lambda c: c['timeline']['rows'][0].update(status='MISSING',mean=None), 'NOT_ESTIMABLE'),

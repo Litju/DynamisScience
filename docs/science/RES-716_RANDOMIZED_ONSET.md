@@ -50,7 +50,7 @@ mechanism, clinical importance, another athlete, or an optimization/forecast cla
 ## Scientific basis
 
 The assignment support must match the actual design, and outcomes remain ordered:
-[Tanious et al., response-function framework](https://pmc.ncbi.nlm.nih.gov/articles/PMC11133040/).
+[Manolov and Onghena, response-function framework](https://pmc.ncbi.nlm.nih.gov/articles/PMC11133040/).
 This implementation uses only the elementary fixed immediate-level statistic, not the
 paper's response-function extensions. Reporting and numerical qualification do not replace
 human scientific review or consent for a real intervention.
@@ -77,6 +77,23 @@ scientific/native regression: **19 passed in 28.38 s**, peak 6,930,411 bytes, sc
 The runner limits scratch to 512 MiB and execution to 300 seconds. No installer campaign,
 private dataset access, push or merge. The native workflow additions receive a separate
 focused Qt validation and commit.
+
+## RES-716 independent verification, 2026-11-17
+
+Read-only SQLite inspection of the retained completed demonstration independently
+constructed rational assignment-mask weights for all 26 permissible onsets in each
+frozen result. Every exact assignment statistic matched: RUN-U-0001 and RUN-U-0003
+(SYN-A, onset 32) have descriptive difference +8 cm, tail count 1/26 and
+p=0.038461538461538464; RUN-U-0002 (SYN-B, onset 32) has difference 0 cm,
+tail count 26/26 and p=1. No new draws, data import or analysis runs were needed.
+
+The two-sided definition is the inclusive tail of the absolute statistic, **not**
+twice the smaller signed tail. A new hand-enumerated asymmetric example has signed
+statistics {1/5, 1/4, -1/5}; observing -1/5 gives p=3/3, whereas doubling the smaller
+signed tail gives 2/3. Sign reversal leaves the implemented p unchanged. The result
+explanation now states this rule, ties, denominator and minimum attainable p explicitly.
+Scoped randomized-onset suite: 17 passed; sampled scratch peak 2,423,725 bytes,
+scratch removed under the existing 512 MiB / 300 s runner.
 
 ## Native delivery and retained demonstration
 

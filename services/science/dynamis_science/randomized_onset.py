@@ -184,6 +184,11 @@ def result_html(result, *, chart=False):
         body += (f"<p>Descriptive post-minus-pre difference: <b>{r['descriptive_difference']:.6g} {esc(result['unit'])}</b> (no causal interval).<br>"
                  f"Two-sided exact p = <b>{r['tail_count']}/{r['assignment_count']} = {r['p_value']:.6g}</b>; "
                  f"resolution {r['p_resolution']:.6g}; statistic |post mean − pre mean| = {r['statistic']:.6g}.</p>"
+                 f"<p>Tail rule: {r['tail_count']} of {r['assignment_count']} permitted onsets have "
+                 'an absolute difference greater than or equal to the observed absolute difference. '
+                 'Ties and the observed allocation are included; both directions count. '
+                 'This is an absolute-statistic tail, not twice a one-sided p-value. '
+                 f"Minimum attainable p = 1/{r['assignment_count']}; ties can make it larger.</p>"
                  '<p>The p-value is the probability under the sharp null and saved assignment mechanism of a statistic at least this extreme. It is not the probability that the null is true. This does not establish a causal effect magnitude.</p>')
     else:
         body += '<p>' + esc('; '.join(r['issues'])) + '</p>'
