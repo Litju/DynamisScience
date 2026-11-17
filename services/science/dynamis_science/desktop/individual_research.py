@@ -84,6 +84,7 @@ class IndividualResearchPanel(QWidget):
     """Data, analysis, results, protocol, scenarios and cohort comparison for one individual investigation."""
 
     analysis_saved = Signal(dict)
+    context_changed = Signal()
 
     def __init__(self, service: DynamisAppService, run_task: RunTask, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -109,6 +110,7 @@ class IndividualResearchPanel(QWidget):
         self._build_scenarios()
         self._build_compare()
         self.tabs.currentChanged.connect(self._fit_current_tab)
+        self.tabs.currentChanged.connect(lambda _: self.context_changed.emit())
         self._fit_current_tab()
         self.setEnabled(False)
 
@@ -208,6 +210,7 @@ class IndividualResearchPanel(QWidget):
         self.model_picker.addItem("No model referenced", None)
         for run in payload["runs"]:
             self.model_picker.addItem(f"{run['id']} · {run['method_id']}", run["id"])
+        self.context_changed.emit()
 
     # ------------------------------------------------------------------ data
 
@@ -316,6 +319,7 @@ class IndividualResearchPanel(QWidget):
         run = self.run_picker.currentData()
         if not run:
             return
+        self.context_changed.emit()
         result, diagnostics = run["result"], run.get("diagnostics", {})
         self.result_diagnostics.setHtml('<pre>' + html.escape(json.dumps(diagnostics, indent=2, default=str)) + '</pre>' + binding_html(run))
         if run['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:

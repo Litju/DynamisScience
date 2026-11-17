@@ -239,13 +239,29 @@ class MainWindow(QMainWindow):
         context_bar.setObjectName("ResearchContext")
         self.addToolBarBreak()
         self.addToolBar(context_bar)
-        context_bar.setFixedHeight(24)
+        context_bar.setMinimumHeight(34)
         context_bar.layout().setContentsMargins(4, 0, 4, 0)
         self.context_title = QLabel("No workspace")
         self.context_title.setAccessibleName("Workspace title and active data revision")
-        self.context_title.setMaximumWidth(560)
+        self.context_title.setMaximumWidth(380)
         context_bar.addWidget(self.context_title)
-
+        self.scope_picker = QComboBox()
+        self.scope_picker.setAccessibleName('Research cohort or athlete investigation')
+        self.scope_picker.setMinimumContentsLength(18)
+        self.scope_picker.setMaximumWidth(260)
+        self.scope_picker.activated.connect(self._workflow_scope_selected)
+        context_bar.addWidget(self.scope_picker)
+        self.stage_picker = QComboBox()
+        self.stage_picker.setAccessibleName('Research stage')
+        self.stage_picker.addItems(['Study', 'Data / QC', 'Protocol', 'Observations', 'Analysis',
+                                    'Results', 'Series comparison', 'Reports / history'])
+        self.stage_picker.activated.connect(lambda _: self._go_research_stage(self.stage_picker.currentText()))
+        context_bar.addWidget(self.stage_picker)
+        self.context_binding = QLabel()
+        self.context_binding.setAccessibleName('Selected protocol and result binding')
+        self.context_binding.setMaximumWidth(420)
+        context_bar.addWidget(self.context_binding)
+        self.research.individual.context_changed.connect(self._sync_context_bar)
         self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
@@ -258,6 +274,7 @@ class MainWindow(QMainWindow):
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
         research_menu = self.menuBar().addMenu("Research")
+        research_menu.addAction('Attach an admitted dataset…', self._select_admitted_workspace_data)
         self.action_new_project = QAction("New project…", self)
         self.action_new_project.triggered.connect(self._new_project)
         self.action_new_study = QAction("New study…", self)
@@ -1204,6 +1221,9 @@ class MainWindow(QMainWindow):
             if not any(item["id"] == self.research_context.get("investigation_id") for item in investigations):
                 self.research_context = {"scope": "COHORT"}
             self._apply_research_context()
+            stage = self.settings.value(f'research-stage/{study_id}', '')
+            if stage and stage != 'Reports / history':
+                self._go_research_stage(stage)
 
         self.run_task(lambda: self.service.individual_investigations(study_id), loaded, "Loading individual investigations")
 
@@ -1212,6 +1232,61 @@ class MainWindow(QMainWindow):
         number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == detail.get("active_data_revision_id")), None)
         title = detail.get("study", {}).get("title")
         self.context_title.setText(f"{title} · {'Data revision ' + str(number) if number else 'no data'}  " if title else "No workspace  ")
+        self.context_title.setToolTip(self.context_title.text())
+        self.scope_picker.clear()
+        self.scope_picker.addItem('Cohort · all selected participants', None)
+        for inv in self.investigations:
+            self.scope_picker.addItem(f"{inv['scope']['subject_id']} · {inv['title']}", inv['id'])
+        selected = self.research_context.get('investigation_id')
+        self.scope_picker.setCurrentIndex(max(0, self.scope_picker.findData(selected)))
+        self.scope_picker.setToolTip(self.scope_picker.currentText())
+        self.scope_picker.setEnabled(bool(detail))
+        self.stage_picker.setEnabled(bool(detail))
+        panel = self.research.individual
+        binding = ''
+        if selected and panel.investigation_id == selected and panel.payload:
+            protocol = panel.payload['investigation'].get('protocol') or {}
+            binding = f"Protocol v{protocol.get('version', '—')} · saved"
+            run = panel.run_picker.currentData() if panel.tabs.currentWidget() is panel.results_page else None
+            if run:
+                binding = f"{run['id']} · {'active' if run['data_revision_id'] == panel.payload['data_revision_id'] else 'historical'} revision · read-only"
+            elif protocol:
+                binding += ' · ' + protocol.get('design_label', '')
+        self.context_binding.setText(binding)
+        self.context_binding.setToolTip(binding)
+
+    def _workflow_scope_selected(self, _index: int) -> None:
+        selected = self.scope_picker.currentData()
+        self._select_scope('INDIVIDUAL' if selected else 'COHORT', selected)
+        self._go_research_stage(self.stage_picker.currentText())
+
+    def _go_research_stage(self, stage: str) -> None:
+        """Navigate existing native tasks without changing revision or frozen identity."""
+        if not self.current_study.get('workspace'):
+            return
+        self.stage_picker.setCurrentText(stage)
+        individual = self.research_context.get('scope') == 'INDIVIDUAL'
+        panel = self.research.individual
+        if stage == 'Reports / history':
+            self._workspace_history()
+            return
+        if stage in {'Protocol', 'Observations'} or individual and stage in {'Analysis', 'Results'}:
+            if not individual:
+                self.workbench.show_toast('Choose an athlete investigation above, or open an athlete in Squad and create one.')
+                return
+            self._open_athlete(self.research_context['subject_id'])
+            name = {'Observations': 'Visits and timeline'}.get(stage, stage)
+            panel.tabs.setCurrentIndex(next(i for i in range(panel.tabs.count()) if panel.tabs.tabText(i) == name))
+            if stage == 'Analysis' and panel.protocol_history.currentData():
+                panel._analyze_experiment()
+        else:
+            self._show_research_mode()
+            self._set_record_view(True)
+            index = {'Study': 0, 'Data / QC': 1, 'Analysis': 3, 'Results': 3, 'Series comparison': 5}[stage]
+            self.research.tabs.setCurrentIndex(index)
+        self._sync_context_bar()
+        self._scroll_to_top()
+        self.settings.setValue(f'research-stage/{self.current_study_id}', stage)
 
     def _apply_research_context(self) -> None:
         context = self.research_context
@@ -1219,6 +1294,7 @@ class MainWindow(QMainWindow):
         self.research.individual.set_investigation(self.current_study_id, investigation_id)
         if investigation_id:
             self._open_athlete(context["subject_id"])
+        self._sync_context_bar()
 
     def _open_athlete(self, subject_id: str) -> None:
         squad = self.squad
@@ -1306,11 +1382,11 @@ class MainWindow(QMainWindow):
         if not self.current_study.get("workspace"):
             self.workbench.show_toast("Create or open a research workspace first.")
             return
-        choice, accepted = QInputDialog.getItem(self, "Add data", "Choose data", ["Import a file", "Select an admitted dataset"], 0, False)
-        if not accepted:
-            return
-        if choice == "Import a file":
-            self._open_import()
+        self._open_import()
+
+    def _select_admitted_workspace_data(self) -> None:
+        if not self.current_study.get('workspace'):
+            self.workbench.show_toast('Create or open a research workspace first.')
             return
         datasets = getattr(self, "datasets", [])
         labels = [f"{item.get('label') or item['id']} · {item['id']}" for item in datasets]
@@ -2261,6 +2337,9 @@ class ResearchWorkbench(QWidget):
         self.window.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
 
     def _clear_study_views(self) -> None:
+        self._clearing_study = True
+        self._eligibility_generation = getattr(self, '_eligibility_generation', 0) + 1
+        self._method_eligibility = {}
         if hasattr(self, "table_model"):
             self.table_picker.blockSignals(True)
             self.table_picker.clear()
@@ -2290,6 +2369,7 @@ class ResearchWorkbench(QWidget):
             self.report_summary.clear()
             self.report_conclusion.clear()
             self.report_recommendations.clear()
+        self._clearing_study = False
 
     def _load_dataset(self, snapshot_id: str | None, detail: dict[str, Any] | None = None) -> None:
         if not snapshot_id:
@@ -2425,6 +2505,8 @@ class ResearchWorkbench(QWidget):
         self._refresh_method_eligibility()
 
     def _refresh_method_eligibility(self, *_args) -> None:
+        if getattr(self, '_clearing_study', False):
+            return
         study_id = getattr(self, "study_id", None)
         metric = self.analysis_metric_picker.currentData()
         if not study_id or not metric or not getattr(self, "detail", None):
