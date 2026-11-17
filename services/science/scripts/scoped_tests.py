@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -58,7 +59,15 @@ def main() -> int:
             # Kill the worker tree before deleting only our verified scratch directory.
             subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, check=False)
             process.wait(timeout=10)
-        shutil.rmtree(scratch)
+        def remove_readonly(function, filename, _error):
+            # Immutable snapshot copies can retain Windows read-only attributes.
+            # Clear that attribute only inside this run's already verified root.
+            candidate = Path(filename)
+            if candidate.is_symlink() or not candidate.resolve().is_relative_to(scratch):
+                raise RuntimeError('Refusing cleanup outside the owned scratch directory')
+            candidate.chmod(stat.S_IREAD | stat.S_IWRITE)
+            function(filename)
+        shutil.rmtree(scratch, onexc=remove_readonly)
         print(json.dumps({"exit_code": result, "scratch_peak_bytes_sampled": peak,
                           "scratch_removed": not scratch.exists(), "limits": "512 MiB / 300 seconds"}))
     return result

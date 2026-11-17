@@ -68,7 +68,9 @@ def test_run_stale_rerun_and_study_switch(app, window):
     window.options_pane.option_changed.emit("alpha", 0.05)  # back to the run's spec
     assert not doc.stale and shell.run_label.text() == "Results up to date"
 
-    window.options_pane.option_changed.emit("alpha", 0.1)
+    # The qualified engine supplies fixed 95% intervals. Rerun a supported
+    # contrast change, rather than waiting for an intentionally invalid alpha.
+    window.options_pane.option_changed.emit("contrast_occasion", 3)
     shell.action_run.trigger()  # rerun
     _pump(app, lambda: doc.run_spec_hash == window.controller.current_spec().spec_hash() and not window.runner.active)
     assert not doc.stale and shell.run_label.text() == "Results up to date" and shell.action_promote.isEnabled()
