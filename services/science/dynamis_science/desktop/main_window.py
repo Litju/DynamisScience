@@ -12,6 +12,7 @@ from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDockWidget,
     QDialog,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QLineEdit,
@@ -2105,6 +2107,12 @@ class ResearchWorkbench(QWidget):
         self.table_picker.currentIndexChanged.connect(self._table_changed)
         controls.addWidget(QLabel("Snapshot table"))
         controls.addWidget(self.table_picker, 1)
+        self.preview_metadata = QCheckBox('Show technical columns')
+        self.preview_metadata.toggled.connect(self._preview_columns)
+        controls.addWidget(self.preview_metadata)
+        details = QPushButton('Row &details / provenance…')
+        details.clicked.connect(self._preview_details)
+        controls.addWidget(details)
         preview_layout.addLayout(controls)
         self.table = QTableView()
         self.table.setAlternatingRowColors(True)
@@ -2112,6 +2120,8 @@ class ResearchWorkbench(QWidget):
         self.table_model = ParquetPreviewTableModel(self.service, self.window.runner)
         self.table.setModel(self.table_model)
         self.table.verticalHeader().setDefaultSectionSize(23)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setDefaultSectionSize(135)
         preview_layout.addWidget(self.table, 1)
         self.table_status = QLabel("Select a study or dataset to inspect bounded Parquet pages.")
         preview_layout.addWidget(self.table_status)
@@ -2502,6 +2512,16 @@ class ResearchWorkbench(QWidget):
         self.data_summary.setText('Immutable measurement snapshot · '
             + ', '.join(f"{t['name'].replace('_', ' ')}: {t['rows']:,} rows" for t in tables)
             + '. Missing outcomes remain absent; review source QC before choosing methods.')
+        summary = self.data_summary.text()
+        def quality_loaded(info):
+            if snapshot_id != self.snapshot_id:
+                return
+            quality = info.get('quality') or {}
+            reasons = [str(value) for value in quality.get('errors', []) + quality.get('warnings', [])]
+            self.data_summary.setText(summary + '\nSource QC: ' + str(quality.get('status', 'not recorded'))
+                + (' · ' + '; '.join(reasons) if reasons else '')
+                + (' · SYNTHETIC; no empirical validity.' if not info.get('real_data') else ''))
+        self.window.run_task(lambda: self.service.dataset_inspector(snapshot_id), quality_loaded, 'Reading source quality context')
         self.table_picker.blockSignals(True)
         self.table_picker.clear()
         for table in detail.get("tables", []):
@@ -2523,12 +2543,41 @@ class ResearchWorkbench(QWidget):
         self.table_status.setText(
             f"{table['rows']:,} rows · showing pages of at most 500 rows · {len(table.get('columns', []))} columns"
         )
+        names = [column['name'] for column in table.get('columns', [])]
+        self.preview_technical = {name for name in names if name.startswith('_') or
+            name.endswith(('_id', '_hash', '_fingerprint')) and name != 'subject_id'}
+        self.preview_technical.update(name for name in names if name in {'sampling_hz', 'parser_version', 'schema_version'})
+        context = [name for name in ('subject_id', 'week', 'occasion', 'session', 'time_s', 'qc_status', 'quality_flags') if name in names]
+        ordered = context + [name for name in names if name not in context and name not in self.preview_technical]
+        ordered += [name for name in names if name in self.preview_technical]
         self.table_model.set_table(
             self.snapshot_id,
             table["name"],
             int(table["rows"]),
-            [column["name"] for column in table.get("columns", [])],
+            ordered,
         )
+        self._preview_columns()
+
+    def _preview_columns(self):
+        for section, name in enumerate(self.table_model.columns):
+            self.table.setColumnHidden(section, name in getattr(self, 'preview_technical', set()) and not self.preview_metadata.isChecked())
+
+    def _preview_details(self):
+        index = self.table.currentIndex()
+        if not index.isValid():
+            self.table_status.setText('Select a measurement row to inspect its complete values and provenance.')
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Measurement row details / provenance')
+        layout = QVBoxLayout(dialog)
+        view = QTextBrowser()
+        view.setPlainText(json.dumps(dict(snapshot_id=self.snapshot_id, table=self.table_model.table_name,
+            data_revision_id=getattr(self, 'detail', {}).get('active_data_revision_id'),
+            row=self.table_model.rows[index.row()]), indent=2, default=str))
+        layout.addWidget(view)
+        from .individual_research import fit_dialog
+        fit_dialog(dialog, 850, 650)
+        dialog.exec()
 
     def _load_controls(self) -> None:
         if not getattr(self, "snapshot_id", None):

@@ -61,7 +61,7 @@ def _fill(table: QTableWidget, rows: list[list[Any]], editable: bool = False) ->
     for row, values in enumerate(rows):
         for column, value in enumerate(values):
             item = QTableWidgetItem(_number(value))
-            item.setToolTip(item.text())
+            item.setToolTip('—' if value is None else str(value))
             if not editable:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             table.setItem(row, column, item)

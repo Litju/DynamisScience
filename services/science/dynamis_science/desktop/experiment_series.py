@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import json
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QPushButton,
     QScrollArea, QSplitter, QTextBrowser, QVBoxLayout, QWidget,
@@ -54,16 +54,23 @@ class ExperimentSeriesPanel(QWidget):
         for widget in (refresh, self.save, self.history):
             controls.addWidget(widget)
         layout.addLayout(controls)
-        self.roster = _table(['Athlete / experiment', 'Active protocol / design', 'Outcome / unit',
-                              'Observed / scheduled', 'Eligibility', 'Latest result'], 'Experiment series roster')
+        self.roster = _table(['Athlete / experiment', 'Protocol / design', 'Outcome / unit',
+                              'Visits\nobserved / planned', 'Eligibility', 'Latest result'], 'Experiment series roster')
         self.roster.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.roster.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.roster.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        for index, width in enumerate((230, 250, 210, 135, 230, 280)):
-            self.roster.setColumnWidth(index, width)
+        self.roster.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.roster.horizontalHeader().setMinimumSectionSize(60)
+        self.roster.setWordWrap(True)
+        self.roster.verticalHeader().setDefaultSectionSize(76)
+        self.roster.setSortingEnabled(True)
+        self.roster.sortItems(0, Qt.SortOrder.AscendingOrder)
         self.roster.itemSelectionChanged.connect(self.preview)
         self.roster.setMaximumHeight(210)
         layout.addWidget(self.roster)
+        inspect = QPushButton('&Inspect selected experiment details…')
+        inspect.setToolTip('Full values, protocol, eligibility, result and captured provenance for each selected athlete')
+        inspect.clicked.connect(self.inspect_selected)
+        layout.addWidget(inspect)
         self.binding = QLabel()
         self.binding.setWordWrap(True)
         layout.addWidget(self.binding)
@@ -109,6 +116,7 @@ class ExperimentSeriesPanel(QWidget):
     def _loaded(self, payload):
         self.payload = payload
         self.roster.blockSignals(True)
+        self.roster.setSortingEnabled(False)
         _fill(self.roster, [[f"{m['subject_id']} · {m['title']}",
                             f"v{m['protocol']['version']} · {m['protocol']['design_label']}" if m['protocol'] else 'No experimental protocol',
                             f"{m['protocol']['outcome_label']} ({m['protocol']['unit']})" if m['protocol'] else '—',
@@ -116,6 +124,9 @@ class ExperimentSeriesPanel(QWidget):
                             m['eligibility']['status'] + ': ' + '; '.join(m['eligibility']['issues']),
                             result_label(m)]
                            for m in payload['roster']['members']])
+        for row, member in enumerate(payload['roster']['members']):
+            self.roster.item(row, 0).setData(Qt.ItemDataRole.UserRole, member)
+        self.roster.setSortingEnabled(True)
         self.roster.blockSignals(False)
         self.history.blockSignals(True)
         self.history.clear()
@@ -126,7 +137,19 @@ class ExperimentSeriesPanel(QWidget):
         self.preview()
 
     def selected(self):
-        return [self.payload['roster']['members'][i.row()] for i in self.roster.selectionModel().selectedRows()] if self.payload else []
+        return [self.roster.item(i.row(), 0).data(Qt.ItemDataRole.UserRole)
+                for i in self.roster.selectionModel().selectedRows()] if self.payload else []
+
+    def inspect_selected(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Selected experiment details / provenance')
+        layout = QVBoxLayout(dialog)
+        view = QTextBrowser()
+        view.setPlainText(json.dumps(dict(data_revision_id=self.payload.get('roster', {}).get('data_revision_id'),
+                                          members=self.selected()), indent=2))
+        layout.addWidget(view)
+        fit_dialog(dialog, 850, 650)
+        dialog.exec()
 
     def preview(self):
         if self.history.currentData():
@@ -167,7 +190,7 @@ class ExperimentSeriesPanel(QWidget):
                             + ('<br><a href="details">Inspect definitions, bindings and sufficiency reasons</a>' if content['checks'] else ''))
         holder = QWidget()
         layout = QVBoxLayout(holder)
-        columns = QSplitter()
+        columns = QSplitter(Qt.Orientation.Vertical)
         layout.addWidget(columns)
         for member in content['members']:
             page = QWidget()
@@ -218,6 +241,8 @@ class ExperimentSeriesPanel(QWidget):
                     f"{r['visit'].get('actual_condition')} / {r['visit']['exposure']}" if r['visit'] else '—',
                     r['mean'], f"{r['status']} / {r['visit'].get('missing_reason', '') if r['visit'] else ''}"] for r in member['timeline']['rows']])
                 table.setMinimumSize(330, 240)
+                table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+                table.verticalHeader().setDefaultSectionSize(58)
                 column.addWidget(table)
             columns.addWidget(page)
         self.detail.setWidget(holder)

@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QFont
 
 from .services import DynamisAppService
 from .tasks import TaskRunner
+from ..dataworkspace import unit_of
 
 
 class RecordTableModel(QAbstractTableModel):
@@ -109,7 +110,7 @@ class ParquetPreviewTableModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self.columns)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+        if not index.isValid() or role not in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
             return None
         value = self.rows[index.row()].get(self.columns[index.column()])
         if isinstance(value, (dict, list)):
@@ -119,7 +120,11 @@ class ParquetPreviewTableModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if role != Qt.ItemDataRole.DisplayRole:
             return None
-        return self.columns[section] if orientation == Qt.Orientation.Horizontal and section < len(self.columns) else str(section + 1)
+        if orientation == Qt.Orientation.Horizontal and section < len(self.columns):
+            name = self.columns[section]
+            unit = unit_of(name)
+            return name.replace('_', ' ') + (f' ({unit})' if unit else '')
+        return str(section + 1)
 
     def canFetchMore(self, parent: QModelIndex = QModelIndex()) -> bool:
         return not parent.isValid() and not self.loading and len(self.rows) < self.total_rows
