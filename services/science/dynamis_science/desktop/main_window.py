@@ -1362,6 +1362,8 @@ class MainWindow(QMainWindow):
             picker = QComboBox()
             picker.setAccessibleName('Workspace history selection')
             layout.addWidget(picker)
+            for report in reports:
+                picker.addItem(f"Report v{report['version']} · frozen", ("report", report))
             for revision in revisions:
                 picker.addItem(f"Data revision {revision['number']} · {revision['mode'].lower()} · {revision['created_at']}", ("data", revision))
             for run in runs:
@@ -1370,8 +1372,6 @@ class MainWindow(QMainWindow):
                 picker.addItem(f"Analysis · {label} · {run['method_id']} · {run['id']}", ("run", run))
             for version in investigations:
                 picker.addItem(f"Investigation · {version['scope']['subject_id']} · {version['title']} v{version['version']}", ("investigation", version))
-            for report in reports:
-                picker.addItem(f"Report v{report['version']} · frozen", ("report", report))
             detail = QTextBrowser()
             detail.setAccessibleName('Workspace history detail or frozen report')
             layout.addWidget(detail, 1)

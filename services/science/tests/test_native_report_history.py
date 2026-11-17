@@ -25,6 +25,7 @@ def test_preview_and_export_frozen_report_without_changing_active_revision(qtbot
     idle()
     dialog = next(d for d in window.findChildren(QDialog) if d.windowTitle() == 'Workspace history')
     picker = next(w for w in dialog.findChildren(QComboBox) if w.accessibleName() == 'Workspace history selection')
+    assert picker.itemData(0)[0] == 'report'
     picker.setCurrentIndex(next(i for i in range(picker.count()) if picker.itemData(i)[0] == 'report'))
     idle()
     detail = next(w for w in dialog.findChildren(QTextBrowser) if w.accessibleName() == 'Workspace history detail or frozen report')
