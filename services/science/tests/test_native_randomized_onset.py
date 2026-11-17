@@ -37,6 +37,14 @@ def test_native_future_allocation_and_explicit_condition(qtbot,service,prospecti
         panel.save_protocol_button.click()
     assert panel.protocol_history.count()==1 and panel.timeline_table.rowCount()==31
     assert not panel.period_table.isEnabled()
+    assert panel.period_actions.isHidden()
+    assert panel.assignment.isReadOnly() and panel.onset_starts.isReadOnly()
+    assert panel.onset_dates.isReadOnly() and not panel.design_picker.isEnabled()
+    assert not panel.protocol_question.isReadOnly() and not panel.amendment_reason.isReadOnly()
+    assert 'frozen' in panel.protocol_note.text()
+    assert panel.visit_editor.isHidden()
+    panel.visit_editor_toggle.click()
+    assert not panel.visit_editor.isHidden()
     assert 'NOT_ESTIMABLE' in panel.experiment_summary.toPlainText()
     panel.analyze_experiment_button.click()
     assert panel.method_picker.currentData()['method_id']==onset.METHOD
@@ -78,6 +86,9 @@ def test_native_two_athletes_exact_results_and_report(qtbot,service,prospective,
         panel=window.research.individual
         assert inv['scope']['subject_id'] in panel.header.text()
         assert panel.visit_history.rowCount()==31
+        assert panel.timeline_table.horizontalHeader().visualIndex(7)==4
+        assert panel.timeline_table.columnWidth(1)<=200
+        assert panel.timeline_table.item(0,0).toolTip().endswith(inv['protocol']['allocation']['configuration']['testing_dates'][0])
         panel.analyze_experiment_button.click()
         assert panel.tabs.tabText(panel.tabs.currentIndex())=='Analysis'
         assert panel.method_picker.currentData()['method_id']==onset.METHOD
@@ -102,6 +113,12 @@ def test_native_two_athletes_exact_results_and_report(qtbot,service,prospective,
         assert 'sharp null' in panel.result_view.toPlainText().lower()
         assert 'Null hypothesis:' in panel.result_view.toPlainText()
         assert 'no causal interval' in panel.result_view.toPlainText()
+        assert 'Ties and the observed allocation are included' in panel.result_view.toPlainText()
+        from dynamis_science.desktop.plots import run_figure
+        figure=run_figure(saved)
+        axis=figure.axes[0]
+        assert any(label.startswith('Planned onset') for label in axis.get_legend_handles_labels()[1])
+        assert any(line.get_marker()=='^' for line in axis.lines)
         assert 'distribution' in panel.result_diagnostics.toPlainText()
         assert panel.figure_holder.layout().count()==1
         path=tmp_path/f"{inv['scope']['subject_id']}.html"

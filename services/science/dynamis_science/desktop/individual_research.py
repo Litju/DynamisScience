@@ -61,6 +61,7 @@ def _fill(table: QTableWidget, rows: list[list[Any]], editable: bool = False) ->
     for row, values in enumerate(rows):
         for column, value in enumerate(values):
             item = QTableWidgetItem(_number(value))
+            item.setToolTip(item.text())
             if not editable:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             table.setItem(row, column, item)
@@ -411,7 +412,9 @@ class IndividualResearchPanel(QWidget):
         row.addWidget(add)
         row.addWidget(remove)
         row.addStretch(1)
-        layout.addLayout(row)
+        self.period_actions = QWidget()
+        self.period_actions.setLayout(row)
+        layout.addWidget(self.period_actions)
         self.changes = QPlainTextEdit()
         self.changes.setPlaceholderText("Legacy tracking notes: <occasion>: <description>. For prospective amendments use Amendment reason above.")
         self.changes.setMaximumHeight(60)
@@ -433,7 +436,20 @@ class IndividualResearchPanel(QWidget):
         randomized = self.design_picker.currentData() == 'RANDOMIZED_ONSET'
         self.onset_fields.setVisible(randomized)
         self.period_table.setEnabled(not randomized)
+        self.period_actions.setVisible(not randomized)
         saved = ((self.payload or {}).get('investigation', {}).get('protocol') or {}).get('allocation')
+        self.assignment.setReadOnly(randomized)
+        self.design_picker.setEnabled(not bool(saved))
+        for field in (self.testing_occasions, self.onset_starts, self.onset_dates,
+                      self.onset_baseline, self.onset_intervention):
+            field.setReadOnly(bool(saved))
+        self.prespecified.setEnabled(not bool(saved))
+        self.onset_acknowledge.setEnabled(not bool(saved))
+        self.protocol_note.setText(
+            'Allocation and measurement schedule are frozen. Amend narrative fields with a reason; '
+            'record actual exposure and deviations in Visits and timeline.' if saved else
+            'Choose a design suited to the intervention. Randomized onset draws a future start once and keeps '
+            'treatment persistent; crossover requires replicated comparator periods. Saved allocations cannot be redrawn.')
         self.save_protocol_button.setText('Save prospective protocol and draw onset' if randomized and not saved else 'Save protocol version')
 
     def _add_period(self, period: dict[str, Any], adherence: dict[str, Any] | None = None) -> None:
@@ -531,17 +547,29 @@ class IndividualResearchPanel(QWidget):
         self.protocol_history.setAccessibleName('Experimental protocol history')
         self.protocol_history.currentIndexChanged.connect(self._experiment_version_changed)
         layout.addWidget(self.protocol_history)
+        self.analyze_experiment_button = QPushButton('Analyze this protocol')
+        self.analyze_experiment_button.clicked.connect(self._analyze_experiment)
+        layout.addWidget(self.analyze_experiment_button)
         self.timeline_table = _table(['Planned occasion', 'Planned period', 'Actual occasion / time', 'Status',
             'Actual exposure', 'Adherence %', 'Deviations / missing reason', 'Mean', 'QC / trials', 'Revision', 'Observed period'],
             'Planned versus observed protocol timeline')
         self.timeline_table.setMinimumHeight(180)
+        header = self.timeline_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(False)
+        for column, width in enumerate((180, 180, 185, 90, 200, 90, 200, 70, 190, 180, 180)):
+            self.timeline_table.setColumnWidth(column, width)
+        header.moveSection(header.visualIndex(7), 4)
+        self.timeline_table.verticalHeader().setDefaultSectionSize(48)
         layout.addWidget(self.timeline_table)
         self.experiment_summary = QTextBrowser()
         self.experiment_summary.setMinimumHeight(130)
         layout.addWidget(self.experiment_summary)
-        self.analyze_experiment_button = QPushButton('Analyze this protocol')
-        self.analyze_experiment_button.clicked.connect(self._analyze_experiment)
-        layout.addWidget(self.analyze_experiment_button)
+        self.visit_editor_toggle = QPushButton('Record or correct an actual visit…')
+        self.visit_editor_toggle.setCheckable(True)
+        layout.addWidget(self.visit_editor_toggle)
+        self.visit_editor = QWidget()
+        editor_layout = QVBoxLayout(self.visit_editor)
         form = QFormLayout()
         self.visit_schedule = QComboBox()
         self.visit_schedule.setAccessibleName('Scheduled experimental measurement')
@@ -571,10 +599,13 @@ class IndividualResearchPanel(QWidget):
                 ('Adherence %', self.visit_adherence), ('Missing reason', self.visit_missing),
                 ('Deviations / correction reason', self.visit_deviations), ('Correct prior visit', self.visit_supersedes)]:
             form.addRow(label, widget)
-        layout.addLayout(form)
+        editor_layout.addLayout(form)
         self.save_visit_button = QPushButton('Record actual visit')
         self.save_visit_button.clicked.connect(self.save_visit)
-        layout.addWidget(self.save_visit_button)
+        editor_layout.addWidget(self.save_visit_button)
+        self.visit_editor_toggle.toggled.connect(self.visit_editor.setVisible)
+        self.visit_editor.hide()
+        layout.addWidget(self.visit_editor)
         self.visit_history = _table(['Visit', 'Protocol version', 'Scheduled → actual', 'Status', 'Exposure',
                                     'Revision', 'Supersedes', 'Recorded at'], 'Append-only experimental visit history')
         self.visit_history.setMinimumHeight(130)
@@ -585,6 +616,7 @@ class IndividualResearchPanel(QWidget):
         self.tabs.addTab(scroll, 'Visits and timeline')
 
     def _show_experiment(self, payload: dict) -> None:
+        self.visit_editor_toggle.setChecked(False)
         self.visit_condition.setCurrentIndex(0)
         self.protocol_history.clear()
         for timeline in payload.get('experiment_history', []):
@@ -613,6 +645,8 @@ class IndividualResearchPanel(QWidget):
         timeline = self.protocol_history.currentData()
         self.visit_schedule.clear()
         self.save_visit_button.setEnabled(bool(timeline))
+        self.analyze_experiment_button.setEnabled(bool(timeline))
+        self.visit_editor_toggle.setEnabled(bool(timeline))
         if not timeline:
             self.timeline_table.setRowCount(0)
             self.experiment_summary.setPlainText('No prospective experiment saved. Experimental inference: NOT_QUALIFIED.')
@@ -625,7 +659,7 @@ class IndividualResearchPanel(QWidget):
             v = r['visit'] or {}
             m = v.get('measurement') or v.get('qc') or {}
             rows.append([r['scheduled_occasion'], f"{r['period']['label']} ({r['period']['kind']})",
-                f"{v.get('occasion', '—')} / {v.get('occurred_at', '—')}", r['status'],
+                f"{v.get('occasion', '—')}\n{v.get('occurred_at', '—')}", r['status'],
                 (f"{v.get('actual_condition') or 'Unknown condition'} · " if plan.get('allocation') and v else '') + v.get('exposure', '—'),
                 v.get('adherence_percent'), ' / '.join(filter(None, [v.get('deviations'), v.get('missing_reason')])),
                 r['mean'], f"{m.get('n_trials', 0)} valid; {', '.join(m.get('quality_flags', [])) or 'no flags'}; {m.get('empty_values', 0)} excluded",
@@ -634,7 +668,9 @@ class IndividualResearchPanel(QWidget):
         if plan.get('allocation'):
             dates = plan['allocation']['configuration']['testing_dates']
             for row,date in enumerate(dates):
-                self.timeline_table.item(row,0).setText(f"{plan['testing_occasions'][row]} / {date}")
+                item = self.timeline_table.item(row,0)
+                item.setText(f"{plan['testing_occasions'][row]}\n{date}")
+                item.setToolTip(item.text())
         changes = ''.join(f"<li>{html.escape(c['period'])}: n={c['n']}, mean {_number(c['mean'])}, "
                           f"change from baseline {_number(c['change_from_baseline'])} {html.escape(c['unit'])}</li>"
                           for c in timeline['changes'])

@@ -75,12 +75,18 @@ def run_figure(run: dict[str, Any]) -> Figure:
                 continue
             phase = (row['observed_period'] or {}).get('kind', 'OUTSIDE_PLAN')
             flagged = bool(qc.get('quality_flags'))
-            axis.plot([date], [row['mean']], marker='x' if flagged else 'o', linestyle='none',
+            axis.plot([date], [row['mean']], marker='x' if flagged else '^' if phase == 'INTERVENTION' else 'o', linestyle='none',
                       color=PHASE_COLORS.get(phase, '#777777'), label=phase if phase not in used else None)
             used.add(phase)
             if flagged or visit['deviations']:
                 axis.annotate(f"! visit {row['scheduled_occasion']}", (date, row['mean']), xytext=(3,6),
                               textcoords='offset points', fontsize=7)
+        allocation = result['protocol'].get('allocation')
+        if allocation:
+            config = allocation['configuration']
+            index = config['testing_occasions'].index(allocation['assigned_start'])
+            axis.axvline(datetime.fromisoformat(config['testing_dates'][index]), color='#555555',
+                         linestyle='--', linewidth=1, label=f"Planned onset · occasion {allocation['assigned_start']}")
         locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
         axis.xaxis.set_major_locator(locator)
         axis.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
