@@ -120,7 +120,7 @@ def test_additive_migration_repeatable(service):
         connection.execute("PRAGMA user_version=1")
     assert service.get_study_detail(identity)["study"]["id"] == identity
     with researchstore._connect() as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == researchstore.DB_SCHEMA_VERSION
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
@@ -250,6 +250,6 @@ def test_real_v1_schema_upgrade_is_additive_and_rollback_safe(service, monkeypat
             assert researchstore.get_project(project["id"])["title"] == "Legacy retained"
     with sqlite3.connect(database) as connection:
         assert connection.execute("SELECT document FROM projects WHERE id=?", (project["id"],)).fetchone()[0] == before
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == (1 if break_migration else 2)
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == (1 if break_migration else researchstore.DB_SCHEMA_VERSION)
         assert bool(connection.execute("SELECT name FROM sqlite_master WHERE name='workspace_revisions'").fetchone()) != break_migration
     assert researchstore.get_project(project["id"])["title"] == "Legacy retained"

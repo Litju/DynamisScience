@@ -161,7 +161,7 @@ def _converted(path: Path, kind: str) -> tuple[Path, dict[str, Any]]:
     return target, info
 
 
-def open_table(path: Path) -> tuple[pl.LazyFrame, dict[str, Any]]:
+def open_table(path: Path, *, text_columns: tuple[str, ...] = ()) -> tuple[pl.LazyFrame, dict[str, Any]]:
     """A lazy, streaming view of a CSV (UTF-8/BOM, common delimiters) or Parquet file; ImportBlocked when unreadable.
 
     Only the first 64 KiB is read here (delimiter, header, encoding); data are scanned lazily by the caller.
@@ -192,7 +192,8 @@ def open_table(path: Path) -> tuple[pl.LazyFrame, dict[str, Any]]:
         duplicates = sorted({h for h in header if header.count(h) > 1})
         if duplicates:
             raise ImportBlocked(f"Duplicate column names: {', '.join(duplicates)}.")
-        return pl.scan_csv(path, separator=delimiter, infer_schema_length=SCHEMA_ROWS), {"format": kind, "delimiter": delimiter}
+        return pl.scan_csv(path, separator=delimiter, infer_schema_length=SCHEMA_ROWS,
+                           schema_overrides={column: pl.String for column in text_columns}), {"format": kind, "delimiter": delimiter}
     except ImportBlocked:
         raise
     except UnicodeDecodeError as error:
@@ -448,6 +449,21 @@ def normalize(frame: pl.DataFrame, mapping: dict[str, Any]) -> pl.DataFrame:
     return frame.select(list(out.values()))
 
 
+def read_summary(plan: dict[str, Any], lazy: pl.LazyFrame | None = None) -> pl.DataFrame:
+    """Read mapped identifiers as text, including leading zeroes in CSV exports."""
+    path = Path(plan["path"])
+    if plan["size_bytes"] > MAX_FILE_BYTES:
+        raise ImportBlocked("Trial-level table exceeds the size limit.")
+    mapping = plan["mapping"]
+    if plan["format"] == "CSV":
+        identifiers = tuple(entry["source"] for name, entry in mapping["columns"].items()
+                            if COLUMNS[name][1] is None)
+        lazy = _records(open_table(path, text_columns=identifiers)[0])
+    elif lazy is None:
+        lazy = _records(open_table(path)[0])
+    return normalize(lazy.collect(), mapping)
+
+
 def _unique(lazy: pl.LazyFrame, column: str, what: str) -> str | None:
     """The single value of a column (as text); several values mean the file must be split, never merged."""
     values = sorted(str(v) for v in lazy.select(pl.col(column).cast(pl.Utf8)).unique().head(5).collect()[column].drop_nulls().to_list())
@@ -588,7 +604,8 @@ def list_receipts() -> list[dict[str, Any]]:
     return _receipts()
 
 
-def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: str = "") -> dict[str, Any]:
+def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: str = "",
+          _reconciled: pl.DataFrame | None = None) -> dict[str, Any]:
     """Normalize one file and run the existing QC. Registers/ingests but does not admit.
 
     Trial-level tables are normalized in memory (size-capped); sample-level recordings are streamed to Parquet.
@@ -610,7 +627,7 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
     work = paths()["tmp"] / f"import-{uuid.uuid4().hex}"
     work.mkdir(parents=True)
     try:
-        name = f"{path.stem}.normalized.parquet"
+        name = f"{raw_sha}.reconciled.parquet" if _reconciled is not None else f"{path.stem}.normalized.parquet"
         normalized_path = work / name
         units = CANONICAL_UNITS[family]
         bad_rows: pl.DataFrame | None = None  # rows that failed row-level QC (trial-level tables only)
@@ -620,9 +637,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
                 stream.sink_parquet(normalized_path, compression="zstd")
                 sampling, instrument_id, protocol_id = facts["sampling_hz"], facts["instrument_id"], facts["protocol_id"]
             else:
-                if plan["size_bytes"] > MAX_FILE_BYTES:
-                    raise ImportBlocked("Trial-level table exceeds the size limit.")
-                normalized, bad_rows = split_rows(normalize(lazy.collect(), mapping), family)
+                frame = read_summary(plan, lazy) if _reconciled is None else _reconciled
+                normalized, bad_rows = split_rows(frame, family)
                 sampling =_unique(normalized.lazy(), "sampling_hz", "sampling rates") if "sampling_hz" in normalized.columns else None
                 instrument_id = _unique(normalized.lazy(), "instrument_id", "instruments") if "instrument_id" in normalized.columns else None
                 instrument_id = instrument_id or "INST-IMP-" + _digest(ctx_i["manufacturer"], ctx_i["model"], ctx_i["serial_number"],
@@ -656,6 +672,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
                                     "import": {"adapter": plan["adapter"], "adapter_version": ADAPTER_VERSION,
                                                "raw_sha256": raw_sha, "schema_fingerprint": plan["schema_fingerprint"],
                                                "rows_quarantined": 0 if bad_rows is None else bad_rows.height}}
+        if _reconciled is not None:
+            metadata["import"]["reconciliation"] = True
         if family == traces.FAMILY:
             metadata.update(sampling_hz=facts["sampling_hz"], sampling_source=facts["sampling_source"], time_base=facts["time_base"])
         constants = mapping.get("constants", {})
@@ -688,6 +706,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
     raw_copy = raw_dir / f"{raw_sha[:12]}-{path.name}"
     if not raw_copy.exists():
         shutil.copyfile(path, raw_copy)
+    if _sha256(raw_copy) != raw_sha:
+        raise ImportBlocked("The retained original failed its checksum check.")
     validate = {"CMJ_FORCE_PLATFORM": admission.validate_cmj, "SPRINT_TIMING": admission.validate_sprint,
                 traces.FAMILY: traces.validate_trace, FAMILIES["MON"]: admission.validate_monitoring}[family]
     quality = validate(artifact, metadata)
@@ -730,7 +750,7 @@ def admit(staged: dict[str, Any]) -> dict[str, Any]:
         raise ImportBlocked(f"This content duplicates source artifact {staged['duplicate_of']}; it was not admitted again.")
     record = admission.admit_artifact(receipt["source_artifact_id"], receipt["family"], receipt["admission_metadata"])
     _save_receipt(dict(receipt, decision=record["status"], admission_record_id=record["id"]))
-    if record.get("dataset_snapshot_id"):
+    if record.get("dataset_snapshot_id") and not receipt["admission_metadata"]["import"].get("reconciliation"):
         remember(receipt, staged["context"])
     return record
 

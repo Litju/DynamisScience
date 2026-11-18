@@ -39,7 +39,7 @@ from . import realstore
 from .data_root import paths
 
 SCHEMA_VERSION = "dynamis-science.research@1.0.0"
-DB_SCHEMA_VERSION = 2
+DB_SCHEMA_VERSION = 3
 _transaction_connection: ContextVar[Any] = ContextVar("research_transaction", default=None)
 
 STUDY_STATES = ("DRAFT", "READY", "ACTIVE", "ANALYSIS", "COMPLETED", "ARCHIVED")
@@ -377,6 +377,13 @@ _SCHEMA = (
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         archived_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS reconciliation_events (
+        workspace_id TEXT NOT NULL REFERENCES entities(id),
+        batch_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        document TEXT NOT NULL,
+        PRIMARY KEY (workspace_id, batch_id, version)
     )""",
     """CREATE TABLE IF NOT EXISTS entity_versions (
         entity_id TEXT NOT NULL,
@@ -1237,7 +1244,8 @@ def select_workspace_run(entity_id: str, run_id: str) -> dict[str, Any]:
 
 
 def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = False, link: bool = False,
-                          confirm_participant_ids: bool = False, base_revision: str | None = None) -> dict[str, Any]:
+                          confirm_participant_ids: bool = False, base_revision: str | None = None,
+                          _reconciliation: dict[str, Any] | None = None, _revision_id: str | None = None) -> dict[str, Any]:
     """Append a revision; separate attachments never imply analytical pooling.
 
     ``link`` keeps the current measurements and adds a different kind of measurement (e.g. monitoring next to CMJ)
@@ -1250,6 +1258,8 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
         raise ResearchConflict("Restore this workspace before adding data")
     if entity.get("active_data_revision_id") != base_revision:
         raise ResearchConflict("The selected data revision changed; select data again")
+    if _reconciliation and not append:
+        raise ResearchValidation("Reconciliation requires a compatible append")
     snapshot = get_snapshot(snapshot_id)
     if not snapshot or snapshot.get("workspace_snapshot"):
         raise ResearchValidation("Select an admitted input dataset")
@@ -1273,13 +1283,14 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
         if len({item["id"] for item in inputs}) != len(inputs):
             raise ResearchValidation("This batch is already in the selected data revision")
         _validate_workspace_append([item for item in inputs if item.get("measurement_family") == snapshot.get("measurement_family")])
-    revision_id = _new_id("DATA-U")
+    revision_id = _revision_id or _new_id("DATA-U")
     directory = paths()["research"] / "data" / revision_id
     try:
         analytical = snapshot
         if link or append:
             # Derived Parquet is written once, before the transactional reference becomes visible.
-            analytical = _materialize_revision(revision_id, previous, snapshot, append)
+            analytical = _materialize_revision(revision_id, previous, snapshot, append,
+                                               (_reconciliation or {}).get("corrections", []))
         metrics = dataset_metrics(snapshot_id)
         metric = next((item for item in metrics if item.get("role") == "PRIMARY"), metrics[0] if metrics else None)
         if link:  # the outcome being studied stays the same; the linked measures are additional
@@ -1287,7 +1298,9 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
         number = len(data_revisions(entity_id)) + 1
         revision = {
             "id": revision_id, "workspace_id": entity_id, "number": number, "created_at": _now(),
-            "parent_revision_id": base_revision, "mode": "APPEND" if append else "LINK" if link else "SEPARATE",
+            "parent_revision_id": base_revision,
+            "mode": "CORRECTION" if (_reconciliation or {}).get("corrections") else
+            "APPEND" if append else "LINK" if link else "SEPARATE",
             "input_snapshot_ids": [item["id"] for item in inputs], "inputs": inputs,
             "snapshot_id": analytical["id"], "snapshot": analytical,
             "compatibility": {"pooled": append, "linked": link, "participant_ids_confirmed": confirm_participant_ids,
@@ -1295,6 +1308,8 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
                               else "Different measurement kinds linked by confirmed participant identifiers; tables are not pooled" if link
                               else "Separate analytical selection; no pooling"},
         }
+        if _reconciliation:
+            revision["reconciliation"] = _reconciliation
         with _tx() as connection:
             current = _row_document(connection.execute("SELECT * FROM entities WHERE id = ?", (entity_id,)).fetchone())
             if current["version"] != entity["version"]:
@@ -1318,7 +1333,8 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
     return study_detail(entity_id)
 
 
-def _materialize_revision(revision_id: str, previous: dict[str, Any], snapshot: dict[str, Any], append: bool) -> dict[str, Any]:
+def _materialize_revision(revision_id: str, previous: dict[str, Any], snapshot: dict[str, Any], append: bool,
+                          corrections: list[str]) -> dict[str, Any]:
     """Carry every table of the previous revision forward and add the new batch: appended rows of the same table,
     or a linked table of a different measurement kind. One participant roster is rebuilt from the observations."""
     directory = paths()["research"] / "data" / revision_id
@@ -1329,7 +1345,17 @@ def _materialize_revision(revision_id: str, previous: dict[str, Any], snapshot: 
             continue
         frame = read_snapshot_table(snapshot["id"], table)
         if append:
-            frame = pl.concat([frames[table], frame], how="vertical")
+            existing = frames[table]
+            if corrections:
+                identity = ["trial_id", "subject_id", "session_id", "week"]
+                if table != "cmj_trials" or not set(identity) <= set(existing.columns):
+                    raise ResearchValidation("Corrections require the CMJ trial, athlete, session and week")
+                targets = existing.filter(pl.col("trial_id").is_in(corrections)).select(identity)
+                replacements = frame.filter(pl.col("trial_id").is_in(corrections)).select(identity)
+                if targets.height != len(corrections) or not targets.sort("trial_id").equals(replacements.sort("trial_id")):
+                    raise ResearchValidation("A correction must retain the original trial, athlete, session and week")
+                existing = existing.filter(~pl.col("trial_id").is_in(corrections))
+            frame = pl.concat([existing, frame], how="vertical")
             key = ["trial_id"] if "trial_id" in frame.columns else ["subject_id", next(a for a in ("date", "day", "week") if a in frame.columns)]
             if frame.select(pl.struct(key).is_duplicated().any()).item():
                 raise ResearchValidation(f"Overlapping {' and '.join(key)} records; attach the batch separately")
