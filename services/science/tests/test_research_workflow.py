@@ -55,11 +55,11 @@ def test_research_tasks_keep_athlete_across_data_series_append_and_restart(qtbot
     assert window.research.tabs.currentWidget() is window.research.series
     assert not window.workbench.run_button.isVisible()
     assert not window.workbench.ribbon.isVisible()
-    # One import entry action; the admitted-dataset alternative remains in Research.
+    # Add data on an admitted CMJ workspace opens the follow-up review.
     opened = []
-    monkeypatch.setattr(window, '_open_import', lambda: opened.append(identity))
+    monkeypatch.setattr(window, '_open_workspace', lambda *, reconcile: opened.append(reconcile))
     window._add_workspace_data()
-    assert opened == [identity]
+    assert opened == [True]
     revision = service.attach_workspace_data(identity, study['follow_up'], append=True,
         confirm_participant_ids=True, base_revision=study['rev1'])['active_data_revision_id']
     window._show_study(identity, service.get_study_detail(identity))

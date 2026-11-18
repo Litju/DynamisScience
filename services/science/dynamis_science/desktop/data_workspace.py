@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from .. import dataworkspace
 from . import theme
+from .reconciliation_review import ReconciliationReview
 from .workbench.signals_view import SignalsView
 
 PAGE = 200
@@ -68,7 +69,9 @@ def _view(name: str) -> QTableView:
 
 class DataWorkspaceDialog(QDialog):
     def __init__(self, service: Any, run_task: Callable[[Callable[[], Any], Callable[[Any], None], str], None],
-                 on_analyze: Callable[[str], None], parent: QWidget | None = None) -> None:
+                 on_analyze: Callable[[str], None], parent: QWidget | None = None, *,
+                 workspace_id: str | None = None, on_reconciled: Callable[[str], None] | None = None,
+                 on_import: Callable[[], None] | None = None) -> None:
         super().__init__(parent)
         self.service, self.run_task, self.on_analyze = service, run_task, on_analyze
         self.setWindowTitle("Data workspace")
@@ -109,6 +112,13 @@ class DataWorkspaceDialog(QDialog):
         self.tabs.addTab(self._compare_tab(), "Co&mpare")
         self.tabs.addTab(self._query_tab(), "&Query")
         self.tabs.addTab(self._inspector_tab(), "&Provenance")
+        self.reconciliation = None
+        if workspace_id and on_reconciled:
+            def open_revision(revision_id: str) -> None:
+                self.accept()
+                on_reconciled(revision_id)
+            self.reconciliation = ReconciliationReview(workspace_id, run_task, open_revision, self)
+            self.tabs.addTab(self.reconciliation, "Reconcile follow-up")
         self.tabs.currentChanged.connect(self._tab_changed)
         split.addWidget(self.tabs)
         split.setSizes([260, 900])
@@ -124,6 +134,13 @@ class DataWorkspaceDialog(QDialog):
         close = QPushButton("Close")
         close.clicked.connect(self.reject)
         bottom.addWidget(self.status, 1)
+        if on_import and self.reconciliation:
+            other = QPushButton("Import a separate dataset…")
+            def open_import():
+                self.accept()
+                on_import()
+            other.clicked.connect(open_import)
+            bottom.addWidget(other)
         bottom.addWidget(self.analyze_button)
         bottom.addWidget(close)
         root.addLayout(bottom)
@@ -336,10 +353,14 @@ class DataWorkspaceDialog(QDialog):
         return self.inspector
 
     # ---- catalogue
-    def open(self, snapshot_id: str | None = None) -> None:
+    def open(self, snapshot_id: str | None = None, *, reconcile: bool = False) -> None:
         self._wanted = snapshot_id
         self._refresh_saved()
         self._guard(self.service.list_workspace, self._catalogue_loaded, "Loading dataset catalogue")
+        if self.reconciliation:
+            if reconcile:
+                self.tabs.setCurrentWidget(self.reconciliation)
+            self.reconciliation.refresh()
 
     def _guard(self, work: Callable[[], Any], done: Callable[[Any], None], label: str) -> None:
         def guarded() -> Any:
@@ -498,6 +519,10 @@ class DataWorkspaceDialog(QDialog):
 
     # ---- traces / query / inspector
     def _tab_changed(self, index: int) -> None:
+        reviewing = self.reconciliation is not None and self.tabs.widget(index) is self.reconciliation
+        self.analyze_button.setVisible(not reviewing)
+        self.analyze_button.setDefault(not reviewing)
+        self.status.setVisible(not reviewing)
         if self.tabs.tabText(index).replace("&", "") != "Traces" or self.snapshot_id is None:
             return
         dataset = next((d for d in self.datasets if d["id"] == self.snapshot_id), {})

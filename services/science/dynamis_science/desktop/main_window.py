@@ -1458,7 +1458,10 @@ class MainWindow(QMainWindow):
         if not self.current_study.get("workspace"):
             self.workbench.show_toast("Create or open a research workspace first.")
             return
-        self._open_import()
+        if self._can_reconcile_followup():
+            self._open_workspace(reconcile=True)
+        else:
+            self._open_import()
 
     def _select_admitted_workspace_data(self) -> None:
         if not self.current_study.get('workspace'):
@@ -1863,10 +1866,39 @@ class MainWindow(QMainWindow):
                 "Loading plan history",
             )
 
-    def _open_workspace(self, snapshot_id: str | None = None) -> None:
-        dialog = DataWorkspaceDialog(self.service, self.run_task, self._analyze_dataset, self)
-        dialog.open(snapshot_id or getattr(self, "current_snapshot_id", None))
-        dialog.exec()
+    def _can_reconcile_followup(self) -> bool:
+        snapshot = (self.current_study.get("snapshot") or {})
+        return bool(self.current_study.get("workspace") and snapshot.get("admitted_source") and
+                    "cmj_trials" in snapshot.get("tables", {}))
+
+    def _open_workspace(self, snapshot_id: str | None = None, *, reconcile: bool = False) -> None:
+        identity = self.current_study_id if self._can_reconcile_followup() else None
+        dialog = DataWorkspaceDialog(self.service, self.run_task, self._analyze_dataset, self,
+                                     workspace_id=identity,
+                                     on_reconciled=lambda revision: self._open_reconciled_analysis(identity, revision),
+                                     on_import=self._open_import if identity else None)
+        dialog.open(snapshot_id or getattr(self, "current_snapshot_id", None), reconcile=reconcile)
+        choice = dialog.exec()
+        if (choice != QDialog.DialogCode.Accepted and dialog.reconciliation
+                and dialog.reconciliation.approved_in_session and self.current_study_id == identity):
+            self.run_task(lambda: self.service.get_study_detail(identity),
+                          lambda detail: self._show_study(identity, detail), "Refreshing the approved data revision")
+
+    def _open_reconciled_analysis(self, identity: str, revision: str) -> None:
+        from .. import researchstore
+
+        def load():
+            detail = self.service.get_study_detail(identity)
+            if detail["active_data_revision_id"] != revision:
+                return researchstore.select_data_revision(identity, revision)
+            return detail
+
+        def opened(detail):
+            if self.current_study_id == identity:
+                self._show_study(identity, detail)
+                self._go_research_stage("Analysis")
+
+        self.run_task(load, opened, "Opening the reconciled data in Analysis")
 
     def _analyze_dataset(self, snapshot_id: str) -> None:
         self.run_task(lambda: self.service.get_dataset_detail(snapshot_id),
