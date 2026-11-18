@@ -135,7 +135,7 @@ class DataWorkspaceDialog(QDialog):
         close.clicked.connect(self.reject)
         bottom.addWidget(self.status, 1)
         if on_import and self.reconciliation:
-            other = QPushButton("Import a separate dataset…")
+            other = QPushButton("Open standard importer…")
             def open_import():
                 self.accept()
                 on_import()

@@ -1,5 +1,6 @@
 """Executable 20-athlete researcher journey through the native review and Analysis controls."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from dynamis_science import reconciliation, researchstore
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.reconciliation_review import ContextEditor, IdentityEditor, ReconciliationReview
 from dynamis_science.desktop.services import DynamisAppService
+from dynamis_science.qa_cleanup import read_marker
 from test_reconciliation import FOLLOWUP_FIELDS, followup_rows, setup, write_export  # noqa: F401
 
 
@@ -28,6 +30,11 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
     qtbot.addWidget(window)
     window.resize(1366, 768)
     window.show()
+
+    def capture(widget, filename):
+        run_root = os.environ.get("DYNAMISSCIENCE_QA_RUN_ROOT")
+        if run_root and read_marker(run_root)["issue_id"] == "RES-722":
+            assert widget.grab().save(str(Path(run_root) / filename))
 
     def idle():
         qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
@@ -102,6 +109,7 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
             choose(review, followup)
             assert {"source_schema", "unit_change", "athlete_identity", "session_identity"} <= {
                 row["kind"] for row in review.entry["discrepancies"]}
+            capture(QApplication.activeModalWidget(), "res722-01-review.png")
             QTimer.singleShot(0, lambda: accept_editor(IdentityEditor, map_identities))
             click(review.identity)
             loaded(review)
@@ -114,6 +122,8 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
             decision(review, review.approve, "Checked roster, session log and the source's millimetre header.")
             assert review.entry["state"] == "APPROVED"
             after.update(review.entry)
+            review.tables.setCurrentWidget(review.measurements)
+            capture(QApplication.activeModalWidget(), "res722-02-approved.png")
             choose(review, followup)
             assert review.status.text().startswith("Duplicate file")
             assert review.entry["decision"] == after["decision"]
@@ -134,7 +144,7 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
     assert len(researchstore.data_revisions(identity)) == 2
     assert report.read_bytes() == frozen
     assert Path(after["raw_path"]).read_bytes() == followup.read_bytes()
-    assert researchstore.list_entities(kind="STUDY")[0]["id"] == identity
+    assert [item["id"] for item in researchstore.list_entities(kind="STUDY")] == [identity]
     window.close()
     idle()
 
@@ -153,13 +163,15 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
     result = panel.latest_run["result"]
     assert result["n_subjects"] == 20
     assert {int(row["week"]) for row in result["points"]} == {1, 12}
+    assert {row["week"]: row["mean"] for row in result["points"]} == pytest.approx({1: 35.275, 12: 37.25})
     assert result["n_observations"] == 40
     assert len(reconciliation.history(identity)) == 8
     qtbot.waitUntil(lambda: not reopened.runner.active, timeout=30000)
+    capture(reopened, "res722-03-analysis.png")
     reopened.close()
     assert not errors, errors
     with capsys.disabled():
         print("RES-722 native: reject duplicate → quarantine protocol → map A07 and two session IDs → "
               "confirm source context → approve 20 new trials and one correction → reopen same workspace → "
-              f"run descriptives (20 athletes, weeks 1 and 12). Batch {after['id']} / revision {revision}.")
-
+              f"run descriptives (20 athletes, 40 trials, weekly means 35.275 and 37.25 cm). "
+              f"Batch {after['id']} / revision {revision} / run {panel.latest_run['id']}.")

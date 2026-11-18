@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import csv
+import json
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import polars as pl
@@ -118,6 +121,14 @@ def test_reconcile_followup_correction_reopen_and_run(setup, tmp_path):
     assert [event["version"] for event in reconcile.history(workspace) if event["id"] == approved["id"]] == [3, 2, 1]
     result = DynamisAppService().execute_analysis_run(workspace, {**run_spec, "data_revision_id": revision_id})
     assert result["status"] == "COMPLETED" and result["data_revision_id"] == revision_id
+    process = subprocess.run([sys.executable, "-c", """
+import json, sys
+from dynamis_science import reconciliation, researchstore
+workspace = sys.argv[1]
+print(json.dumps([researchstore.get_entity(workspace)["active_data_revision_id"],
+                  reconciliation.history(workspace)[0]["state"]]))
+""", workspace], capture_output=True, text=True, check=True, timeout=25)
+    assert json.loads(process.stdout) == [revision_id, "APPROVED"]
     with sqlite3.connect(store._db_path()) as connection:
         assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -255,3 +266,51 @@ def test_source_ids_keep_csv_leading_zeroes(tmp_path):
     data = importer.read_summary(importer.probe_file(path))
     assert data.select("subject_id", "session_id", "trial_id").rows() == [("01", "01", "01"), ("1", "1", "1")]
 
+
+def test_mixed_row_units_and_ignored_timebase_cannot_be_overridden(setup, tmp_path):
+    _, workspace, _, _ = setup
+    units = [row + ["cm" if index == 1 else "mm"] for index, row in enumerate(followup_rows())]
+    file = write_export(tmp_path / "different_row_units.csv", units, FOLLOWUP_FIELDS + ["Jump Height Unit"])
+    assert "unit_conflict" in kinds(reconcile.propose(workspace, file))
+    rows = followup_rows()
+    for row in rows:
+        row[4] = 500
+    rate = reconcile.propose(workspace, write_export(tmp_path / "sample_rate.csv", rows, FOLLOWUP_FIELDS))
+    override = revise(rate, edits={"sampling_hz": None}, constants={"sampling_hz": 1000})
+    assert "timebase_drift" in kinds(override)
+    assert not override["ready"]
+
+
+@pytest.mark.parametrize("suffix", [".xlsx", ".parquet"])
+def test_reconcile_existing_excel_and_parquet_support(setup, tmp_path, suffix):
+    _, workspace, _, _ = setup
+    source = tmp_path / ("followup" + suffix)
+    rows = followup_rows()
+    if suffix == ".xlsx":
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        for row in [FOLLOWUP_FIELDS, *rows]:
+            workbook.active.append(row)
+        workbook.save(source)
+    else:
+        pl.DataFrame(rows, schema=FOLLOWUP_FIELDS, orient="row").write_parquet(source)
+    entry = reconcile.propose(workspace, source)
+    mapped = revise(entry, athletes={"A07-renamed": "A07"}, sessions={"Week 12 export": "Follow-up"},
+                    declared=declaration(entry))
+    assert mapped["ready"], mapped["discrepancies"]
+    assert Path(mapped["raw_path"]).read_bytes() == source.read_bytes()
+    assert decide(mapped, "APPROVED")["state"] == "APPROVED"
+
+
+def test_cannot_reuse_a_session_id_for_a_different_date(setup, tmp_path):
+    service, workspace, _, first = setup
+    recorded = write_export(tmp_path / "dated.csv", [row + ["2026-10-01"] for row in baseline_rows()], FIELDS + ["date"])
+    staged = importer.stage(importer.probe_file(recorded), importer.build_context(FIXTURE))
+    snapshot = importer.admit(staged)["dataset_snapshot_id"]
+    service.attach_workspace_data(workspace, snapshot, base_revision=first["active_data_revision_id"])
+    row = ["A01", "Baseline", "NEW-TRIAL", 1, 1000, 31, 73, 1601, "2026-10-02"]
+    path = write_export(tmp_path / "new-date.csv", [row], FIELDS + ["date"])
+    proposal = reconcile.propose(workspace, path)
+    assert "session_date_conflict" in kinds(proposal)
+    assert not proposal["ready"]

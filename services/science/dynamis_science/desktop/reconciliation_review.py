@@ -198,6 +198,7 @@ class ReconciliationReview(QWidget):
         self.identities = _table("Athlete and session identity differences")
         self.qc = _table("Per-session quality checks")
         self.measurements = _table("Trial changes and measurement preview")
+        self.measurements.setToolTip("All proposed corrections and a sample of new or repeated trials.")
         self.source_preview = _table("Original source preview")
         for table, title in ((self.differences, "Discrepancies"), (self.identities, "Identities"),
                              (self.qc, "Session QC"), (self.measurements, "Trial changes"),
@@ -232,6 +233,7 @@ class ReconciliationReview(QWidget):
         self.quarantine = QPushButton("&Quarantine")
         self.analyze = QPushButton("Open revision in Analysis")
         for action, button in (("APPROVED", self.approve), ("REJECTED", self.reject), ("QUARANTINED", self.quarantine)):
+            button.setAutoDefault(False)
             button.clicked.connect(lambda checked=False, value=action: self._decide(value))
         self.analyze.clicked.connect(lambda: self.open_analysis(self.entry["decision"]["revision_id"]))
         for widget in (self.reviewer, self.reason, self.approve, self.reject, self.quarantine, self.analyze):
@@ -332,6 +334,7 @@ class ReconciliationReview(QWidget):
             quality = entry["quality"]
             facts.append("Admission QC " + quality["status"].replace("_", " ").lower())
             facts.extend(quality["errors"] + quality["warnings"])
+        facts.extend(entry.get("plan", {}).get("warnings", []))
         self.context.setText("   |   ".join(facts))
         if entry:
             self.context.setToolTip(f"Base revision {entry['base_revision']}\nSHA-256 {entry['raw_sha256']}")
@@ -347,8 +350,9 @@ class ReconciliationReview(QWidget):
         preview = entry.get("identity_preview", {})
         _fill(self.identities, ("Identity", "Incoming ID", "Workspace ID"), [
             (kind, row["source"], row["target"]) for kind, rows in preview.items() for row in rows[:150]], stretch=True)
-        _fill(self.qc, ("Session", "Study week", "Rows", "Flagged", "QC reasons"),
-              [(r["session"], r["weeks"], r["rows"], r["flagged"], r["reasons"]) for r in entry.get("sessions_qc", [])[:100]])
+        _fill(self.qc, ("Session", "Study week", "Date", "Rows", "Flagged", "QC reasons"),
+              [(r["session"], r["weeks"], r.get("dates", []), r["rows"], r["flagged"], r["reasons"])
+               for r in entry.get("sessions_qc", [])])
         _fill(self.measurements, ("Trial", "Athlete", "Session", "Classification", "Measure (canonical)", "Previous", "Incoming"), [
             (row["trial"], row["athlete"], row["session"], row["classification"], name, *values)
             for row in entry.get("rows_preview", []) for name, values in (row["changes"] or {"—": [None, None]}).items()])
@@ -405,4 +409,3 @@ class ReconciliationReview(QWidget):
         reviewer, reason = self.reviewer.text(), self.reason.text()
         self._run(lambda: reconciliation.decide(self.workspace_id, batch, version, action, reviewer=reviewer, reason=reason),
                   self._updated, "Recording the decision")
-

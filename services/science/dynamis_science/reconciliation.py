@@ -22,6 +22,8 @@ CONTEXT_FIELDS = ("source_id", "instrument_id", "protocol_id")
 IDENTITY_FIELDS = ("subject_id", "session_id", "trial_id", "week")
 METRICS = set(admission.CMJ_METRIC_COLUMNS) | {"body_mass_kg"}
 MAX_ROWS = 50_000
+MAX_SESSIONS = 100
+MAX_CORRECTIONS = 200
 PREVIEW_LIMIT = 30
 
 
@@ -40,7 +42,11 @@ def _event(connection, proposal: dict, **changes) -> dict:
 
 
 def _latest(workspace_id: str, batch_id: str, version: int) -> dict:
-    entry = next((event for event in history(workspace_id) if event["id"] == batch_id), None)
+    with store._connect() as connection:
+        row = connection.execute(
+            """SELECT document FROM reconciliation_events WHERE workspace_id = ? AND batch_id = ?
+               ORDER BY version DESC LIMIT 1""", (workspace_id, batch_id)).fetchone()
+    entry = json.loads(row[0]) if row else None
     if entry is None or entry["version"] != version:
         raise store.ResearchConflict("The proposal has changed. Refresh review history.")
     return entry
@@ -119,8 +125,12 @@ def _reference(revision: dict) -> tuple[dict, pl.DataFrame, dict, dict]:
         raise importer.ImportBlocked("The registered source, instrument or calibration differs from the captured reference.")
     if source["rights_status"] != first["rights_status"] or source["rights_status"] not in {"VERIFIED", "FIXTURE_ONLY"}:
         raise importer.ImportBlocked("Source rights no longer match the admitted reference.")
-    if source["permitted_uses"] != first["source"]["permitted_uses"] or "research" not in {
-            use.strip().lower() for use in source["permitted_uses"]}:
+    pinned = first["source"]
+    policy = ("name", "publisher", "dataset_identity", "version", "permitted_uses", "redistribution_restrictions")
+    if (any(source.get(key) != pinned.get(key) for key in policy)
+            or source["license_or_agreement"] != pinned["license"]["id"]
+            or source["privacy_status"] != pinned["privacy"]["classification"]
+            or "research" not in {use.strip().lower() for use in source["permitted_uses"]}):
         raise importer.ImportBlocked("Source permissions must still allow research under the original terms.")
     if (protocol["units"] != importer.CANONICAL_UNITS[FAMILY] or
             protocol["sampling_hz"] != ids["sampling_hz"][0]):
@@ -143,7 +153,7 @@ def propose(workspace_id: str, path: str | Path) -> dict:
                       (item["id"] == batch_id or item["state"] == "APPROVED")), None)
         if found:
             return {**found, "repeat_file": True, "repeat_filename": source.name}
-        plan = importer.probe_file(retained)
+        plan = {**importer.probe_file(retained), "name": source.name}
         proposal = {"workspace_id": workspace_id, "id": batch_id, "base_revision": revision["id"],
                     "filename": source.name, "raw_sha256": checksum, "raw_path": str(retained),
                     "plan": plan, "athletes": {}, "sessions": {}, "declared": {}, "state": "PROPOSED"}
@@ -162,6 +172,8 @@ def revise(workspace_id: str, batch_id: str, version: int, *, edits: dict | None
         plan = entry["plan"]
         if plan["state"] == "UNSUPPORTED":
             raise importer.ImportBlocked("Choose a readable revised source file.")
+        if set(constants or {}) - {"session_id", "sampling_hz"}:
+            raise importer.ImportBlocked("Only a documented session ID or sampling rate can be supplied for a summary.")
         if edits or constants:
             plan = importer.edit_mapping(plan, edits or {}, constants)
         candidate = {**entry, "plan": plan, "athletes": entry["athletes"] if athletes is None else athletes,
@@ -262,6 +274,18 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
                 issue("unit_change", f"{name}: {previous['unit']}", f"{entry['source']}: {entry['unit']}")
             elif entry["origin"] == "user" and importer.COLUMNS[name][1] is not None:
                 issue("unit_mapping", f"{name}: {importer._canonical_unit(name)}", f"{entry['source']}: {entry['unit']}")
+        for column in plan["columns"]:
+            header = column["name"]
+            base, _ = importer._split_header(header)
+            suffix = next((value for value in ("_unit", "_units") if base.endswith(value)), None)
+            if base in {"unit", "units"}:
+                issue("unit_conflict", "Metric-specific unit declarations", f"{header}: measurement is unspecified", True)
+            elif suffix:
+                metric = importer._ALIAS.get(base.removesuffix(suffix))
+                if metric in columns and importer.COLUMNS[metric][1] is not None:
+                    stated = _column_value(plan, [header])
+                    if None in stated or {importer._unit_key(value) for value in stated} != {columns[metric]["unit"]}:
+                        issue("unit_conflict", f"{metric}: {columns[metric]['unit']}", {header: stated}, True)
         for message in plan["needs"] + plan["ambiguities"]:
             issue("column_mapping", "Explicit source field and unit", message, True)
         for field, value in expected.items():
@@ -301,6 +325,12 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
             issue("session_time", "Integer study week", "Missing or fractional week", True)
         if incoming["sampling_hz"].unique().to_list() != [protocol["sampling_hz"]]:
             issue("timebase_drift", protocol["sampling_hz"], incoming["sampling_hz"].unique().sort().to_list(), True)
+        sampling_columns = [col["name"] for col in plan["columns"]
+                            if importer._ALIAS.get(importer._split_header(col["name"])[0]) == "sampling_hz"
+                            and col["name"] != columns.get("sampling_hz", {}).get("source")]
+        if sampling_columns:
+            issue("timebase_drift", "One unambiguous sampling rate column",
+                  {name: _column_value(plan, [name]) for name in sampling_columns}, True)
         if incoming.is_empty():
             issue("empty_file", "At least one trial", "No data rows", True)
         if any(row["blocked"] for row in result["discrepancies"]):
@@ -327,15 +357,28 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
         if set(incoming.columns) != canonical or any(incoming.schema[column] != old.schema[column] for column in canonical):
             issue("canonical_schema", sorted(canonical), sorted(incoming.columns), True)
             return result, None
+        if incoming["session_id"].n_unique() > MAX_SESSIONS:
+            issue("session_review_limit", f"At most {MAX_SESSIONS} sessions per review", "Split the source file", True)
+            return result, None
+        if "date" in canonical:
+            parsed = incoming["date"].str.to_date("%Y-%m-%d", strict=False)
+            if not parsed.dt.strftime("%Y-%m-%d").eq(incoming["date"]).fill_null(False).all():
+                issue("session_date", "A recorded ISO date on each row", "Missing or invalid date", True)
+                return result, None
         for group in incoming.partition_by("session_id", maintain_order=True):
             session = group["session_id"][0]
             _, flags = importer.split_rows(group, FAMILY)
             weeks = group["week"].unique().sort().to_list()
-            before = old.filter(pl.col("session_id") == session)["week"].unique().sort().to_list()
-            result["sessions_qc"].append({"session": session, "weeks": weeks, "rows": group.height,
+            reference_session = old.filter(pl.col("session_id") == session)
+            before = reference_session["week"].unique().sort().to_list()
+            dates = group["date"].unique().sort().to_list() if "date" in canonical else []
+            previous_dates = reference_session["date"].unique().sort().to_list() if "date" in canonical else []
+            result["sessions_qc"].append({"session": session, "weeks": weeks, "dates": dates, "rows": group.height,
                                            "flagged": flags.height, "reasons": sorted(set(flags["qc_flag"]))})
             if len(weeks) != 1 or (before and before != weeks):
                 issue("session_time_conflict", before or "One week per session", f"{session}: {weeks}", True)
+            if len(dates) > 1 or (previous_dates and previous_dates != dates):
+                issue("session_date_conflict", previous_dates or "One date per session", f"{session}: {dates}", True)
             if flags.height:
                 issue("row_qc", f"{session}: all rows pass", sorted(set(flags["qc_flag"])), True)
         if incoming["trial_id"].n_unique() != incoming.height:
@@ -345,6 +388,7 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
 
         old_rows = {row["trial_id"]: row for row in old.select(sorted(canonical)).iter_rows(named=True)}
         keep, duplicates, corrections = [], [], []
+        change_rows, sample_rows = [], []
         columns_for_preview = sorted(canonical & METRICS)
         for row in incoming.sort("trial_id").iter_rows(named=True):
             key = row["trial_id"]
@@ -361,26 +405,37 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
                     issue("trial_identity_conflict", {k: original[k] for k in IDENTITY_FIELDS},
                           {k: row[k] for k in IDENTITY_FIELDS}, True)
                     status = "Identity or acquisition conflict"
+                elif any(after is None for _, after in differences.values()):
+                    issue("missing_correction", "A measured replacement value", f"{key}: replacement is blank", True)
+                    status = "Missing correction value"
                 else:
                     corrections.append(key)
                     keep.append(key)
                     status = "Correction"
             else:
                 keep.append(key)
-            if len(result["rows_preview"]) < PREVIEW_LIMIT:
-                result["rows_preview"].append({"trial": key, "athlete": row["subject_id"], "session": row["session_id"],
-                                               "classification": status, "changes": differences or
-                                               {k: [None, row[k]] for k in columns_for_preview if original is None}})
+            preview = {"trial": key, "athlete": row["subject_id"], "session": row["session_id"],
+                       "classification": status, "changes": differences or
+                       {k: [None, row[k]] for k in columns_for_preview if original is None}}
+            if status == "Correction" and len(change_rows) < MAX_CORRECTIONS:
+                change_rows.append(preview)
+            elif len(sample_rows) < PREVIEW_LIMIT:
+                sample_rows.append(preview)
+        result["rows_preview"] = change_rows + sample_rows
         result["corrections"] = corrections
         result["counts"] = {"new": len(keep) - len(corrections), "duplicate": len(duplicates), "correction": len(corrections)}
         if not keep:
             issue("duplicate_measurements", "No new or corrected trials", f"{len(duplicates)} repeated trials", True)
+        if len(corrections) > MAX_CORRECTIONS:
+            issue("correction_review_limit", f"At most {MAX_CORRECTIONS} corrections per review", "Split the source file", True)
         if any(row["blocked"] for row in result["discrepancies"]):
             return result, None
         stage = importer.stage(plan, context, _reconciled=incoming.filter(pl.col("trial_id").is_in(keep)))
         result["quality"] = stage["quality"]
         result["import_receipt_id"] = stage["receipt"]["id"]
-        if not stage["eligible"]:
+        if stage["duplicate_of"]:
+            issue("duplicate_measurements", "New normalized content", stage["duplicate_of"], True)
+        elif not stage["eligible"]:
             issue("admission_qc", "Eligible admission with matching rights", stage["quality"]["status"], True)
         result["ready"] = stage["eligible"] and not any(
             row["kind"] == "context_confirmation" for row in result["discrepancies"])
@@ -432,4 +487,3 @@ def decide(workspace_id: str, batch_id: str, version: int, action: str, *, revie
             if directory.exists():
                 shutil.rmtree(directory)
         raise
-

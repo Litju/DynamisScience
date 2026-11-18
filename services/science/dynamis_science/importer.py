@@ -701,11 +701,13 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
         normalized_rows = pq.ParquetFile(normalized_path).metadata.num_rows
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    raw_dir = paths()["sources"] / src["id"] / "raw"
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    raw_copy = raw_dir / f"{raw_sha[:12]}-{path.name}"
-    if not raw_copy.exists():
-        shutil.copyfile(path, raw_copy)
+    raw_copy = path
+    if _reconciled is None:
+        raw_dir = paths()["sources"] / src["id"] / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        raw_copy = raw_dir / f"{raw_sha[:12]}-{path.name}"
+        if not raw_copy.exists():
+            shutil.copyfile(path, raw_copy)
     if _sha256(raw_copy) != raw_sha:
         raise ImportBlocked("The retained original failed its checksum check.")
     validate = {"CMJ_FORCE_PLATFORM": admission.validate_cmj, "SPRINT_TIMING": admission.validate_sprint,
@@ -715,7 +717,7 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
     eligible = quality["status"] in ADMITTABLE and rights in {"VERIFIED", "FIXTURE_ONLY"} and duplicate_of is None
     receipt = {
         "id": "IR-" + hashlib.sha256(f"{raw_sha}:{artifact['id']}".encode()).hexdigest()[:12].upper(),
-        "raw_filename": path.name, "raw_sha256": raw_sha, "raw_size_bytes": plan["size_bytes"], "raw_copy": str(raw_copy),
+        "raw_filename": plan["name"], "raw_sha256": raw_sha, "raw_size_bytes": plan["size_bytes"], "raw_copy": str(raw_copy),
         "schema_fingerprint": plan["schema_fingerprint"], "columns": plan["columns"], "adapter": plan["adapter"],
         "adapter_version": ADAPTER_VERSION, "mapping": mapping, "family": family, "admission_metadata": metadata,
         "source_id": src["id"], "source_artifact_id": artifact["id"], "quality_assessment_id": quality["id"],
