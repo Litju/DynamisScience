@@ -150,6 +150,7 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
 
     reopened = MainWindow(DynamisAppService())
     qtbot.addWidget(reopened)
+    reopened.resize(1366, 768)
     reopened.show()
     qtbot.waitUntil(lambda: not reopened.runner.active, timeout=30000)
     reopened._show_study(identity, reopened.service.get_study_detail(identity))
