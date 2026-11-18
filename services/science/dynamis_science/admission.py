@@ -822,6 +822,7 @@ def admit_artifact(artifact_id: str, family: str, metadata: dict[str, Any]) -> d
             "qc_operations": qc_operations,
             "exclusion_criteria": assessment.get("rejected_record_ids", []) + assessment.get("quarantined_record_ids", []),
             "instrument_metadata": [get_instrument(iid) for iid in _safe_column_values(artifact, "instrument_id") if get_instrument(iid)],
+            "protocol_metadata": [get_protocol(pid) for pid in _safe_column_values(artifact, "protocol_id") if get_protocol(pid)],
             "metric_definitions": [],
             "algorithm_versions": {"admission": PARSER_VERSION},
             "schema_version": SCHEMA_VERSION,

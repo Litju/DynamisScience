@@ -352,6 +352,18 @@ def execute(
                 for index, row in enumerate(result["activities"], start=1)
             ],
         }
+    elif method_id == "METH-U-MEASUREMENT-TRUST":
+        from .measurement_trust import ComparisonRequest, evaluate
+
+        scope = cohort["scope"]
+        assessment = evaluate(entity["id"], entity["active_data_revision_id"], scope["subject_id"],
+                              ComparisonRequest.model_validate(parameters))
+        result = assessment.model_dump(mode="json")
+        diagnostics = {key: result[key] for key in ("status", "reasons", "limitations", "provenance")}
+        binding["measurement_trust"] = {
+            "revisions": result["provenance"], "subject_id": scope["subject_id"],
+            "reference_session": result["reference"]["session_id"], "comparison_session": result["comparison"]["session_id"],
+        }
     elif method_id == "METH-U-INDIVIDUAL":
         if (cohort.get("scope") or {}).get("kind") != "INDIVIDUAL" or len(cohort_ids) != 1:
             raise researchstore.ResearchValidation("The individual trajectory method requires an individual investigation scope")
@@ -586,6 +598,14 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
                           'Descriptive observed changes and elapsed-day slopes only. Causal inference is NOT_QUALIFIED; '
                           'time trends, order, carryover and serial dependence are not controlled.')
         quality = 'EXPLORATORY'
+    elif run["method_id"] == "METH-U-MEASUREMENT-TRUST":
+        kind = "CHANGE"
+        value = result["observed_change"]
+        title = f"Measurement trust · participant {result['subject_id']}"
+        interpretation = f"{result['status']}: " + (" ".join(result["reasons"]) or
+            f"The observed change is {result['relation_to_retest'].lower()} the matched 95% retest prediction range.")
+        interpretation += " " + " ".join(result["limitations"])
+        quality = "EXPLORATORY" if result["retest_evidence"] else "WARNING"
     elif run["method_id"] == "METH-U-INDIVIDUAL":
         value = result["change_first_to_last"]
         uncertainty = result.get("change_trial_noise_se")
@@ -623,7 +643,7 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         "interval": interval,
         "effect_size": effect_size,
         "contrast_id": contrast_id,
-        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else f"{entity.get('population', 'Participants')} · {entity['id']}",
+        "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] in {"METH-U-INDIVIDUAL", "METH-U-MEASUREMENT-TRUST", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else f"{entity.get('population', 'Participants')} · {entity['id']}",
         "sample_size": int(result.get("n_subjects") or result.get("n_observations") or 0),
         "protocol_id": protocol_id,
         "dataset_snapshot_id": run["snapshot_id"],

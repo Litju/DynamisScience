@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-CATALOGUE_VERSION = "1.3.0"
+CATALOGUE_VERSION = "1.4.0"
 MIN_TREND_REPEATED_ATHLETES = 3
 
 # Estimands and limits follow the RES-619 matrix, not menu labels.
@@ -34,6 +34,9 @@ DETAILS = {
                       "researchanalysis.py:_individual_change", "docs/science/RES-619_METHODOLOGY.md"),
     "METH-U-INDIVIDUAL": ("One participant's observed session means and first-to-last change", "Outcome units", "Trial-noise SE excludes between-day biological variation; no causal CI",
                           "longitudinal.py:individual_trajectory", "tests/test_longitudinal_research.py:test_individual_trajectory_independent_recomputation"),
+    "METH-U-MEASUREMENT-TRUST": ("Difference in one athlete's two recorded session means",
+                                 "Jump height in cm; ICC dimensionless", "95% Student-t prediction limits for a new matched retest difference when supported.",
+                                 "measurement_trust.py:evaluate", "tests/test_measurement_trust.py"),
     "METH-REAL-SIGNAL-QA": ("Restricted summed vertical force and IMU signal quality summaries", "N, N s, Hz and clock offsets as labelled", "Descriptive QA; no cross-modality validity or body-weight recovery claim",
                            "realanalysis.py:signal_qa", "qualification_real.py:qualify_signal"),
 }
@@ -50,11 +53,13 @@ def catalogue() -> list[dict[str, Any]]:
         item.update(catalogue_version=CATALOGUE_VERSION, estimand=estimand, units=units,
                     uncertainty=uncertainty, implementation=implementation,
                     evidence_references=["docs/science/RES-619_METHODOLOGY.md", evidence],
-                    scopes=["INDIVIDUAL" if identity in {"METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else "COHORT"],
+                    scopes=["INDIVIDUAL" if identity in {"METH-U-INDIVIDUAL", "METH-U-MEASUREMENT-TRUST", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else "COHORT"],
                     method_class="DESCRIPTIVE" if identity in {"METH-U-DESC", "METH-REAL-DESC", "METH-U-CHANGE", "METH-U-INDIVIDUAL", "METH-EXPERIMENT-DESC"} else "QUALIFIED",
                     execution_route="researchanalysis.execute", report_outputs=meta["output_schema"],
                     timebase="Ordinal occasion/week; no equal calendar spacing assumed" if "signal_trials" not in meta["required_tables"] else "Activity / acquisition-ordered trials; native signals 1000 Hz")
         item["limitations"] = [*item["constraints"], "Qualification is numerical and scope-specific; no independent human statistical approval is implied."]
+        if identity == "METH-U-MEASUREMENT-TRUST":
+            item.update(method_class="CONDITIONAL", timebase="Canonical session IDs; recorded date intervals for retest interpretation.")
         if identity in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             item['timebase'] = 'Actual timezone-aware visit timestamps; elapsed 24-hour days, not ordinal occasions'
         if identity == 'METH-ONSET-EXACT':
@@ -114,7 +119,8 @@ def trend_repetition(rows: list[dict], outcome: str) -> int:
 
 
 def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[str],
-                scope: dict, design: str, parameters: dict | None = None, experiment: dict | None = None) -> dict:
+                scope: dict, design: str, parameters: dict | None = None, experiment: dict | None = None,
+                *, admitted_workspace: bool = False) -> dict:
     """Check actual selected rows, before any fit or persistence. Missing outcomes stay missing."""
     p = parameters or {}
     if method['id'] == 'METH-ONSET-EXACT':
@@ -145,6 +151,10 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
                  or (isinstance(value, str) and schema["type"] == "string" and bool(value.strip())))
         if not valid or ("minimum" in schema and value < schema["minimum"]) or ("maximum" in schema and value > schema["maximum"]):
             issues.append(f"Invalid parameter {key}: expected {schema['type']} within the method's declared bounds.")
+    if identity == "METH-U-MEASUREMENT-TRUST":
+        if not admitted_workspace or metric["id"] != "MET-CMJ-HEIGHT" or metric["unit"] != "cm":
+            issues.append("Measurement trust requires admitted CMJ jump height in cm in a persistent workspace.")
+        return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE" if issues else "ELIGIBLE", "issues": issues}
     # Invalid types must not reach comparisons, row selection or the numerical engine.
     if any(issue.startswith("Invalid parameter") for issue in issues):
         return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE", "issues": issues}
@@ -219,6 +229,8 @@ def execution_binding(identity: str, metric: dict, parameters: dict, snapshot: d
     """Capture contract and implementation bytes, including uncommitted source changes."""
     root = Path(__file__).resolve().parent
     sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py", "experiments.py", "randomized_onset.py")]
+    if identity == "METH-U-MEASUREMENT-TRUST":
+        sources.extend(root / name for name in ("measurement_trust.py", "admission.py", "importer.py", "reconciliation.py"))
     digest = hashlib.sha256()
     for path in sources:
         digest.update(path.name.encode())

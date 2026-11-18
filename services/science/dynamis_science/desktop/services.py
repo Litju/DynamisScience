@@ -763,6 +763,15 @@ class DynamisAppService:
                 if metric["table"] == "signal_trials" and payload.get("parameters", {}).get("activity"):
                     definition["activity"] = payload["parameters"]["activity"]
                 scope = self._analysis_scope(study_id, payload.get("scope"))
+                if payload["method_id"] == "METH-U-MEASUREMENT-TRUST":
+                    from ..measurement_trust import ComparisonRequest
+
+                    params = ComparisonRequest.model_validate(payload.get("parameters", {}))
+                    reference = researchstore.get_data_revision(params.reference_revision_id)
+                    if not reference or reference["workspace_id"] != study_id:
+                        raise researchstore.ResearchValidation("Select a reference revision from this workspace.")
+                    payload = {**payload, "parameters": params.model_dump(mode="json", exclude_none=True)}
+                    definition["min_metric_observations"] = 0
                 if scope["kind"] == "INDIVIDUAL":
                     definition.update({"include_subject_ids": [scope["subject_id"]], "scope": scope})
                     # Frozen at creation so an individual selection never replaces the workspace cohort binding.

@@ -201,6 +201,26 @@ METHODS: dict[str, dict[str, Any]] = {
         "diagnostics": ["observed and missing occasions", "trials per occasion", "pooled within-session SD and degrees of freedom", "quality flags"],
         "output_schema": ["session means", "within-session SD", "first-to-last change", "trial-noise standard error of the change"],
     },
+    "METH-U-MEASUREMENT-TRUST": {
+        "id": "METH-U-MEASUREMENT-TRUST",
+        "name": "Measurement trust and individual change",
+        "version": "1.0.0",
+        "qualification": {"status": "CONDITIONAL", "basis": "Interpretation requires independent matched retest pairs and a recorded review of the design and its applicability."},
+        "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
+        "required_tables": ["cmj_trials"],
+        "required_shape": "Recorded sessions in admitted CMJ summary revisions, with one participant and flight-time jump height in cm.",
+        "constraints": ["No inference about meaningful change, fatigue, adaptation, readiness, injury risk or causation."],
+        "missingness": "Incomplete session scores remain unestimated. Reference pair exclusions are reported.",
+        "parameter_schema": {
+            "reference_revision_id": {"type": "string"},
+            "reference_session": {"type": "string"},
+            "comparison_session": {"type": "string"},
+        },
+        "assumptions": ["Comparable sessions and aggregation. For interpretation, matched independent reference pairs with stable conditions and approximately normal differences across the applicable population.",
+                        "Typical error assumes equal, independent session errors. ICC(3,1) measures consistency; retest bias is reported separately."],
+        "diagnostics": ["source QC and identity lineage", "trials and missing values", "retest design, pairs and prediction limits"],
+        "output_schema": ["observed session means and change", "interpretability and reasons", "retest variation and provenance"],
+    },
     "METH-U-DESC": {
         "id": "METH-U-DESC",
         "name": "Descriptive longitudinal summary",
@@ -2820,9 +2840,13 @@ def method_eligibility(entity: dict[str, Any], cohort: dict[str, Any], resolved:
     rows = read_snapshot_table(snapshot_id, metric["table"]).to_dicts()
     from .experiments import analysis_context
     context = analysis_context(entity, cohort.get('scope') or {}, (plan or {}).get('parameters', {}))
+    snapshot = get_snapshot(snapshot_id)
+    admitted_workspace = bool(entity.get("workspace") and entity.get("active_data_revision_id")
+                              and snapshot and snapshot.get("admitted_source"))
     return [eligibility(method, metric, rows, resolved["cohort"]["subject_ids"],
                         cohort.get("scope") or {"kind": "COHORT"}, entity.get("design", ""),
-                        (plan or {}).get("parameters", {}), experiment=context) for method in catalogue()]
+                        (plan or {}).get("parameters", {}), experiment=context,
+                        admitted_workspace=admitted_workspace) for method in catalogue()]
 
 
 # --------------------------------------------------------------------------- #
