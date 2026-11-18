@@ -144,7 +144,7 @@ def test_native_entry_point_smokes_and_reopens_its_private_store(tmp_path):
         assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
-def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monkeypatch):
+def test_native_window_loads_research_tabs_and_catalogue(qtbot, tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     monkeypatch.setenv("DYNAMISSCIENCE_DATA_ROOT", str(tmp_path / "private"))
     window = MainWindow(DynamisAppService())
@@ -156,7 +156,12 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     assert window.frameGeometry().width() <= available.width()
     assert window.frameGeometry().height() <= available.height()
 
-    assert window.research.tabs.count() == 5
+    tabs = window.research.tabs
+    labels = [tabs.tabText(index) for index in range(tabs.count())]
+    assert {
+        "Overview & Protocol", "Dataset & Cohort", "Exploration & Signals",
+        "Analysis Plan & Runs", "Evidence & Report", "Series of experiments", "Frozen history",
+    } <= set(labels)
     study_parent = window.navigator.topLevelItem(1)
     synthetic = next(
         study_parent.child(index)
@@ -167,7 +172,7 @@ def test_native_window_loads_five_workspaces_and_catalogue(qtbot, tmp_path, monk
     qtbot.waitUntil(lambda: window.current_study_id == "STUDY-001")
     qtbot.waitUntil(lambda: window.research.table_model.rowCount() == 500)
     qtbot.waitUntil(lambda: not window.runner.active)
-    window.research.tabs.setCurrentIndex(3)
+    tabs.setCurrentIndex(labels.index("Analysis Plan & Runs"))
     assert window.research.parameters.width() >= 100
     assert window.frameGeometry().width() <= available.width()
     assert window.frameGeometry().height() <= available.height()
@@ -647,7 +652,10 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
         window.research.analysis_metric_picker.findData(plan["outcome_metric_id"])
     )
     window.research.parameters.setPlainText(json.dumps(plan.get("parameters", {})))
-    window.research._execute()
+    qtbot.waitUntil(lambda: bool(errors) or window.research.execute_button.isEnabled())
+    assert not errors, errors
+    assert window.research.method_picker.currentData() == plan["method_id"]
+    window.research.execute_button.click()
     assert window.progress.isVisible()
     qtbot.waitUntil(
         lambda: window.research.latest_run is not None or bool(errors), timeout=30000
