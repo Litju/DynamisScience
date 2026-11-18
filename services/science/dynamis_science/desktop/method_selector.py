@@ -40,6 +40,20 @@ def binding_html(run: dict) -> str:
     return "<h4>Captured scientific execution contract</h4><pre>" + html.escape(json.dumps(binding, indent=2, default=str)) + "</pre>"
 
 
+def mixedlm_repetition_summary(run: dict) -> str:
+    """Describe only the within-athlete support recorded in this run."""
+    result = run.get("result") or {}
+    diagnostics = run.get("diagnostics") or result.get("diagnostics") or {}
+    repeated = (diagnostics.get("sample_context") or {}).get("athletes_with_repeated_occasions")
+    if repeated is None:
+        return ""
+    athletes = result["n_subjects"]
+    summary = f"{repeated} of {athletes} athletes have outcomes on multiple occasions."
+    if repeated < athletes:
+        summary += " Athletes measured on one occasion contribute no within-athlete change."
+    return summary
+
+
 def run_html(run: dict, *, include_details: bool = True) -> str:
     """Readable recorded output; no statistic or uncertainty is recomputed in the UI."""
     esc = lambda value: html.escape(str(value))
@@ -50,6 +64,11 @@ def run_html(run: dict, *, include_details: bool = True) -> str:
             f"<p>{esc(run['method_id'])} v{esc(run['method_version'])} · {esc(spec.get('method_class', 'Historical'))}</p>"
             f"<p>{esc(spec.get('estimand', ''))}</p><p><b>Uncertainty:</b> {esc(spec.get('uncertainty', 'See recorded result'))}</p>"
             f"<p>Run {esc(run['id'])} · data revision {esc(run.get('data_revision_id', run.get('snapshot_id')))} · digest {esc(run.get('result_digest'))}</p>")
+    if run["method_id"] == "METH-REAL-TREND" and (summary := mixedlm_repetition_summary(run)):
+        body += f"<p>{esc(summary)}</p>"
+    state = run.get("method_status") or {}
+    if state.get("state") == "SUPERSEDED":
+        body += f"<p><b>Superseded method.</b> {esc(state.get('reason', ''))}</p>"
     if result.get("points") and result.get("axis"):
         axis = result["axis"]
         body += f"<table cellpadding='4'><tr><th>{esc(axis)}</th><th>Athletes</th><th>Mean</th><th>SD</th><th>95% CI low</th><th>95% CI high</th></tr>"

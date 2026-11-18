@@ -15,6 +15,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from dynamis_science.desktop import theme  # noqa: E402
+from dynamis_science.desktop.method_selector import mixedlm_repetition_summary, run_html  # noqa: E402
 from dynamis_science.desktop.workbench import figures  # noqa: E402
 from dynamis_science.desktop.workbench.results import (  # noqa: E402
     ResultsDocument,
@@ -73,6 +74,16 @@ def test_helpers():
     insufficient = run_method_state({"method_id": "METH-REAL-RELIABILITY", "method_version": "1.1.0", "status": "COMPLETED",
                                      "result": {"status": "INSUFFICIENT_DATA", "message": "too few"}})
     assert insufficient["kind"] == "unavailable" and not insufficient["promotable"]
+
+
+def test_repetition_summary_distinguishes_singletons_and_legacy_runs():
+    run = {"result": {"n_subjects": 4},
+           "diagnostics": {"sample_context": {"athletes_with_repeated_occasions": 3}}}
+    assert mixedlm_repetition_summary(run) == (
+        "3 of 4 athletes have outcomes on multiple occasions. "
+        "Athletes measured on one occasion contribute no within-athlete change."
+    )
+    assert mixedlm_repetition_summary({"result": {"n_subjects": 4}}) == ""
 
 
 @pytest.mark.parametrize("kind", ["ttest", "anova", "regression"])
@@ -140,6 +151,11 @@ def test_mixed_model_block_shows_recorded_specification(app, real):
     assert estimation_of(result["formula"]) == "ML" and ">ML<" in text and "REML" not in text
     assert result["estimator"] == "MIXEDLM_RANDOM_SLOPE" and "intercept + occasion slope | subject" in text
     assert f">{result['n_observations']}<" in text and result["n_observations"] == 82
+    sample = "21 of 21 athletes have outcomes on multiple occasions."
+    assert sample in text and sample in run_html(run, include_details=False)
+    legacy = {**run, "method_version": "1.1.0",
+              "method_status": {"state": "SUPERSEDED", "reason": "Repeated-athlete support was not checked."}}
+    assert "Superseded method." in run_html(legacy, include_details=False)
     assert "0.998" in text and "0.622 – 1.375" in text
     assert "conditional Pearson residual (y − Xβ̂ − Zb̂) / σ̂" in text and "EXPLORATORY" in text
     assert "2 of 84 athlete-occasions missing" in text

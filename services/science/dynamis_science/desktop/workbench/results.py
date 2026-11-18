@@ -475,6 +475,8 @@ class ResultsDocument(QScrollArea):
         return "real" if str(run.get("snapshot_id", "")).startswith("DS-REAL") else "synthetic"
 
     def _mixed_model(self, run: dict[str, Any]) -> None:
+        from ..method_selector import mixedlm_repetition_summary
+
         t = theme.tokens()
         result, diagnostics = run["result"], run.get("diagnostics") or run["result"].get("diagnostics") or {}
         context = diagnostics.get("sample_context") or {}
@@ -490,6 +492,8 @@ class ResultsDocument(QScrollArea):
               str(result["n_subjects"]), _f(result.get("log_likelihood"), 2),
               f"{result.get('optimizer') or '—'} · {'converged' if result.get('converged') else 'NOT converged'}"]],
             numeric_from=2))
+        if summary := mixedlm_repetition_summary(run):
+            block.rich(html.escape(summary))
         occasions = context.get("weeks_observed") or []
         slots = result["n_subjects"] * len(occasions)
         missing = slots - result["n_observations"]

@@ -178,3 +178,65 @@ Occasion summaries (Mendeley) have exactly one row per athlete per occasion, so 
 3. How to interpret the non-normal random intercepts in the trend model.
 4. ~~Owner authorization for the operational store~~: done 2026-11-10 (see "Operational store").
 5. The DataCite "© 2025 The Authors" statement alongside CC0, before any commercial distribution (privacy obligations remain regardless).
+
+## Integrated development audit, 2026-11-18
+
+The source baseline was `1771a675856b2d8bccb0ffcc9093e1024babd80f`.
+The full baseline collected 393 tests and finished in 584.56 seconds with 391
+passing and two native harness failures. Both failures passed after updating
+research-tab expectations and waiting for the asynchronous eligibility receipt.
+
+The eight-row counterexample used four different athletes per occasion and values
+28, 29, 31, 32 cm at occasion 1 and 36, 37, 39, 40 cm at occasion 2. The two
+means are 30 and 38 cm. Method 1.1.0 admitted these data and returned an 8 cm per
+occasion slope with the random-intercept fallback and a Wald 95% interval of
+[5.8087, 10.1913]. Zero athletes had a within-athlete contrast. The numerical
+result came entirely from a between-athlete difference.
+
+Method 1.2.0 applies the existing minimum of three athletes to athletes with
+finite outcomes at two or more distinct ordinal occasions. The eight-row
+minimum continues to apply. The minima are eligibility checks and do not
+establish adequate power or reliable covariance estimation. Missing outcomes
+and duplicate rows cannot create repeated-athlete support. Singleton
+observations can contribute to a supported fit and supply no within-athlete
+contrast. The analysis receipt and fitted result record the repeated-athlete
+count, and native Results presents it. The 1.1.0 run records remain immutable
+and are superseded for new evidence use. The corrected runs pass the established
+independent R tolerances for fixed effects and residuals. See [Curran and Bauer on within-person and
+between-person effects](https://pmc.ncbi.nlm.nih.gov/articles/PMC3059070/).
+
+- **MixedLM.** The validated reference is ML with fixed ordinal occasion and
+  athlete random intercept and slope. A random-intercept fallback changes the
+  covariance and SE basis. Optimizer convergence and finite estimates alone
+  leave covariance-boundary and singularity assessment open for new cohorts.
+  The conditional Pearson Q–Q is exploratory because the residuals are shrunk
+  and correlated. The marginal residuals assess mean-structure misfit. Wald
+  intervals rely on asymptotic approximations. The 21-athlete R profile and
+  t sensitivity, the missing-at-random assumption, and conditional error
+  independence remain relevant to interpretation.
+- **Reliability.** ICC(3,1) measures within-session single-trial consistency
+  after accounting for trial order. The two-way residual provides typical
+  error and the 95% minimal detectable change for two comparable single
+  measurements under the measurement model. ICC(2,1) is an agreement
+  sensitivity. Between-day biological variation, device agreement, and the
+  choice of primary ICC and mixed-plate eligibility still require adjudication.
+- **Individual experiments.** The onset method uses the saved prospective
+  uniform draw and every permissible assignment. Its two-sided sharp-null
+  tail counts absolute statistics at least as large as the observed statistic
+  and includes ties. Complete QC-eligible sessions and verified conduct are
+  required. Fixed trends and serial dependence are retained in the assignment
+  distribution. They can reduce sensitivity, particularly for delayed or
+  gradual responses to a persistent intervention. Missing visits, timing or
+  treatment deviations, and absent assignment evidence retain unsupported
+  states. The post-minus-pre difference is descriptive.
+- **Series.** Comparison preserves distinct participants, individual designs,
+  revisions and conduct. Matching outcomes, units, schedules, allocation
+  rules and method versions support side-by-side inspection. Exchangeability,
+  measurement equivalence, independent experimental units and a shared
+  estimand require separate evidence before pooled inference.
+- **Empirical readiness.** Mendeley CMJ is source-derived tabular data for a
+  single-arm ordinal cohort trend and descriptive athlete trajectories.
+  MoveSmart supports bounded walking reliability and force/IMU QA. Its raw
+  signals and DynamisScience-derived summaries retain separate provenance.
+  The generic raw trace comparison is descriptive and records its derivation.
+  The MoveSmart license reconciliation and practitioner review remain open.
