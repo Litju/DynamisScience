@@ -61,7 +61,9 @@ def test_helpers():
     assert wald(1.0, 0.0) == (None, None)
     superseded = run_method_state({"method_id": "METH-REAL-RELIABILITY", "method_version": "1.0.0", "status": "COMPLETED"})
     assert superseded["kind"] == "superseded" and not superseded["promotable"]
-    current = run_method_state({"method_id": "METH-REAL-TREND", "method_version": "1.1.0", "status": "COMPLETED", "result": {}})
+    old_trend = run_method_state({"method_id": "METH-REAL-TREND", "method_version": "1.1.0", "status": "COMPLETED", "result": {}})
+    assert old_trend["kind"] == "superseded" and not old_trend["promotable"]
+    current = run_method_state({"method_id": "METH-REAL-TREND", "method_version": "1.2.0", "status": "COMPLETED", "result": {}})
     assert current["kind"] == "qualified" and current["promotable"]
     unknown = run_method_state({"method_id": "METH-REAL-TREND", "method_version": "9.9.9", "status": "COMPLETED", "result": {}})
     assert unknown["kind"] == "not_qualified" and not unknown["promotable"]

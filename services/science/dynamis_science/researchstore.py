@@ -79,7 +79,7 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-REAL-TREND": {
         "id": "METH-REAL-TREND",
         "name": "Linear mixed-effects change model",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "qualification": {
             "status": "QUALIFIED",
             "record": "QUAL-REAL-MIXEDLM",
@@ -88,7 +88,7 @@ METHODS: dict[str, dict[str, Any]] = {
         },
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES"],
         "required_tables": ["cmj_occasions"],
-        "required_shape": "One row per subject and testing occasion; a numeric outcome; at least three subjects and eight complete observations.",
+        "required_shape": "One row per athlete and testing occasion, eight complete observations, and at least three athletes each observed at two or more distinct occasions.",
         "constraints": ["Single-arm within-subject change only.", "Occasions are not assumed to be equally spaced calendar time.", "No group or intervention contrast is inferred."],
         "missingness": "Complete-case at the outcome; missing rows are never imputed.",
         "parameter_schema": {
@@ -97,7 +97,7 @@ METHODS: dict[str, dict[str, Any]] = {
             "alpha": {"type": "number", "default": 0.05},
         },
         "assumptions": ["Linear change on the model scale.", "Random intercept and random occasion slope for subject.", "Approximately normal residuals."],
-        "diagnostics": ["optimizer selection and all attempts", "convergence", "residual summary", "marginal residuals by occasion", "conditional Pearson residual normal Q-Q (exploratory)", "sample and missingness context"],
+        "diagnostics": ["optimizer selection and all attempts", "convergence", "residual summary", "marginal residuals by occasion", "conditional Pearson residual normal Q-Q (exploratory)", "sample, repeated-athlete count and missingness context"],
         "output_schema": ["occasion slope with SE and 95% CI", "model-implied change between the selected occasions", "random-effect variances", "effect size against baseline SD"],
     },
     "METH-REAL-DESC": {
@@ -228,6 +228,10 @@ SUPERSEDED_METHOD_VERSIONS: dict[tuple[str, str], dict[str, str]] = {
     ("METH-REAL-TREND", "1.0.0"): {
         "affects": "DIAGNOSTICS_AND_FIGURE_INTERVALS",
         "reason": "Fixed effects and their Wald intervals are unchanged; the residual Q-Q used marginal residuals over the conditional SD and figure mean bands used z = 1.96.",
+    },
+    ("METH-REAL-TREND", "1.1.0"): {
+        "affects": "DESIGN_ELIGIBILITY",
+        "reason": "This version could report a longitudinal slope without repeated observations from any athlete. Re-run to verify within-athlete support for the selected cohort.",
     },
     ("METH-U-CHANGE", "1.0.0"): {
         "affects": "INTERPRETATION",

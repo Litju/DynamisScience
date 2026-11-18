@@ -9,7 +9,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-CATALOGUE_VERSION = "1.2.0"
+CATALOGUE_VERSION = "1.3.0"
+MIN_TREND_REPEATED_ATHLETES = 3
 
 # Estimands and limits follow the RES-619 matrix, not menu labels.
 DETAILS = {
@@ -101,6 +102,17 @@ def method_spec(identity: str) -> dict[str, Any]:
     return next(item for item in catalogue() if item["id"] == identity)
 
 
+def trend_repetition(rows: list[dict], outcome: str) -> int:
+    """Count athletes with finite outcomes at two or more distinct ordinal occasions."""
+    occasions_by_athlete: dict[str, set[int]] = {}
+    for row in rows:
+        occasion, value = row.get("occasion"), row.get(outcome)
+        if (type(occasion) in (int, float) and math.isfinite(occasion) and occasion == int(occasion)
+                and type(value) in (int, float) and math.isfinite(value)):
+            occasions_by_athlete.setdefault(row["subject_id"], set()).add(int(occasion))
+    return sum(len(occasions) >= 2 for occasions in occasions_by_athlete.values())
+
+
 def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[str],
                 scope: dict, design: str, parameters: dict | None = None, experiment: dict | None = None) -> dict:
     """Check actual selected rows, before any fit or persistence. Missing outcomes stay missing."""
@@ -142,6 +154,8 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
             issues.append("Reliability engine requires peak vertical force fz_peak_n in N; it cannot run another metric.")
         selected = [r for r in selected if r.get("activity") == p.get("activity", "Walking")]
     values = [r for r in selected if r.get(column) is not None]
+    population = {"subjects": len(subject_ids), "observed_rows": len(values),
+                  "missing_rows": len(selected) - len(values)}
     if any(not isinstance(r[column], (int, float)) or not math.isfinite(r[column]) for r in values):
         issues.append("Outcome contains non-finite or non-numeric values; correct the input before analysis.")
     if not values:
@@ -156,8 +170,11 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
             issues.append(f"The {axis} axis requires finite integer ordinal values.")
             return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE", "issues": issues}
     if identity == "METH-REAL-TREND":
-        if len({r.get("subject_id") for r in values}) < 3:
-            issues.append("At least three included participants with observed outcomes are required.")
+        repeated = trend_repetition(values, column)
+        population["athletes_with_repeated_occasions"] = repeated
+        if repeated < MIN_TREND_REPEATED_ATHLETES:
+            issues.append(f"Only {repeated} athletes have outcomes on two or more distinct occasions; "
+                          f"at least {MIN_TREND_REPEATED_ATHLETES} are required for a longitudinal trend.")
         if len(values) < 8:
             issues.append(f"Only {len(values)} complete observations; at least 8 are required.")
         keys = [(r.get("subject_id"), r.get(axis)) for r in selected]
@@ -194,7 +211,7 @@ def eligibility(method: dict, metric: dict, rows: list[dict], subject_ids: list[
         if len(values) != len(selected):
             issues.append("Reliability requires complete trial outcomes; remove or correct empty trials explicitly.")
     return {**copy.deepcopy(method), "method_id": identity, "status": "INELIGIBLE" if issues else "ELIGIBLE", "issues": issues,
-            "population": {"subjects": len(subject_ids), "observed_rows": len(values), "missing_rows": len(selected) - len(values)}}
+            "population": population}
 
 
 def execution_binding(identity: str, metric: dict, parameters: dict, snapshot: dict,

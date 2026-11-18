@@ -455,7 +455,7 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     authored_evidence = service.promote_run_to_evidence(authored_run["id"])
     assert authored_evidence["evidence_artifact"]["analysis_run_id"] == authored_run["id"]
     service.cite_report_artifact(study_id, authored_evidence["evidence_artifact"]["id"])
-    assert authored_run["method_version"] == "1.1.0"
+    assert authored_run["method_version"] == "1.2.0"
     assert authored_run["method_status"]["state"] == "CURRENT"
     authored_figure = run_figure(authored_run)
     assert authored_figure.axes[0].get_title() == "Observed means by occasion"
@@ -467,7 +467,7 @@ def test_real_mendeley_movesmart_runs_evidence_waveforms_and_exports(tmp_path, m
     assert legacy
     legacy_html = service.render_report_html(study_id)
     assert "Superseded evidence." in legacy_html and legacy[0]["id"] in legacy_html
-    with pytest.raises(researchstore.ResearchValidation, match="superseded by 1.1.0"):
+    with pytest.raises(researchstore.ResearchValidation, match=r"superseded by 1\.2\.0"):
         service.freeze_report(study_id)
     with pytest.raises(researchstore.ResearchValidation, match="cannot be used to add a new report citation"):
         service.cite_report_artifact(study_id, legacy[0]["id"])
@@ -704,7 +704,7 @@ def test_native_research_journey_executes_promotes_freezes_and_exports(
     qtbot.waitUntil(lambda: not window.runner.active)
     window.research._freeze_report()
     qtbot.waitUntil(lambda: bool(errors) and not window.runner.active)
-    assert "superseded by 1.1.0" in errors.pop()
+    assert "superseded by 1.2.0" in errors.pop()
     assert window.status_text.text() == "Operation failed"
     for legacy in [item for item in service.get_report(study_id)["evidence"] if item["method_status"]["state"] == "SUPERSEDED"]:
         service.uncite_report_artifact(study_id, legacy["id"])

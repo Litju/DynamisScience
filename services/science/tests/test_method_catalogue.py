@@ -58,7 +58,33 @@ def test_observed_missingness_is_not_imputed():
     rows[0]["cmj_height_cm"] = None
     result = check(rows)
     assert result["status"] == "ELIGIBLE"
-    assert result["population"] == {"subjects": 3, "observed_rows": 11, "missing_rows": 1}
+    assert result["population"] == {"subjects": 3, "observed_rows": 11, "missing_rows": 1,
+                                    "athletes_with_repeated_occasions": 3}
+
+
+def test_disjoint_occasion_groups_cannot_supply_a_longitudinal_slope():
+    rows = [{"subject_id": f"S{i}", "occasion": 1 + i // 4, "cmj_height_cm": value}
+            for i, value in enumerate((28, 29, 31, 32, 36, 37, 39, 40))]
+    subjects = [row["subject_id"] for row in rows]
+    # The 8 cm difference comes entirely from two independent group means.
+    assert sum(row["cmj_height_cm"] for row in rows[4:]) / 4 - sum(
+        row["cmj_height_cm"] for row in rows[:4]) / 4 == 8
+    receipt = mc.eligibility(mc.method_spec("METH-REAL-TREND"), METRIC, rows, subjects,
+                             {"kind": "COHORT"}, "REPEATED_MEASURES")
+    assert receipt["status"] == "INELIGIBLE"
+    assert receipt["population"]["athletes_with_repeated_occasions"] == 0
+    assert "Only 0 athletes" in " ".join(receipt["issues"])
+    with pytest.raises(ValueError, match="not estimable for within-athlete change"):
+        realanalysis._fit_trend(pl.DataFrame(rows), METRIC["column"], subjects, 1, 2)
+
+
+def test_a_missing_second_occasion_cannot_supply_repeated_athlete_support():
+    rows = [row for row in ROWS if row["subject_id"] != "C" or row["occasion"] == 1]
+    rows.append({"subject_id": "C", "occasion": 2, "cmj_height_cm": None})
+    receipt = check(rows)
+    assert receipt["population"]["observed_rows"] == 9
+    assert receipt["population"]["athletes_with_repeated_occasions"] == 2
+    assert receipt["status"] == "INELIGIBLE"
 
 
 def test_reliability_uses_only_peak_force_and_acquisition_trials():
@@ -109,11 +135,16 @@ def test_existing_mixedlm_and_icc_execution_contracts_on_synthetic_rows(tmp_path
     trend = realanalysis.execute(realanalysis.STUDY_MENDELEY, "METH-REAL-TREND", "MET-REAL-CMJ-HEIGHT", [],
                                  {"reference_occasion": 1, "contrast_occasion": 4, "alpha": 0.05})
     assert trend["execution"]["eligibility"]["status"] == "ELIGIBLE"
+    assert trend["execution"]["method_binding"]["method_version"] == "1.2.0"
+    assert trend["execution"]["eligibility"]["population"]["athletes_with_repeated_occasions"] == 12
+    assert trend["diagnostics"]["sample_context"]["athletes_with_repeated_occasions"] == 12
     assert trend["diagnostics"]["converged"]
     # Balanced athlete/occasion design: compare fixed slope with a separate OLS slope calculation.
     x = np.array([r["occasion"] for r in rows], dtype=float)
     y = np.array([r["cmj_height_cm"] for r in rows])
-    slope = float(np.sum((x - x.mean()) * (y - y.mean())) / np.sum((x - x.mean())**2))
+    changes = y.reshape(-1, 4)
+    changes = changes - changes.mean(axis=1, keepdims=True)
+    slope = float(np.sum((x - x.mean()) * changes.ravel()) / np.sum((x - x.mean())**2))
     assert trend["result"]["coefficients"]["occasion_slope"]["estimate"] == pytest.approx(slope, abs=0.02)
     reliability = realanalysis.execute(realanalysis.STUDY_MOVESMART, "METH-REAL-RELIABILITY", "MET-REAL-FZ-PEAK", [],
                                       {"activity": "Walking", "max_trials": 4})

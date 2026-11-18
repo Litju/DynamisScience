@@ -121,7 +121,7 @@ def test_method_status_from_codebase():
 
 def test_mixed_payload_and_syntax():
     p = mixed().to_run_payload()
-    assert p == {"method_id": "METH-REAL-TREND", "method_version": "1.1.0", "outcome_metric_id": "MET-REAL-CMJ-HEIGHT",
+    assert p == {"method_id": "METH-REAL-TREND", "method_version": "1.2.0", "outcome_metric_id": "MET-REAL-CMJ-HEIGHT",
                  "excluded_subject_ids": [],
                  "parameters": {"reference_occasion": 1, "contrast_occasion": 4, "alpha": 0.05}}
     code = mixed().to_python_syntax()

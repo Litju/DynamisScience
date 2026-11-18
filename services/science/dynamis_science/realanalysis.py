@@ -668,6 +668,7 @@ def _reliability_matrix(values: np.ndarray) -> dict[str, Any]:
 
 def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contrast: int, unit: str = "cm") -> dict[str, Any]:
     from statsmodels.regression.mixed_linear_model import MixedLM
+    from .method_catalogue import MIN_TREND_REPEATED_ATHLETES, trend_repetition
 
     rows = [
         row
@@ -677,6 +678,11 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
     rows.sort(key=lambda row: (row["subject_id"], row["occasion"]))
     if len(rows) < 8:
         raise ValueError("Fewer than 8 complete observations; mixed model is not estimable")
+    repeated = trend_repetition(rows, outcome)
+    if repeated < MIN_TREND_REPEATED_ATHLETES:
+        raise ValueError(f"Mixed model is not estimable for within-athlete change: "
+                         f"{repeated} athletes have outcomes on two or more distinct occasions; "
+                         f"at least {MIN_TREND_REPEATED_ATHLETES} are required.")
     occasions = np.array([float(row["occasion"]) for row in rows])
     outcomes = np.array([float(row[outcome]) for row in rows])
     subjects = [str(row["subject_id"]) for row in rows]
@@ -863,6 +869,7 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
             ],
             "residual_by_arm": {"INTERVENTION": {"n": int(len(rows)), "sd": float(np.std(residuals, ddof=1)), "mean": float(np.mean(residuals))}},
             "sample_context": {
+                "athletes_with_repeated_occasions": repeated,
                 "valid_first_trials_used": int(len(rows)),
                 "excluded_trials_in_cohort": 0,
                 "excluded_trial_ids": [],
@@ -890,7 +897,6 @@ def _fit_trend(frame, outcome: str, cohort_ids: list[str], reference: int, contr
                 "Single-arm design; no causal contrast against a concurrent control.",
                 "The deposit does not map COND 1-4 to calendar weeks or training phases.",
                 "No raw force traces, so CMJ height cannot be independently recomputed.",
-                "Only 19 athletes contribute the fourth occasion; two are missing.",
             ],
         },
     }
