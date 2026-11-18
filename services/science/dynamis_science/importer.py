@@ -123,14 +123,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _converted(path: Path, kind: str) -> tuple[Path, dict[str, Any]]:
-    """Excel and JSON-array files are converted once to a Parquet cache under the data root (bounded by the file-size cap)."""
+def _read_document(path: Path, kind: str) -> tuple[pl.DataFrame, dict[str, Any]]:
+    """Parse the retained Excel or JSON document within the file-size cap."""
     if path.stat().st_size > MAX_FILE_BYTES:
         raise ImportBlocked(f"{kind.title()} files above {MAX_FILE_BYTES >> 20} MiB are not imported; export CSV or Parquet.")
-    key = hashlib.sha256(f"{path.resolve()}|{path.stat().st_size}|{path.stat().st_mtime_ns}".encode()).hexdigest()[:16]
-    cache = paths()["tmp"] / "converted"
-    cache.mkdir(parents=True, exist_ok=True)
-    target, info = cache / f"{key}.parquet", {"format": kind}
+    info = {"format": kind}
     if kind == "EXCEL":
         import openpyxl
 
@@ -156,9 +153,7 @@ def _converted(path: Path, kind: str) -> tuple[Path, dict[str, Any]]:
         frame = pl.DataFrame([list(r) for r in rows[1:]], schema=header, orient="row", infer_schema_length=None)
     else:  # a JSON array of records
         frame = pl.read_json(path)
-    if not target.exists():
-        frame.write_parquet(target, compression="zstd")
-    return target, info
+    return frame, info
 
 
 def open_table(path: Path, *, text_columns: tuple[str, ...] = ()) -> tuple[pl.LazyFrame, dict[str, Any]]:
@@ -179,8 +174,8 @@ def open_table(path: Path, *, text_columns: tuple[str, ...] = ()) -> tuple[pl.La
         if kind == "NDJSON":
             return pl.scan_ndjson(path, infer_schema_length=SCHEMA_ROWS), {"format": kind}
         if kind in ("EXCEL", "JSON"):
-            cached, info = _converted(path, kind)
-            return pl.scan_parquet(cached), info
+            frame, info = _read_document(path, kind)
+            return frame.lazy(), info
         with path.open("rb") as handle:
             head = handle.read(65536)
         text = codecs.getincrementaldecoder("utf-8-sig")().decode(head, final=False)  # tolerant of a cut multibyte tail
@@ -430,7 +425,11 @@ def normalize(frame: pl.DataFrame, mapping: dict[str, Any]) -> pl.DataFrame:
             raise ImportBlocked(f"Column '{entry['source']}' is missing from the file (schema changed).")
         units = COLUMNS[name][1]
         if units is None:
-            out[name] = pl.col(entry["source"]).cast(pl.Utf8).str.strip_chars().replace("", None).alias(name)
+            value = pl.col(entry["source"])
+            if name == "date" and isinstance(frame.schema[entry["source"]], pl.Datetime):
+                # Excel calendar dates arrive as midnight datetimes. Preserve explicit times as text.
+                value = pl.when(value == value.dt.truncate("1d")).then(value.dt.date().cast(pl.String)).otherwise(value.cast(pl.String))
+            out[name] = value.cast(pl.String).str.strip_chars().replace("", None).alias(name)
         else:
             try:
                 frame[entry["source"]].cast(pl.Float64, strict=True)
@@ -439,8 +438,7 @@ def normalize(frame: pl.DataFrame, mapping: dict[str, Any]) -> pl.DataFrame:
             out[name] = (pl.col(entry["source"]).cast(pl.Float64) * units[entry["unit"]]).alias(name)
     if family == FAMILIES["MON"]:
         if "date" in out:  # ISO dates only; anything else would need a guess about the day order
-            out["date"] = pl.col(mapping["columns"]["date"]["source"]).cast(pl.Utf8).str.strip_chars().str.to_date(
-                "%Y-%m-%d", strict=False).cast(pl.Utf8).alias("date")
+            out["date"] = out["date"].str.to_date("%Y-%m-%d", strict=False).cast(pl.String).alias("date")
         return frame.select(list(out.values()))
     if "session_id" not in out:
         out["session_id"] = pl.lit(str(constants["session_id"]).strip()).alias("session_id")

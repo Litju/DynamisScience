@@ -881,6 +881,7 @@ def get_admission_record(record_id: str) -> dict[str, Any] | None:
 
 def list_admitted_snapshots() -> list[dict[str, Any]]:
     snapshots = []
+    approved = None
     admitted_dir = _admitted_dir()
     if admitted_dir.exists():
         for path in admitted_dir.iterdir():
@@ -888,8 +889,16 @@ def list_admitted_snapshots() -> list[dict[str, Any]]:
                 snapshot_file = path / "snapshot.json"
                 if snapshot_file.exists():
                     snapshot = json.loads(snapshot_file.read_text(encoding="utf-8"))
-                    if snapshot.get("id") == path.name:
-                        snapshots.append(snapshot)
+                    if snapshot.get("id") != path.name:
+                        continue
+                    if snapshot.get("admission_metadata", {}).get("import", {}).get("reconciliation"):
+                        from .reconciliation import approved_snapshots
+
+                        if approved is None:
+                            approved = approved_snapshots()
+                        if snapshot["id"] not in approved:
+                            continue
+                    snapshots.append(snapshot)
     return snapshots
 
 

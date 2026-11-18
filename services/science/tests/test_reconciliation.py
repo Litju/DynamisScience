@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import sqlite3
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import polars as pl
@@ -209,20 +211,26 @@ def test_additive_migration_and_failed_approval_can_retry(setup, tmp_path, monke
     entry = reconcile.propose(workspace, path)
     ready = revise(entry, athletes={"A07-renamed": "A07"}, sessions={"Week 12 export": "Follow-up"},
                    declared=declaration(entry))
-    event = reconcile._event
+    attach = store.attach_workspace_data
 
     def fail(*args, **kwargs):
+        attach(*args, **kwargs)
         raise RuntimeError("Injected decision write failure")
 
     with monkeypatch.context() as patch:
-        patch.setattr(reconcile, "_event", fail)
+        patch.setattr(store, "attach_workspace_data", fail)
         with pytest.raises(RuntimeError, match="decision write failure"):
             decide(ready, "APPROVED")
     from dynamis_science.data_root import paths
     assert list((paths()["research"] / "data").iterdir()) == []
     assert reconcile.history(workspace)[0] == ready
     assert len(store.data_revisions(workspace)) == 1
-    assert reconcile._event is event
+    mapped_id = next(row["dataset_snapshot_id"] for row in admission.list_admission_records()
+                     if row.get("dataset_snapshot_id") and row["dataset_snapshot_id"] != first["snapshot"]["id"])
+    assert admission.get_admitted_snapshot(mapped_id) is None
+    other = service.create_workspace("Other workspace")["study"]["id"]
+    with pytest.raises(store.ResearchValidation, match="admitted input"):
+        service.attach_workspace_data(other, mapped_id)
     approved = decide(ready, "APPROVED")
     assert len(admission.list_admitted_snapshots()) == 2
     assert len(store.data_revisions(workspace)) == 2
@@ -314,3 +322,60 @@ def test_cannot_reuse_a_session_id_for_a_different_date(setup, tmp_path):
     proposal = reconcile.propose(workspace, path)
     assert "session_date_conflict" in kinds(proposal)
     assert not proposal["ready"]
+
+
+def test_recorded_sessions_cannot_be_replaced_with_a_constant(setup, tmp_path):
+    _, workspace, _, _ = setup
+    rows = [["A01", visit, f"V{index}", 12, 1000, 35, 73, 1700]
+            for index, visit in enumerate(("Visit A", "Visit B"))]
+    entry = reconcile.propose(workspace, write_export(tmp_path / "two-visits.csv", rows))
+    mapped = revise(entry, edits={"session_id": None}, constants={"session_id": "Merged"},
+                    sessions={"Merged": "Merged"}, declared=declaration(entry))
+    assert "session_identity" in kinds(mapped)
+    assert not mapped["ready"]
+
+
+def test_approval_verifies_retained_reference_export(setup, tmp_path):
+    _, workspace, _, first = setup
+    rows = [["A01", "Follow-up", "F01", 12, 1000, 35, 73, 1700]]
+    entry = reconcile.propose(workspace, write_export(tmp_path / "followup.csv", rows))
+    mapped = revise(entry, sessions={"Follow-up": "Follow-up"}, declared=declaration(entry))
+    assert mapped["ready"]
+    artifact = first["snapshot"]["admission"]["source_artifact_id"]
+    receipt = next(row for row in importer.list_receipts() if row["source_artifact_id"] == artifact)
+    Path(receipt["raw_copy"]).write_bytes(b"Corrupt retained reference")
+    with pytest.raises(importer.ImportBlocked, match="Retained reference export.*checksum"):
+        decide(mapped, "APPROVED")
+
+
+def test_excel_date_is_preserved_and_legacy_cache_is_ignored(setup, tmp_path):
+    from openpyxl import Workbook
+
+    from dynamis_science.data_root import paths
+
+    service, workspace, _, first = setup
+    fields = FIELDS + ["Date"]
+    original = write_export(tmp_path / "dated-baseline.csv", [r + ["2026-09-01"] for r in baseline_rows()], fields)
+    staged = importer.stage(importer.probe_file(original), importer.build_context(FIXTURE))
+    service.attach_workspace_data(workspace, importer.admit(staged)["dataset_snapshot_id"],
+                                  base_revision=first["active_data_revision_id"])
+    source = tmp_path / "followup.xlsx"
+    rows = [["A01", "Visit A", "F01", 12, 1000, 35, 73, 1700, date(2026, 11, 17)]]
+    workbook = Workbook()
+    for row in [fields, *rows]:
+        workbook.active.append(row)
+    workbook.save(source)
+    workbook.close()
+    entry = reconcile.propose(workspace, source)
+    retained = Path(entry["raw_path"])
+    digest = hashlib.sha256(
+        f"{retained.resolve()}|{retained.stat().st_size}|{retained.stat().st_mtime_ns}".encode()
+    ).hexdigest()[:16]
+    legacy_cache = paths()["tmp"] / "converted" / f"{digest}.parquet"
+    legacy_cache.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame([rows[0][:5] + [49] + rows[0][6:]], schema=fields, orient="row").write_parquet(legacy_cache)
+    mapped = revise(entry, sessions={"Visit A": "Visit A"}, declared=declaration(entry))
+    assert mapped["ready"], mapped["discrepancies"]
+    approved = decide(mapped, "APPROVED")
+    result = store.read_snapshot_table(approved["decision"]["revision_id"], "cmj_trials")
+    assert result.filter(pl.col("trial_id") == "F01").select("jump_height_cm", "date").row(0) == (35.0, "2026-11-17")

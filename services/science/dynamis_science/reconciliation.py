@@ -34,6 +34,14 @@ def history(workspace_id: str) -> list[dict]:
                ORDER BY rowid DESC""", (workspace_id,))]
 
 
+def approved_snapshots() -> set[str]:
+    """Expose mapped input snapshots only after their SQLite approval is visible."""
+    with store._connect() as connection:
+        return {row[0] for row in connection.execute(
+            """SELECT json_extract(document, '$.decision.snapshot_id') FROM reconciliation_events
+               WHERE json_extract(document, '$.state') = 'APPROVED'""")}
+
+
 def _event(connection, proposal: dict, **changes) -> dict:
     event = {**proposal, **changes, "version": proposal.get("version", 0) + 1, "recorded_at": store._now()}
     connection.execute("INSERT INTO reconciliation_events VALUES (?, ?, ?, ?)",
@@ -100,14 +108,14 @@ def _reference(revision: dict) -> tuple[dict, pl.DataFrame, dict, dict]:
     if not inputs:
         raise importer.ImportBlocked("The revision has no admitted CMJ source.")
     first = inputs[0]
-    store._validate_workspace_append(inputs)
-    filename = f"{TABLE}.parquet"
     analytical = revision["snapshot"]
-    directory = (paths()["research"] / "data" if analytical.get("workspace_snapshot") else paths()["admitted"])
-    for snapshot, path in [(analytical, directory / analytical["id"] / filename),
-                           *((item, paths()["admitted"] / item["id"] / filename) for item in inputs)]:
-        if not path.is_file() or importer._sha256(path) != snapshot.get("checksums", {}).get(filename):
-            raise importer.ImportBlocked(f"Reference snapshot {snapshot['id']} failed its checksum check.")
+    for snapshot in [analytical, *[item for item in inputs if item["id"] != analytical["id"]]]:
+        directory = paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]
+        for table in snapshot["tables"]:
+            path = directory / snapshot["id"] / f"{table}.parquet"
+            if not path.is_file() or importer._sha256(path) != snapshot.get("checksums", {}).get(path.name):
+                raise importer.ImportBlocked(f"Reference snapshot {snapshot['id']} failed its checksum check.")
+    store._validate_workspace_append(inputs)
     frame = store.read_snapshot_table(analytical["id"], TABLE)
     for name in (*IDENTITY_FIELDS, "sampling_hz", "instrument_id", "protocol_id"):
         if name not in frame.columns or frame[name].null_count():
@@ -138,6 +146,13 @@ def _reference(revision: dict) -> tuple[dict, pl.DataFrame, dict, dict]:
     receipts = importer.list_receipts()
     prior = [r for item in inputs for r in receipts
              if r["source_artifact_id"] == item["admission"]["source_artifact_id"]]
+    for item in inputs:
+        artifact = admission.get_source_artifact(item["admission"]["source_artifact_id"])
+        if not artifact or importer._sha256(Path(artifact["stored_path"])) != artifact["content_hash_sha256"]:
+            raise importer.ImportBlocked(f"Reference snapshot {item['id']} has a corrupt source artifact.")
+    for receipt in prior:
+        if importer._sha256(Path(receipt["raw_copy"])) != receipt["raw_sha256"]:
+            raise importer.ImportBlocked(f"Retained reference export {receipt['raw_filename']} failed its checksum check.")
     return {"source": source, "instrument": instrument, "protocol": protocol}, frame, (prior[-1] if prior else {}), {
         "snapshot_id": first["id"], "raw_exposures": sorted({r["raw_sha256"] for r in prior})}
 
@@ -262,6 +277,10 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
         if prior and plan["columns"] != prior["columns"]:
             issue("source_schema", prior["columns"], plan["columns"])
         columns = plan["mapping"]["columns"]
+        session_columns = [col["name"] for col in plan["columns"]
+                           if importer._ALIAS.get(importer._split_header(col["name"])[0]) == "session_id"]
+        if session_columns and columns.get("session_id", {}).get("source") not in session_columns:
+            issue("session_identity", "Map a recorded session column", session_columns, True)
         if len({entry["source"] for entry in columns.values()}) != len(columns):
             issue("column_mapping", "Distinct input column for each target", "A source column is mapped more than once", True)
         for name, entry in columns.items():
@@ -473,15 +492,15 @@ def decide(workspace_id: str, batch_id: str, version: int, action: str, *, revie
             if not snapshot_id:
                 raise importer.ImportBlocked("The existing admission gate did not admit this batch.")
             revision_id = store._new_id("DATA-U")
+            decision.update(snapshot_id=snapshot_id, revision_id=revision_id, admission_record_id=admitted["id"])
+            event = _event(connection, entry, state=action, decision=decision)
             store.attach_workspace_data(workspace_id, snapshot_id, append=True, confirm_participant_ids=True,
                                         base_revision=revision["id"], _reconciliation={
                                             "id": batch_id, "version": version + 1,
                                             "corrections": evaluated["corrections"]}, _revision_id=revision_id)
-            decision.update(snapshot_id=snapshot_id, revision_id=revision_id, admission_record_id=admitted["id"])
-            return _event(connection, entry, state=action, decision=decision)
+            return event
     except BaseException:
-        # SQLite rolls back the decision and revision together. The independently admitted source
-        # snapshot is reusable on retry; the unreferenced analytical copy belongs to this attempt.
+        # The mapped source remains private to approval until a retry commits. Remove only this attempt's analytical copy.
         if revision_id and store.get_data_revision(revision_id) is None:
             directory = paths()["research"] / "data" / revision_id
             if directory.exists():
