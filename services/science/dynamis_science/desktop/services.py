@@ -113,6 +113,7 @@ class DynamisAppService:
         axis, points = longitudinal.individual_points(snapshot_id, metric, investigation["scope"]["subject_id"])
         revision = researchstore.get_data_revision(entity.get("active_data_revision_id") or "") or {}
         from .. import experiments
+        from .. import measurement_trust as trust
         from ..method_catalogue import eligibility, method_spec
         history = []
         scope = {'kind':'INDIVIDUAL', 'subject_id':investigation['scope']['subject_id'],
@@ -126,17 +127,33 @@ class DynamisAppService:
             item['onset_eligibility'] = eligibility(method_spec('METH-ONSET-EXACT'), metric, [],
                 [scope['subject_id']], scope, p['design'], params, experiment=context)
             history.append(item)
+        revisions = researchstore.data_revisions(investigation["study_id"])
+        methods = longitudinal.individual_eligibility(investigation_id)
+        height = next((item for item in researchstore.dataset_metrics(snapshot_id) if item["id"] == trust.METRIC), None)
+        trust_options = trust.options(revisions) if height and revision.get("snapshot", {}).get("admitted_source") else []
+        if height and metric["id"] != trust.METRIC:
+            trust_method = eligibility(method_spec(trust.METHOD), height, [], [scope["subject_id"]], scope,
+                                       entity["design"], admitted_workspace=bool(trust_options))
+            methods = [trust_method if item["method_id"] == trust.METHOD else item for item in methods]
         return {"experiment": experiments.timeline(investigation_id),
                 "experiment_history": history,
-                "data_revisions": researchstore.data_revisions(investigation['study_id']),
+                "data_revisions": revisions, "measurement_trust_sessions": trust_options,
                 "investigation": investigation, "data_revision_id": entity.get("active_data_revision_id"),
                 "data_revision_number": revision.get("number"),
                 "snapshot_id": snapshot_id, "metric": metric, "axis": axis, "points": points,
                 "runs": longitudinal.investigation_runs(investigation_id),
                 "periods": longitudinal.protocol_observations(investigation_id),
                 "scenarios": longitudinal.current_scenarios(investigation),
-                "eligibility": longitudinal.individual_eligibility(investigation_id),
+                "eligibility": methods,
                 "versions": researchstore.investigation_versions(investigation_id)}
+
+    def locate_measurement_trace(self, run_id: str, revision_id: str, session_id: str, trial_id: str) -> str | None:
+        from ..measurement_trust import locate_trace
+
+        run = researchstore.get_run(run_id)
+        if not run:
+            raise researchstore.ResearchNotFound("The saved assessment is unavailable.")
+        return locate_trace(run, revision_id, session_id, trial_id)
 
     def save_protocol(self, investigation_id: str, protocol: dict[str, Any], base_version: int | None) -> dict[str, Any]:
         self.ensure_initialized()

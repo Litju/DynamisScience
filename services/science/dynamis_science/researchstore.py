@@ -205,10 +205,10 @@ METHODS: dict[str, dict[str, Any]] = {
         "id": "METH-U-MEASUREMENT-TRUST",
         "name": "Measurement trust and individual change",
         "version": "1.0.0",
-        "qualification": {"status": "CONDITIONAL", "basis": "Interpretation requires independent matched retest pairs and a recorded review of the design and its applicability."},
+        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "basis": "Session means and matched retest arithmetic have independent synthetic checks. Interpretation requires independent matched retest pairs and a recorded review of the design and its applicability."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
         "required_tables": ["cmj_trials"],
-        "required_shape": "Recorded sessions in admitted CMJ summary revisions, with one participant and flight-time jump height in cm.",
+        "required_shape": "Recorded sessions in admitted CMJ summary revisions, with one participant and jump height in cm.",
         "constraints": ["No inference about meaningful change, fatigue, adaptation, readiness, injury risk or causation."],
         "missingness": "Incomplete session scores remain unestimated. Reference pair exclusions are reported.",
         "parameter_schema": {

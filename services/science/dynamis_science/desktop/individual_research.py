@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..longitudinal import HORIZON_UNITS, NOT_QUALIFIED, PERIOD_KINDS, PROTOCOL_DESIGNS, SCENARIO_KINDS
+from ..measurement_trust import METRIC as TRUST_METRIC, METHOD as TRUST_METHOD
 from .services import DynamisAppService
 from .method_selector import method_html, binding_html
 
@@ -80,6 +82,67 @@ def fit_dialog(dialog: QDialog, width: int, height: int) -> None:
     dialog.resize(width, height)
 
 
+def _session_choices(picker: QComboBox, choices: list[dict], *, revisions: bool = False) -> None:
+    previous = picker.currentData()
+    picker.blockSignals(True)
+    picker.clear()
+    picker.addItem("Choose a session", None)
+    for choice in choices:
+        when = choice["date"] or (f"week {choice['week']:g}" if choice["week"] is not None else "")
+        parts = [choice["session_id"], when]
+        if revisions:
+            parts.append(f"revision {choice['number']}")
+        picker.addItem(" · ".join(part for part in parts if part), choice)
+    picker.setCurrentIndex(max(0, picker.findData(previous)))
+    picker.blockSignals(False)
+
+
+class RetestReviewDialog(QDialog):
+    def __init__(self, sessions: list[dict], parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Review matched retest evidence")
+        fit_dialog(self, 600, 440)
+        layout = QFormLayout(self)
+        self.first, self.second = QComboBox(), QComboBox()
+        for picker in (self.first, self.second):
+            _session_choices(picker, sessions)
+        self.reviewer, self.population = QLineEdit(), QLineEdit()
+        for field in (self.reviewer, self.population):
+            field.setMaxLength(150)
+        self.evidence = QPlainTextEdit()
+        self.evidence.setPlaceholderText("Testing log reference, jump-height scoring method and why the stable retest design applies to this athlete")
+        self.confirm = QCheckBox("I confirmed stable retest conditions and matching jump-height methods.")
+        self.confirm.setAccessibleName("Confirm stable and applicable retest design")
+        for label, widget in (("First retest session", self.first), ("Second retest session", self.second),
+                              ("Reviewer", self.reviewer), ("Applicable population", self.population),
+                              ("Design evidence", self.evidence)):
+            widget.setAccessibleName(label)
+            layout.addRow(label, widget)
+        layout.addRow(self.confirm)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Use retest evidence")
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addRow(self.buttons)
+        for signal in (self.first.currentIndexChanged, self.second.currentIndexChanged, self.reviewer.textChanged,
+                       self.population.textChanged, self.evidence.textChanged, self.confirm.toggled):
+            signal.connect(self._validate)
+        self._validate()
+
+    def _validate(self) -> None:
+        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
+            self.first.currentIndex() > 0 and self.second.currentIndex() > 0
+            and self.first.currentData() != self.second.currentData() and self.confirm.isChecked()
+            and bool(self.reviewer.text().strip() and self.population.text().strip())
+            and 0 < len(self.evidence.toPlainText().strip()) <= 2000
+        )
+
+    def review(self) -> dict:
+        return {"first_session": self.first.currentData()["session_id"], "second_session": self.second.currentData()["session_id"],
+                "reviewer": self.reviewer.text().strip(), "population": self.population.text().strip(),
+                "design_evidence": self.evidence.toPlainText().strip(), "confirmed_stable_and_applicable": self.confirm.isChecked()}
+
+
 class IndividualResearchPanel(QWidget):
     """Data, analysis, results, protocol, scenarios and cohort comparison for one individual investigation."""
 
@@ -87,6 +150,7 @@ class IndividualResearchPanel(QWidget):
     context_changed = Signal()
     reports_requested = Signal()
     export_requested = Signal()
+    trace_requested = Signal(str, str)
 
     def __init__(self, service: DynamisAppService, run_task: RunTask, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -96,6 +160,7 @@ class IndividualResearchPanel(QWidget):
         self.payload: dict[str, Any] = {}
         self.generation = 0
         self.protocol_dirty = False
+        self.trust_retest: dict | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.header = QLabel("Open an athlete from the squad to start individual research.")
@@ -144,6 +209,9 @@ class IndividualResearchPanel(QWidget):
                 widget.deleteLater()
         self.run_picker.clear()
         self.analysis_protocol.clear()
+        self.trust_reference.clear()
+        self.trust_comparison.clear()
+        self._clear_retest()
         self.protocol_history.clear()
         self.visit_revision.clear()
         self.experiment_summary.clear()
@@ -185,6 +253,11 @@ class IndividualResearchPanel(QWidget):
             f"{len(observed)}/{len(payload['points'])} {axis}s · {sum(p['n_trials'] for p in observed)} trials"
             + (f"<br>{html.escape(investigation['question'])}" if investigation.get("question") else ""))
         self.header.setToolTip(f"{investigation['id']} v{investigation['version']} · {payload['data_revision_id']}")
+        choices = payload.get("measurement_trust_sessions", [])
+        _session_choices(self.trust_reference, choices, revisions=True)
+        _session_choices(self.trust_comparison, [item for item in choices if item["revision_id"] == payload["data_revision_id"]])
+        if not self.trust_reference.currentData() or not self.trust_comparison.currentData():
+            self.trust_retest = None
         _fill(self.data_table, [[point[axis], point["status"], point["n_trials"], ", ".join(f"{v:.2f}" for v in point["values"]) or "—",
                                  point["mean"], point["within_session_sd"], metric["unit"], point["empty_values"],
                                  ", ".join(point["quality_flags"]) or "—"] for point in payload["points"]])
@@ -244,6 +317,27 @@ class IndividualResearchPanel(QWidget):
         self.analysis_protocol.currentIndexChanged.connect(self._method_changed)
         self.analysis_protocol.currentIndexChanged.connect(lambda _: self.context_changed.emit())
         layout.addWidget(self.analysis_protocol)
+        self.trust_controls = QWidget()
+        trust_form = QFormLayout(self.trust_controls)
+        trust_form.setContentsMargins(0, 0, 0, 0)
+        self.trust_reference, self.trust_comparison = QComboBox(), QComboBox()
+        for label, picker in (("Reference session", self.trust_reference), ("Comparison session", self.trust_comparison)):
+            picker.setAccessibleName(label)
+            picker.currentIndexChanged.connect(self._clear_retest)
+            trust_form.addRow(label, picker)
+        retest_row = QHBoxLayout()
+        self.trust_review = QPushButton("Review matched retest evidence…")
+        self.trust_review.clicked.connect(self._review_retest)
+        self.trust_remove = QPushButton("Remove evidence")
+        self.trust_remove.clicked.connect(self._clear_retest)
+        retest_row.addWidget(self.trust_review)
+        retest_row.addWidget(self.trust_remove)
+        retest_row.addStretch(1)
+        trust_form.addRow(retest_row)
+        self.trust_note = QLabel()
+        self.trust_note.setWordWrap(True)
+        trust_form.addRow(self.trust_note)
+        layout.addWidget(self.trust_controls)
         self.method_advanced = QCheckBox('Show full statistical contract and assumptions')
         self.method_advanced.toggled.connect(self._method_changed)
         layout.addWidget(self.method_advanced)
@@ -253,6 +347,7 @@ class IndividualResearchPanel(QWidget):
         self.run_button.clicked.connect(self.execute)
         layout.addWidget(self.run_button)
         self.tabs.addTab(page, "Analysis")
+        self.trust_controls.hide()
 
     def _selected_method(self) -> dict | None:
         method = self.method_picker.currentData()
@@ -263,8 +358,16 @@ class IndividualResearchPanel(QWidget):
 
     def _method_changed(self) -> None:
         method = self._selected_method()
+        trust_selected = bool(method and method["method_id"] == TRUST_METHOD)
         self.analysis_protocol.setVisible(bool(method and method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}))
-        self.run_button.setEnabled(bool(method and method["status"] == "ELIGIBLE"))
+        self.trust_controls.setVisible(trust_selected)
+        self.run_button.setEnabled(bool(method and method["status"] == "ELIGIBLE"
+                                        and (not trust_selected or self._trust_sessions_selected())))
+        if trust_selected:
+            self.trust_review.setEnabled(self._trust_sessions_selected())
+            self.trust_remove.setVisible(self.trust_retest is not None)
+            self.trust_note.setText("Retest review recorded for this comparison." if self.trust_retest else
+                                    "Jump height (cm). With no applicable retest evidence, the assessment reports observed values and limits.")
         if not method:
             self.method_detail.clear()
             return
@@ -273,10 +376,29 @@ class IndividualResearchPanel(QWidget):
         else:
             p = (self.analysis_protocol.currentData() or {}).get('protocol', {})
             issues = '<br>'.join(html.escape(s) for s in method['issues']) or 'Eligible on the captured protocol and active data revision.'
-            self.method_detail.setHtml(f"<h3>{html.escape(method['name'])}</h3>"
-                f"<p>{html.escape(p.get('question', ''))}<br>{html.escape(p.get('design_label', ''))} · protocol v{p.get('version', '—')}</p>"
+            protocol = f"<p>{html.escape(p['question'])}<br>{html.escape(p['design_label'])} · protocol v{p['version']}</p>" if p else ""
+            self.method_detail.setHtml(f"<h3>{html.escape(method['name'])}</h3>" + protocol +
                 f"<p><b>{html.escape(method.get('inference_status', method['status']))}</b><br>{issues}</p>"
                 f"<p>{html.escape(method['estimand'])}</p><p>{html.escape(method['uncertainty'])}</p>")
+
+    def _trust_sessions_selected(self) -> bool:
+        first, second = self.trust_reference.currentData(), self.trust_comparison.currentData()
+        return bool(first and second and first != second)
+
+    def _clear_retest(self, *_args) -> None:
+        self.trust_retest = None
+        self._method_changed()
+
+    def _review_retest(self) -> None:
+        if not self._trust_sessions_selected():
+            return
+        selected = {self.trust_reference.currentData()["session_id"], self.trust_comparison.currentData()["session_id"]}
+        sessions = [item for item in self.payload["measurement_trust_sessions"]
+                    if item["revision_id"] == self.payload["data_revision_id"] and item["session_id"] not in selected]
+        dialog = RetestReviewDialog(sessions, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.trust_retest = dialog.review()
+            self._method_changed()
 
     def execute(self) -> None:
         method = self._selected_method()
@@ -290,6 +412,13 @@ class IndividualResearchPanel(QWidget):
                              "investigation_version":self.payload['investigation']['version']}}
         if method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             request['parameters'] = {'protocol_version':method['protocol_version']}
+        if method["method_id"] == TRUST_METHOD:
+            if not self._trust_sessions_selected():
+                return
+            first, second = self.trust_reference.currentData(), self.trust_comparison.currentData()
+            request.update(outcome_metric_id=TRUST_METRIC, method_version=method["version"],
+                           parameters={"reference_revision_id": first["revision_id"], "reference_session": first["session_id"],
+                                       "comparison_session": second["session_id"], "retest": self.trust_retest})
 
         def finished(run: dict[str, Any]) -> None:
             if (workspace_id, investigation_id, revision) != self.context() or run.get("data_revision_id") != revision:
@@ -325,11 +454,29 @@ class IndividualResearchPanel(QWidget):
         QVBoxLayout(self.figure_holder)
         self.result_tabs.addTab(self.figure_holder, "Trajectory")
         self.result_tabs.addTab(self.result_diagnostics, 'Diagnostics and provenance')
+        self.trust_sources = QWidget()
+        sources = QVBoxLayout(self.trust_sources)
+        self.trust_trials = _table(["Session", "Trial", "Recorded value", "QC", "Source artifact"], "Assessment source trials")
+        self.trust_trials.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.trust_trials.currentCellChanged.connect(self._trace_selection)
+        sources.addWidget(self.trust_trials, 1)
+        self.trust_trace = QPushButton("Open matched force trace")
+        self.trust_trace.clicked.connect(self._open_trace)
+        sources.addWidget(self.trust_trace)
+        self.trust_trace_note = QLabel()
+        self.trust_trace_note.setWordWrap(True)
+        sources.addWidget(self.trust_trace_note)
+        self.trust_trial_rows: list[tuple[str, str, dict]] = []
+        self.result_tabs.addTab(self.trust_sources, "Source trials")
+        self.result_tabs.setTabVisible(self.result_tabs.indexOf(self.trust_sources), False)
         layout.addWidget(self.result_tabs, 1)
         self.tabs.addTab(self.results_page, "Results")
 
     def _show_run(self) -> None:
         run = self.run_picker.currentData()
+        is_trust = bool(run and run["method_id"] == TRUST_METHOD)
+        self.result_tabs.setTabVisible(self.result_tabs.indexOf(self.trust_sources), is_trust)
+        self.result_tabs.setTabVisible(self.result_tabs.indexOf(self.figure_holder), not is_trust)
         self.export_result.setEnabled(bool(run and run.get('data_revision_id') == self.payload.get('data_revision_id')
             and run.get('scope', {}).get('investigation_version') == self.payload.get('investigation', {}).get('version')))
         if not run:
@@ -337,6 +484,9 @@ class IndividualResearchPanel(QWidget):
         self.context_changed.emit()
         result, diagnostics = run["result"], run.get("diagnostics", {})
         self.result_diagnostics.setHtml('<pre>' + html.escape(json.dumps(diagnostics, indent=2, default=str)) + '</pre>' + binding_html(run))
+        if is_trust:
+            self._show_measurement_trust(run)
+            return
         if run['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}:
             from ..experiments import result_html
             if run['method_id'] == 'METH-ONSET-EXACT':
@@ -361,6 +511,91 @@ class IndividualResearchPanel(QWidget):
             f"<p>Limitations:</p><ul>{limitations}</ul><p class='meta'>Digest {html.escape(run.get('result_digest', ''))} · "
             f"reproducibility {html.escape(run.get('reproducibility_key', ''))}</p>")
         self._show_run_figure(run)
+
+    def _show_measurement_trust(self, run: dict) -> None:
+        result = run["result"]
+        a, b = result["reference"], result["comparison"]
+        esc = html.escape
+        rows = []
+        for label, session in (("Reference", a), ("Comparison", b)):
+            when = session["date"] or (f"Week {session['week']}" if session["week"] is not None else "Unrecorded")
+            rows.append(f"<tr><td>{label}</td><td>{esc(session['session_id'])}</td><td>{esc(when)}</td>"
+                        f"<td>{_number(session['mean'])}</td><td>{session['n_trials']}</td><td>{session['missing_values']}</td>"
+                        f"<td>{session['excluded_trials']}</td><td>{_number(session['within_session_sd'])}</td></tr>")
+        change = result["observed_change"]
+        observed = f"Observed change {change:+.2f} cm." if change is not None else "A comparable change is unavailable."
+        evidence = result["retest_evidence"]
+        if evidence:
+            lower, upper = evidence["prediction_95"]
+            conclusion = (f"The observed change is <b>{esc(result['relation_to_retest'].lower())}</b> the matched "
+                          f"95% retest prediction range of {lower:.2f} to {upper:.2f} cm.")
+            conclusion += (f" {evidence['n_pairs']} independent pairs, {evidence['trial_counts_per_session']} trials per session, "
+                           f"{evidence['interval_days']} days. Retest bias {evidence['bias']:+.2f} cm, representative typical "
+                           f"error {evidence['typical_error']:.2f} cm, MDC95 {evidence['mdc95']:.2f} cm, "
+                           f"consistency ICC(3,1) {evidence['icc_3_1']:.2f}.")
+            next_step = "Review the captured testing conditions before applying the retest evidence to another comparison."
+        else:
+            conclusion = " ".join(esc(reason) for reason in result["reasons"])
+            next_step = {
+                "INCOMPARABLE": "Check the source trials, recorded athlete identity, units and acquisition protocol.",
+                "NOT_ESTIMABLE": "Check missing trials and obtain a reviewed, matched between-session retest reference.",
+                "UNQUALIFIED": "Resolve source verification or supply retest evidence that matches the recorded comparison.",
+            }[result["status"]]
+        fixture = any(item["rights_status"] == "FIXTURE_ONLY" for provenance in result["provenance"].values()
+                      for item in provenance["inputs"].values())
+        label = " · Synthetic fixture" if fixture else ""
+        self.result_view.setHtml(
+            f"<p><b>{esc(result['status'])}</b> · Participant {esc(result['subject_id'])} · Jump height (cm) · {esc(run['id'])}{label}</p>"
+            "<h3>Observed</h3><table border='1' cellpadding='4'><tr><th>Role</th><th>Session</th><th>Recorded time</th>"
+            "<th>Mean</th><th>Valid trials</th><th>Missing</th><th>QC excluded</th><th>Within-session SD</th></tr>"
+            f"{''.join(rows)}</table><p>{observed}</p><h3>Can conclude</h3><p>{conclusion}</p>"
+            f"<h3>Cannot conclude</h3><p>{esc(result['limitations'][1])}</p><h3>Verify next</h3><p>{next_step}</p>"
+        )
+        detail = {**run.get("diagnostics", {}),
+                  **{key: result[key] for key in ("reference_window_days", "retest_review", "retest_evidence")}}
+        self.result_diagnostics.setHtml(f"<pre>{esc(json.dumps(detail, indent=2))}</pre>" + binding_html(run))
+        self.trust_trial_rows = [(session["revision_id"], session["session_id"], trial)
+                                 for session in (a, b) for trial in session["trials"]]
+        _fill(self.trust_trials, [[session, trial["trial_id"], trial["value"], trial["qc"], trial["source_artifact_id"]]
+                                  for _, session, trial in self.trust_trial_rows])
+        if self.trust_trial_rows:
+            self.trust_trials.setCurrentCell(0, 0)
+        self._trace_selection()
+
+    def _trace_selection(self, *_args) -> None:
+        row, run = self.trust_trials.currentRow(), self.run_picker.currentData()
+        ready = bool(run and run["method_id"] == TRUST_METHOD and 0 <= row < len(self.trust_trial_rows))
+        revision = self.trust_trial_rows[row][0] if ready else None
+        linked = bool(ready and run["result"]["provenance"].get(revision, {}).get("linked_traces"))
+        self.trust_trace.setEnabled(linked)
+        self.trust_trace_note.setText("" if linked else "No raw trace input is linked to this session revision.")
+
+    def _open_trace(self) -> None:
+        row, run = self.trust_trials.currentRow(), self.run_picker.currentData()
+        if not self.trust_trace.isEnabled() or not run:
+            return
+        revision, session, trial = self.trust_trial_rows[row]
+        trial_id = trial["trial_id"]
+        self.trust_trace.setEnabled(False)
+        self.trust_trace_note.setText("Checking the saved trace linkage…")
+
+        def finished(result):
+            current = self.run_picker.currentData()
+            if current and current["id"] == run["id"] and row == self.trust_trials.currentRow():
+                self._trace_selection()
+                snapshot, warning = result
+                if snapshot:
+                    self.trace_requested.emit(snapshot, trial_id)
+                else:
+                    self.trust_trace_note.setText(warning or "No unambiguous recording matches this athlete, session and trial.")
+
+        def lookup():
+            try:
+                return self.service.locate_measurement_trace(run["id"], revision, session, trial_id), None
+            except (OSError, ValueError, LookupError) as error:
+                return None, str(error)
+
+        self.run_task(lookup, finished, "Checking the linked force trace")
 
     def _show_run_figure(self, run: dict) -> None:
         from .plots import ScientificFigureWidget, run_figure

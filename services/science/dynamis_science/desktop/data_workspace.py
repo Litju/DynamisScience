@@ -353,8 +353,9 @@ class DataWorkspaceDialog(QDialog):
         return self.inspector
 
     # ---- catalogue
-    def open(self, snapshot_id: str | None = None, *, reconcile: bool = False) -> None:
+    def open(self, snapshot_id: str | None = None, *, reconcile: bool = False, trace_trial: str | None = None) -> None:
         self._wanted = snapshot_id
+        self._wanted_trace = trace_trial
         self._refresh_saved()
         self._guard(self.service.list_workspace, self._catalogue_loaded, "Loading dataset catalogue")
         if self.reconciliation:
@@ -383,6 +384,8 @@ class DataWorkspaceDialog(QDialog):
         wanted = getattr(self, "_wanted", None)
         ids = [self.catalogue.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.catalogue.count())]
         self.catalogue.setCurrentRow(ids.index(wanted) if wanted in ids else 0 if ids else -1)
+        if self._wanted_trace and wanted in ids:
+            self.tabs.setCurrentWidget(self.signals_note.parentWidget())
 
     def _fill_datasets(self) -> None:
         needle = self.search.text().strip().lower()
@@ -428,7 +431,8 @@ class DataWorkspaceDialog(QDialog):
             self.signals.setVisible(has_signals)
             if has_signals:
                 self.signals.set_snapshot(sid)
-                self._first_trial(sid, 20)
+                trace = self._wanted_trace if sid == self._wanted else None
+                self._first_trial(sid, 20, trace)
         self.query_text.setPlainText(EXAMPLE.format(table=(dataset.get("tables") or ["table"])[0]))
         self.query_hint.setText("Read-only SELECT over: " + ", ".join(dataset.get("tables", [])) +
                                 ". No writes, files or scripts.")
@@ -532,17 +536,20 @@ class DataWorkspaceDialog(QDialog):
                 self.signals_layout.addWidget(self.signals)
             self.signals.setVisible(True)
             self.signals.set_snapshot(self.snapshot_id)
-            self._first_trial(self.snapshot_id, 20)
+            trace = self._wanted_trace if self.snapshot_id == self._wanted else None
+            self._first_trial(self.snapshot_id, 20, trace)
 
-    def _first_trial(self, snapshot_id: str, attempts: int) -> None:
+    def _first_trial(self, snapshot_id: str, attempts: int, trial_id: str | None = None) -> None:
         """Show the first recording once the trial list has loaded, so the tab is never an empty plot."""
         view = self.signals
         if view is None or snapshot_id != self.snapshot_id or view.waveform is not None:
             return
         if view.trial_list.count():
-            view.show_trial(view.trial_list.item(0).data(Qt.ItemDataRole.UserRole))
+            if trial_id is None or any(view.trial_list.item(i).data(Qt.ItemDataRole.UserRole) == trial_id
+                                       for i in range(view.trial_list.count())):
+                view.show_trial(trial_id or view.trial_list.item(0).data(Qt.ItemDataRole.UserRole))
         elif attempts:
-            QTimer.singleShot(150, lambda: self._first_trial(snapshot_id, attempts - 1))
+            QTimer.singleShot(150, lambda: self._first_trial(snapshot_id, attempts - 1, trial_id))
 
     def _run_query(self) -> None:
         sid, sql = self.snapshot_id, self.query_text.toPlainText()

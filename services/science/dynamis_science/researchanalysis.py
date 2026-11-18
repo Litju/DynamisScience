@@ -602,10 +602,15 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         kind = "CHANGE"
         value = result["observed_change"]
         title = f"Measurement trust · participant {result['subject_id']}"
-        interpretation = f"{result['status']}: " + (" ".join(result["reasons"]) or
-            f"The observed change is {result['relation_to_retest'].lower()} the matched 95% retest prediction range.")
+        evidence = result["retest_evidence"]
+        if evidence:
+            low, high = evidence["prediction_95"]
+            interpretation = (f"The observed change was {value:+.2f} cm, {result['relation_to_retest'].lower()} the matched "
+                              f"95% retest prediction range ({low:.2f} to {high:.2f} cm from {evidence['n_pairs']} independent pairs).")
+        else:
+            interpretation = f"{result['status']}. " + " ".join(result["reasons"])
         interpretation += " " + " ".join(result["limitations"])
-        quality = "EXPLORATORY" if result["retest_evidence"] else "WARNING"
+        quality = "EXPLORATORY" if evidence else "WARNING"
     elif run["method_id"] == "METH-U-INDIVIDUAL":
         value = result["change_first_to_last"]
         uncertainty = result.get("change_trial_noise_se")
@@ -644,7 +649,8 @@ def _evidence_profile(run: dict[str, Any], entity: dict[str, Any]) -> dict[str, 
         "effect_size": effect_size,
         "contrast_id": contrast_id,
         "population": f"Participant {result['subject_id']} · {entity['id']}" if run["method_id"] in {"METH-U-INDIVIDUAL", "METH-U-MEASUREMENT-TRUST", "METH-EXPERIMENT-DESC", "METH-ONSET-EXACT"} else f"{entity.get('population', 'Participants')} · {entity['id']}",
-        "sample_size": int(result.get("n_subjects") or result.get("n_observations") or 0),
+        "sample_size": (int(value is not None) if run["method_id"] == "METH-U-MEASUREMENT-TRUST" else
+                        int(result.get("n_subjects") or result.get("n_observations") or 0)),
         "protocol_id": protocol_id,
         "dataset_snapshot_id": run["snapshot_id"],
         "analysis_run_id": run["id"],

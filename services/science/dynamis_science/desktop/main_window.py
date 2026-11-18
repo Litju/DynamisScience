@@ -1871,13 +1871,14 @@ class MainWindow(QMainWindow):
         return bool(self.current_study.get("workspace") and snapshot.get("admitted_source") and
                     "cmj_trials" in snapshot.get("tables", {}))
 
-    def _open_workspace(self, snapshot_id: str | None = None, *, reconcile: bool = False) -> None:
+    def _open_workspace(self, snapshot_id: str | None = None, *, reconcile: bool = False,
+                        trace_trial: str | None = None) -> None:
         identity = self.current_study_id if self._can_reconcile_followup() else None
         dialog = DataWorkspaceDialog(self.service, self.run_task, self._analyze_dataset, self,
                                      workspace_id=identity,
                                      on_reconciled=lambda revision: self._open_reconciled_analysis(identity, revision),
                                      on_import=self._open_import if identity else None)
-        dialog.open(snapshot_id or getattr(self, "current_snapshot_id", None), reconcile=reconcile)
+        dialog.open(snapshot_id or getattr(self, "current_snapshot_id", None), reconcile=reconcile, trace_trial=trace_trial)
         choice = dialog.exec()
         if (choice != QDialog.DialogCode.Accepted and dialog.reconciliation
                 and dialog.reconciliation.approved_in_session and self.current_study_id == identity):
@@ -2146,6 +2147,7 @@ class ResearchWorkbench(QWidget):
         self.tabs.addTab(self.history_panel, 'Frozen history')
         self.individual.reports_requested.connect(lambda: window._go_research_stage('Reports / history'))
         self.individual.export_requested.connect(self.export_report)
+        self.individual.trace_requested.connect(lambda snapshot, trial: window._open_workspace(snapshot, trace_trial=trial))
         self.tabs.currentChanged.connect(self._ensure_tab)
         self._ensure_tab(0)
 

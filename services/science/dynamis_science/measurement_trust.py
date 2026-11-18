@@ -6,13 +6,12 @@ import math
 from datetime import date
 from pathlib import Path
 from statistics import mean, stdev
-from typing import Literal
+from typing import Annotated, Literal
 
 import numpy as np
 import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from scipy.stats import norm, t
-from typing_extensions import Annotated
 
 from . import admission, importer, researchstore as store
 from .analysis import two_way_icc
@@ -115,11 +114,13 @@ def options(revisions: list[dict]) -> list[dict]:
             table = store.read_snapshot_table(snapshot["id"], TABLE)
             if not {"session_id", COLUMN} <= set(table.columns):
                 continue
-            sessions = sorted(table["session_id"].drop_nulls().unique())
+            sessions = table.select("session_id", *[column for column in ("date", "week") if column in table.columns])
         except (OSError, ValueError, pl.exceptions.PolarsError, store.ResearchNotFound):
             continue
-        choices.extend({"revision_id": revision["id"], "number": revision["number"], "session_id": session}
-                       for session in sessions if session)
+        for visit in sessions.drop_nulls("session_id").partition_by("session_id"):
+            choices.append({"revision_id": revision["id"], "number": revision["number"],
+                            "session_id": visit["session_id"][0], "date": _one(visit, "date"), "week": _one(visit, "week")})
+    choices.sort(key=lambda row: (-row["number"], row["date"] or "", row["week"] or 0, row["session_id"]))
     return choices
 
 
@@ -139,12 +140,12 @@ def _same_identity_lineage(reference_id: str, comparison: dict) -> bool:
     return True
 
 
-def _parquet_check(snapshot: dict) -> str:
+def _parquet_check(snapshot: dict, table: str = TABLE) -> str:
     root = paths()["research"] / "data" if snapshot.get("workspace_snapshot") else paths()["admitted"]
-    path = root / snapshot["id"] / f"{TABLE}.parquet"
+    path = root / snapshot["id"] / f"{table}.parquet"
     expected = snapshot.get("checksums", {}).get(path.name)
     if not expected or importer._sha256(path) != expected:
-        raise ValueError(f"CMJ Parquet checksum failed for {snapshot['id']}.")
+        raise ValueError(f"{table} Parquet checksum failed for {snapshot['id']}.")
     return expected
 
 
@@ -153,8 +154,11 @@ def _load(revision: dict, receipts: list[dict]) -> tuple[pl.DataFrame, dict]:
     if not snapshot.get("admitted_source") or TABLE not in snapshot["tables"]:
         raise ValueError("This data revision has no admitted CMJ trial summary.")
     note = {"snapshot_id": snapshot["id"], "parquet_sha256": _parquet_check(snapshot),
-            "reconciliation": revision.get("reconciliation"), "inputs": {}}
+            "reconciliation": revision.get("reconciliation"), "inputs": {}, "linked_traces": []}
     for item in revision["inputs"]:
+        if {"trace_index", "force_signals"} <= set(item["tables"]):
+            note["linked_traces"].append({"snapshot_id": item["id"], "checksums": item["checksums"],
+                                          "source_id": item["admission"]["source_id"], "rights_status": item["rights_status"]})
         if item.get("measurement_family") != FAMILY:
             continue
         record = item["admission"]
@@ -188,6 +192,33 @@ def _load(revision: dict, receipts: list[dict]) -> tuple[pl.DataFrame, dict]:
             "protocols": item.get("provenance", {}).get("protocol_metadata", []),
         }
     return store.read_snapshot_table(snapshot["id"], TABLE), note
+
+
+def locate_trace(run: dict, revision_id: str, session_id: str, trial_id: str) -> str | None:
+    """Locate an unambiguous same-athlete, same-session, same-trial recording pinned by the run."""
+    if run["method_id"] != METHOD:
+        raise store.ResearchValidation("Select a saved measurement trust result.")
+    result = run["result"]
+    if not any(session["revision_id"] == revision_id and session["session_id"] == session_id
+               and any(trial["trial_id"] == trial_id for trial in session["trials"])
+               for session in (result["reference"], result["comparison"])):
+        raise store.ResearchValidation("The trial is outside the saved measurement trust assessment.")
+    candidates = result["provenance"][revision_id].get("linked_traces", [])
+    matches = []
+    for candidate in candidates:
+        snapshot = store.get_snapshot(candidate["snapshot_id"])
+        source = admission.get_source(candidate["source_id"])
+        if (not snapshot or snapshot["checksums"] != candidate["checksums"] or not source
+                or source["rights_status"] not in {"VERIFIED", "FIXTURE_ONLY"}
+                or source["rights_status"] != candidate["rights_status"]
+                or "research" not in {str(use).strip().lower() for use in source["permitted_uses"]}):
+            continue
+        _parquet_check(snapshot, "trace_index")
+        trials = store.read_snapshot_table(snapshot["id"], "trace_index").filter(pl.col("trial_id") == trial_id)
+        if trials.height == 1 and trials["subject_id"][0] == result["subject_id"] and trials["session_id"][0] == session_id:
+            _parquet_check(snapshot, "force_signals")
+            matches.append(snapshot["id"])
+    return matches[0] if len(matches) == 1 else None
 
 
 def _one(rows: pl.DataFrame, column: str):
