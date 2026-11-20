@@ -162,6 +162,10 @@ def _reference(revision: dict) -> tuple[dict, pl.DataFrame, dict, dict]:
     for receipt in prior:
         if importer._sha256(Path(receipt["raw_copy"])) != receipt["raw_sha256"]:
             raise importer.ImportBlocked(f"Retained reference export {receipt['raw_filename']} failed its checksum check.")
+    calculations = [item["admission_metadata"].get("jump_height_provenance") for item in inputs]
+    if any(value != calculations[0] for value in calculations):
+        raise importer.ImportBlocked("The reference mixes different jump-height calculation records.")
+    protocol = {**protocol, "jump_height_provenance": calculations[0]}
     return {"source": source, "instrument": instrument, "protocol": protocol}, frame, (prior[-1] if prior else {}), {
         "snapshot_id": first["id"], "raw_exposures": sorted({r["raw_sha256"] for r in prior})}
 
@@ -334,7 +338,8 @@ def _evaluate(proposal: dict, revision: dict, records: list[dict]) -> tuple[dict
                              "protocol_version": protocol["version"], "protocol_revision": protocol["version"],
                              "source_name": source["name"], "dataset_identity": source["dataset_identity"],
                              "serial_number": instrument["serial_number"],
-                             "coordinate_system": protocol["coordinate_convention"]}.items():
+                             "coordinate_system": protocol["coordinate_convention"],
+                             "jump_height_calculation": (protocol["jump_height_provenance"] or {}).get("method")}.items():
             headers = [col["name"] for col in plan["columns"] if importer._split_header(col["name"])[0] == field]
             if headers and (observed := _column_value(plan, headers)) != [str(value)]:
                 issue("source_metadata_drift", f"{field}: {value}", observed, True)

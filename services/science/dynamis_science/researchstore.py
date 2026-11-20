@@ -204,11 +204,11 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-U-MEASUREMENT-TRUST": {
         "id": "METH-U-MEASUREMENT-TRUST",
         "name": "Measurement trust and individual change",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "basis": "Synthetic pairs verify arithmetic only. Empirical interpretation requires empirical matched retest pairs and a recorded review of the design and its applicability."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
         "required_tables": ["cmj_trials"],
-        "required_shape": "Recorded sessions in admitted CMJ summary revisions, with one participant and jump height in cm.",
+        "required_shape": "Recorded sessions in admitted CMJ summary revisions, with one participant and source-reported jump height in cm. Empirical comparisons require documented and matching calculation provenance.",
         "constraints": ["No inference about meaningful change, fatigue, adaptation, readiness, injury risk or causation."],
         "missingness": "Incomplete session scores remain unestimated. Reference pair exclusions are reported.",
         "parameter_schema": {
@@ -763,7 +763,7 @@ def dataset_metrics(snapshot_id: str) -> list[dict[str, Any]]:
     tables = set(_table_names(snapshot))
     candidates = [
         ("MET-CMJ-IMPULSE", "Concentric impulse", "N·s·kg⁻¹", "concentric_impulse_n_s_kg", "cmj_trials", "PRIMARY"),
-        ("MET-CMJ-HEIGHT", "Jump height (flight time)", "cm", "jump_height_cm", "cmj_trials", "SECONDARY"),
+        ("MET-CMJ-HEIGHT", "Jump height", "cm", "jump_height_cm", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-BRAKING-DURATION", "Eccentric braking duration", "s", "eccentric_braking_duration_s", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-POWER", "Peak power", "W·kg⁻¹", "peak_power_w_kg", "cmj_trials", "SECONDARY"),
         ("MET-CMJ-DEPTH", "Countermovement depth", "cm", "countermovement_depth_cm", "cmj_trials", "SECONDARY"),

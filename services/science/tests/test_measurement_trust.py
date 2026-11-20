@@ -123,6 +123,31 @@ def test_sparse_missing_and_inapplicable_error_are_distinct(assessment):
         run_assessment(service, workspace, investigation, "Stale", request_for(revision))
 
 
+@pytest.mark.parametrize("documented", [False, True])
+def test_empirical_summary_requires_documented_height_calculation(assessment, tmp_path, documented):
+    service, workspace, _, initial, investigation, _ = assessment
+    fields = {**FIXTURE, "source_name": "Empirical lab test fixture", "privacy_status": "DEIDENTIFIED",
+              "calibration_status": "CALIBRATED", "calibration_date": "2026-07-20"}
+    if documented:
+        fields.update(jump_height_calculation="FLIGHT_TIME", jump_height_reference="Acquisition manual v1 §3")
+    path = write_export(tmp_path / "empirical-summary.csv", visit(2) + visit(3), DATED_FIELDS)
+    stage = importer.stage(importer.probe_file(path), importer.build_context(fields),
+                           rights_reviewed_by="Fixture reviewer")
+    assert stage["eligible"], stage["quality"]
+    admitted = importer.admit(stage)["dataset_snapshot_id"]
+    revision = service.attach_workspace_data(workspace, admitted, base_revision=initial)["active_data_revision_id"]
+    result = run_assessment(service, workspace, investigation, revision, request_for(revision, retest=None))["result"]
+    source = next(iter(result["provenance"][revision]["inputs"].values()))
+    if documented:
+        assert result["observed_change"] == pytest.approx(3.0)
+        assert result["status"] == "NOT_ESTIMABLE"
+        assert source["height_calculation"] == {"method": "FLIGHT_TIME", "reference": "Acquisition manual v1 §3"}
+    else:
+        assert result["status"] == "INCOMPARABLE"
+        assert result["observed_change"] is None
+        assert any("calculation and reference" in reason for reason in result["reasons"])
+
+
 def test_protocol_and_unconfirmed_athlete_lineage_block_change(assessment, tmp_path):
     service, workspace, _, revision, investigation, _ = assessment
     changed = write_export(tmp_path / "changed-protocol.csv", visit(3), DATED_FIELDS)

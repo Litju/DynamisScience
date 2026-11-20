@@ -27,6 +27,8 @@ TEXT_FIELDS = (  # (key, label, required)
     ("manufacturer", "Instrument or app manufacturer", True), ("model", "Instrument or app model", True),
     ("serial_number", "Instrument serial / app version", True), ("calibration_status", "Calibration status", False),
     ("protocol_name", "Protocol name", True), ("protocol_version", "Protocol version", True),
+    ("jump_height_calculation", "CMJ height calculation", False),
+    ("jump_height_reference", "CMJ calculation reference", False),
     ("subject_id", "Subject ID (single-trace file)", False), ("trial_id", "Trial ID (single-trace file)", False),
     ("session_id", "Session ID (if not in file)", False), ("sampling_hz", "Sampling rate Hz (if not in file)", False),
     ("coordinate_system", "Coordinate convention (sprint)", False),
@@ -229,6 +231,8 @@ class ImportReviewDialog(QDialog):
         self.edits["protocol_version"].setText("1.0")
         self.edits["publisher"].setPlaceholderText("defaults to the source name")
         self.edits["dataset_identity"].setPlaceholderText("defaults to the source name")
+        self.edits["jump_height_calculation"].setPlaceholderText("FLIGHT_TIME, IMPULSE_MOMENTUM or DISPLACEMENT")
+        self.edits["jump_height_reference"].setPlaceholderText("Source protocol or algorithm documentation and version")
         self.rights = QCheckBox("I reviewed the licence, permitted uses and redistribution terms.")
         self.reviewer = QLineEdit(getpass.getuser())
         self.reviewer.setAccessibleName("Rights verified by")
@@ -252,7 +256,7 @@ class ImportReviewDialog(QDialog):
         self.more = QWidget()
         more_layout = QFormLayout(self.more)
         for key in ("publisher", "dataset_identity", "protocol_version", "subject_id", "trial_id", "session_id", "sampling_hz",
-                    "coordinate_system"):
+                    "coordinate_system", "jump_height_calculation", "jump_height_reference"):
             more_layout.addRow(dict((k, lab) for k, lab, _ in TEXT_FIELDS)[key], self.edits[key])
         self.more.setVisible(False)
         self.more_button.toggled.connect(lambda on: (self.more.setVisible(on), self.more_button.setText("Fewer ▴" if on else "More ▾")))

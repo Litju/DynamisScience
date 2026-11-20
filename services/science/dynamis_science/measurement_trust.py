@@ -18,7 +18,7 @@ from .analysis import two_way_icc
 from .data_root import paths
 
 METHOD = "METH-U-MEASUREMENT-TRUST"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 METRIC = "MET-CMJ-HEIGHT"
 TABLE = "cmj_trials"
 COLUMN = "jump_height_cm"
@@ -188,6 +188,8 @@ def _load(revision: dict, receipts: list[dict]) -> tuple[pl.DataFrame, dict]:
             "snapshot_id": item["id"], "source_id": source["id"], "rights_status": item["rights_status"],
             "artifact_sha256": artifact["content_hash_sha256"], "parquet_sha256": _parquet_check(item),
             "raw_exports": raw_files, "units": item.get("admission_metadata", {}).get("units", {}),
+            "height_calculation": item.get("admission_metadata", {}).get("jump_height_provenance"),
+            "height_origin": "Reported trial-level value in the source, normalized to cm",
             "qc": admission.get_quality(record["quality_assessment_id"]),
             "instruments": item.get("provenance", {}).get("instrument_metadata", []),
             "protocols": item.get("provenance", {}).get("protocol_metadata", []),
@@ -278,6 +280,7 @@ def _source_context(rows: pl.DataFrame, note: dict) -> tuple[tuple | None, list[
     issues = []
     sources = set(rows["source_artifact_id"]) if "source_artifact_id" in rows.columns else {None}
     rights = {note["inputs"][artifact]["rights_status"] for artifact in sources if artifact in note["inputs"]}
+    calculations = set()
     if len(rights) > 1:
         issues.append("A session score mixes empirical observations and synthetic fixture trials.")
     for artifact_id in sources:
@@ -293,8 +296,19 @@ def _source_context(rows: pl.DataFrame, note: dict) -> tuple[tuple | None, list[
             issues.append("Source import quarantined trial rows. Verify their effect on the completeness of the session score.")
         elif instrument["calibration_status"] != ("SIMULATED" if source["rights_status"] == "FIXTURE_ONLY" else "CALIBRATED"):
             issues.append("The instrument calibration has not been established for this source.")
+        if source:
+            calculation = source.get("height_calculation") or {}
+            method, reference = calculation.get("method"), calculation.get("reference")
+            if method in {"FLIGHT_TIME", "IMPULSE_MOMENTUM", "DISPLACEMENT"} and reference:
+                calculations.add((method, reference))
+            elif source["rights_status"] == "FIXTURE_ONLY":
+                calculations.add(("SYNTHETIC", "Generated fixture values"))
+            else:
+                issues.append("The source has no documented jump-height calculation and reference.")
+    if len(calculations) > 1:
+        issues.append("A session mixes jump-height calculation provenance.")
     note.setdefault("acquisition", {})[protocol_id] = {"protocol": protocol, "instrument": instrument, "sampling_hz": sampling}
-    return (instrument_id, protocol_id, sampling, tuple(sorted(rights))), sorted(set(issues))
+    return (instrument_id, protocol_id, sampling, tuple(sorted(rights)), tuple(sorted(calculations))), sorted(set(issues))
 
 
 def _bad_trials(session: Session) -> bool:
@@ -322,6 +336,9 @@ def _retest(frame: pl.DataFrame, revision_id: str, note: dict, review: RetestRev
         return None
     if visit_context[3] != context[3]:
         result.reasons.append("Retest and comparison must both be empirical observations or both be synthetic fixtures.")
+        return None
+    if visit_context[4] != context[4]:
+        result.reasons.append("Retest jump-height calculation differs from the compared sessions.")
         return None
     if visits["trial_id"].null_count() or visits["trial_id"].n_unique() != visits.height:
         result.reasons.append("The retest sessions contain missing or reused trial identifiers.")
@@ -398,6 +415,8 @@ def evaluate(workspace_id: str, active_id: str, subject: str, request: Compariso
         result.reasons.append("Instrument, protocol or sampling rate changed between the sessions.")
     if a_context and b_context and a_context[3] != b_context[3]:
         result.reasons.append("The compared sessions mix empirical observations and synthetic fixtures.")
+    if a_context and b_context and a_context[4] != b_context[4]:
+        result.reasons.append("Jump-height calculation provenance changed between the sessions.")
     result.reasons.extend(sorted(set(a_issues + b_issues)))
     if result.reasons:
         result.status = "INCOMPARABLE"

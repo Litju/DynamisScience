@@ -575,6 +575,12 @@ def build_context(fields: dict[str, Any]) -> dict[str, Any]:
                   "calibration_date": fields.get("calibration_date")}
     protocol = {"name": fields.get("protocol_name", ""), "version": fields.get("protocol_version", "1.0"),
                 "coordinate_convention": fields.get("coordinate_system") or "NOT_SPECIFIED"}
+    calculation = str(fields.get("jump_height_calculation") or "").strip().upper()
+    reference = str(fields.get("jump_height_reference") or "").strip()
+    if calculation or reference:
+        if calculation not in {"FLIGHT_TIME", "IMPULSE_MOMENTUM", "DISPLACEMENT"} or not reference:
+            raise ImportBlocked("Record FLIGHT_TIME, IMPULSE_MOMENTUM or DISPLACEMENT and the source calculation reference.")
+        protocol["jump_height_provenance"] = {"method": calculation, "reference": reference}
     return {"source": source, "instrument": instrument, "protocol": protocol, "fields": dict(fields)}
 
 
@@ -672,6 +678,8 @@ def stage(plan: dict[str, Any], context: dict[str, Any], *, rights_reviewed_by: 
                                                "rows_quarantined": 0 if bad_rows is None else bad_rows.height}}
         if _reconciled is not None:
             metadata["import"]["reconciliation"] = True
+        if family == "CMJ_FORCE_PLATFORM" and ctx_p.get("jump_height_provenance"):
+            metadata["jump_height_provenance"] = ctx_p["jump_height_provenance"]
         if family == traces.FAMILY:
             metadata.update(sampling_hz=facts["sampling_hz"], sampling_source=facts["sampling_source"], time_base=facts["time_base"])
         constants = mapping.get("constants", {})
