@@ -184,16 +184,24 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     wait(window)
     panel = window.research.training_context
 
-    def attach_source(source_id, alias=""):
+    def attach_source(source_id, alias=None, expected_change=None):
         def review():
             dialog = QApplication.activeModalWidget()
             assert isinstance(dialog, ContextSourceDialog)
             try:
-                dialog.sources.setCurrentIndex(dialog.sources.findData(source_id))
-                dialog.participants.setText(alias)
-                dialog.file_button.click()
+                if expected_change:
+                    assert dialog.sources.currentData() == source_id
+                    assert "EXT-07 → A07" in dialog.details.toPlainText()
+                else:
+                    dialog.sources.setCurrentIndex(dialog.sources.findData(source_id))
+                if alias:
+                    external, athlete = alias
+                    assert not dialog.preview_button.isEnabled()
+                    dialog.aliases[external].setCurrentText(athlete)
                 dialog.preview_button.click()
                 assert dialog.attach_button.isEnabled(), dialog.details.toPlainText()
+                if expected_change:
+                    assert expected_change in dialog.details.toPlainText()
                 dialog.attach_button.click()
                 assert dialog.result() == 1, dialog.details.toPlainText()
             finally:
@@ -203,7 +211,7 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
         panel.add_source.click()
         wait(window)
 
-    attach_source(TRAINING, "EXT-07=A07")
+    attach_source(TRAINING, ("EXT-07", "A07"))
     exports["file"] = wellness_file
     attach_source(WELLNESS)
     panel.week_one.setText(START.isoformat())
@@ -300,11 +308,15 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     assert panel.comparison["status"] == "INCOMPARABLE" and panel.comparison["change"] is None
     assert "different numbers of trials" in panel.comparison_summary.text()
 
-    target = next(row for row in training_data if row["participant"] == "A01" and row["rpe"])
+    panel.scope.setCurrentIndex(panel.scope.findData("A01"))
+    wait(window)
+    target = next(row for row in training_data if row["record_id"].startswith("TR-A01-2-") and row["rpe"])
     corrected = [{**row, "rpe": str(float(row["rpe"]) + 1)} if row["record_id"] == target["record_id"] else row
                  for row in training_data]
     exports["file"] = export(tmp_path / "training-v2.csv", corrected)
-    attach_source(TRAINING)
+    attach_source(TRAINING, expected_change="160 AU → 192 AU")
+    assert "3,334 → 3,366 AU" in panel.import_outcome.text()
+    assert panel.comparison["change"] == pytest.approx(2.75)
     context_history = context.source_history(workspace, revision)
     assert [row["version"] for row in context_history if row["source"]["id"] == TRAINING] == [1, 2]
     old = measures(1, 12)[0]

@@ -1382,10 +1382,15 @@ class MainWindow(QMainWindow):
             self.settings.setValue(f'research-stage/{self.current_study_id}', stage)
             return
         if stage == 'Training context':
+            context = self.research.training_context
+            reentering = (not self._investigation_visible() and context.workspace == self.current_study_id
+                          and context.view and not context.saved)
             self._show_research_mode()
             self._set_record_view(True)
-            self.results_stack.setCurrentWidget(self.research.training_context)
+            self.results_stack.setCurrentWidget(context)
             self.research.show_training_context()
+            if reentering:
+                context.reload()
             self.workbench.panes['data'].hide()
         elif stage in {'Protocol', 'Observations'} or individual and stage in {'Analysis', 'Results'}:
             if not individual:

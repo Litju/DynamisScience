@@ -220,15 +220,20 @@ def _read_observations(record: dict) -> pl.DataFrame:
     return pl.read_parquet(file)
 
 
-def preview(workspace_id: str, revision_id: str, source_id: str, file: str | Path,
-            mapping: SourceMapping) -> tuple[dict, list[Observation]]:
-    _, revision = workspace_revision(workspace_id, revision_id)
-    source = _rights(source_id)
+def source_file(file: str | Path) -> Path:
     path = Path(file)
     if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_BYTES:
         raise store.ResearchValidation("Select a regular source file of up to 20 MiB.")
     if path.suffix.lower() not in {".csv", ".tsv", ".xlsx", ".parquet", ".pq"}:
         raise store.ResearchValidation("Select a CSV, TSV, Excel or Parquet context source.")
+    return path
+
+
+def preview(workspace_id: str, revision_id: str, source_id: str, file: str | Path,
+            mapping: SourceMapping) -> tuple[dict, list[Observation]]:
+    _, revision = workspace_revision(workspace_id, revision_id)
+    source = _rights(source_id)
+    path = source_file(file)
     raw = importer._sha256(path)
     lazy, _ = importer.open_table(path)
     columns = lazy.collect_schema().names()

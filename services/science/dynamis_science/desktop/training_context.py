@@ -2,228 +2,18 @@
 
 from __future__ import annotations
 
-import getpass
-import json
-from pathlib import Path
-
-import polars as pl
 import pyqtgraph as pg
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout,
+    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
     QInputDialog, QLabel, QLineEdit, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
 )
 from PySide6.QtCore import Qt
 
-from .. import admission, context_timeline as timeline, measurement_trust, researchstore as store, training_context as context
+from .. import context_timeline as timeline, measurement_trust
+from .context_source_dialog import ContextSourceDialog, ERRORS
 from .individual_research import fit_dialog
 from .investigation_timeline import EvidencePanel, InvestigationChart, LANES, date_label, heading, readable, wrapping_label
-
-ERRORS = (ValueError, OSError, LookupError, RuntimeError, pl.exceptions.PolarsError)
-
-def _describe(row: dict) -> str:
-    if row["kind"] == "PLAN":
-        period = row["period"]
-        return f"{period['label']} · weeks {period['start']}–{period['end']}"
-    if row["kind"] == "VISIT":
-        visit = row["visit"]
-        observed = (row["observed_period"] or {}).get("label", "Outside plan")
-        adherence = f" · {visit['adherence_percent']:g}% adherence" if visit["adherence_percent"] is not None else ""
-        return f"Planned {row['period']['label']} · observed {observed} · {visit['exposure']}{adherence}"
-    if row["kind"] == "ASSESSMENT":
-        value = f"{row['value']:.3g} {row['unit']}" if row["value"] is not None else "Score unavailable"
-        return f"{row['session_id']} · {row['measure']} · {value} · {row['valid_trials']}/{row['n_trials']} trials"
-    if row["status"] != "OBSERVED":
-        return row.get("reason") or row["status"].title()
-    if row["kind"] == "TRAINING":
-        parts = []
-        if row["duration"] is not None:
-            parts.append(f"{row['duration']:g} {row['duration_unit']}")
-        if row["rpe"] is not None:
-            parts.append(f"RPE {row['rpe']:g} {row['rpe_scale']}")
-        if row["session_load_au"] is not None:
-            parts.append(f"load {row['session_load_au']:g} AU")
-        return " · ".join(parts) or "Session recorded"
-    return f"{row['measure']} · {row['value']:g} {row['unit']}"
-
-
-def _pairs(text: str) -> dict[str, str]:
-    pairs = {}
-    for assignment in filter(str.strip, text.split(";")):
-        key, separator, value = assignment.partition("=")
-        if not separator or not key.strip() or not value.strip() or key.strip() in pairs:
-            raise ValueError("Enter unique field=value pairs separated by semicolons.")
-        pairs[key.strip()] = value.strip()
-    return pairs
-
-
-class SourceRegistration(QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setWindowTitle("Register a context source")
-        layout = QFormLayout(self)
-        fields = (
-            ("id", "Source identifier"), ("name", "Source label"), ("publisher", "Provider"),
-            ("dataset_identity", "Dataset identity"), ("version", "Provider version"),
-            ("license_or_agreement", "Licence or agreement"),
-            ("redistribution_restrictions", "Redistribution terms"),
-        )
-        self.fields = {key: QLineEdit() for key, _ in fields}
-        for key, label in fields:
-            layout.addRow(label, self.fields[key])
-        self.privacy = QComboBox()
-        self.privacy.addItems(["DEIDENTIFIED", "PSEUDONYMOUS", "IDENTIFIABLE", "TEST_FIXTURE"])
-        layout.addRow("Source classification", self.privacy)
-        self.reviewer = QLineEdit(getpass.getuser())
-        layout.addRow("Rights reviewer", self.reviewer)
-        self.error = QLabel()
-        self.error.setWordWrap(True)
-        layout.addRow(self.error)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
-        buttons.addButton("Confirm research rights and register", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttons.accepted.connect(self.register)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
-        fit_dialog(self, 640, 380)
-
-    def register(self):
-        reviewer = self.reviewer.text().strip()
-        if not reviewer:
-            self.error.setText("Enter the researcher who reviewed the source permissions.")
-            return
-        fields = {key: field.text().strip() for key, field in self.fields.items()}
-        privacy = self.privacy.currentText()
-        try:
-            self.source = admission.register_source({
-                **fields, "privacy_status": privacy, "acquisition_method": context.SOURCE_METHOD,
-                "permitted_uses": ["research"],
-                "rights_status": "FIXTURE_ONLY" if privacy == "TEST_FIXTURE" else "VERIFIED",
-                "rights_verified_by": reviewer, "rights_verified_at": store._now(),
-            })
-        except ERRORS as error:
-            self.error.setText(str(error))
-            return
-        self.accept()
-
-
-class ContextSourceDialog(QDialog):
-    def __init__(self, workspace: str, revision: str, parent):
-        super().__init__(parent)
-        self.workspace, self.revision = workspace, revision
-        self.file = None
-        self.reviewed = None
-        self.setWindowTitle("Review training and wellness source")
-        layout = QVBoxLayout(self)
-        form = QFormLayout()
-        self.sources = QComboBox()
-        source_row = QHBoxLayout()
-        source_row.addWidget(self.sources, 1)
-        register = QPushButton("Register source…")
-        register.clicked.connect(self._register)
-        source_row.addWidget(register)
-        form.addRow("Authorized source", source_row)
-        self.file_button = QPushButton("Choose source file…")
-        self.file_button.clicked.connect(self._choose)
-        form.addRow("Export", self.file_button)
-        self.columns = QLineEdit()
-        self.columns.setPlaceholderText("Optional, e.g. participant=Athlete; occurred_at=Timestamp")
-        form.addRow("Column mapping", self.columns)
-        self.participants = QLineEdit()
-        self.participants.setPlaceholderText("Optional, e.g. External07=A07")
-        form.addRow("Confirmed athlete aliases", self.participants)
-        self.reviewer = QLineEdit(getpass.getuser())
-        form.addRow("Reviewed by", self.reviewer)
-        layout.addLayout(form)
-        self.details = QTextBrowser()
-        layout.addWidget(self.details, 1)
-        self.details.setPlainText(
-            "Required columns: participant, record_id, kind, status. Use TRAINING or WELLNESS. "
-            "Provide actual time for observed data and scheduled time plus reason for missing or omitted data. "
-            "Timestamp values require an explicit UTC offset. Use min or s for duration and CR10 for session RPE. "
-            "Wellness uses measure, value, unit, questionnaire and questionnaire_version. "
-            "Each source revision includes its previous record IDs.\n\n"
-            "Optional fields: " + ", ".join(context.OPTIONAL)
-        )
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
-        self.preview_button = buttons.addButton("Preview QC and mappings", QDialogButtonBox.ButtonRole.ActionRole)
-        self.attach_button = buttons.addButton("Approve attachment", QDialogButtonBox.ButtonRole.AcceptRole)
-        self.attach_button.setEnabled(False)
-        buttons.rejected.connect(self.reject)
-        self.preview_button.clicked.connect(self._preview)
-        self.attach_button.clicked.connect(self._attach)
-        layout.addWidget(buttons)
-        self._sources()
-        for field in (self.columns, self.participants, self.reviewer):
-            field.textChanged.connect(self._invalidate)
-        self.sources.currentIndexChanged.connect(self._invalidate)
-        fit_dialog(self, 800, 570)
-
-    def _sources(self, selected=None):
-        self.sources.clear()
-        self.sources.addItem("Choose a research source", None)
-        for source in admission.list_sources():
-            if (source["rights_status"] in {"VERIFIED", "FIXTURE_ONLY"}
-                    and "research" in {str(use).strip().lower() for use in source["permitted_uses"]}):
-                self.sources.addItem(f"{source['name']} · {source['rights_status']} · {source['id']}", source["id"])
-        if selected:
-            self.sources.setCurrentIndex(self.sources.findData(selected))
-
-    def _register(self):
-        dialog = SourceRegistration(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._sources(dialog.source["id"])
-
-    def _invalidate(self):
-        self.reviewed = None
-        self.attach_button.setEnabled(False)
-
-    def _choose(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Choose training or wellness export",
-                                               filter="Context files (*.csv *.tsv *.xlsx *.parquet *.pq)")
-        if file:
-            self.file = Path(file)
-            self.file_button.setText(self.file.name)
-            self._invalidate()
-
-    def _preview(self):
-        self._invalidate()
-        try:
-            if not self.file or not self.sources.currentData() or not self.reviewer.text().strip():
-                raise ValueError("Choose a file and authorized source, and enter the reviewer.")
-            mapping = context.SourceMapping(columns=_pairs(self.columns.text()), participants=_pairs(self.participants.text()))
-            receipt, rows = context.preview(self.workspace, self.revision, self.sources.currentData(), self.file, mapping)
-        except ERRORS as error:
-            self.details.setPlainText(str(error))
-            return
-        self.reviewed = (mapping, receipt)
-        self.attach_button.setEnabled(True)
-        policy = receipt["source"]
-        self.details.setPlainText(
-            f"{receipt['row_count']:,} rows · Proposed source version {receipt['version']}\n"
-            f"{policy['name']} · {policy['rights_status']} · {policy['license_or_agreement']}\n"
-            f"SHA-256 {receipt['raw_sha256']}\n"
-            f"Change from prior source version: {receipt['changes']}\n"
-            f"QC and missingness: {receipt['qc'] or 'No flagged rows'}\n"
-            f"Unused columns: {', '.join(receipt['unused_columns']) or 'None'}\n\n"
-            + "\n".join(f"{item.external_id} → {item.subject_id}" for item in {
-                row.external_id: row for row in rows}.values())
-            + "\n\nSource observations\n"
-            + "\n".join(f"{row.kind} · {row.record_id} · {_describe(row.model_dump())}" for row in rows[:25])
-        )
-
-    def _attach(self):
-        if not self.reviewed:
-            return
-        mapping, receipt = self.reviewed
-        try:
-            self.attachment = context.attach(self.workspace, self.revision, self.sources.currentData(),
-                                             self.file, mapping, receipt, self.reviewer.text())
-        except ERRORS as error:
-            self.details.setPlainText(str(error))
-            self._invalidate()
-            return
-        self.accept()
-
 
 class TrainingContextPanel(QWidget):
     def __init__(self, run_task, settings=None):
@@ -237,6 +27,7 @@ class TrainingContextPanel(QWidget):
         self._live_model = self._live_result = self._live_pair = None
         self._selection_by_scope = {}
         self._stale = self._outcome_message = ""
+        self._import_change = None
         self._refresh_after_import = False
         self.visible_rows = []
 
@@ -394,6 +185,7 @@ class TrainingContextPanel(QWidget):
             self._selection_by_scope.clear()
             self._live_model = self._live_result = self._live_pair = None
             self._outcome_message = self._stale = ""
+            self._import_change = None
             self._refresh_after_import = False
             for field in self._calendar_fields[:-1]:
                 field.clear()
@@ -544,26 +336,36 @@ class TrainingContextPanel(QWidget):
 
     def _import(self):
         dialog = ContextSourceDialog(self.workspace, self.revision, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            receipt = dialog.attachment
-            self._outcome_message = f"Imported {receipt['source']['name']} · version {receipt['version']}."
-            self._refresh_after_import = not bool(self._stale)
-            self.reload()
+        if not dialog.choose_file() or dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        self._import_change = None
+        if dialog.held:
+            self._outcome_message = f"Quarantined {dialog.held['filename']}. The investigation is unchanged."
+            self._set_import_outcome()
+            return
+        receipt = dialog.attachment
+        self._outcome_message = f"Imported {receipt['source']['name']} · version {receipt['version']}."
+        self._refresh_after_import = not bool(self._stale)
+        self.reload()
 
     def _show_import_outcome(self, prior_view, prior_result):
         if prior_result and self.comparison and prior_view:
             def loads(view, result):
-                names = {item["id"]: item["source"]["name"] for item in view["sources"]}
-                return {names[key]: item["recorded_load_sum_au"]
+                identities = {item["id"]: item["source"]["id"] for item in view["sources"]}
+                return {identities[key]: item["recorded_load_sum_au"]
                         for key, item in result["between_exclusive_dates_by_source"].items()}
             before, after = loads(prior_view, prior_result), loads(self.view, self.comparison)
-            for name, value in after.items():
-                if value is not None and before.get(name) is not None and before[name] != value:
-                    self._outcome_message += f" {name} · recorded load between assessments {before[name]:,.0f} → {value:,.0f} AU."
+            for identity, value in after.items():
+                if value is not None and before.get(identity) is not None and before[identity] != value:
+                    names = {item["source"]["id"]: item["source"]["name"] for item in self.view["sources"]}
+                    change = f"{before[identity]:,.8g} → {value:,.8g} AU"
+                    self._import_change = (self.revision, self.pair, f"{names[identity]} · recorded load between assessments {change}.")
         self._set_import_outcome()
 
     def _set_import_outcome(self):
         message = self._outcome_message if not self.saved else ""
+        if message and self._import_change and self._import_change[:2] == (self.revision, self.pair):
+            message += " " + self._import_change[2]
         self.import_outcome.setText(message)
         self.import_outcome.setVisible(bool(message))
 
@@ -762,16 +564,16 @@ class TrainingContextPanel(QWidget):
             message = "Comparable for this descriptive comparison. Meaningful change has not been established."
             if synthetic:
                 message = "Comparable for description · synthetic fixture. Meaningful change has not been established."
-        values = (f" · {first['value']:g} → {second['value']:g} {result['unit']}"
+        values = (f"Session means · {first['value']:g} → {second['value']:g} {result['unit']}\n"
                   if first["value"] is not None and second["value"] is not None else "")
         sources = {item["id"]: item for item in self.view["sources"]}
         loads = []
         for key, item in result["between_exclusive_dates_by_source"].items():
             if item["recorded_load_sum_au"] is not None:
                 name = sources[key]["source"]["name"]
-                loads.append(f"{name} · {item['recorded_load_sum_au']:,.0f} AU over {item['sessions_with_load']} sessions")
-        title = f"{self.saved['title']} · " if self.saved else ""
-        self.comparison_summary.setText(f"{title}{dates}{values}\n{message}" + (
+                loads.append(f"{name} · {item['recorded_load_sum_au']:,.8g} AU over {item['sessions_with_load']} sessions")
+        title = f"{self.saved['title']}\n" if self.saved else ""
+        self.comparison_summary.setText(f"{title}{values}{message}" + (
             "\nBetween assessment dates · " + "  |  ".join(loads) if loads else ""))
 
     def _comparison_details(self):

@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
 
-from dynamis_science import admission, context_timeline as timeline, training_context as context
+from dynamis_science import admission, context_import, context_timeline as timeline, training_context as context
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.training_context import ContextSourceDialog
 from test_reconciliation import setup  # noqa: F401
@@ -98,13 +98,14 @@ def test_native_workspace_import_reviews_and_reads_source(qtbot, workspace, tmp_
     def review():
         dialog = QApplication.activeModalWidget()
         assert isinstance(dialog, ContextSourceDialog)
+        assert dialog.title.text() == "Preview suggested mapping"
         dialog.sources.setCurrentIndex(dialog.sources.findData(SOURCE))
-        dialog.participants.setText("External-01=A01")
-        dialog.file_button.click()
+        assert not dialog.preview_button.isEnabled()
+        dialog.aliases["External-01"].setCurrentText("A01")
         dialog.preview_button.click()
         assert dialog.attach_button.isEnabled(), dialog.details.toPlainText()
         assert "220 AU" in dialog.details.toPlainText()
-        assert "INCOMPLETE_EXPOSURE" in dialog.details.toPlainText()
+        assert "incomplete exposure" in dialog.details.toPlainText()
         dialog.attach_button.click()
 
     QTimer.singleShot(0, review)
@@ -176,3 +177,52 @@ def test_context_attachment_rolls_back_parquet_when_catalogue_commit_fails(works
     assert context.source_history(identity, revision) == []
     assert not list((paths()["research"] / "context").glob("*.parquet"))
     assert context.attach(identity, revision, SOURCE, file, mapping, preview, "Independent reviewer")["version"] == 1
+
+
+def test_mapping_suggests_unambiguous_headers_and_does_not_guess_athletes(workspace, tmp_path):
+    _, identity, revision = workspace
+    file = tmp_path / "export.csv"
+    file.write_text("Athlete ID,Observation ID,Record Type,Status,Timestamp,Duration unit,RPE Scale\n"
+                    "ATH-01,session1,TRAINING,OBSERVED,2026-08-01T18:00:00-03:00,s,CR10\n",
+                    encoding="utf-8")
+    preview = context_import.mapping_preview(identity, revision, file)
+    assert preview["columns"]["participant"] == "Athlete ID"
+    assert preview["columns"]["record_id"] == "Observation ID"
+    assert preview["columns"]["occurred_at"] == "Timestamp"
+    assert preview["identities"] == {"ATH-01": None}
+    assert preview["units"]["duration_unit"] == ["s"]
+    assert preview["source_id"] is None and preview["problems"] == []
+
+    file.write_text("Athlete ID,Subject ID,Observation ID,Record Type,Status\nA01,A02,record1,TRAINING,OBSERVED\n",
+                    encoding="utf-8")
+    ambiguous = context_import.mapping_preview(identity, revision, file)
+    assert "participant" not in ambiguous["columns"]
+    assert ambiguous["problems"] == ["Choose columns for Athlete."]
+
+
+def test_native_quarantine_keeps_raw_bytes_out_of_investigation(qtbot, workspace, tmp_path, monkeypatch):
+    _, identity, revision = workspace
+    file = export(tmp_path / "duplicate.csv", [training(), training()])
+    raw = file.read_bytes()
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(file), ""))
+    dialog = ContextSourceDialog(identity, revision, None)
+    qtbot.addWidget(dialog)
+    assert dialog.choose_file()
+    dialog.show()
+    dialog.sources.setCurrentIndex(dialog.sources.findData(SOURCE))
+    dialog.preview_button.click()
+    assert dialog.title.text() == "Review conflicts"
+    assert "unique within the source" in dialog.details.toPlainText()
+    assert not dialog.attach_button.isEnabled() and dialog.quarantine_button.isEnabled()
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Duplicate record requires source review.", True))
+    file.write_bytes(raw + b"\n")
+    dialog.quarantine_button.click()
+    assert dialog.held is None and "changed during review" in dialog.message.text()
+    file.write_bytes(raw)
+    dialog.quarantine_button.click()
+    assert dialog.result() == 1
+    quality = admission.get_quality(dialog.held["quality_id"])
+    assert quality["status"] == "QUARANTINED"
+    artifact = admission.get_source_artifact(dialog.held["artifact_id"])
+    assert artifact["source_id"] == SOURCE and Path(artifact["stored_path"]).read_bytes() == raw
+    assert context.source_history(identity, revision) == []
