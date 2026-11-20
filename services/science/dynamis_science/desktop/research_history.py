@@ -4,16 +4,19 @@ from __future__ import annotations
 import html
 import json
 
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QPushButton,
     QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
 )
 
-from .. import researchstore as store
+from .. import context_timeline, researchstore as store
 from .plots import ScientificFigureWidget, run_figure
 
 
 class ResearchHistoryPanel(QWidget):
+    context_requested = Signal(str)
+
     def __init__(self, service, run_task, parent=None):
         super().__init__(parent)
         self.service, self.run_task = service, run_task
@@ -26,7 +29,7 @@ class ResearchHistoryPanel(QWidget):
         layout.addWidget(self.binding)
         controls = QHBoxLayout()
         self.kind = QComboBox()
-        self.kind.addItems(['Frozen reports', 'Saved analyses', 'Data revisions'])
+        self.kind.addItems(['Frozen reports', 'Saved analyses', 'Data revisions', 'Contextual views'])
         self.kind.currentIndexChanged.connect(self.populate)
         self.all_scopes = QCheckBox('Include all athletes and cohort')
         self.all_scopes.toggled.connect(self.populate)
@@ -38,6 +41,10 @@ class ResearchHistoryPanel(QWidget):
         self.export = QPushButton('Export selected frozen report…')
         self.export.clicked.connect(self.export_report)
         controls.addWidget(self.export)
+        self.open_context = QPushButton('Open selected contextual view…')
+        self.open_context.clicked.connect(self._open_context)
+        self.open_context.hide()
+        controls.addWidget(self.open_context)
         layout.addLayout(controls)
         self.picker = QComboBox()
         self.picker.setAccessibleName('Frozen research record')
@@ -73,7 +80,8 @@ class ResearchHistoryPanel(QWidget):
         token, identity = self.generation, self.identity
         def read():
             return dict(reports=[store.get_report_version(identity, r['version']) for r in store.report_versions(identity)],
-                        runs=store.list_runs(identity), revisions=store.data_revisions(identity))
+                        runs=store.list_runs(identity), revisions=store.data_revisions(identity),
+                        context=context_timeline.history(identity))
         def loaded(value):
             if (token, identity) != (self.generation, self.identity):
                 return
@@ -103,6 +111,10 @@ class ResearchHistoryPanel(QWidget):
                     continue
                 name = record.get('result', {}).get('method') or record['method_id']
                 self.picker.addItem(f"{scope.get('subject_id') or 'Cohort'} · {name} · {record['created_at']}", ('run', record))
+        elif kind == 'Contextual views':
+            for record in self.records.get('context', []):
+                if not subject or subject in json.loads(record['participants']):
+                    self.picker.addItem(f"{record['title']} · {record['created_at'][:16]}", ('context', record))
         else:
             for record in reversed(self.records.get('revisions', [])):
                 self.picker.addItem(f"Data revision {record['number']} · {record['mode'].lower()}", ('data', record))
@@ -116,6 +128,8 @@ class ResearchHistoryPanel(QWidget):
         self.provenance.clear()
         value = self.picker.currentData()
         self.export.setEnabled(bool(value and value[0] == 'report'))
+        self.open_context.setVisible(self.kind.currentText() == 'Contextual views')
+        self.open_context.setEnabled(bool(value and value[0] == 'context'))
         self.tabs.setTabEnabled(1, bool(value and value[0] == 'run'))
         self.tabs.setCurrentIndex(0)
         self.binding.setText(f"{self.subject or 'Workspace'} · Frozen history · current research context is preserved")
@@ -144,10 +158,19 @@ class ResearchHistoryPanel(QWidget):
                 from .method_selector import run_html
                 self.preview.setHtml(run_html(record, include_details=False))
             self.figure.show_figure(run_figure(record))
+        elif kind == 'context':
+            self.binding.setText(f"{record['id']} · {record['revision_id']} · Frozen contextual view")
+            self.preview.setPlainText(f"{record['title']}\n\nSaved {record['created_at']}\n"
+                                      f"SHA-256 {record['content_hash']}")
         else:
             self.preview.setPlainText(f"Data revision {record['number']} · {record['mode']}\n"
                 f"Created {record['created_at']}\nImmutable measurements; inspecting this record does not activate it.\n"
                 'Use the workspace History action to explicitly change the active data revision.')
+
+    def _open_context(self):
+        selected = self.picker.currentData()
+        if selected and selected[0] == 'context':
+            self.context_requested.emit(selected[1]['id'])
 
     def export_report(self):
         value = self.picker.currentData()

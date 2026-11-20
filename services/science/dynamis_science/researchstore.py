@@ -39,7 +39,7 @@ from . import realstore
 from .data_root import paths
 
 SCHEMA_VERSION = "dynamis-science.research@1.0.0"
-DB_SCHEMA_VERSION = 4
+DB_SCHEMA_VERSION = 5
 _transaction_connection: ContextVar[Any] = ContextVar("research_transaction", default=None)
 
 STUDY_STATES = ("DRAFT", "READY", "ACTIVE", "ANALYSIS", "COMPLETED", "ARCHIVED")
@@ -414,6 +414,15 @@ _SCHEMA = (
         document TEXT NOT NULL,
         PRIMARY KEY (workspace_id, anchor_id, source_id, version)
     )""",
+    """CREATE TABLE IF NOT EXISTS context_views (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES entities(id),
+        revision_id TEXT NOT NULL REFERENCES workspace_revisions(id),
+        created_at TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        document TEXT NOT NULL
+    )""",
+    """CREATE INDEX IF NOT EXISTS context_views_workspace ON context_views(workspace_id, created_at)""",
     """CREATE TABLE IF NOT EXISTS entity_versions (
         entity_id TEXT NOT NULL,
         version INTEGER NOT NULL,

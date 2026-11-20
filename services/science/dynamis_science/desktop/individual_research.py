@@ -149,6 +149,7 @@ class IndividualResearchPanel(QWidget):
     analysis_saved = Signal(dict)
     context_changed = Signal()
     reports_requested = Signal()
+    context_requested = Signal()
     export_requested = Signal()
     trace_requested = Signal(str, str)
 
@@ -445,6 +446,9 @@ class IndividualResearchPanel(QWidget):
         self.frozen_reports.clicked.connect(self.reports_requested)
         report_actions.addWidget(self.export_result)
         report_actions.addWidget(self.frozen_reports)
+        context = QPushButton('Explore training & testing context')
+        context.clicked.connect(self.context_requested)
+        report_actions.addWidget(context)
         layout.addLayout(report_actions)
         self.result_tabs = QTabWidget()
         self.result_view = QTextBrowser()

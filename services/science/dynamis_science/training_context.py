@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ OPTIONAL = (
     "measure", "value", "unit", "questionnaire", "questionnaire_version",
     "adherence", "deviation", "reason",
 )
+TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(Z|([+-])(\d{2}):(\d{2}))")
 
 
 class SourceMapping(BaseModel):
@@ -120,9 +122,12 @@ def _time(text: str | None) -> str | None:
     if text is None:
         return None
     try:
-        value = datetime.fromisoformat(text)
-        if value.utcoffset() is not None and "T" in text:
-            return value.isoformat()
+        match = TIMESTAMP.fullmatch(text)
+        if match:
+            offset, _, hours, minutes = match.groups()
+            if offset == "Z" or (offset != "-00:00" and int(minutes) < 60
+                                 and (int(hours) < 14 or offset in {"+14:00", "-14:00"})):
+                return datetime.fromisoformat(text).isoformat()
     except ValueError:
         pass
     raise ValueError("Use an ISO date and time with an explicit UTC offset, for example 2026-08-12T18:00:00-03:00.")
@@ -239,7 +244,10 @@ def preview(workspace_id: str, revision_id: str, source_id: str, file: str | Pat
         raise store.ResearchValidation("A context source requires between 1 and 50,000 rows.")
     if importer._sha256(path) != raw:
         raise store.ResearchConflict("The source changed during review. Preview it again.")
-    history = [item for item in source_history(workspace_id, revision_id) if item["source"]["id"] == source_id]
+    records = source_history(workspace_id, revision_id)
+    if any(item["raw_sha256"] == raw and item["source"]["id"] != source_id for item in records):
+        raise store.ResearchValidation("Identical source bytes already belong to another attached source identity.")
+    history = [item for item in records if item["source"]["id"] == source_id]
     prior = history[-1] if history else None
     bindings = prior["bindings"] if prior else {}
     allowed = set(roster(revision))
@@ -252,12 +260,15 @@ def preview(workspace_id: str, revision_id: str, source_id: str, file: str | Pat
     previous = {item["record_id"]: item for item in _read_observations(prior).to_dicts()} if prior else {}
     parsed = {}
     grains = set()
+    scales = {}
     for index, entry in enumerate(frame.iter_rows(named=True), 1):
         values = {name: _text(value) for name, value in entry.items()}
         key = values["record_id"]
         try:
             if not key or key in parsed:
                 raise ValueError("Record identifiers must be present and unique within the source.")
+            if any(len(values.get(name) or "") > 150 for name in ("record_id", "participant", "questionnaire", "measure", "unit")):
+                raise ValueError("Record, participant and measure identifiers must be at most 150 characters.")
             observation = _observation(values, resolved[values["participant"]], index)
             grain = (observation.external_id, observation.kind, observation.measure,
                      observation.questionnaire, observation.questionnaire_version,
@@ -265,6 +276,10 @@ def preview(workspace_id: str, revision_id: str, source_id: str, file: str | Pat
             if grain in grains:
                 raise ValueError("Duplicate observation at the same participant, measure and timestamp.")
             grains.add(grain)
+            if observation.kind == "WELLNESS":
+                instrument = (observation.questionnaire, observation.questionnaire_version, observation.measure)
+                if scales.setdefault(instrument, observation.unit) != observation.unit:
+                    raise ValueError("A questionnaire item version must use one explicit measurement unit.")
             original = previous.get(key)
             if original and any(original[field] != getattr(observation, field) for field in
                                 ("external_id", "subject_id", "kind", "measure", "questionnaire")):
@@ -275,11 +290,15 @@ def preview(workspace_id: str, revision_id: str, source_id: str, file: str | Pat
     if set(previous) - set(parsed):
         raise store.ResearchValidation("A new source version must keep prior record IDs and mark missing or omitted observations explicitly.")
     qc = Counter(flag for observation in parsed.values() for flag in observation.qc)
+    changes = Counter("new" if key not in previous else
+                      "unchanged" if row.model_dump(exclude={"source_row"}) ==
+                      {field: value for field, value in previous[key].items() if field != "source_row"} else "changed"
+                      for key, row in parsed.items())
     receipt = {"method": SOURCE_METHOD, "workspace_id": workspace_id, "anchor_id": anchor_id(revision),
                "data_revision_id": revision_id, "source": source, "format": info,
                "filename": path.name, "raw_sha256": raw, "mapping": mapping.model_dump(),
                "columns": configured, "unused_columns": sorted(set(columns) - set(configured.values())),
-               "bindings": {**bindings, **resolved}, "row_count": len(parsed), "qc": dict(qc),
+               "bindings": {**bindings, **resolved}, "row_count": len(parsed), "qc": dict(qc), "changes": dict(changes),
                "prior_id": prior["id"] if prior else None, "version": len(history) + 1}
     return receipt, list(parsed.values())
 
@@ -288,7 +307,7 @@ def attach(workspace_id: str, revision_id: str, source_id: str, file: str | Path
            mapping: SourceMapping, preview_receipt: dict, reviewer: str) -> dict:
     if not reviewer.strip():
         raise store.ResearchValidation("Record who reviewed participant mappings, units and source rights.")
-    destination = None
+    identity = destination = None
     committed = False
     try:
         with store._tx() as connection:
@@ -307,9 +326,11 @@ def attach(workspace_id: str, revision_id: str, source_id: str, file: str | Path
                     or importer._sha256(Path(artifact["stored_path"])) != receipt["raw_sha256"]):
                 raise store.ResearchConflict("The retained file differs from the reviewed source.")
             identity = store._new_id("CTX-U")
-            destination = paths()["research"] / "context" / f"{identity}.parquet"
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            pl.DataFrame([row.model_dump() for row in rows], infer_schema_length=None).write_parquet(destination)
+            target = paths()["research"] / "context" / f"{identity}.parquet"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("xb") as output:
+                destination = target
+                pl.DataFrame([row.model_dump() for row in rows], infer_schema_length=None).write_parquet(output)
             receipt.update(id=identity, artifact_id=artifact["id"], parquet_sha256=importer._sha256(destination),
                            reviewed_by=reviewer.strip(), created_at=store._now())
             connection.execute("INSERT INTO context_sources VALUES (?, ?, ?, ?, ?, ?)",
@@ -320,7 +341,10 @@ def attach(workspace_id: str, revision_id: str, source_id: str, file: str | Path
         return receipt
     finally:
         if destination and not committed:
-            destination.unlink(missing_ok=True)
+            with store._connect() as connection:
+                persisted = connection.execute("SELECT 1 FROM context_sources WHERE id = ?", (identity,)).fetchone()
+            if not persisted:
+                destination.unlink(missing_ok=True)
 
 
 def observations(workspace_id: str, revision_id: str, subject_ids: list[str],

@@ -2155,6 +2155,8 @@ class ResearchWorkbench(QWidget):
         self.training_context = TrainingContextPanel(window.run_task)
         self.tabs.addTab(self.training_context, TITLE)
         self.tabs.currentChanged.connect(self._training_context_selected)
+        self.history_panel.context_requested.connect(self._open_saved_training_context)
+        self.individual.context_requested.connect(lambda: window._go_research_stage('Training context'))
         self.individual.reports_requested.connect(lambda: window._go_research_stage('Reports / history'))
         self.individual.export_requested.connect(self.export_report)
         self.individual.trace_requested.connect(lambda snapshot, trial: window._open_workspace(snapshot, trace_trial=trial))
@@ -2177,6 +2179,10 @@ class ResearchWorkbench(QWidget):
             self.study_id if detail.get('workspace') else None,
             detail.get('active_data_revision_id'), subject,
         )
+
+    def _open_saved_training_context(self, view_id: str) -> None:
+        self.window._go_research_stage('Training context')
+        self.training_context.open_saved(view_id)
 
     def _build_overview(self) -> None:
         page = self.tabs.widget(0)
