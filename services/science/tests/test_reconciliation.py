@@ -262,6 +262,19 @@ def test_approved_mapping_cannot_seed_another_workspace(setup, tmp_path):
     assert store.data_revisions(other) == []
 
 
+def test_approved_mapping_cannot_seed_a_legacy_monitoring_program(setup, tmp_path):
+    _, workspace, _, _ = setup
+    incoming = write_export(tmp_path / "mapped.csv", followup_rows(), FOLLOWUP_FIELDS)
+    entry = reconcile.propose(workspace, incoming)
+    approved = decide(revise(entry, athletes={"A07-renamed": "A07"},
+                             sessions={"Week 12 export": "Follow-up"},
+                             declared=declaration(entry)), "APPROVED")
+    project = store.create_project("Unrelated legacy program")
+    with pytest.raises(store.ResearchValidation, match="workspace-bound"):
+        store.create_monitoring_program(project["id"], {"title": "Follow-up",
+            "dataset_snapshot_id": approved["decision"]["snapshot_id"], "primary_metric_id": "MET-CMJ-HEIGHT"})
+
+
 def test_approval_requires_retained_reference_qc(setup, tmp_path):
     _, workspace, _, first = setup
     incoming = write_export(tmp_path / "pending.csv", followup_rows(), FOLLOWUP_FIELDS)

@@ -1582,6 +1582,8 @@ def create_monitoring_program(project_id: str, payload: dict[str, Any]) -> dict[
     snapshot = get_snapshot(snapshot_id)
     if snapshot is None:
         raise ResearchValidation(f"Snapshot {snapshot_id} is not admitted")
+    if snapshot.get("admission_metadata", {}).get("import", {}).get("reconciliation"):
+        raise ResearchValidation("Reconciled input is workspace-bound. Select the original admitted source.")
     metrics = dataset_metrics(snapshot_id)
     metric = next((item for item in metrics if item["id"] == metric_id), None)
     if metric is None:
