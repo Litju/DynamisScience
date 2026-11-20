@@ -525,6 +525,8 @@ class IndividualResearchPanel(QWidget):
         change = result["observed_change"]
         observed = f"Observed change {change:+.2f} cm." if change is not None else "A comparable change is unavailable."
         evidence = result["retest_evidence"]
+        fixture = any(item["rights_status"] == "FIXTURE_ONLY" for provenance in result["provenance"].values()
+                      for item in provenance["inputs"].values())
         if evidence:
             lower, upper = evidence["prediction_95"]
             conclusion = (f"The observed change is <b>{esc(result['relation_to_retest'].lower())}</b> the matched "
@@ -534,6 +536,9 @@ class IndividualResearchPanel(QWidget):
                            f"error {evidence['typical_error']:.2f} cm, MDC95 {evidence['mdc95']:.2f} cm, "
                            f"consistency ICC(3,1) {evidence['icc_3_1']:.2f}.")
             next_step = "Review the captured testing conditions before applying the retest evidence to another comparison."
+            if fixture:
+                conclusion = "Synthetic arithmetic demonstration only. " + conclusion
+                next_step = "Collect independent empirical retest pairs with applicable acquisition and aggregation."
         else:
             conclusion = " ".join(esc(reason) for reason in result["reasons"])
             next_step = {
@@ -541,8 +546,6 @@ class IndividualResearchPanel(QWidget):
                 "NOT_ESTIMABLE": "Check missing trials and obtain a reviewed, matched between-session retest reference.",
                 "UNQUALIFIED": "Resolve source verification or supply retest evidence that matches the recorded comparison.",
             }[result["status"]]
-        fixture = any(item["rights_status"] == "FIXTURE_ONLY" for provenance in result["provenance"].values()
-                      for item in provenance["inputs"].values())
         label = " · Synthetic fixture" if fixture else ""
         self.result_view.setHtml(
             f"<p><b>{esc(result['status'])}</b> · Participant {esc(result['subject_id'])} · Jump height (cm) · {esc(run['id'])}{label}</p>"

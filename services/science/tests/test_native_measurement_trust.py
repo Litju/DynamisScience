@@ -98,7 +98,7 @@ def test_twenty_athletes_retest_correction_and_refusals_in_native_results(qtbot,
     panel.trust_review.click()
     assert not failures
     qualified = execute(panel)
-    assert qualified["result"]["status"] == "INTERPRETABLE"
+    assert qualified["result"]["status"] == "SYNTHETIC_DEMONSTRATION"
     assert qualified["result"]["retest_evidence"]["n_pairs"] == 19
     assert qualified["result"]["observed_change"] == pytest.approx(3)
     assert qualified["data_revision_id"] == linked

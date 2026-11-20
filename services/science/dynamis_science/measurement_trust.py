@@ -18,6 +18,7 @@ from .analysis import two_way_icc
 from .data_root import paths
 
 METHOD = "METH-U-MEASUREMENT-TRUST"
+VERSION = "1.1.0"
 METRIC = "MET-CMJ-HEIGHT"
 TABLE = "cmj_trials"
 COLUMN = "jump_height_cm"
@@ -83,7 +84,7 @@ class RetestEvidence(BaseModel):
 
 
 class MeasurementTrustResult(BaseModel):
-    status: Literal["INTERPRETABLE", "INCOMPARABLE", "NOT_ESTIMABLE", "UNQUALIFIED"] = "UNQUALIFIED"
+    status: Literal["INTERPRETABLE", "SYNTHETIC_DEMONSTRATION", "INCOMPARABLE", "NOT_ESTIMABLE", "UNQUALIFIED"] = "UNQUALIFIED"
     subject_id: str
     outcome_metric_id: str = METRIC
     unit: str = "cm"
@@ -276,6 +277,9 @@ def _source_context(rows: pl.DataFrame, note: dict) -> tuple[tuple | None, list[
         return None, ["Instrument, protocol and sampling rate must be explicit and homogeneous."]
     issues = []
     sources = set(rows["source_artifact_id"]) if "source_artifact_id" in rows.columns else {None}
+    rights = {note["inputs"][artifact]["rights_status"] for artifact in sources if artifact in note["inputs"]}
+    if len(rights) > 1:
+        issues.append("A session score mixes empirical observations and synthetic fixture trials.")
     for artifact_id in sources:
         source = note["inputs"].get(artifact_id)
         if not source or not source["qc"] or source["qc"]["status"] not in {"ADMITTED", "ADMITTED_WITH_WARNINGS"}:
@@ -290,7 +294,7 @@ def _source_context(rows: pl.DataFrame, note: dict) -> tuple[tuple | None, list[
         elif instrument["calibration_status"] != ("SIMULATED" if source["rights_status"] == "FIXTURE_ONLY" else "CALIBRATED"):
             issues.append("The instrument calibration has not been established for this source.")
     note.setdefault("acquisition", {})[protocol_id] = {"protocol": protocol, "instrument": instrument, "sampling_hz": sampling}
-    return (instrument_id, protocol_id, sampling), sorted(set(issues))
+    return (instrument_id, protocol_id, sampling, tuple(sorted(rights))), sorted(set(issues))
 
 
 def _bad_trials(session: Session) -> bool:
@@ -313,8 +317,11 @@ def _retest(frame: pl.DataFrame, revision_id: str, note: dict, review: RetestRev
         result.reasons.append("Retest and comparison require the same positive recorded day interval and trial count per session.")
         return None
     visit_context, issues = _source_context(visits, note)
-    if issues or visit_context != context:
+    if issues or visit_context[:3] != context[:3]:
         result.reasons.extend(issues or ["Retest acquisition differs from the compared sessions."])
+        return None
+    if visit_context[3] != context[3]:
+        result.reasons.append("Retest and comparison must both be empirical observations or both be synthetic fixtures.")
         return None
     if visits["trial_id"].null_count() or visits["trial_id"].n_unique() != visits.height:
         result.reasons.append("The retest sessions contain missing or reused trial identifiers.")
@@ -387,8 +394,10 @@ def evaluate(workspace_id: str, active_id: str, subject: str, request: Compariso
         result.reasons.append("The comparison week precedes the reference week.")
     a_context, a_issues = _source_context(a_rows, earlier_note) if a.trials else (None, [])
     b_context, b_issues = _source_context(b_rows, note) if b.trials else (None, [])
-    if a_context and b_context and a_context != b_context:
+    if a_context and b_context and a_context[:3] != b_context[:3]:
         result.reasons.append("Instrument, protocol or sampling rate changed between the sessions.")
+    if a_context and b_context and a_context[3] != b_context[3]:
+        result.reasons.append("The compared sessions mix empirical observations and synthetic fixtures.")
     result.reasons.extend(sorted(set(a_issues + b_issues)))
     if result.reasons:
         result.status = "INCOMPARABLE"
@@ -408,7 +417,7 @@ def evaluate(workspace_id: str, active_id: str, subject: str, request: Compariso
         return result
     evidence = _retest(current, active_id, note, request.retest, result, b_context)
     if evidence is not None:
-        result.status = "INTERPRETABLE"
+        result.status = "SYNTHETIC_DEMONSTRATION" if b_context[3] == ("FIXTURE_ONLY",) else "INTERPRETABLE"
         result.retest_evidence = evidence
         low, high = evidence.prediction_95
         result.relation_to_retest = "BELOW" if result.observed_change < low else "ABOVE" if result.observed_change > high else "WITHIN"

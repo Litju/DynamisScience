@@ -204,8 +204,8 @@ METHODS: dict[str, dict[str, Any]] = {
     "METH-U-MEASUREMENT-TRUST": {
         "id": "METH-U-MEASUREMENT-TRUST",
         "name": "Measurement trust and individual change",
-        "version": "1.0.0",
-        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "basis": "Session means and matched retest arithmetic have independent synthetic checks. Interpretation requires independent matched retest pairs and a recorded review of the design and its applicability."},
+        "version": "1.1.0",
+        "qualification": {"status": "QUALIFIED_DESCRIPTIVE", "basis": "Synthetic pairs verify arithmetic only. Empirical interpretation requires empirical matched retest pairs and a recorded review of the design and its applicability."},
         "supported_designs": ["OBSERVATIONAL_LONGITUDINAL", "REPEATED_MEASURES", "DESCRIPTIVE"],
         "required_tables": ["cmj_trials"],
         "required_shape": "Recorded sessions in admitted CMJ summary revisions, with one participant and jump height in cm.",

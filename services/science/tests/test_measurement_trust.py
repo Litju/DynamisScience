@@ -63,7 +63,7 @@ def request_for(revision, *, source=None, target=SESSIONS[3], retest=RETEST):
 
 def run_assessment(service, workspace, investigation, revision, parameters):
     return service.execute_analysis_run(workspace, {
-        "method_id": trust.METHOD, "method_version": "1.0.0", "outcome_metric_id": trust.METRIC,
+        "method_id": trust.METHOD, "method_version": trust.VERSION, "outcome_metric_id": trust.METRIC,
         "data_revision_id": revision, "parameters": parameters,
         "scope": {"kind": "INDIVIDUAL", "subject_id": "A01", "investigation_id": investigation["id"],
                   "investigation_version": investigation["version"]},
@@ -74,7 +74,7 @@ def test_matched_retest_arithmetic_and_persistence(assessment):
     service, workspace, base, revision, investigation, approval = assessment
     run = run_assessment(service, workspace, investigation, revision, request_for(revision, source=base))
     result = trust.MeasurementTrustResult.model_validate(run["result"])
-    if result.status != "INTERPRETABLE":
+    if result.status != "SYNTHETIC_DEMONSTRATION":
         pytest.fail(result.model_dump_json())
     assert result.observed_change == pytest.approx(3)
     assert result.reference.mean == pytest.approx(30.25)
