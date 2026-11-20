@@ -147,9 +147,18 @@ def _reference(revision: dict) -> tuple[dict, pl.DataFrame, dict, dict]:
     prior = [r for item in inputs for r in receipts
              if r["source_artifact_id"] == item["admission"]["source_artifact_id"]]
     for item in inputs:
-        artifact = admission.get_source_artifact(item["admission"]["source_artifact_id"])
+        record = item["admission"]
+        artifact = admission.get_source_artifact(record["source_artifact_id"])
         if not artifact or importer._sha256(Path(artifact["stored_path"])) != artifact["content_hash_sha256"]:
             raise importer.ImportBlocked(f"Reference snapshot {item['id']} has a corrupt source artifact.")
+        quality = admission.get_quality(record["quality_assessment_id"])
+        if (not quality or quality.get("source_artifact_id") != artifact["id"]
+                or quality.get("status") != record["status"] or quality["status"] not in importer.ADMITTABLE
+                or quality.get("metadata") != item["admission_metadata"]):
+            raise importer.ImportBlocked(f"Retained reference QC does not match admission for {item['id']}.")
+        captured = item["provenance"].get("protocol_metadata")
+        if captured and captured != [protocol]:
+            raise importer.ImportBlocked(f"Registered protocol differs from the retained reference for {item['id']}.")
     for receipt in prior:
         if importer._sha256(Path(receipt["raw_copy"])) != receipt["raw_sha256"]:
             raise importer.ImportBlocked(f"Retained reference export {receipt['raw_filename']} failed its checksum check.")

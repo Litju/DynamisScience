@@ -262,6 +262,23 @@ def test_approved_mapping_cannot_seed_another_workspace(setup, tmp_path):
     assert store.data_revisions(other) == []
 
 
+def test_approval_requires_retained_reference_qc(setup, tmp_path):
+    _, workspace, _, first = setup
+    incoming = write_export(tmp_path / "pending.csv", followup_rows(), FOLLOWUP_FIELDS)
+    proposal = reconcile.propose(workspace, incoming)
+    ready = revise(proposal, athletes={"A07-renamed": "A07"},
+                   sessions={"Week 12 export": "Follow-up"}, declared=declaration(proposal))
+    assert ready["ready"]
+    quality_id = first["snapshot"]["admission"]["quality_assessment_id"]
+    catalogue = admission._artifact_path("admission_quality.json")
+    records = admission._load_list(catalogue)
+    admission._save_list(catalogue, [record for record in records if record["id"] != quality_id])
+    with pytest.raises(importer.ImportBlocked, match="reference QC"):
+        decide(ready, "APPROVED")
+    assert len(store.data_revisions(workspace)) == 1
+    assert reconcile.history(workspace)[0] == ready
+
+
 def test_source_conflict_and_semantic_duplicate(setup, tmp_path):
     _, workspace, _, _ = setup
     baseline = baseline_rows()
