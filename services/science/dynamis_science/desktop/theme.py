@@ -205,6 +205,25 @@ QStatusBar QLabel { color: $dim_text; padding: 0 6px; }
 QSplitter::handle { background: transparent; }
 QSplitter::handle:hover { background: $line; }
 
+/* ---- study and investigation ---- */
+QToolBar#ResearchContext { background: $window; border-bottom: 1px solid $line2; min-height: 54px; }
+QLabel#ResearchWordmark { font-family: Georgia; font-size: 19px; font-weight: bold; padding-right: 12px; }
+QLabel#ResearchLocation { color: $muted; padding-left: 6px; }
+QPushButton#ResearchDestination { min-height: 26px; min-width: 82px; border: 1px solid transparent; background: transparent; }
+QPushButton#ResearchDestination:checked { border-color: $accent_text; background: $accent_tint; color: $text; font-weight: bold; }
+QPushButton#ResearchDestination:hover { border-color: $line2; }
+QPushButton#ResearchDestination:focus { border-color: $accent_text; }
+QPushButton#ResearchDestination:disabled { color: $faint; }
+QWidget#StudyHome { background: $window; }
+QLabel#StudyHeading, QLabel#InvestigationFinding { font-family: Georgia; font-weight: bold; color: $text; }
+QLabel#StudyHeading { font-size: 30px; }
+QLabel#StudySummary { color: $muted; }
+QPushButton#StudyDestination { text-align: left; padding: 9px 16px; min-height: 26px; font-weight: bold;
+    border-left: 4px solid $line2; background: $base; }
+QPushButton#StudyDestination:hover, QPushButton#StudyDestination:focus { border-left-color: $accent_text; background: $accent_tint; }
+QLabel#InvestigationMode { padding: 4px 8px; border: 1px solid $accent_edge; border-radius: 6px; background: $accent_tint; }
+QLabel#InvestigationMode[frozen="true"] { background: $warn_chip; color: $warn_text; border-color: $warn_edge; }
+
 /* ---- generic controls ---- */
 QTreeWidget, QTreeView, QListWidget, QListView, QTableView, QTextBrowser, QPlainTextEdit, QTextEdit, QLineEdit,
 QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit, QTableWidget {

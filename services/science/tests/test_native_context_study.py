@@ -9,12 +9,13 @@ import sqlite3
 
 import pytest
 from PySide6.QtCore import QPointF, QTimer, Qt
-from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QInputDialog, QMessageBox
 
 from dynamis_science import admission, context_timeline as timeline, importer, reconciliation
 from dynamis_science import researchstore as store, training_context as context
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.services import DynamisAppService
+from dynamis_science.desktop.study_home import _NODES
 from dynamis_science.desktop.training_context import ContextSourceDialog
 from dynamis_science.qa_cleanup import read_marker
 from test_reconciliation import FIELDS, declaration, decide, revise, write_export
@@ -246,6 +247,65 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     assert not window.scope_picker.isVisible()
     assert not window.research.tabs.tabBar().isVisible()
     assert "Jump height" in panel.evidence.details.toPlainText()
+    assert window.investigate_button.isChecked() and window.study_button.isVisible()
+    window.study_button.click()
+    study_home = window.study_home
+    assert study_home.isVisible() and window.study_button.isChecked()
+    assert not window.stage_picker.isVisible() and not window.research.tabs.tabBar().isVisible()
+    instrument = study_home.instrument
+    original_projection = instrument._project(_NODES[1])[0]
+    instrument.setFocus()
+    qtbot.keyClick(instrument, Qt.Key.Key_Right)
+    assert instrument._project(_NODES[1])[0] != original_projection
+    qtbot.keyClick(instrument, Qt.Key.Key_Home)
+    pos = instrument._project(_NODES[1] * 1.17)[0].toPoint()
+    qtbot.mouseClick(instrument, Qt.MouseButton.LeftButton, pos=pos)
+    wait(window)
+    assert window.location.text() == "Sources & quality"
+    window.investigate_button.click()
+    wait(window)
+    assert panel.scope.currentData() == "A01" and panel.comparison is comparison
+
+    def check_task(title, verify):
+        opened = []
+
+        def review():
+            dialog = QApplication.activeModalWidget()
+            assert isinstance(dialog, QDialog)
+            try:
+                task_panel = window.research.individual
+                assert title in dialog.windowTitle()
+                assert not task_panel.tabs.tabBar().isVisible()
+                qtbot.waitUntil(lambda: task_panel.payload.get("investigation", {}).get("id") == investigation["id"], timeout=20000)
+                verify(task_panel)
+                opened.append(True)
+            finally:
+                dialog.reject()
+
+        QTimer.singleShot(50, review)
+        panel.evidence.followup.click()
+        wait(window)
+        assert opened and panel.comparison is comparison and window._investigation_visible()
+
+    first_plan = next(i for i, row in enumerate(panel.visible_rows) if row["kind"] == "PLAN")
+    panel.evidence.picker.setCurrentIndex(first_plan)
+
+    def planned(task_panel):
+        qtbot.waitUntil(lambda: task_panel.protocol_sections.currentIndex() == 2, timeout=15000)
+        assert task_panel.period_table.item(task_panel.period_table.currentRow(), 1).text() == "Baseline"
+
+    check_task("A01 · Protocol", planned)
+    visit_index = next(i for i, row in enumerate(panel.visible_rows)
+                       if row.get("visit", {}).get("id") == late["visit"]["id"])
+    panel.evidence.picker.setCurrentIndex(visit_index)
+
+    def recorded(task_panel):
+        qtbot.waitUntil(lambda: task_panel.visit_editor.isVisible(), timeout=15000)
+        assert task_panel.visit_supersedes.currentData() == late["visit"]["id"]
+        assert task_panel.visit_adherence.text() == "80"
+
+    check_task("A01 · Visits", recorded)
+    assert panel.evidence.picker.currentIndex() == visit_index
     assert panel.plots.findText("Jump height (cm)") > 0
     panel.plots.setCurrentText("Jump height (cm)")
     assert panel.values_chart.isVisible()
@@ -303,8 +363,12 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     responses = [row for row in all_events if row["kind"] == "WELLNESS"]
     assert any(row["status"] == "MISSING" and row["value"] is None for row in responses)
     assert {row["questionnaire_version"] for row in responses} == {"1", "2"}
-    panel.scope.setCurrentIndex(panel.scope.findData("A20"))
+    window.study_button.click()
+    window.study_home.buttons["people"].click()
+    tile = next(tile for tile in window.squad.board.tiles() if "A20" in tile.accessibleName())
+    tile.click()
     wait(window)
+    assert window._investigation_visible() and panel.scope.currentData() == "A20"
     assert panel.comparison["status"] == "INCOMPARABLE" and panel.comparison["change"] is None
     assert "different numbers of trials" in panel.comparison_summary.text()
 

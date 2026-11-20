@@ -103,7 +103,6 @@ class AthleteTile(QToolButton):
 class SquadBoard(QWidget):
     athlete_opened = Signal(dict)
     loaded = Signal()
-    research_requested = Signal()
 
     def __init__(self, service: DynamisAppService, run_task: RunTask, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -137,12 +136,8 @@ class SquadBoard(QWidget):
         bar.addWidget(self.metric_picker)
         bar.addWidget(QLabel("Group by"))
         bar.addWidget(self.group_picker)
-        research = QPushButton("Research workbench")
-        research.setToolTip("Cohort analyses, evidence and reports")
-        research.clicked.connect(self.research_requested.emit)
         bar.addWidget(self.rules_button)
         bar.addWidget(self.simulate_button)
-        bar.addWidget(research)
         layout.addLayout(bar)
         self.note = QLabel("")
         self.note.setWordWrap(True)
@@ -178,9 +173,10 @@ class SquadBoard(QWidget):
         self.board = board
         flagged = sum(1 for group in board["groups"] for athlete in group["athletes"] if athlete["flags"])
         total = sum(len(group["athletes"]) for group in board["groups"])
-        self.title.setText(f"<b>{html.escape(board.get('title', 'Squad research'))}</b> · {board['data_revision_id']} · {total} participants · {board['metric']['label']} ({board['metric']['unit']})")
+        self.title.setText(f"<b>{total} athletes</b> · {html.escape(board['metric']['label'])} ({html.escape(board['metric']['unit'])})")
+        self.title.setToolTip(f"Source data revision {board['data_revision_id']}")
         self.note.setText(board["note"] if board["rules"] else
-                          "Open a participant to inspect measurements and create an investigation, or open Research Workbench for cohort analyses. Flags are optional researcher-defined descriptions, not validated risk classifications.")
+                          "Select an athlete to open their investigation.")
         self.group_picker.blockSignals(True)
         self.group_picker.clear()
         labels = {"category": "Flag category", "trend": "Trend"}

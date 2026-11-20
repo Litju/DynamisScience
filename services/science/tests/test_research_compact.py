@@ -56,13 +56,13 @@ def test_compact_surface_receipt(qtbot, service, study, monkeypatch):
                   'roster_scroll': series.roster.horizontalScrollBar().maximum(), 'toolbar_visible': bars}
         assert series.roster.horizontalScrollBar().maximum() == 0
         assert {m['subject_id'] for m in series.selected()} == {'P01', 'P02'}
-        workspace_bar = window.findChild(QToolBar, 'PersistentWorkspaceActions')
-        for name in ('Add data', 'Analyze', 'Export report'):
-            widget = workspace_bar.widgetForAction(window.workspace_actions[name])
+        context_bar = window.findChild(QToolBar, 'ResearchContext')
+        for widget in (window.investigate_button, window.study_button):
             assert widget.isVisible() and not widget.visibleRegion().isEmpty()
-            assert workspace_bar.rect().contains(widget.geometry())
+            assert context_bar.rect().contains(widget.geometry())
+        for name in ('Add data', 'Analyze', 'Export report'):
             assert not window.workspace_actions[name].shortcut().isEmpty()
-        assert window.context_binding.isVisible() and not window.context_binding.visibleRegion().isEmpty()
+        assert not window.scope_picker.isVisible() and not window.stage_picker.isVisible()
         if out:
             window.grab().save(str(out/f'series-{width}.png'))
         stage(window, 'Protocol')

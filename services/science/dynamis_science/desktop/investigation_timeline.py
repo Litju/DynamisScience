@@ -62,8 +62,8 @@ class InvestigationChart(pg.PlotWidget):
 
     def set_theme(self, name):
         self.dark = name == "dark"
-        background = "#172329" if self.dark else "#f7faf9"
-        self.ink = "#e3efee" if self.dark else "#273c39"
+        background = "#211f1b" if self.dark else "#fbf7ed"
+        self.ink = "#efe5d2" if self.dark else "#3b3329"
         self.setBackground(background)
         for side in ("left", "bottom"):
             axis = self.getAxis(side)
@@ -168,6 +168,9 @@ class EvidencePanel(QWidget):
         self.details.setAccessibleName("Selected observation evidence")
         self.details.setMinimumHeight(105)
         layout.addWidget(self.details, 1)
+        self.followup = QPushButton()
+        self.followup.hide()
+        layout.addWidget(self.followup)
         self.provenance_button = QPushButton("Details / Provenance…")
         self.provenance_button.clicked.connect(self._open_provenance)
         layout.addWidget(self.provenance_button)
@@ -184,6 +187,7 @@ class EvidencePanel(QWidget):
         self.picker.setCurrentIndex(-1)
         self.picker.blockSignals(False)
         self.picker.setEnabled(bool(rows))
+        self.followup.hide()
         self.show_row(None, None)
 
     def show_row(self, row, view):

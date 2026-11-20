@@ -16,6 +16,7 @@ from .plots import ScientificFigureWidget, run_figure
 
 class ResearchHistoryPanel(QWidget):
     context_requested = Signal(str)
+    compose_requested = Signal()
 
     def __init__(self, service, run_task, parent=None):
         super().__init__(parent)
@@ -41,6 +42,9 @@ class ResearchHistoryPanel(QWidget):
         self.export = QPushButton('Export selected frozen report…')
         self.export.clicked.connect(self.export_report)
         controls.addWidget(self.export)
+        compose = QPushButton("Write report…")
+        compose.clicked.connect(self.compose_requested)
+        controls.addWidget(compose)
         self.open_context = QPushButton('Open selected contextual view…')
         self.open_context.clicked.connect(self._open_context)
         self.open_context.hide()

@@ -190,13 +190,13 @@ def test_twelve_week_researcher_journey(qtbot, service, tmp_path, monkeypatch):
     assert store.get_entity(identity)['active_data_revision_id'] == revision
     assert store.get_entity(identity)['research_context']['subject_id'] == 'SUB-001'
     assert not errors, errors
-    # Keyboard reaches the persistent stage selector without navigating inner tabs.
+    # The two destinations remain in keyboard order while viewing a historical report.
     window.activateWindow()
     qtbot.wait(10)
-    window.scope_picker.setFocus()
-    assert window.scope_picker.hasFocus()
-    qtbot.keyClick(window.scope_picker, Qt.Key.Key_Tab)
-    assert window.stage_picker.hasFocus()
+    window.investigate_button.setFocus()
+    assert window.investigate_button.hasFocus()
+    qtbot.keyClick(window.investigate_button, Qt.Key.Key_Tab)
+    assert window.study_button.hasFocus()
     window.resize(911, 480)  # 1366×720 physical-area equivalent at 150%; not actual Windows DPI.
     stage(window, 'Observations')
     assert panel.visit_editor_toggle.isVisible()

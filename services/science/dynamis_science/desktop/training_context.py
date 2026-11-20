@@ -2,20 +2,25 @@
 
 from __future__ import annotations
 
+import json
+
 import pyqtgraph as pg
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
-    QInputDialog, QLabel, QLineEdit, QPushButton, QTextBrowser,
+    QInputDialog, QLabel, QLineEdit, QMenu, QPushButton, QTextBrowser,
     QVBoxLayout, QWidget,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 from .. import context_timeline as timeline, measurement_trust
+from . import theme
 from .context_source_dialog import ContextSourceDialog, ERRORS
 from .individual_research import fit_dialog
 from .investigation_timeline import EvidencePanel, InvestigationChart, LANES, date_label, heading, readable, wrapping_label
 
 class TrainingContextPanel(QWidget):
+    tool_requested = Signal(str, object)
+
     def __init__(self, run_task, settings=None):
         super().__init__()
         self.run_task = run_task
@@ -26,21 +31,23 @@ class TrainingContextPanel(QWidget):
         self.view = self.saved = self.pair = self.comparison = None
         self._live_model = self._live_result = self._live_pair = None
         self._selection_by_scope = {}
+        self._event_selections = {}
         self._stale = self._outcome_message = ""
         self._import_change = None
         self._refresh_after_import = False
         self.visible_rows = []
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setContentsMargins(20, 12, 20, 12)
         layout.setSpacing(8)
         context_row = QHBoxLayout()
         self.scope = QComboBox()
         self.scope.setAccessibleName("Athlete or cohort")
         self.scope.setMinimumContentsLength(12)
         self.scope.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.scope.currentIndexChanged.connect(self._query)
+        self.scope.currentIndexChanged.connect(self._scope_changed)
         self.mode = QLabel()
+        self.mode.setObjectName('InvestigationMode')
         self.mode.setAccessibleName("Investigation mode and data revision")
         heading(self.mode, 11)
         self.pinned_scope = QLabel()
@@ -73,8 +80,9 @@ class TrainingContextPanel(QWidget):
         layout.addLayout(context_row)
 
         self.finding = QLabel()
+        self.finding.setObjectName('InvestigationFinding')
         self.finding.setTextFormat(Qt.TextFormat.PlainText)
-        heading(self.finding, 21)
+        heading(self.finding, 23)
         layout.addWidget(self.finding)
         finding_row = QHBoxLayout()
         self.comparison_summary = wrapping_label()
@@ -108,19 +116,30 @@ class TrainingContextPanel(QWidget):
         split.addLayout(timeline_layout, 3)
         self.evidence = EvidencePanel()
         self.evidence.selected.connect(self._select_observation)
+        self.evidence.followup.clicked.connect(self._open_evidence_tool)
         self.chart.selected.connect(self._select_observation)
         split.addWidget(self.evidence, 1)
         layout.addLayout(split, 1)
 
         footer = QHBoxLayout()
-        self.configure = QPushButton("Timeline settings…")
-        self.configure.clicked.connect(self._settings)
-        self.save_view = QPushButton("Freeze current view…")
+        self.research_actions = QPushButton("Research actions")
+        research = QMenu(self.research_actions)
+        for title, name in (("Plan", "Protocol"), ("Record visits", "Visits and timeline"), ("Run analysis", "Analysis"),
+                            ("Saved analyses", "Results"), ("Compare with cohort", "Compare with cohort"),
+                            ("Scenarios", "Scenarios"), ("Assessment data", "Data")):
+            research.addAction(title, lambda _checked=False, name=name: self.tool_requested.emit(name, None))
+        self.research_actions.setMenu(research)
+        self.configure = QPushButton("Timeline options")
+        options = QMenu(self.configure)
+        self.configure_action = options.addAction("Timeline settings…", self._settings)
+        self.save_view = QPushButton("Freeze current view…", self)
+        self.save_view.hide()
         self.save_view.clicked.connect(self._freeze)
-        self.method_details = QPushButton("Comparison details…")
-        self.method_details.clicked.connect(self._comparison_details)
-        for action in (self.configure, self.save_view, self.method_details):
-            footer.addWidget(action)
+        self.freeze_action = options.addAction("Freeze current view…", self.save_view.click)
+        self.method_details = options.addAction("Comparison details…", self._comparison_details)
+        self.configure.setMenu(options)
+        footer.addWidget(self.research_actions)
+        footer.addWidget(self.configure)
         footer.addStretch(1)
         layout.addLayout(footer)
 
@@ -176,13 +195,21 @@ class TrainingContextPanel(QWidget):
         if revision_numbers is not None:
             self.revision_numbers = revision_numbers
         if (workspace, revision) == (self.workspace, self.revision):
-            if subject and self.scope.findData(subject) >= 0 and not self.saved:
-                self.scope.setCurrentIndex(self.scope.findData(subject))
+            if subject and (self.saved or self.scope.currentData() != subject):
+                self.saved = None
+                index = self.scope.findData(subject)
+                if index >= 0 and self.scope.currentIndex() != index:
+                    self.scope.setCurrentIndex(index)
+                else:
+                    self.reload(subject)
             return
         changed_workspace = workspace != self.workspace
         if changed_workspace:
+            self.scope.blockSignals(True)
             self.scope.clear()
+            self.scope.blockSignals(False)
             self._selection_by_scope.clear()
+            self._event_selections.clear()
             self._live_model = self._live_result = self._live_pair = None
             self._outcome_message = self._stale = ""
             self._import_change = None
@@ -201,7 +228,8 @@ class TrainingContextPanel(QWidget):
         self.view = self.pair = self.comparison = None
         self._render()
         if workspace and revision:
-            self.reload(subject, reset=changed_workspace)
+            remembered = self.settings.value(f"timeline/{workspace}/scope", None) if changed_workspace and self.settings else None
+            self.reload(subject or remembered, reset=changed_workspace and subject is None and remembered is None)
 
     @staticmethod
     def _fill(combo, items, selection):
@@ -227,6 +255,8 @@ class TrainingContextPanel(QWidget):
                 return
             people, cohorts = value["participants"], value["cohorts"]
             selected = people[0] if reset and selection not in people and people else selection
+            if subject is not None and self.settings and subject in people:
+                self.settings.setValue(f"timeline/{workspace}/scope", subject)
             self._fill(self.scope, [(f"All athletes ({len(people)})", None),
                 *[(f"Athlete {item}", item) for item in people],
                 *[(f"Cohort · {row['name']}", f"cohort:{row['id']}") for row in cohorts]], selected)
@@ -265,6 +295,11 @@ class TrainingContextPanel(QWidget):
         self._render()
         self.finding.setText("Investigation unavailable")
         self.comparison_summary.setText(message)
+
+    def _scope_changed(self, *_):
+        if self.settings and self.workspace and self.scope.count() and not self.saved:
+            self.settings.setValue(f"timeline/{self.workspace}/scope", self.scope.currentData() or "")
+        self._query()
 
     def _query(self, *_, save_calendar=False):
         if not self.revision or self.saved:
@@ -380,18 +415,26 @@ class TrainingContextPanel(QWidget):
         self.scope.setEnabled(bool(self.revision and self.scope.count() and not frozen))
         self.pinned_scope.setVisible(frozen)
         self.pinned_dates.setVisible(frozen and bool(self.comparison))
-        self.configure.setVisible(not frozen)
-        self.configure.setEnabled(ready and not frozen)
+        self.configure.setEnabled(ready)
+        self.configure_action.setVisible(not frozen)
+        self.configure_action.setEnabled(ready and not frozen)
+        scope = self.scope.currentData()
+        self.research_actions.setVisible(not frozen)
+        self.research_actions.setEnabled(bool(ready and scope and not scope.startswith("cohort:")))
         self.add_source.setVisible(not frozen)
         self.add_source.setEnabled(ready and not frozen)
         self.live_view.setVisible(frozen)
         self.open_view.setVisible(not frozen)
         self.open_view.setEnabled(bool(self.workspace))
-        self.save_view.setVisible(not frozen)
-        self.save_view.setEnabled(bool(ready and self.view["events"] and not self._stale and not frozen))
+        can_freeze = bool(ready and self.view["events"] and not self._stale and not frozen)
+        self.save_view.setEnabled(can_freeze)
+        self.freeze_action.setVisible(not frozen)
+        self.freeze_action.setEnabled(can_freeze)
         revision = self.view["revision_id"] if frozen else self.revision
         self.mode.setText(f"{'FROZEN' if frozen else 'LIVE'} · {self._revision_label(revision)}")
         self.mode.setToolTip(revision or "")
+        self.mode.setProperty("frozen", frozen)
+        theme.repolish(self.mode)
         if frozen:
             view = self.view
             label = (view.get("cohort") or {}).get("name") or (
@@ -408,9 +451,11 @@ class TrainingContextPanel(QWidget):
         self._draw_chart()
         self.evidence.load(self.visible_rows)
         reference = self.comparison["reference"]["id"] if self.comparison else self.first.currentData()
-        first_assessment = next((i for i, row in enumerate(self.visible_rows) if row.get("id") == reference), 0)
         if self.visible_rows:
-            self._select_observation(first_assessment)
+            selected = self._event_selections.get(self._event_scope())
+            saved_index = next((i for i, row in enumerate(self.visible_rows) if self._event_key(row) == selected), None)
+            first_assessment = next((i for i, row in enumerate(self.visible_rows) if row.get("id") == reference), 0)
+            self._select_observation(first_assessment if saved_index is None else saved_index)
         if self.view:
             self._plot_options(self.visible_rows)
         else:
@@ -431,13 +476,37 @@ class TrainingContextPanel(QWidget):
         if hasattr(self, "evidence"):
             self.chart.highlight(self.evidence.picker.currentIndex())
 
+    def _event_scope(self):
+        return (self.view["revision_id"], self.saved["id"] if self.saved else None, self._scope_key())
+
+    @staticmethod
+    def _event_key(row):
+        period = row.get("period") or {}
+        return (row["kind"], row["subject_id"], row.get("id"), row.get("record_id"), row.get("investigation_id"),
+                (row.get("visit") or {}).get("id"), period.get("label"), row.get("source_name"))
+
+    def _open_evidence_tool(self):
+        index = self.evidence.picker.currentIndex()
+        if self.saved or not 0 <= index < len(self.visible_rows):
+            return
+        row = self.visible_rows[index]
+        name = {"PLAN": "Protocol", "VISIT": "Visits and timeline"}.get(row["kind"])
+        if name:
+            self.tool_requested.emit(name, row)
+
     def _select_observation(self, index):
         if not 0 <= index < len(self.visible_rows):
             return
         self.evidence.picker.blockSignals(True)
         self.evidence.picker.setCurrentIndex(index)
         self.evidence.picker.blockSignals(False)
-        self.evidence.show_row(self.visible_rows[index], self.view)
+        row = self.visible_rows[index]
+        self._event_selections[self._event_scope()] = self._event_key(row)
+        self.evidence.show_row(row, self.view)
+        followup = {"PLAN": "Review protocol…", "VISIT": "Review recorded visit…"}.get(row["kind"])
+        self.evidence.followup.setVisible(bool(followup and not self.saved))
+        if followup:
+            self.evidence.followup.setText(followup)
         self.chart.highlight(index)
 
     def _plot_options(self, events):
@@ -611,11 +680,15 @@ class TrainingContextPanel(QWidget):
     def _open(self):
         workspace, token = self.workspace, self.generation
 
+        scope = self.scope.currentData()
+
         def choose(records):
             if workspace != self.workspace or token != self.generation:
                 return
+            if scope and not scope.startswith("cohort:"):
+                records = [row for row in records if json.loads(row["participants"] or "[]") == [scope]]
             if not records:
-                self.summary.setText("There are no frozen investigations in this workspace.")
+                self.summary.setText("No frozen investigations for this selection. The Study archive shows all saved views.")
                 return
             labels = {
                 f"{row['title']} · {self._revision_label(row['revision_id'])} · "
