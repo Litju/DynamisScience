@@ -248,6 +248,20 @@ def test_additive_migration_and_failed_approval_can_retry(setup, tmp_path, monke
     assert reconcile.propose(workspace, path)["decision"] == approved["decision"]
 
 
+def test_approved_mapping_cannot_seed_another_workspace(setup, tmp_path):
+    service, workspace, _, _ = setup
+    path = write_export(tmp_path / "mapped.csv", followup_rows(), FOLLOWUP_FIELDS)
+    entry = reconcile.propose(workspace, path)
+    approved = decide(revise(entry, athletes={"A07-renamed": "A07"},
+                             sessions={"Week 12 export": "Follow-up"},
+                             declared=declaration(entry)), "APPROVED")
+    other = service.create_workspace("Unrelated IDs")["study"]["id"]
+    assert store.get_snapshot(approved["decision"]["snapshot_id"])
+    with pytest.raises(store.ResearchValidation, match="workspace-bound"):
+        service.attach_workspace_data(other, approved["decision"]["snapshot_id"])
+    assert store.data_revisions(other) == []
+
+
 def test_source_conflict_and_semantic_duplicate(setup, tmp_path):
     _, workspace, _, _ = setup
     baseline = baseline_rows()

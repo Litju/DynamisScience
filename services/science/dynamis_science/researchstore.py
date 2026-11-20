@@ -1283,6 +1283,18 @@ def attach_workspace_data(entity_id: str, snapshot_id: str, *, append: bool = Fa
     snapshot = get_snapshot(snapshot_id)
     if not snapshot or snapshot.get("workspace_snapshot"):
         raise ResearchValidation("Select an admitted input dataset")
+    if snapshot.get("admission_metadata", {}).get("import", {}).get("reconciliation"):
+        from .reconciliation import history
+
+        approved = any(
+            event["state"] == "APPROVED" and event["id"] == _reconciliation["id"]
+            and event["version"] == _reconciliation["version"] and event["base_revision"] == base_revision
+            and event["decision"]["snapshot_id"] == snapshot_id
+            and event["decision"]["revision_id"] == _revision_id
+            for event in history(entity_id)
+        ) if _reconciliation else False
+        if not approved:
+            raise ResearchValidation("Reconciled input is workspace-bound. Review the original export here.")
     previous = get_data_revision(base_revision) if base_revision else None
     inputs = [snapshot]
     if append and link:
@@ -1457,6 +1469,8 @@ def create_study(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     snapshot = get_snapshot(snapshot_id)
     if snapshot is None:
         raise ResearchValidation(f"Snapshot {snapshot_id} is not admitted")
+    if snapshot.get("admission_metadata", {}).get("import", {}).get("reconciliation"):
+        raise ResearchValidation("Reconciled input is workspace-bound. Select the original admitted source.")
     metrics = dataset_metrics(snapshot_id)
     metric = next((item for item in metrics if item["id"] == metric_id), None)
     if metric is None:
