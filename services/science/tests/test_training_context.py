@@ -111,13 +111,17 @@ def test_native_workspace_import_reviews_and_reads_source(qtbot, workspace, tmp_
     panel.add_source.click()
     idle()
     assert errors == []
-    assert panel.table.rowCount() == 3
-    panel.scope.setCurrentIndex(panel.scope.findData("A01"))
+    assert panel.scope.currentData() == "A01"
+    assert panel.evidence.picker.count() == 2
+    panel.evidence.picker.setCurrentIndex(0)
+    details = panel.evidence.details.toPlainText()
+    assert "220 AU" in details and "Synthetic training log" in details
+    assert "sha256" not in details and panel.evidence.provenance["source_receipt"]["raw_sha256"]
+    panel.evidence.picker.setCurrentIndex(1)
+    assert "No response" in panel.evidence.details.toPlainText()
+    panel.scope.setCurrentIndex(0)
     idle()
-    assert panel.table.rowCount() == 2
-    assert "220 AU" in panel.table.item(0, 3).text()
-    assert "No response" in panel.table.item(1, 3).text()
-    assert "Synthetic training log" in panel.table.item(0, 5).text()
+    assert panel.evidence.picker.count() == 3
     sources, rows = context.observations(identity, revision, ["A02"])
     assert sources[0]["qc"] == {"AFTER_SCHEDULE": 2, "MISSING": 1, "INCOMPLETE_EXPOSURE": 1}
     assert rows[0]["session_load_au"] is None and rows[0]["duration_min"] == 40

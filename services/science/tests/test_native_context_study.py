@@ -8,7 +8,7 @@ import os
 import sqlite3
 
 import pytest
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QPointF, QTimer, Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
 
 from dynamis_science import admission, context_timeline as timeline, importer, reconciliation
@@ -208,8 +208,10 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     attach_source(WELLNESS)
     panel.week_one.setText(START.isoformat())
     panel.offset.setText("-03:00")
-    panel.scope.setCurrentIndex(panel.scope.findData("A01"))
+    panel._query(save_calendar=True)
     wait(window)
+    if panel.comparison is None:
+        panel.compare_button.click()
     assert panel.view["subject_ids"] == ["A01"]
     assert {row["kind"] for row in panel.view["events"]} == set(timeline.KINDS)
     plans = [row for row in panel.view["events"] if row["kind"] == "PLAN"]
@@ -219,11 +221,23 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     assert late["period"]["label"] == "Comparator A" and late["observed_period"]["label"] == "Block B"
     assert late["visit"]["adherence_percent"] == 80
     assert late["visit"]["data_revision_id"] == revision
-    panel.compare_button.click()
+    point = panel.chart.getViewBox().mapViewToScene(QPointF(late["axis_time"], 2))
+    qtbot.mouseClick(panel.chart.viewport(), Qt.MouseButton.LeftButton, pos=panel.chart.mapFromScene(point))
+    evidence = panel.evidence.details.toPlainText()
+    assert "Comparator A" in evidence and "Block B" in evidence and "80% adherence" in evidence
+    panel.evidence.picker.setFocus()
+    qtbot.keyClick(panel.evidence.picker, Qt.Key.Key_Home)
+    assert panel.evidence.picker.currentIndex() == 0
+    panel.evidence.picker.setCurrentIndex(next(i for i, row in enumerate(panel.visible_rows) if row["kind"] == "ASSESSMENT"))
     comparison = panel.comparison
     assert comparison["status"] == "DESCRIPTIVE"
     assert comparison["change"] == pytest.approx(11 * 0.25)
-    assert "Observed change +2.75 cm" in panel.comparison_summary.text()
+    assert "+2.75 cm" in panel.finding.text()
+    assert "Meaningful change has not been established" in panel.comparison_summary.text()
+    assert "LIVE · Revision 2" == panel.mode.text()
+    assert not window.scope_picker.isVisible()
+    assert not window.research.tabs.tabBar().isVisible()
+    assert "Jump height" in panel.evidence.details.toPlainText()
     assert panel.plots.findText("Jump height (cm)") > 0
     panel.plots.setCurrentText("Jump height (cm)")
     assert panel.values_chart.isVisible()
@@ -245,10 +259,17 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     wait(window)
     frozen = panel.saved
     assert frozen and not panel.add_source.isEnabled()
-    assert "Frozen" in panel.summary.text()
+    assert "FROZEN · Revision 2" == panel.mode.text()
     capture(panel, "724-frozen-context.png")
-    panel.live_view.click()
-    wait(window)
+    def unexpected_comparison(*args):
+        pytest.fail("Returning to the unchanged live view reran the comparison")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(timeline, "compare", unexpected_comparison)
+        panel.live_view.click()
+        wait(window)
+    assert panel.comparison is comparison and panel.scope.currentData() == "A01"
+    assert "LIVE · Revision 2" == panel.mode.text()
 
     panel.scope.setCurrentIndex(panel.scope.findData(f"cohort:{cohort['id']}"))
     wait(window)
@@ -276,7 +297,6 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     assert {row["questionnaire_version"] for row in responses} == {"1", "2"}
     panel.scope.setCurrentIndex(panel.scope.findData("A20"))
     wait(window)
-    panel.compare_button.click()
     assert panel.comparison["status"] == "INCOMPARABLE" and panel.comparison["change"] is None
     assert "different numbers of trials" in panel.comparison_summary.text()
 
@@ -291,6 +311,21 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     old[5] += 2
     correction = _append(workspace, tmp_path / "cmj-correction.csv", [old], [])
     assert store.get_data_revision(correction)["mode"] == "CORRECTION"
+    panel.scope.setCurrentIndex(panel.scope.findData("A01"))
+    wait(window)
+    panel.open_saved(frozen["id"])
+    wait(window)
+    window.research.set_study(workspace, service.get_study_detail(workspace))
+    wait(window)
+    assert "FROZEN · Revision 2" == panel.mode.text()
+    assert panel.comparison["change"] == pytest.approx(2.75)
+    panel.live_view.click()
+    wait(window)
+    assert panel.comparison is None and panel.scope.currentData() == "A01"
+    assert "data revision changed" in panel.comparison_summary.text().lower()
+    assert panel.compare_button.isVisible()
+    panel.compare_button.click()
+    assert panel.comparison["change"] == pytest.approx(3.75)
     assert [row["id"] for row in store.data_revisions(workspace)] == [baseline, revision, correction]
     window.close()
 
@@ -313,7 +348,7 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     wait(restarted)
     reopened.scope.setCurrentIndex(reopened.scope.findData("A01"))
     wait(restarted)
-    reopened.compare_button.click()
+    assert "LIVE · Revision 3" == reopened.mode.text()
     assert reopened.comparison["change"] == pytest.approx(3.75)
     assert warnings == []
     with sqlite3.connect(store._db_path()) as connection:

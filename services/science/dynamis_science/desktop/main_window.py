@@ -162,6 +162,7 @@ class MainWindow(QMainWindow):
         self.results_stack = QStackedWidget()
         self.results_stack.addWidget(self.results_doc)
         self.results_stack.addWidget(results_scroll)
+        self.results_stack.addWidget(self.research.training_context)
         self.workbench.set_results_widget(self.results_stack)
         self.controller.spec_changed.connect(self._spec_changed)
         self.workbench.action_promote.triggered.connect(self.results_doc.promote)
@@ -225,7 +226,7 @@ class MainWindow(QMainWindow):
         self.navigator.setFocus()
 
     def _build_menu(self) -> None:
-        workspace_bar = QToolBar("Research Workspace", self)
+        self.workspace_bar = workspace_bar = QToolBar("Research Workspace", self)
         workspace_bar.setObjectName("PersistentWorkspaceActions")
         self.addToolBar(workspace_bar)
         self.workspace_actions = {}
@@ -277,7 +278,7 @@ class MainWindow(QMainWindow):
         self.scope_picker.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.scope_picker.setMaximumWidth(230)
         self.scope_picker.activated.connect(self._workflow_scope_selected)
-        context_bar.addWidget(self.scope_picker)
+        self.scope_picker_action = context_bar.addWidget(self.scope_picker)
         self.stage_picker = QComboBox()
         self.stage_picker.setAccessibleName('Research stage')
         self.stage_picker.setMaximumWidth(180)
@@ -291,11 +292,12 @@ class MainWindow(QMainWindow):
         self.context_binding = QLabel()
         self.context_binding.setAccessibleName('Selected protocol and result binding')
         self.context_binding.setMaximumWidth(220)
-        context_bar.addWidget(self.context_binding)
+        self.context_binding_action = context_bar.addWidget(self.context_binding)
         self.research.individual.context_changed.connect(self._sync_context_bar)
         self.research.individual.tabs.currentChanged.connect(self._sync_workflow_stage)
         self.research.tabs.currentChanged.connect(self._sync_workflow_stage)
         self.perspectives.currentChanged.connect(self._sync_workflow_stage)
+        self.results_stack.currentChanged.connect(self._sync_workflow_stage)
         self._sync_context_bar()
         file_menu = self.menuBar().addMenu("File")
         export_action = QAction("Export current report…", self)
@@ -900,6 +902,7 @@ class MainWindow(QMainWindow):
             self.workbench.panes["data"].show()
             if not self.workbench._compact:
                 self.workbench.panes["options"].show()
+        self._sync_workflow_stage()
 
     def _reset_results(self, record: bool = False) -> None:
         """Dataset or study switch: no result, spec or run state outlives its data."""
@@ -1249,7 +1252,13 @@ class MainWindow(QMainWindow):
         self._show_squad_mode()
         revision = detail.get("active_data_revision_id")
 
-        def loaded(investigations: list[dict[str, Any]]) -> None:
+        def load():
+            from ..training_context import source_history
+            investigations = self.service.individual_investigations(study_id)
+            return investigations, bool(revision and source_history(study_id, revision))
+
+        def loaded(result) -> None:
+            investigations, has_training_context = result
             if (self.current_study_id, self.current_study.get("active_data_revision_id")) != (study_id, revision):
                 return
             self.investigations = investigations
@@ -1257,17 +1266,28 @@ class MainWindow(QMainWindow):
                 self.research_context = {"scope": "COHORT"}
             self._apply_research_context()
             stage = self.settings.value(f'research-stage/{study_id}', '')
+            if not stage and has_training_context:
+                stage = 'Training context'
             if stage:
                 self._go_research_stage(stage)
 
-        self.run_task(lambda: self.service.individual_investigations(study_id), loaded, "Loading individual investigations")
+        self.run_task(load, loaded, "Loading individual investigations")
+
+    def _sync_context_title(self, focused: bool) -> None:
+        detail = self.current_study if self.current_study.get("workspace") else {}
+        title = detail.get("study", {}).get("title")
+        text = title or "No workspace"
+        if title and not focused:
+            number = next((item["number"] for item in detail.get("data_revisions", [])
+                           if item["id"] == detail.get("active_data_revision_id")), None)
+            text = f"{'Data revision ' + str(number) if number else 'No data'} · {title}"
+        self.context_title.setMaximumWidth(380 if focused else 190)
+        self.context_title.setText(text + "  ")
+        self.context_title.setToolTip(text)
 
     def _sync_context_bar(self) -> None:
         detail = self.current_study if self.current_study.get("workspace") else {}
-        number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == detail.get("active_data_revision_id")), None)
-        title = detail.get("study", {}).get("title")
-        self.context_title.setText(f"{'Data revision ' + str(number) if number else 'no data'} · {title}  " if title else "No workspace  ")
-        self.context_title.setToolTip(self.context_title.text())
+        self._sync_context_title(self._investigation_visible())
         self.scope_picker.clear()
         self.scope_picker.addItem('Cohort · all selected participants', None)
         for inv in self.investigations:
@@ -1316,11 +1336,27 @@ class MainWindow(QMainWindow):
         self._select_scope('INDIVIDUAL' if selected else 'COHORT', selected)
         self._go_research_stage(stage)
 
+    def _investigation_visible(self) -> bool:
+        return (self.perspectives.currentWidget() is self.workbench
+                and self.results_stack.currentWidget() is self.research.training_context)
+
     def _sync_workflow_stage(self, *_args) -> None:
+        focused = self._investigation_visible()
+        self.workspace_bar.setVisible(not focused)
+        self.scope_picker_action.setVisible(not focused)
+        self.context_binding_action.setVisible(not focused)
+        self.research.tabs.tabBar().setVisible(not focused)
+        self.workbench.panes["results"].header.setVisible(not focused)
+        self.workbench.status_items.setVisible(not focused)
+        if focused:
+            self.workbench.panes["data"].hide()
+        self._sync_context_title(focused)
         stage = None
-        if self.perspectives.currentWidget() is self.workbench and self.results_stack.currentIndex() == 1:
+        if focused:
+            stage = 'Training context'
+        elif self.perspectives.currentWidget() is self.workbench and self.results_stack.currentIndex() == 1:
             stage = {0:'Study', 1:'Data / QC', 3:'Analysis', 4:'Reports / history',
-                     5:'Series comparison', 6:'Reports / history', 7:'Training context'}.get(self.research.tabs.currentIndex())
+                     5:'Series comparison', 6:'Reports / history'}.get(self.research.tabs.currentIndex())
         elif (self.perspectives.currentWidget() is self.squad
               and self.squad.currentWidget() is self.squad.athlete_page):
             panel = self.research.individual
@@ -1348,8 +1384,8 @@ class MainWindow(QMainWindow):
         if stage == 'Training context':
             self._show_research_mode()
             self._set_record_view(True)
-            self.research.tabs.setCurrentWidget(self.research.training_context)
-            self.research.show_training_context(self.research_context.get('subject_id') if individual else None)
+            self.results_stack.setCurrentWidget(self.research.training_context)
+            self.research.show_training_context()
             self.workbench.panes['data'].hide()
         elif stage in {'Protocol', 'Observations'} or individual and stage in {'Analysis', 'Results'}:
             if not individual:
@@ -2151,12 +2187,13 @@ class ResearchWorkbench(QWidget):
         from .research_history import ResearchHistoryPanel
         self.history_panel = ResearchHistoryPanel(self.service, window.run_task)
         self.tabs.addTab(self.history_panel, 'Frozen history')
-        from .training_context import TITLE, TrainingContextPanel
-        self.training_context = TrainingContextPanel(window.run_task)
-        self.tabs.addTab(self.training_context, TITLE)
-        self.tabs.currentChanged.connect(self._training_context_selected)
+        from .training_context import TrainingContextPanel
+        from . import theme
+        self.training_context = TrainingContextPanel(window.run_task, window.settings)
+        self.training_context.set_theme(theme.current_theme())
+        window.workbench.theme_changed.connect(self.training_context.set_theme)
         self.history_panel.context_requested.connect(self._open_saved_training_context)
-        self.individual.context_requested.connect(lambda: window._go_research_stage('Training context'))
+        self.individual.context_requested.connect(self._open_individual_training_context)
         self.individual.reports_requested.connect(lambda: window._go_research_stage('Reports / history'))
         self.individual.export_requested.connect(self.export_report)
         self.individual.trace_requested.connect(lambda snapshot, trial: window._open_workspace(snapshot, trace_trial=trial))
@@ -2169,15 +2206,16 @@ class ResearchWorkbench(QWidget):
         self._builders[index]()
         self._built_tabs.add(index)
 
-    def _training_context_selected(self, _index: int) -> None:
-        if self.tabs.currentWidget() is self.training_context:
-            self.show_training_context()
+    def _open_individual_training_context(self) -> None:
+        self.show_training_context(self.window.research_context.get('subject_id'))
+        self.window._go_research_stage('Training context')
 
     def show_training_context(self, subject: str | None = None) -> None:
         detail = getattr(self, 'detail', {})
         self.training_context.set_context(
             self.study_id if detail.get('workspace') else None,
             detail.get('active_data_revision_id'), subject,
+            {row['id']: row['number'] for row in detail.get('data_revisions', [])},
         )
 
     def _open_saved_training_context(self, view_id: str) -> None:
@@ -2389,8 +2427,10 @@ class ResearchWorkbench(QWidget):
         self._clear_study_views()
         self.study_id = study_id
         self.detail = detail
-        self.training_context.set_context(None, None)
-        self._training_context_selected(self.tabs.currentIndex())
+        if self.training_context.workspace == study_id:
+            self.show_training_context()
+        else:
+            self.training_context.set_context(None, None)
         self.snapshot_id = detail.get("snapshot", {}).get("id") or detail.get("study", {}).get("dataset_snapshot_id")
         self.window.inspector.setPlainText(
             json.dumps(
