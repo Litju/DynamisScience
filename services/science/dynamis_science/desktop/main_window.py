@@ -284,7 +284,7 @@ class MainWindow(QMainWindow):
         self.scope_picker.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.stage_picker.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.stage_picker.addItems(['Study', 'Data / QC', 'Protocol', 'Observations', 'Analysis',
-                                    'Results', 'Series comparison', 'Reports / history'])
+                                    'Results', 'Training context', 'Series comparison', 'Reports / history'])
         self.stage_picker.activated.connect(lambda _: self._go_research_stage(self.stage_picker.currentText()))
         context_bar.addWidget(self.stage_picker)
         QWidget.setTabOrder(self.scope_picker, self.stage_picker)
@@ -1320,7 +1320,7 @@ class MainWindow(QMainWindow):
         stage = None
         if self.perspectives.currentWidget() is self.workbench and self.results_stack.currentIndex() == 1:
             stage = {0:'Study', 1:'Data / QC', 3:'Analysis', 4:'Reports / history',
-                     5:'Series comparison', 6:'Reports / history'}.get(self.research.tabs.currentIndex())
+                     5:'Series comparison', 6:'Reports / history', 7:'Training context'}.get(self.research.tabs.currentIndex())
         elif (self.perspectives.currentWidget() is self.squad
               and self.squad.currentWidget() is self.squad.athlete_page):
             panel = self.research.individual
@@ -1345,7 +1345,13 @@ class MainWindow(QMainWindow):
             self.stage_picker.setCurrentText(stage)
             self.settings.setValue(f'research-stage/{self.current_study_id}', stage)
             return
-        if stage in {'Protocol', 'Observations'} or individual and stage in {'Analysis', 'Results'}:
+        if stage == 'Training context':
+            self._show_research_mode()
+            self._set_record_view(True)
+            self.research.tabs.setCurrentWidget(self.research.training_context)
+            self.research.show_training_context(self.research_context.get('subject_id') if individual else None)
+            self.workbench.panes['data'].hide()
+        elif stage in {'Protocol', 'Observations'} or individual and stage in {'Analysis', 'Results'}:
             if not individual:
                 self.workbench.show_toast('Choose an athlete investigation above, or open an athlete in Squad and create one.')
                 return
@@ -2145,6 +2151,10 @@ class ResearchWorkbench(QWidget):
         from .research_history import ResearchHistoryPanel
         self.history_panel = ResearchHistoryPanel(self.service, window.run_task)
         self.tabs.addTab(self.history_panel, 'Frozen history')
+        from .training_context import TITLE, TrainingContextPanel
+        self.training_context = TrainingContextPanel(window.run_task)
+        self.tabs.addTab(self.training_context, TITLE)
+        self.tabs.currentChanged.connect(self._training_context_selected)
         self.individual.reports_requested.connect(lambda: window._go_research_stage('Reports / history'))
         self.individual.export_requested.connect(self.export_report)
         self.individual.trace_requested.connect(lambda snapshot, trial: window._open_workspace(snapshot, trace_trial=trial))
@@ -2156,6 +2166,17 @@ class ResearchWorkbench(QWidget):
             return
         self._builders[index]()
         self._built_tabs.add(index)
+
+    def _training_context_selected(self, _index: int) -> None:
+        if self.tabs.currentWidget() is self.training_context:
+            self.show_training_context()
+
+    def show_training_context(self, subject: str | None = None) -> None:
+        detail = getattr(self, 'detail', {})
+        self.training_context.set_context(
+            self.study_id if detail.get('workspace') else None,
+            detail.get('active_data_revision_id'), subject,
+        )
 
     def _build_overview(self) -> None:
         page = self.tabs.widget(0)
@@ -2362,6 +2383,8 @@ class ResearchWorkbench(QWidget):
         self._clear_study_views()
         self.study_id = study_id
         self.detail = detail
+        self.training_context.set_context(None, None)
+        self._training_context_selected(self.tabs.currentIndex())
         self.snapshot_id = detail.get("snapshot", {}).get("id") or detail.get("study", {}).get("dataset_snapshot_id")
         self.window.inspector.setPlainText(
             json.dumps(
