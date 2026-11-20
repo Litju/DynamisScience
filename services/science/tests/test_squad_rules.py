@@ -48,7 +48,7 @@ def test_user_rules_flag_athletes_with_evidence(workspace):
         assert ("In danger" in categories) == drop and ("Doing great" in categories) == rise, subject
     flagged = next(a for a in athletes.values() if a["flags"])
     evidence = flagged["flags"][0]["evidence"][0]
-    assert evidence["met"] and evidence["metric"] == "Jump height (flight time)" and evidence["unit"] == "cm"
+    assert evidence["met"] and evidence["metric"] == "Jump height" and evidence["unit"] == "cm"
     assert {group["name"] for group in squad.squad_board(workspace, "trend")["groups"]} <= {"up", "down", "flat", "insufficient data"}
     missed = squad.evaluate(researchstore.get_entity(workspace)["dataset_snapshot_id"], [squad.validate_rule(
         {"name": "Missing data", "category": "Follow up", "conditions": [{"metric_id": "MET-CMJ-HEIGHT", "measure": "missed_tests", "operator": ">=", "value": 2}]},
