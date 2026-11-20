@@ -262,12 +262,18 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     qtbot.mouseClick(instrument, Qt.MouseButton.LeftButton, pos=pos)
     wait(window)
     assert window.location.text() == "Sources & quality"
+    sources = window.research.source_overview
+    assert "Training session log" in sources.context_sources.text()
+    assert "Morning wellness questionnaire" in sources.context_sources.text()
+    assert "Synthetic fixture" in sources.quality.text()
+    assert not window.research.table.isVisible()
     window.investigate_button.click()
     wait(window)
     assert panel.scope.currentData() == "A01" and panel.comparison is comparison
 
     def check_task(title, verify):
         opened = []
+        current = panel.comparison
 
         def review():
             dialog = QApplication.activeModalWidget()
@@ -285,7 +291,7 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
         QTimer.singleShot(50, review)
         panel.evidence.followup.click()
         wait(window)
-        assert opened and panel.comparison is comparison and window._investigation_visible()
+        assert opened and panel.comparison is current and window._investigation_visible()
 
     first_plan = next(i for i, row in enumerate(panel.visible_rows) if row["kind"] == "PLAN")
     panel.evidence.picker.setCurrentIndex(first_plan)
@@ -402,6 +408,13 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     assert panel.compare_button.isVisible()
     panel.compare_button.click()
     assert panel.comparison["change"] == pytest.approx(3.75)
+    panel.evidence.picker.setCurrentIndex(next(i for i, row in enumerate(panel.visible_rows)
+                                               if row.get("visit", {}).get("id") == late["visit"]["id"]))
+    check_task("A01 · Visits", recorded)
+    window.study_button.click()
+    window.study_home.buttons["design"].click()
+    assert "20" in window.research.overview.toPlainText() or "Twenty" in window.research.overview.toPlainText()
+    assert "workspace_id" not in window.research.overview.toPlainText()
     assert [row["id"] for row in store.data_revisions(workspace)] == [baseline, revision, correction]
     window.close()
 

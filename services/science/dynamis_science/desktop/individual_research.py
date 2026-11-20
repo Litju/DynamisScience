@@ -148,6 +148,7 @@ class IndividualResearchPanel(QWidget):
 
     analysis_saved = Signal(dict)
     context_changed = Signal()
+    investigation_loaded = Signal()
     reports_requested = Signal()
     context_requested = Signal()
     export_requested = Signal()
@@ -219,6 +220,7 @@ class IndividualResearchPanel(QWidget):
         self.protocol_outcome.clear()
         self.visit_schedule.clear()
         self.visit_supersedes.clear()
+        self.visit_editor_toggle.setChecked(False)
         for field in (self.protocol_question, self.assignment, self.blinding, self.testing_occasions,
                       self.amendment_reason, self.visit_exposure, self.visit_adherence, self.visit_missing,
                       self.visit_deviations, self.visit_occasion, self.onset_starts, self.onset_baseline,
@@ -289,6 +291,7 @@ class IndividualResearchPanel(QWidget):
         for run in payload["runs"]:
             self.model_picker.addItem(f"{run['id']} · {run['method_id']}", run["id"])
         self.context_changed.emit()
+        self.investigation_loaded.emit()
 
     # ------------------------------------------------------------------ data
 
@@ -893,6 +896,11 @@ class IndividualResearchPanel(QWidget):
         self.conduct_details = QCheckBox('Show period summaries and append-only visit history')
         layout.addWidget(self.conduct_details)
         layout.addWidget(self.experiment_summary)
+        self.visit_review = QLabel()
+        self.visit_review.setWordWrap(True)
+        self.visit_review.setTextFormat(Qt.TextFormat.PlainText)
+        self.visit_review.hide()
+        layout.addWidget(self.visit_review)
         self.visit_editor = QWidget()
         editor_layout = QVBoxLayout(self.visit_editor)
         form = QFormLayout()
@@ -943,6 +951,26 @@ class IndividualResearchPanel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(page)
         self.tabs.addTab(scroll, 'Visits and timeline')
+        self.visit_browser = (note, inference_note, self.protocol_history, self.visit_editor_toggle,
+                              self.analyze_experiment_button, self.conduct_status, self.timeline_table,
+                              self.conduct_details, self.experiment_summary, self.visit_history)
+
+    def focus_recorded_visit(self, event: dict) -> None:
+        visit = event['visit']
+        self.visit_review.setText(
+            f"Scheduled occasion {visit['scheduled_occasion']} · actual occasion {visit['occasion']} · "
+            f"protocol v{event['protocol_version']}. Saving creates a dated correction in the visit history."
+        )
+        for widget in self.visit_browser:
+            widget.hide()
+        self.visit_review.show()
+
+    def restore_visit_browser(self) -> None:
+        self.visit_review.hide()
+        for widget in self.visit_browser[:-2]:
+            widget.show()
+        self.experiment_summary.setVisible(self.conduct_details.isChecked())
+        self.visit_history.setVisible(self.conduct_details.isChecked())
 
     def _show_experiment(self, payload: dict) -> None:
         self.visit_editor_toggle.setChecked(False)

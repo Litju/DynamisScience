@@ -63,6 +63,7 @@ from ..researchstore import ResearchConflict
 from .services import DynamisAppService
 from .data_workspace import DataWorkspaceDialog
 from .import_review import ImportReviewDialog
+from .source_overview import SourceOverview
 from .study_home import StudyHome
 from .tasks import TaskRunner
 from .theme import apply_theme
@@ -1514,11 +1515,15 @@ class MainWindow(QMainWindow):
                         focused_event = True
                         panel.protocol_history.setCurrentIndex(i)
                         panel.timeline_table.selectRow(row)
+                        panel.focus_recorded_visit(event)
                         panel._edit_timeline_visit(row, 0)
+                        if panel.visit_supersedes.currentData() != event["visit"]["id"]:
+                            panel.save_visit_button.setEnabled(False)
+                            panel.visit_review.setText("Read-only record. This visit is no longer available for correction.")
                         return
 
         if event:
-            panel.context_changed.connect(focus_event)
+            panel.investigation_loaded.connect(focus_event)
             QTimer.singleShot(0, dialog, focus_event)
         fit_dialog(dialog, 1120, 710)
 
@@ -1531,7 +1536,9 @@ class MainWindow(QMainWindow):
         finally:
             panel.tabs.currentChanged.disconnect(switch_title)
             if event:
-                panel.context_changed.disconnect(focus_event)
+                panel.investigation_loaded.disconnect(focus_event)
+                if task == "Visits and timeline" and focused_event:
+                    panel.restore_visit_browser()
             old_layout.insertWidget(slot, panel, 1)
             panel.tabs.tabBar().show()
             panel.context_link.show()
@@ -1601,6 +1608,8 @@ class MainWindow(QMainWindow):
             self._set_record_view(True)
             index = {'Study': 0, 'Data / QC': 1, 'Analysis': 3, 'Results': 3, 'Series comparison': 5}[stage]
             self.research.tabs.setCurrentIndex(index)
+            if index == 1:
+                self.research.show_sources()
             self.workbench.panes['data'].hide()
         self._sync_context_bar()
         self.stage_picker.setCurrentText(stage)
@@ -2346,6 +2355,8 @@ class ResearchWorkbench(QWidget):
         self.window = window
         self.service = window.service
         self.latest_run: dict[str, Any] | None = None
+        self.source_generation = 0
+        self.setup_details = {}
         self.latest_evidence_id: str | None = None
         self.report_version: int | None = None
         self.report_document_version: int | None = None
@@ -2423,30 +2434,81 @@ class ResearchWorkbench(QWidget):
         layout = QVBoxLayout(page)
         edit = QPushButton("Edit study…")
         edit.clicked.connect(self.window._edit_current)
-        layout.addWidget(edit, alignment=Qt.AlignmentFlag.AlignLeft)
+        actions = QHBoxLayout()
+        actions.addWidget(edit)
+        cohorts = QPushButton("Review cohort membership…")
+        cohorts.clicked.connect(self._open_cohort_review)
+        actions.addWidget(cohorts)
+        details = QPushButton("Details / Provenance…")
+        details.clicked.connect(self._show_setup_details)
+        actions.addWidget(details)
+        actions.addStretch()
+        layout.addLayout(actions)
         self.overview = QTextBrowser()
         layout.addWidget(self.overview)
+
+    def _show_setup_details(self) -> None:
+        from .individual_research import fit_dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Study details / provenance")
+        layout = QVBoxLayout(dialog)
+        browser = QTextBrowser()
+        browser.setPlainText(json.dumps(self.setup_details, indent=2, ensure_ascii=False, default=str))
+        layout.addWidget(browser)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        fit_dialog(dialog, 740, 470)
+        dialog.exec()
+
+    def _present_study_setup(self, summary, revision=None, run_count=None):
+        study = summary.get("study") or {}
+        title = study.get("title") or "Study setup"
+        question = summary.get("question")
+        if isinstance(question, dict):
+            question = question.get("question") or question.get("statement") or question.get("title")
+        state = (study.get("state") or study.get("status") or "").replace("_", " ").capitalize()
+        sections = [title, state]
+        sections.append(f"Research question\n{question}" if question else "Research question is open.")
+        if revision:
+            sections.append(f"Data revision {revision} · {run_count} saved study {'analysis' if run_count == 1 else 'analyses'}")
+        elif run_count is not None:
+            sections.append("Add measurements to start the investigation.")
+        else:
+            sections.append(study.get("description") or "")
+        self.overview.setPlainText("\n\n".join(section for section in sections if section))
 
     def _build_dataset(self) -> None:
         page = self.tabs.widget(1)
         layout = QVBoxLayout(page)
-        add = QPushButton("Add measurements…")
-        add.setProperty("primary", True)
-        add.clicked.connect(self.window._add_workspace_data)
-        layout.addWidget(add, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.data_summary = QLabel('Inspect measurements and source QC before analysis.')
+        self.source_stack = QStackedWidget()
+        self.source_overview = SourceOverview()
+        self.source_overview.import_requested.connect(self.window._add_workspace_data)
+        self.source_overview.qc_requested.connect(self.window._open_admission_history)
+        self.source_overview.measurements_requested.connect(lambda: self._show_source_detail(0))
+        self.source_overview.exploration_requested.connect(lambda: self.tabs.setCurrentIndex(2))
+        self.source_stack.addWidget(self.source_overview)
+        self.source_detail = QWidget()
+        detail_layout = QVBoxLayout(self.source_detail)
+        heading = QHBoxLayout()
+        back = QPushButton("Back to sources")
+        back.clicked.connect(self.show_sources)
+        heading.addWidget(back)
+        self.source_detail_title = QLabel()
+        self.source_detail_title.setObjectName("StudyHeading")
+        heading.addWidget(self.source_detail_title, 1)
+        detail_layout.addLayout(heading)
+        self.data_summary = QLabel("Inspect measurements and source quality before analysis.")
         self.data_summary.setWordWrap(True)
-        layout.addWidget(self.data_summary)
-        qc_button = QPushButton('Inspect source admission and QC receipts…')
-        qc_button.clicked.connect(self.window._open_admission_history)
-        layout.addWidget(qc_button)
+        detail_layout.addWidget(self.data_summary)
         self.dataset_tabs = QTabWidget()
+        self.dataset_tabs.tabBar().hide()
         preview_page = QWidget()
         preview_layout = QVBoxLayout(preview_page)
         controls = QHBoxLayout()
         self.table_picker = QComboBox()
         self.table_picker.currentIndexChanged.connect(self._table_changed)
-        controls.addWidget(QLabel("Snapshot table"))
+        controls.addWidget(QLabel("Measurement type"))
         controls.addWidget(self.table_picker, 1)
         self.preview_metadata = QCheckBox('Show technical columns')
         self.preview_metadata.toggled.connect(self._preview_columns)
@@ -2486,7 +2548,47 @@ class ResearchWorkbench(QWidget):
         self.cohort_table.setAlternatingRowColors(True)
         cohort_layout.addWidget(self.cohort_table, 1)
         self.dataset_tabs.addTab(cohort_page, "Cohort resolution")
-        layout.addWidget(self.dataset_tabs)
+        detail_layout.addWidget(self.dataset_tabs, 1)
+        self.source_stack.addWidget(self.source_detail)
+        layout.addWidget(self.source_stack, 1)
+
+    def _open_cohort_review(self):
+        if self.detail.get("workspace"):
+            self.window._go_research_stage("Data / QC")
+            self._show_source_detail(1)
+
+    def _show_source_detail(self, index):
+        self.dataset_tabs.setCurrentIndex(index)
+        self.source_detail_title.setText("Measurement rows" if index == 0 else "Cohort membership")
+        self.source_stack.setCurrentWidget(self.source_detail)
+
+    def show_sources(self):
+        from ..training_context import source_history
+        self.source_stack.setCurrentWidget(self.source_overview)
+        workspace = self.study_id
+        revision = self.detail.get("active_data_revision_id")
+        self.source_generation += 1
+        generation = self.source_generation
+        if not workspace or not revision:
+            self.source_overview.show_context_sources([])
+            return
+
+        def load():
+            try:
+                return source_history(workspace, revision), None
+            except (ValueError, LookupError, OSError, RuntimeError) as error:
+                return [], str(error)
+
+        def present(result):
+            if generation != self.source_generation:
+                return
+            sources, error = result
+            if error:
+                self.source_overview.context_sources.setText(f"Source review unavailable. {error}")
+            else:
+                self.source_overview.show_context_sources(sources)
+
+        self.window.run_task(load, present, "Loading attached sources")
 
     def _build_exploration(self) -> None:
         import pyqtgraph as pg
@@ -2552,10 +2654,14 @@ class ResearchWorkbench(QWidget):
         export_run.clicked.connect(self._export_run_figure)
         controls.addWidget(self.method_picker, 0, 0, 1, 2)
         controls.addWidget(self.analysis_metric_picker, 0, 2)
-        controls.addWidget(self.parameters, 1, 0, 1, 3)
-        controls.addWidget(execute_button, 2, 0)
-        controls.addWidget(self.show_figure_button, 2, 1)
-        controls.addWidget(export_run, 2, 2)
+        advanced_parameters = QCheckBox("Advanced parameters")
+        advanced_parameters.toggled.connect(self.parameters.setVisible)
+        controls.addWidget(advanced_parameters, 1, 0, 1, 3)
+        controls.addWidget(self.parameters, 2, 0, 1, 3)
+        self.parameters.hide()
+        controls.addWidget(execute_button, 3, 0)
+        controls.addWidget(self.show_figure_button, 3, 1)
+        controls.addWidget(export_run, 3, 2)
         self.method_details = QTextBrowser()
         self.method_details.setAccessibleName("Scientific method contract and eligibility")
         self.method_details.setMaximumHeight(240)
@@ -2659,19 +2765,23 @@ class ResearchWorkbench(QWidget):
             "data_health": detail.get("data_health"),
             "source_manifest": detail.get("snapshot", {}).get("source", {}),
         }
-        self.overview.setPlainText(json.dumps(summary, indent=2, ensure_ascii=False, default=str))
+        self.setup_details = summary
+        self._present_study_setup(summary)
         self.latest_run = None
         self.latest_evidence_id = None
         self.report_version = None
         self.report_document_version = None
         self.exploration_result = None
         if detail.get("workspace") and not detail.get("metrics"):
-            self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\n\nAdd data when you are ready. Your workspace identity stays the same.\n\nAttached data without eligible metrics can be inspected in Data Workspace.")
+            revision = detail.get("active_data_revision_id")
+            number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == revision), None)
+            self._present_study_setup(summary, revision=number, run_count=0)
+            if revision:
+                self.overview.append("The attached data has no eligible outcome for analysis in this study.")
             self.execute_button.setEnabled(False)
             return
         self.investigation_editor.set_study(study_id)
         self.method_picker.clear()
-        self.parameters.setVisible(not self.detail.get("workspace"))
         self.metric_picker.clear()
         self.analysis_metric_picker.clear()
         self.execute_button.setEnabled(study_id != "STUDY-001")
@@ -2696,7 +2806,7 @@ class ResearchWorkbench(QWidget):
                 self.run_provenance.setPlainText(json.dumps(self.latest_run, indent=2, default=str))
                 self.show_figure_button.setEnabled(True)
             number = next((item["number"] for item in detail.get("data_revisions", []) if item["id"] == revision), "—")
-            self.overview.setPlainText(f"{detail['study']['title']}\n\nResearch Workspace · {study_id}\nData revision {number} · {self.snapshot_id}\n\n{len(runs)} saved analyses on this revision.\nUse Add data, Analyze, Export report or History above to continue.")
+            self._present_study_setup(summary, revision=number, run_count=len(runs))
 
     def select_project(self, project: dict[str, Any]) -> None:
         self.history_panel.set_context(None)
@@ -2716,7 +2826,8 @@ class ResearchWorkbench(QWidget):
             self.execute_button.setEnabled(False)
         if hasattr(self, "save_report_button"):
             self.save_report_button.setEnabled(False)
-        self.overview.setPlainText(json.dumps(project, indent=2, ensure_ascii=False, default=str))
+        self.setup_details = project
+        self._present_study_setup({"study": project})
 
     def select_dataset(self, snapshot_id: str, detail: dict[str, Any]) -> None:
         self.history_panel.set_context(None)
@@ -2741,7 +2852,7 @@ class ResearchWorkbench(QWidget):
         if hasattr(self, "save_report_button"):
             self.save_report_button.setEnabled(False)
         self._load_dataset(snapshot_id, detail)
-        self.dataset_tabs.setCurrentIndex(0)
+        self.show_sources()
         self.window.inspector.setPlainText(json.dumps(detail, indent=2, ensure_ascii=False, default=str))
 
     def _clear_study_views(self) -> None:
@@ -2749,6 +2860,9 @@ class ResearchWorkbench(QWidget):
         self._eligibility_generation = getattr(self, '_eligibility_generation', 0) + 1
         self._method_eligibility = {}
         if hasattr(self, "table_model"):
+            self.source_generation += 1
+            self.source_overview.reset()
+            self.source_stack.setCurrentWidget(self.source_overview)
             self.table_picker.blockSignals(True)
             self.table_picker.clear()
             self.table_picker.blockSignals(False)
@@ -2853,6 +2967,7 @@ class ResearchWorkbench(QWidget):
         if snapshot_id != self.snapshot_id:
             return
         self.dataset_detail = detail
+        self.source_overview.show_measurements(detail)
         tables = detail.get('tables', [])
         self.data_summary.setText('Immutable measurement snapshot · '
             + ', '.join(f"{t['name'].replace('_', ' ')}: {t['rows']:,} rows" for t in tables)
@@ -2861,6 +2976,7 @@ class ResearchWorkbench(QWidget):
         def quality_loaded(info):
             if snapshot_id != self.snapshot_id:
                 return
+            self.source_overview.show_quality(info)
             quality = info.get('quality') or {}
             reasons = [str(value) for value in quality.get('errors', []) + quality.get('warnings', [])]
             self.data_summary.setText(summary + '\nSource QC: ' + str(quality.get('status', 'not recorded'))

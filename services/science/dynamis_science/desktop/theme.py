@@ -218,6 +218,8 @@ QWidget#StudyHome { background: $window; }
 QLabel#StudyHeading, QLabel#InvestigationFinding { font-family: Georgia; font-weight: bold; color: $text; }
 QLabel#StudyHeading { font-size: 30px; }
 QLabel#StudySummary { color: $muted; }
+QFrame#SourceCard { background: $base; border: 1px solid $line2; border-radius: 10px; }
+QLabel#SourceCount { background: $accent_tint; color: $text; padding: 6px 10px; border-radius: 5px; font-weight: bold; }
 QPushButton#StudyDestination { text-align: left; padding: 9px 16px; min-height: 26px; font-weight: bold;
     border-left: 4px solid $line2; background: $base; }
 QPushButton#StudyDestination:hover, QPushButton#StudyDestination:focus { border-left-color: $accent_text; background: $accent_tint; }

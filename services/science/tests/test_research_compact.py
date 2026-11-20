@@ -86,6 +86,10 @@ def test_compact_surface_receipt(qtbot, service, study, monkeypatch):
         stage(window, 'Data / QC')
         idle()
         qtbot.wait(40)
+        assert window.research.source_overview.isVisible()
+        assert not window.research.table.isVisible()
+        window.research.source_overview.measurements_button.click()
+        assert window.research.table.isVisible()
         record['preview_columns'] = window.research.table_model.columns
         assert 'Source QC:' in window.research.data_summary.text()
         record['preview_visible_columns'] = [name for c, name in enumerate(window.research.table_model.columns)
