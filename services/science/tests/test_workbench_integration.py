@@ -178,6 +178,15 @@ def test_mixed_model_trajectories_link_with_by_athlete(app, window):
     window.trajectory_actions["3D"].trigger()
     assert doc.trajectory_mode == "3D" and doc.trajectory_3d is not None
     assert doc.trajectory_3d.selected == "MEN-05"
+    assert doc.trajectory_athletes.currentData() == "MEN-05"
+    doc.trajectory_athletes.setCurrentIndex(doc.trajectory_athletes.findData("MEN-03"))
+    assert data.selected_athlete() == "MEN-03"
+    assert doc.trajectory_3d.selected == doc.trajectory_plot.selected == "MEN-03"
+    doc.trajectory_points.setCurrentIndex(1)
+    readout = doc.trajectory_readout.text()
+    window.trajectory_actions["2D"].trigger()
+    assert doc.trajectory_readout.text() == readout
+    assert readout == doc.trajectory_plot.describe_point("MEN-03", 1)
 
 
 def test_signals_in_results_and_perspective_switch(app, window):
