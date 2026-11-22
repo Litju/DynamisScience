@@ -24,6 +24,9 @@ class ResearchHistoryPanel(QWidget):
         self.identity = self.subject = None
         self.generation = 0
         layout = QVBoxLayout(self)
+        title = QLabel("Research archive")
+        title.setObjectName("StudyHeading")
+        layout.addWidget(title)
         self.binding = QLabel('Open a workspace to inspect frozen history.')
         self.binding.setWordWrap(True)
         self.binding.setAccessibleName('Frozen history context')
@@ -43,6 +46,7 @@ class ResearchHistoryPanel(QWidget):
         self.export.clicked.connect(self.export_report)
         controls.addWidget(self.export)
         compose = QPushButton("Write report…")
+        compose.setProperty("primary", True)
         compose.clicked.connect(self.compose_requested)
         controls.addWidget(compose)
         self.open_context = QPushButton('Open selected contextual view…')
@@ -66,6 +70,9 @@ class ResearchHistoryPanel(QWidget):
         self.records = {}
 
     def set_context(self, identity, subject=None):
+        if identity and (identity, subject) == (self.identity, self.subject):
+            self.reload()
+            return
         self.identity, self.subject = identity, subject
         self.generation += 1
         self.records = {}
@@ -130,6 +137,7 @@ class ResearchHistoryPanel(QWidget):
     def show_record(self):
         self.preview.clear()
         self.provenance.clear()
+        self.binding.setToolTip("")
         value = self.picker.currentData()
         self.export.setEnabled(bool(value and value[0] == 'report'))
         self.open_context.setVisible(self.kind.currentText() == 'Contextual views')
@@ -138,13 +146,15 @@ class ResearchHistoryPanel(QWidget):
         self.tabs.setCurrentIndex(0)
         self.binding.setText(f"{self.subject or 'Workspace'} · Frozen history · current research context is preserved")
         if not value:
-            self.preview.setPlainText('No saved records for this selection. Include all athletes and cohort to broaden history.')
+            extra = " Include all athletes and cohort to broaden history." if self.subject and not self.all_scopes.isChecked() else ""
+            self.preview.setPlainText(f"No saved records for this selection.{extra}")
             return
         kind, record = value
         self.provenance.setPlainText(json.dumps(record, indent=2, default=str))
         if kind == 'report':
             identity, version, token = self.identity, record['version'], self.generation
-            self.binding.setText(f"Frozen report v{version} · SHA-256 {record['content_hash']} · read-only")
+            self.binding.setText(f"Frozen report v{version} · read-only")
+            self.binding.setToolTip(f"SHA-256 {record['content_hash']}")
             self.run_task(lambda: self.service.render_report_html(identity, version),
                 lambda rendered: self.preview.setHtml(rendered) if
                     (token, identity, value) == (self.generation, self.identity, self.picker.currentData()) else None,
