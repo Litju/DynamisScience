@@ -9,7 +9,7 @@ import sys
 import difflib
 from typing import Any
 
-from PySide6.QtCore import QEvent, QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
@@ -534,6 +534,8 @@ class MainWindow(QMainWindow):
         self.performance_header = PerformanceHeader(self)
         self.performance_header.search_requested.connect(self._search_performance)
         self.performance_header.set_menu_actions(self.menuBar().actions())
+        self.performance_header.context_button.clicked.connect(self.inspector_dock.setVisible)
+        self.inspector_dock.visibilityChanged.connect(self.performance_header.context_button.setChecked)
         self.performance_rail = PerformanceRail(self)
         self.performance_rail.page_selected.connect(self.show_performance_page)
         self.navigator_stack.addWidget(self.performance_rail)
@@ -541,15 +543,7 @@ class MainWindow(QMainWindow):
         self.performance_toolbar.setObjectName("PerformanceToolbar")
         self.performance_toolbar.setMovable(False)
         self.performance_toolbar.setFloatable(False)
-        header_scroll = QScrollArea()
-        header_scroll.setWidgetResizable(True)
-        header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        header_scroll.setWidget(self.performance_header)
-        header_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        # The toolbar is 48 px (theme); a taller scroll area was clipped and cut "SPORTS SCIENCE" off.
-        # shortcut: in a window narrower than the header the horizontal scroll bar overlays its bottom edge.
-        header_scroll.setFixedHeight(self.performance_header.minimumHeight())  # its fixed 48 px, not the 29 px hint
-        self.performance_toolbar.addWidget(header_scroll)
+        self.performance_toolbar.addWidget(self.performance_header)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
         self.insertToolBarBreak(self.performance_toolbar)
         self.performance_toolbar.hide()
@@ -681,12 +675,10 @@ class MainWindow(QMainWindow):
         self._ensure_performance()
         self.menuBar().hide()
         self.performance_toolbar.show()
-        # the toolbar layout keeps the generic QToolBar margins (12 px) until a StyleChange; they clip the header
-        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         if self._perspective != "performance":
             self._perspective = "performance"
             self.navigator_dock.show()
-            self.inspector_dock.show()
+            self.inspector_dock.setVisible(self.width() >= 1100)
         self.navigator_stack.setCurrentWidget(self.performance_rail)
         self.navigator_dock.setTitleBarWidget(QWidget())
         self.navigator_dock.setMinimumWidth(196)
@@ -999,11 +991,7 @@ class MainWindow(QMainWindow):
             self._research_target = self.current_target
         self._ensure_performance()
         self._show_performance_mode()
-        page_alias = {"athlete": "today", "match": "monitor"}
-        if page in page_alias:
-            self.performance_rail.set_current(page_alias[page])
-        else:
-            self.performance_rail.set_current(page)
+        self.performance_rail.set_current(page)
         self.current_target = {"type": "performance", "page": page}
         title = {"athlete": "Athlete 360", "match": "Match & Pose"}.get(
             page, self.performance.page_names[self.performance.page_keys.index(page)]
