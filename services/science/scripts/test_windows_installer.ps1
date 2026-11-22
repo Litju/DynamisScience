@@ -308,8 +308,9 @@ for activity, prefix in {"Walking": "walk", "Running": "run", "Heel drop": "heel
         [Math]::Abs([double]$reliability.result.typical_error - 75.782605988) -gt 1e-6) {
         throw "The packaged reliability worker did not reproduce the RES-619 ICC(3,1) reference."
     }
-    if ($trend.method_version -ne "1.1.0" -or $trend.diagnostics.residual_qq_type -ne "CONDITIONAL_PEARSON") {
-        throw "The packaged MixedLM worker did not record the RES-619 residual definition."
+    if ($trend.method_version -ne "1.2.0" -or $trend.method_status.state -ne "CURRENT" -or
+        $trend.diagnostics.residual_qq_type -ne "CONDITIONAL_PEARSON") {
+        throw "The packaged MixedLM worker did not record the current 1.2.0 contract and conditional Pearson residual definition."
     }
     $benchmarks.res619_scientific_values = @{
         reliability_method_version = $reliability.method_version
