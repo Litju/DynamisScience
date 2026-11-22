@@ -52,6 +52,9 @@ class ExperimentSeriesPanel(QWidget):
         self.payload = {}
         self.rendered_checks = []
         layout = QVBoxLayout(self)
+        title = QLabel("Compare experiments")
+        title.setObjectName("StudyHeading")
+        layout.addWidget(title)
         note = QLabel(LIMIT + '\nSelect two or more athlete rows with Ctrl or Shift, then save a comparison to retain this revision.')
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -59,6 +62,7 @@ class ExperimentSeriesPanel(QWidget):
         refresh = QPushButton('Refresh experiment roster')
         refresh.clicked.connect(self.reload)
         self.save = QPushButton('Save selected comparison')
+        self.save.setProperty("primary", True)
         self.save.clicked.connect(self.capture)
         self.history = QComboBox()
         self.history.setAccessibleName('Frozen series comparison history')

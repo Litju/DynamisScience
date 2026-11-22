@@ -63,11 +63,6 @@ def _fmt(value: Any, digits: int = 1, suffix: str = "") -> str:
     return "—" if value is None else f"{value:+.{digits}f}{suffix}" if suffix == "%" else f"{value:.{digits}f}{suffix}"
 
 
-def _tone_color(tone: str | None) -> str:
-    colors = theme.tokens()
-    return {"negative": colors["bad"], "positive": colors["ok"], "neutral": colors["warn"]}.get(tone or "", colors["line2"])
-
-
 def flag_text(flag: dict[str, Any]) -> str:
     parts = []
     for item in flag["evidence"]:
@@ -92,12 +87,9 @@ class AthleteTile(QToolButton):
         self.setFixedWidth(TILE_WIDTH)
         self.setMinimumHeight(62)
         self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        colors = theme.tokens()
-        edge = _tone_color(flag["tone"]) if flag else colors["line2"]
-        self.setStyleSheet(f"QToolButton {{ text-align: left; padding: 8px 10px; border: 1px solid {colors['line2']};"
-                           f" border-left: 4px solid {edge}; border-radius: 6px; background: {colors['base']}; color: {colors['text']}; }}"
-                           f" QToolButton:hover {{ border-color: {colors['accent']}; border-left: 4px solid {edge}; }}"
-                           f" QToolButton:focus {{ border: 2px solid {colors['accent']}; }}")
+        self.setObjectName("AthleteTile")
+        if flag:
+            self.setProperty("tone", flag["tone"])
 
 
 class SquadBoard(QWidget):
@@ -680,13 +672,12 @@ class EventsFeed(QWidget):
 
     def _card(self, item: dict[str, Any], action: str | None = None) -> QFrame:
         colors = theme.tokens()
-        edge = _tone_color(item["tone"]) if item["kind"] in ("flag", "attention") else colors["line2"]
         card = QFrame()
         card.setObjectName("EventCard")
-        card.setStyleSheet(f"QFrame#EventCard {{ background: {colors['base']}; border: 1px solid {colors['line2']};"
-                           f" border-left: 4px solid {edge}; border-radius: 6px; }}")
+        if item["kind"] in ("flag", "attention"):
+            card.setProperty("tone", item["tone"])
         row = QHBoxLayout(card)
-        when = f"<br><span style='color:{colors['dim']}; font-size:11px'>{item['at'][:16].replace('T', ' ')}</span>" if item.get("at") else ""
+        when = f"<br><span style='color:{colors['dim_text']}; font-size:11px'>{item['at'][:16].replace('T', ' ')}</span>" if item.get("at") else ""
         text = QLabel(f"<b>{html.escape(item['title'])}</b><br><span style='color:{colors['muted']}'>{html.escape(item['detail'])}</span>{when}")
         text.setWordWrap(True)
         text.setTextFormat(Qt.TextFormat.RichText)

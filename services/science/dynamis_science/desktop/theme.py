@@ -236,6 +236,14 @@ QFrame#WorkspaceIdentity { background: $window; border: 1px solid $line2; border
     border-radius: 10px; }
 QFrame#WorkspaceTool { background: $window; border: 1px solid $line2; border-radius: 8px; }
 QWidget#DropZone { border: 2px dashed $line2; border-radius: 8px; padding: 10px; }
+QToolButton#AthleteTile, QFrame#EventCard { background: $base; border: 1px solid $line2;
+    border-left: 4px solid $line2; border-radius: 6px; }
+QToolButton#AthleteTile { text-align: left; padding: 8px 10px; }
+QToolButton#AthleteTile:hover { background: $hover; }
+QToolButton#AthleteTile[tone="negative"], QFrame#EventCard[tone="negative"] { border-left-color: $bad; }
+QToolButton#AthleteTile[tone="positive"], QFrame#EventCard[tone="positive"] { border-left-color: $ok; }
+QToolButton#AthleteTile[tone="neutral"], QFrame#EventCard[tone="neutral"] { border-left-color: $warn; }
+QToolButton#AthleteTile:focus { border-top-color: $accent; border-right-color: $accent; border-bottom-color: $accent; }
 QLabel#StudyHeading, QLabel#InvestigationFinding { font-weight: 700; color: $text; }
 QLabel#StudyHeading { font-size: 32px; }
 QLabel#StudySummary { color: $dim_text; }
