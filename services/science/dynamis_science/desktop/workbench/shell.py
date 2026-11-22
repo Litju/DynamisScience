@@ -194,6 +194,7 @@ class WorkbenchShell(QWidget):
         theme.set_reduced_motion(motion.isChecked())
         motion.toggled.connect(self._set_reduced_motion)
         self.view_actions.append(motion)
+        self.action_reduce_motion = motion
         self.action_syntax = QAction("Show analysis syntax", self)
         self.action_syntax.setCheckable(True)
         self.action_syntax.toggled.connect(self._update_syntax_visibility)

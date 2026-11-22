@@ -136,10 +136,7 @@ class ImportReviewDialog(QDialog):
         root.setContentsMargins(22, 22, 22, 22)
         root.setSpacing(12)
         self.heading = QLabel("Import your data")
-        font = self.heading.font()
-        font.setPointSize(20)
-        font.setBold(True)
-        self.heading.setFont(font)
+        self.heading.setObjectName("StudyHeading")
         root.addWidget(self.heading)
         top = QHBoxLayout()
         self.path_label = QLabel("Drag a file here, or choose one from your computer.")
@@ -165,7 +162,6 @@ class ImportReviewDialog(QDialog):
         drop_layout.addWidget(self.folder_button, 0, Qt.AlignmentFlag.AlignCenter)
         self.drop.setMinimumHeight(170)
         self.drop.setObjectName("DropZone")
-        self.drop.setStyleSheet("#DropZone { border: 2px dashed palette(mid); border-radius: 8px; padding: 10px; }")
         self.drop.setAccessibleName("Drop zone")
         self.summary = QLabel()
         self.summary.setWordWrap(True)
@@ -192,6 +188,7 @@ class ImportReviewDialog(QDialog):
         for value in PRIVACY:
             self.answer_choice.addItem("Synthetic test fixture" if value == "TEST_FIXTURE" else value.replace("_", " ").title(), value)
         self.continue_button = QPushButton("&Continue")
+        self.continue_button.setProperty("primary", True)
         self.continue_button.clicked.connect(self._answer_question)
         for widget in (self.question, self.answer, self.answer_choice, self.continue_button):
             question_layout.addWidget(widget)
@@ -558,7 +555,7 @@ class ImportReviewDialog(QDialog):
     def _set_state(self, state: str, text: str = "") -> None:
         self.state = state
         titles = {"select": "Import your data", "processing": "Integrating your data…",
-                  "ready": "Your data is ready.", "partial": "Your data is ready.",
+                  "ready": "Your data is ready.", "partial": "Some files need review",
                   "attention": "One thing needs your attention", "failure": "We couldn’t import your data"}
         self.heading.setText(titles[state])
         self.summary.setText(text)
@@ -616,6 +613,8 @@ class ImportReviewDialog(QDialog):
         self.question_key = key
         self._set_state("attention", "Your file is safely staged. No pending records have been added.")
         self.question.setText(question)
+        self.answer.setAccessibleName(question)
+        self.answer_choice.setAccessibleName(question)
         self.answer.clear()
         self.answer.setAccessibleName(question)
         self.answer.setVisible(key not in ("privacy_status", "mapping", "rights", "source_confirmation"))

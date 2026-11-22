@@ -6,7 +6,7 @@ import html
 import json
 from typing import Any, Callable
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QSignalBlocker, QTimer
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QPlainTextEdit,
     QInputDialog, QPushButton, QSplitter, QTableView, QTabWidget, QTextBrowser, QToolButton, QVBoxLayout, QWidget,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from .. import dataworkspace
 from . import theme
+from .individual_research import fit_dialog
 from .reconciliation_review import ReconciliationReview
 from .workbench.signals_view import SignalsView
 
@@ -76,7 +77,7 @@ class DataWorkspaceDialog(QDialog):
         self.service, self.run_task, self.on_analyze = service, run_task, on_analyze
         self.setWindowTitle("Data workspace")
         self.setMinimumSize(700, 460)
-        self.resize(1180, 700)
+        fit_dialog(self, 1180, 700)
         self.datasets: list[dict[str, Any]] = []
         self.snapshot_id: str | None = None
         self.table: str | None = None
@@ -90,6 +91,13 @@ class DataWorkspaceDialog(QDialog):
         self.signals: SignalsView | None = None
 
         root = QVBoxLayout(self)
+        title = QLabel("Data workspace")
+        title.setObjectName("StudyHeading")
+        root.addWidget(title)
+        self.dataset_context = QLabel("Choose a dataset to inspect its records.")
+        self.dataset_context.setTextFormat(Qt.TextFormat.PlainText)
+        self.dataset_context.setWordWrap(True)
+        root.addWidget(self.dataset_context)
         split = QSplitter(Qt.Orientation.Horizontal)
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -103,6 +111,10 @@ class DataWorkspaceDialog(QDialog):
         self.catalogue.currentRowChanged.connect(self._dataset_chosen)
         left_layout.addWidget(self.search)
         left_layout.addWidget(self.catalogue, 1)
+        self.catalogue_empty = QLabel("No matching datasets")
+        self.catalogue_empty.setObjectName("PaneEmpty")
+        self.catalogue_empty.hide()
+        left_layout.addWidget(self.catalogue_empty)
         split.addWidget(left)
 
         self.tabs = QTabWidget()
@@ -128,6 +140,7 @@ class DataWorkspaceDialog(QDialog):
         self.status.setWordWrap(True)
         bottom = QHBoxLayout()
         self.analyze_button = QPushButton("&Analyze this dataset")
+        self.analyze_button.setProperty("primary", True)
         self.analyze_button.setDefault(True)
         self.analyze_button.setEnabled(False)
         self.analyze_button.clicked.connect(self._analyze)
@@ -383,32 +396,37 @@ class DataWorkspaceDialog(QDialog):
         self._fill_datasets()
         wanted = getattr(self, "_wanted", None)
         ids = [self.catalogue.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.catalogue.count())]
-        self.catalogue.setCurrentRow(ids.index(wanted) if wanted in ids else 0 if ids else -1)
+        row = ids.index(wanted) if wanted in ids else 0 if ids else -1
+        with QSignalBlocker(self.catalogue):
+            self.catalogue.setCurrentRow(row)
+        self._dataset_chosen(row)
         if self._wanted_trace and wanted in ids:
             self.tabs.setCurrentWidget(self.signals_note.parentWidget())
 
     def _fill_datasets(self) -> None:
         needle = self.search.text().strip().lower()
-        self.catalogue.blockSignals(True)
-        self.catalogue.clear()
-        for item in self.datasets:
-            kind = "REAL" if item.get("real_data") else "SYNTHETIC"
-            rows = sum(item.get("row_counts", {}).values())
-            source = (item.get("source") or {}).get("name") or ""
-            entry_kind = item.get("kind", "dataset")
-            if entry_kind == "logical":
-                text = f"{item['label']} · {rows:,} rows"
-            elif entry_kind == "batch":
-                text = f"      {item['label']} · {rows:,} rows"
-            else:
-                text = f"{source or item.get('label') or item['id']}" + ("" if item.get("real_data") else " (synthetic)")
-            if needle and needle not in (text + " ".join(item.get("tables", []))).lower():
-                continue
-            entry = QListWidgetItem(text)
-            entry.setToolTip(f"{item['id']}\n{kind} · {rows:,} rows")
-            entry.setData(Qt.ItemDataRole.UserRole, item["id"])
-            self.catalogue.addItem(entry)
-        self.catalogue.blockSignals(False)
+        with QSignalBlocker(self.catalogue):
+            self.catalogue.clear()
+            for item in self.datasets:
+                kind = "REAL" if item.get("real_data") else "SYNTHETIC"
+                rows = sum(item.get("row_counts", {}).values())
+                source = (item.get("source") or {}).get("name") or ""
+                entry_kind = item.get("kind", "dataset")
+                if entry_kind == "logical":
+                    text = f"{item['label']} · {rows:,} rows"
+                elif entry_kind == "batch":
+                    text = f"      {item['label']} · {rows:,} rows"
+                else:
+                    text = f"{source or item.get('label') or item['id']}" + ("" if item.get("real_data") else " (synthetic)")
+                if needle and needle not in (text + " ".join(item.get("tables", []))).lower():
+                    continue
+                entry = QListWidgetItem(text)
+                entry.setToolTip(f"{item['id']}\n{kind} · {rows:,} rows")
+                entry.setData(Qt.ItemDataRole.UserRole, item["id"])
+                self.catalogue.addItem(entry)
+                if item["id"] == self.snapshot_id:
+                    self.catalogue.setCurrentItem(entry)
+        self.catalogue_empty.setVisible(self.catalogue.count() == 0)
 
     def _dataset_chosen(self, row: int) -> None:
         if row < 0:
@@ -417,6 +435,8 @@ class DataWorkspaceDialog(QDialog):
         dataset = next(d for d in self.datasets if d["id"] == sid)
         self.snapshot_id = sid
         logical = dataset.get("kind") == "logical"
+        label = dataset.get("label") or sid
+        self.dataset_context.setText(f"{label} · {'Logical dataset' if logical else 'Immutable snapshot'}")
         self.analyze_button.setEnabled(not logical)
         self.status.setText(
             f"{dataset.get('label') or sid} — {len(dataset.get('tables', []))} table(s)"

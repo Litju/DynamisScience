@@ -67,7 +67,7 @@ from .import_review import ImportReviewDialog
 from .source_overview import SourceOverview
 from .study_home import StudyHome
 from .tasks import TaskRunner
-from .theme import apply_theme
+from .theme import THEMES, apply_theme, current_theme
 from .workbench.controller import WorkbenchController
 from .workbench.data_pane import DataPane
 from .workbench.options_pane import OptionsPane
@@ -510,10 +510,34 @@ class MainWindow(QMainWindow):
             self.workbench.palette.add_action(action, "View")
         self.tools_menu.addActions([self.workspace_actions[key] for key in (
             "New", "Open", "Add data", "Events", "Research Workbench", "History")])
+        preferences = self.tools_menu.addAction("Preferences…", self._open_preferences)
+        self.workbench.palette.add_action(preferences, "View")
         self.tools_menu.addAction("Research context details…", self._inspect_research_context)
         self.tools_menu.addSeparator()
         for menu in (file_menu, research_menu, analyses_menu, results_menu, view_menu, perspective_menu, tools_menu, help_menu):
             self.tools_menu.addMenu(menu)
+
+    def _open_preferences(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("DynamisScience preferences")
+        form = QFormLayout(dialog)
+        appearance = QComboBox()
+        appearance.setAccessibleName("Application appearance")
+        for name in THEMES:
+            appearance.addItem(name.title(), name)
+        appearance.setCurrentIndex(appearance.findData(current_theme()))
+        form.addRow("Appearance", appearance)
+        motion = QCheckBox("Reduce animations")
+        motion.setChecked(self.workbench.action_reduce_motion.isChecked())
+        form.addRow("Motion", motion)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if appearance.currentData() != current_theme():
+                self.workbench.set_theme(appearance.currentData())
+            self.workbench.action_reduce_motion.setChecked(motion.isChecked())
 
     def _ensure_performance(self) -> None:
         if self.performance is not None:
