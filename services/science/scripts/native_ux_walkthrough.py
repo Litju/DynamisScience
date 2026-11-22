@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from time import perf_counter
+from time import perf_counter, sleep
 
 SERVICE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVICE))
@@ -54,8 +54,10 @@ def walk(scale: str) -> None:
         deadline = perf_counter() + 30
         while not predicate():
             if perf_counter() >= deadline:
-                raise TimeoutError(f"Native view timed out after {steps[-1]['step'] if steps else 'launch'}")
-            QTest.qWait(30)
+                last = steps[-1]["step"] if steps else "launch"
+                raise TimeoutError(f"Native view timed out after {last}: {window.status_text.text()}")
+            app.processEvents()
+            sleep(0.015)
         QTest.qWait(45)
 
     def click(button) -> None:
