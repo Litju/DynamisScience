@@ -1282,12 +1282,14 @@ def test_athlete_inspector_full_profile_preserves_selection_on_first_load(qtbot,
     window.performance.context_panel._open_full_profile()
     qtbot.waitUntil(lambda: "athlete" in window.performance.loaded_pages and not window.runner.active)
     assert window.performance.athlete_picker.currentText() == selected
-    assert json.loads(window.performance.athlete_detail.toPlainText())["subject"]["display_id"] == selected
+    assert window.performance.athlete_detail.toPlainText().startswith(f"{selected} · ")
+    assert window.performance.athlete_record["subject"]["display_id"] == selected
 
     # A delayed response for a previous selection must not replace the current profile.
     stale = window.service.performance_athlete(window.performance.athlete_picker.itemText(0))
     window.performance._athlete_loaded(stale)
-    assert json.loads(window.performance.athlete_detail.toPlainText())["subject"]["display_id"] == selected
+    assert window.performance.athlete_detail.toPlainText().startswith(f"{selected} · ")
+    assert window.performance.athlete_record["subject"]["display_id"] == selected
     window.close()
 
 
