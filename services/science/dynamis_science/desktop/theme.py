@@ -364,6 +364,7 @@ QLabel#PaletteHint { color: $dim_text; font-family: "$mono"; font-size: 11px; pa
 /* ---- Performance OS, restyled onto the same tokens ---- */
 QToolBar#PerformanceToolbar { background: $chrome; border-bottom: 1px solid $line; min-height: 48px; max-height: 48px; padding: 0; }
 QWidget#PerformanceHeader { background: $chrome; }
+QLabel#OperationsHeading { color: $text; font-size: 20px; font-weight: 700; }
 QToolButton#PerformanceMenu { padding: 4px 8px; border: 1px solid $line2; border-radius: 6px; background: $base; }
 QToolButton#PerformanceMenu:focus { border-color: $accent; }
 QLabel#PerformanceClub { color: $text; font-size: 12px; font-weight: 700; }

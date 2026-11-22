@@ -9,7 +9,7 @@ import sys
 import difflib
 from typing import Any
 
-from PySide6.QtCore import QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
@@ -562,7 +562,12 @@ class MainWindow(QMainWindow):
         self.inspector_dock.visibilityChanged.connect(self.performance_header.context_button.setChecked)
         self.performance_rail = PerformanceRail(self)
         self.performance_rail.page_selected.connect(self.show_performance_page)
-        self.navigator_stack.addWidget(self.performance_rail)
+        self.performance_navigation = QScrollArea()
+        self.performance_navigation.setWidgetResizable(True)
+        self.performance_navigation.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.performance_navigation.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.performance_navigation.setWidget(self.performance_rail)
+        self.navigator_stack.addWidget(self.performance_navigation)
         self.performance_toolbar = QToolBar("Performance OS", self)
         self.performance_toolbar.setObjectName("PerformanceToolbar")
         self.performance_toolbar.setMovable(False)
@@ -699,11 +704,13 @@ class MainWindow(QMainWindow):
         self._ensure_performance()
         self.menuBar().hide()
         self.performance_toolbar.show()
+        # Qt initially lays out newly attached toolbars with the generic toolbar padding.
+        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         if self._perspective != "performance":
             self._perspective = "performance"
             self.navigator_dock.show()
             self.inspector_dock.setVisible(self.width() >= 1100)
-        self.navigator_stack.setCurrentWidget(self.performance_rail)
+        self.navigator_stack.setCurrentWidget(self.performance_navigation)
         self.navigator_dock.setTitleBarWidget(QWidget())
         self.navigator_dock.setMinimumWidth(196)
         self.navigator_dock.setMaximumWidth(232)

@@ -317,7 +317,7 @@ class PerformanceRail(QWidget):
             group.addWidget(label)
             for key in items:
                 name = labels[key]
-                button = QPushButton(name)
+                button = QPushButton(name.replace("&", "&&"))
                 button.setObjectName("PerformanceRailItem")
                 button.setAccessibleName(name)
                 button.setCheckable(True)
@@ -661,9 +661,14 @@ class PerformanceWorkbench(QWidget):
 
     @staticmethod
     def _heading(layout: QVBoxLayout, title: str, note: str = "") -> None:
-        label = QLabel(title if not note else f"{title}  ·  {note}")
+        label = QLabel(title)
+        label.setObjectName("OperationsHeading")
         label.setWordWrap(True)
         layout.addWidget(label)
+        if note:
+            summary = QLabel(note)
+            summary.setWordWrap(True)
+            layout.addWidget(summary)
 
     @staticmethod
     def _module(title: str, note: str = "") -> tuple[QFrame, QVBoxLayout]:
@@ -954,12 +959,16 @@ class PerformanceWorkbench(QWidget):
         self._heading(layout, "Match tracking and pose", "10 Hz synthetic segment; not a full-match or validated kinematics product")
         controls = QHBoxLayout()
         self.match_player = QComboBox()
+        self.match_player.setAccessibleName("Player for movement and pose")
+        self.match_player.setMinimumContentsLength(16)
+        self.match_player.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.match_player.currentIndexChanged.connect(
             lambda _index: self._load_match_path(self.match_player.currentData())
         )
         controls.addWidget(QLabel("Player"))
         controls.addWidget(self.match_player)
         self.frame_slider = QSlider(Qt.Orientation.Horizontal)
+        self.frame_slider.setAccessibleName("Match frame")
         self.frame_slider.setRange(0, 1799)
         self.frame_slider.setValue(900)
         self.frame_slider.valueChanged.connect(self._schedule_match_frame)

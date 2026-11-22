@@ -66,6 +66,9 @@ def walk(scale: str) -> None:
 
     def capture(name, started, target=window) -> None:
         assert target.isVisible()
+        if target is window:
+            assert window.frameGeometry().height() <= work_area.height() + 2, (
+                name, window.frameGeometry().height(), work_area.height())
         pixmap = target.grab()
         filename = f"{len(steps) + 1:02d}-{name}.png"
         assert not pixmap.isNull() and pixmap.save(str(evidence / filename))
@@ -133,7 +136,9 @@ def walk(scale: str) -> None:
     dialog_step("measurement-import", window.action_import.trigger)
     visit("operations-today", window.destinations["operations"])
     for page in PERFORMANCE_PAGE_KEYS[1:]:
-        visit(f"operations-{page}", window.performance_rail.buttons[page],
+        button = window.performance_rail.buttons[page]
+        window.performance_navigation.ensureWidgetVisible(button)
+        visit(f"operations-{page}", button,
               lambda page=page: page in window.performance.loaded_pages)
         assert window.performance.current_page == page
     visit("return-to-investigate", window.investigate_button)
@@ -152,7 +157,7 @@ def walk(scale: str) -> None:
     QTest.keyClick(window.investigate_button, Qt.Key.Key_Tab)
     assert window.destinations["design"].hasFocus()
     compact_width = max(720, window.width() - 150)
-    window.resize(compact_width, max(470, window.height() - 80))
+    window.resize(compact_width, min(max(350, window.height() - 80), work_area.height() - 36))
     wait_for(lambda: window.width() <= max(work_area.width(), compact_width))
     assert all(button.isVisible() for button in window.destinations.values())
     capture("compact", perf_counter())
