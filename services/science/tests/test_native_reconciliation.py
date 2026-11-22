@@ -172,7 +172,7 @@ def test_native_reconcile_twenty_athletes(qtbot, setup, tmp_path, monkeypatch, c
     reopened.close()
     assert not errors, errors
     with capsys.disabled():
-        print("RES-722 native: reject duplicate → quarantine protocol → map A07 and two session IDs → "
-              "confirm source context → approve 20 new trials and one correction → reopen same workspace → "
-              f"run descriptives (20 athletes, 40 trials, weekly means 35.275 and 37.25 cm). "
+        print("RES-722 native: rejected duplicate, quarantined protocol, mapped A07 and two session IDs, "
+              "confirmed source context, approved 20 new trials and one correction, and reopened the same workspace. "
+              f"Ran descriptives (20 athletes, 40 trials, weekly means 35.275 and 37.25 cm). "
               f"Batch {after['id']} / revision {revision} / run {panel.latest_run['id']}.")
