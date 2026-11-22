@@ -15,7 +15,7 @@ sys.path.insert(0, str(SERVICE))
 from dynamis_science.qa_cleanup import read_marker
 
 
-def walk(scale: str) -> None:
+def walk(scale: str, appearance: str | None = None) -> None:
     scratch = Path(os.environ["DYNAMISSCIENCE_QA_RUN_ROOT"]).resolve(strict=True)
     marker = read_marker(scratch)
     if marker["issue_id"] != "RES-760":
@@ -33,6 +33,7 @@ def walk(scale: str) -> None:
     from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QInputDialog
 
     from dynamis_science.desktop import theme
+    from dynamis_science.desktop.data_workspace import DataWorkspaceDialog
     from dynamis_science.desktop.main_window import MainWindow
     from dynamis_science.desktop.performance_navigation import PERFORMANCE_PAGE_KEYS
     from dynamis_science.desktop.services import DynamisAppService
@@ -43,6 +44,9 @@ def walk(scale: str) -> None:
     service = DynamisAppService()
     case = follow_up(service, prepare(service, private), private)
     window = MainWindow(service)
+    if appearance:
+        window.workbench.set_theme(appearance)
+    initial_appearance = theme.current_theme()
     screen = window.screen()
     work_area = screen.availableGeometry()
     window.resize(min(1366, work_area.width() - 16), min(720, work_area.height() - 36))
@@ -78,6 +82,8 @@ def walk(scale: str) -> None:
             "step": name,
             "ms_including_settle_and_capture": round(1000 * (perf_counter() - started)),
             "pixels": [pixmap.width(), pixmap.height()],
+            "frame_fits_work_area": (target.frameGeometry().width() <= work_area.width() + 2
+                                     and target.frameGeometry().height() <= work_area.height() + 2),
             "file": filename,
         })
 
@@ -89,6 +95,7 @@ def walk(scale: str) -> None:
 
     def dialog_step(name, action, inspect=None) -> None:
         started = perf_counter()
+        first_step = len(steps)
         timer = QTimer()
         errors = []
 
@@ -114,7 +121,7 @@ def walk(scale: str) -> None:
         timer.stop()
         if errors:
             raise errors[0]
-        assert steps[-1]["step"] == name
+        assert len(steps) > first_step and steps[first_step]["step"] == name
 
     started = perf_counter()
     wait_for(lambda: not window.runner.active and hasattr(window, "studies"))
@@ -131,17 +138,42 @@ def walk(scale: str) -> None:
     athlete, revision = panel.scope.currentData(), panel.revision
     assert revision == case["revisions"][-1]
     capture("investigate", perf_counter())
+    actions = {action.text(): action for action in panel.research_actions.menu().actions()}
+    for command, name in (
+        ("Plan", "individual-protocol"), ("Record visits", "individual-visits"),
+        ("Run analysis", "individual-analysis"), ("Saved analyses", "individual-results"),
+        ("Compare with cohort", "individual-comparison"), ("Scenarios", "individual-scenarios"),
+        ("Assessment data", "individual-data"),
+    ):
+        dialog_step(name, actions[command].trigger)
     started = perf_counter()
     panel.athlete_record_action.trigger()
     wait_for(lambda: window.perspectives.currentWidget() is window.squad
              and window.squad.currentWidget() is window.squad.athlete_page and not window.runner.active)
     assert window.squad.athlete_page.athlete["subject_id"] == athlete
     capture("athlete-record", started)
+    page = window.squad.athlete_page
+    page.view_values.setFocus()
+    QTest.keyClick(page.view_values, Qt.Key.Key_Space)
+    assert page.measurement_view.currentWidget() is page.measurement_values
+    capture("athlete-values", perf_counter())
+    QTest.keyClick(page.view_values, Qt.Key.Key_Space)
+    assert page.measurement_view.currentWidget() is page.figure
     visit("library-with-study", window.study_button)
     visit("design", window.destinations["design"])
     visit("evidence", window.destinations["evidence"])
     visit("analyze", window.destinations["analyze"])
-    dialog_step("data-workspace", window.action_workspace.trigger)
+    def inspect_data_workspace(dialog) -> None:
+        assert isinstance(dialog, DataWorkspaceDialog)
+        for index in range(1, dialog.tabs.count()):
+            started = perf_counter()
+            dialog.tabs.setCurrentIndex(index)
+            wait_for(lambda: not window.runner.active)
+            name = dialog.tabs.tabText(index).replace("&", "").lower().replace(" ", "-")
+            capture(f"data-workspace-{name}", started, dialog)
+        dialog.reject()
+
+    dialog_step("data-workspace", window.action_workspace.trigger, inspect_data_workspace)
     dialog_step("measurement-import", window.action_import.trigger)
     visit("operations-today", window.destinations["operations"])
     for page in PERFORMANCE_PAGE_KEYS[1:]:
@@ -181,11 +213,12 @@ def walk(scale: str) -> None:
 
     receipt = {
         "platform": app.platformName(),
+        "initial_appearance": initial_appearance,
         "requested_scale": scale,
         "device_pixel_ratio": window.devicePixelRatioF(),
         "logical_work_area": [work_area.width(), work_area.height()],
         "logical_compact_window": [window.width(), window.height()],
-        "fixture": "RES-621 synthetic 20-athlete, 12-week study",
+        "fixture": "Disposable SUB-001 to SUB-020 study from res621_study.py",
         "frozen_report_unchanged_while_seeding_followup": True,
         "steps": steps,
     }
@@ -197,4 +230,6 @@ def walk(scale: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scale", choices=("1", "1.25", "1.5"), default="1")
-    walk(parser.parse_args().scale)
+    parser.add_argument("--appearance", choices=("light", "dark"))
+    args = parser.parse_args()
+    walk(args.scale, args.appearance)

@@ -108,6 +108,8 @@ class DataWorkspaceDialog(QDialog):
         self.search.textChanged.connect(self._fill_datasets)
         self.catalogue = QListWidget()
         self.catalogue.setAccessibleName("Dataset catalogue")
+        self.catalogue.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.catalogue.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.catalogue.currentRowChanged.connect(self._dataset_chosen)
         left_layout.addWidget(self.search)
         left_layout.addWidget(self.catalogue, 1)
@@ -421,7 +423,9 @@ class DataWorkspaceDialog(QDialog):
                 if needle and needle not in (text + " ".join(item.get("tables", []))).lower():
                     continue
                 entry = QListWidgetItem(text)
-                entry.setToolTip(f"{item['id']}\n{kind} · {rows:,} rows")
+                details = f"{text.strip()}\n{item['id']}\n{kind} · {rows:,} rows"
+                entry.setToolTip(details)
+                entry.setData(Qt.ItemDataRole.AccessibleDescriptionRole, details)
                 entry.setData(Qt.ItemDataRole.UserRole, item["id"])
                 self.catalogue.addItem(entry)
                 if item["id"] == self.snapshot_id:

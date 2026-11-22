@@ -102,12 +102,17 @@ def test_inspector_exposes_rights_qc_provenance_and_receipt(service, tmp_path):
 
 
 def test_dialog_browse_filter_query_inspect_and_continue_into_analysis(service, tmp_path, qtbot):
+    from PySide6.QtCore import Qt
+
     cmj, trace = _admit_cmj(tmp_path), _admit_trace(tmp_path)
     chosen = []
     dialog = DataWorkspaceDialog(service, lambda op, done, label="": done(op()), chosen.append)
     qtbot.addWidget(dialog)
     dialog.open(cmj)
     assert dialog.catalogue.count() >= 2 and dialog.snapshot_id == cmj
+    entry = dialog.catalogue.currentItem()
+    assert entry.text().strip() in entry.toolTip()
+    assert entry.data(Qt.ItemDataRole.AccessibleDescriptionRole) == entry.toolTip()
     assert dialog.table_picker.currentText() == "cmj_trials" and dialog.rows_model.rowCount() == 3
     assert "Rows 1–3 of 3" in dialog.page_label.text()
     assert any("(cm)" in c for c in dialog.rows_model.columns)  # units shown with the data
