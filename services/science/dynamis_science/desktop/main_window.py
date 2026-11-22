@@ -557,6 +557,7 @@ class MainWindow(QMainWindow):
         self.perspectives.addWidget(self.performance)
         self.performance_header = PerformanceHeader(self)
         self.performance_header.search_requested.connect(self._search_performance)
+        self.performance_header.page_requested.connect(self.show_performance_page)
         self.performance_header.set_menu_actions(self.menuBar().actions())
         self.performance_header.context_button.clicked.connect(self.inspector_dock.setVisible)
         self.inspector_dock.visibilityChanged.connect(self.performance_header.context_button.setChecked)
@@ -708,12 +709,12 @@ class MainWindow(QMainWindow):
         QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         if self._perspective != "performance":
             self._perspective = "performance"
-            self.navigator_dock.show()
             self.inspector_dock.setVisible(self.width() >= 1100)
         self.navigator_stack.setCurrentWidget(self.performance_navigation)
         self.navigator_dock.setTitleBarWidget(QWidget())
         self.navigator_dock.setMinimumWidth(196)
         self.navigator_dock.setMaximumWidth(232)
+        self._fit_operations_navigation()
         self.inspector_dock.setWindowTitle(
             "ATHLETE 360"
             if self.performance.context_panel.current_athlete
@@ -738,6 +739,16 @@ class MainWindow(QMainWindow):
     def _performance_context_loaded_from_service(self, context: dict[str, Any]) -> None:
         self.performance_header.set_context(context)
         self.performance_rail.set_context(context)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if getattr(self, "_perspective", "") == "performance":
+            self._fit_operations_navigation()
+
+    def _fit_operations_navigation(self) -> None:
+        compact = self.width() < 1020
+        self.performance_header.set_compact_navigation(compact)
+        self.navigator_dock.setVisible(not compact)
 
     def _fit_perspective(self, *_args) -> None:
         for index in range(self.perspectives.count()):
@@ -1023,6 +1034,7 @@ class MainWindow(QMainWindow):
         self._ensure_performance()
         self._show_performance_mode()
         self.performance_rail.set_current(page)
+        self.performance_header.page_picker.setCurrentIndex(PERFORMANCE_PAGE_KEYS.index(page))
         self.current_target = {"type": "performance", "page": page}
         title = {"athlete": "Athlete 360", "match": "Match & Pose"}.get(
             page, self.performance.page_names[self.performance.page_keys.index(page)]

@@ -136,10 +136,18 @@ def walk(scale: str) -> None:
     dialog_step("measurement-import", window.action_import.trigger)
     visit("operations-today", window.destinations["operations"])
     for page in PERFORMANCE_PAGE_KEYS[1:]:
-        button = window.performance_rail.buttons[page]
-        window.performance_navigation.ensureWidgetVisible(button)
-        visit(f"operations-{page}", button,
-              lambda page=page: page in window.performance.loaded_pages)
+        picker = window.performance_header.page_picker
+        if picker.isVisible():
+            started = perf_counter()
+            picker.setFocus()
+            QTest.keyClick(picker, Qt.Key.Key_Down)
+            wait_for(lambda: page in window.performance.loaded_pages and not window.runner.active)
+            capture(f"operations-{page}", started)
+        else:
+            button = window.performance_rail.buttons[page]
+            window.performance_navigation.ensureWidgetVisible(button)
+            visit(f"operations-{page}", button,
+                  lambda page=page: page in window.performance.loaded_pages)
         assert window.performance.current_page == page
     visit("return-to-investigate", window.investigate_button)
     assert (panel.scope.currentData(), panel.revision) == (athlete, revision)

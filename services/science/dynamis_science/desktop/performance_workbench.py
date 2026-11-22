@@ -219,6 +219,7 @@ class ReportDialog(QDialog):
 
 class PerformanceHeader(QWidget):
     search_requested = Signal(str)
+    page_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -234,6 +235,13 @@ class PerformanceHeader(QWidget):
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu_button.setObjectName("PerformanceMenu")
         layout.addWidget(self.menu_button)
+        self.page_picker = QComboBox()
+        self.page_picker.setAccessibleName("Operations page")
+        for key, name in zip(PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES):
+            self.page_picker.addItem(name, key)
+        self.page_picker.activated.connect(lambda: self.page_requested.emit(self.page_picker.currentData()))
+        self.page_picker.hide()
+        layout.addWidget(self.page_picker)
         self.club = QLabel("Loading roster…")
         self.club.setObjectName("PerformanceClub")
         self.squad = QLabel()
@@ -264,6 +272,10 @@ class PerformanceHeader(QWidget):
         menu = QMenu(self.menu_button)
         menu.addActions(actions)
         self.menu_button.setMenu(menu)
+
+    def set_compact_navigation(self, compact: bool) -> None:
+        self.menu_button.setVisible(not compact)
+        self.page_picker.setVisible(compact)
 
     def set_context(self, context: dict[str, Any]) -> None:
         club = context.get("club", {})
