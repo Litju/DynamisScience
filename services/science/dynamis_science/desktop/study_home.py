@@ -1,10 +1,10 @@
-"""Study destinations arranged around an interactive native 3D instrument."""
+"""Workspace library with an optional spatial map of study tools."""
 
 from math import cos, pi, sin
 
 from PySide6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QPainter, QPen, QRadialGradient, QVector3D
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 DESTINATIONS = (
     ("people", "People", "Athletes, groups and follow-ups"),
@@ -193,49 +193,73 @@ class StudyHome(QWidget):
         super().__init__()
         self.setObjectName("StudyHome")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 18, 24, 14)
-        layout.setSpacing(12)
-        heading = QHBoxLayout()
-        self.title = QLabel("Open a study")
+        layout.setContentsMargins(32, 26, 32, 24)
+        layout.setSpacing(18)
+        identity = QFrame()
+        identity.setObjectName("WorkspaceIdentity")
+        heading = QVBoxLayout(identity)
+        heading.setContentsMargins(22, 18, 22, 18)
+        heading.setSpacing(8)
+        self.title = QLabel()
         self.title.setObjectName("StudyHeading")
         self.title.setWordWrap(True)
         self.title.setTextFormat(Qt.TextFormat.PlainText)
-        heading.addWidget(self.title, 1)
-        layout.addLayout(heading)
+        heading.addWidget(self.title)
         self.summary = QLabel()
         self.summary.setObjectName("StudySummary")
         self.summary.setWordWrap(True)
-        layout.addWidget(self.summary)
-        self.body = QWidget()
-        split = QHBoxLayout(self.body)
-        split.setContentsMargins(0, 0, 0, 0)
-        split.setSpacing(22)
-        self.instrument = StudyInstrument()
-        self.instrument.opened.connect(self.destination)
-        split.addWidget(self.instrument, 4)
-        links = QVBoxLayout()
-        links.setSpacing(6)
-        self.buttons = {}
-        for key, title, description in DESTINATIONS:
-            button = QPushButton(title.replace('&', '&&'))
-            button.setObjectName("StudyDestination")
-            button.setAccessibleDescription(description)
-            button.setToolTip(description)
-            button.clicked.connect(lambda _checked=False, key=key: self.destination.emit(key))
-            button.installEventFilter(self)
-            self.buttons[key] = button
-            links.addWidget(button, 1)
-        split.addLayout(links, 3)
-        layout.addWidget(self.body, 1)
+        heading.addWidget(self.summary)
         actions = QHBoxLayout()
         self.open_button = QPushButton("Open study…")
         self.new_button = QPushButton("New study…")
         self.import_button = QPushButton("Add measurements…")
+        self.open_button.setProperty("primary", True)
         self.import_button.setProperty("primary", True)
         for button in (self.open_button, self.new_button, self.import_button):
             actions.addWidget(button)
         actions.addStretch()
-        layout.addLayout(actions)
+        heading.addLayout(actions)
+        layout.addWidget(identity)
+
+        self.body = QWidget()
+        body = QVBoxLayout(self.body)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(10)
+        links = QGridLayout()
+        links.setSpacing(10)
+        self.buttons = {}
+        for index, (key, title, description) in enumerate(DESTINATIONS):
+            card = QFrame()
+            card.setObjectName("WorkspaceTool")
+            content = QVBoxLayout(card)
+            content.setContentsMargins(12, 10, 12, 12)
+            content.setSpacing(4)
+            button = QPushButton(title.replace('&', '&&'))
+            button.setObjectName("StudyDestination")
+            button.setAccessibleDescription(description)
+            button.clicked.connect(lambda _checked=False, key=key: self.destination.emit(key))
+            button.installEventFilter(self)
+            caption = QLabel(description)
+            caption.setObjectName("StudySummary")
+            caption.setWordWrap(True)
+            content.addWidget(button)
+            content.addWidget(caption)
+            self.buttons[key] = button
+            row, column = divmod(index, 3)
+            links.addWidget(card, row, column)
+            links.setColumnStretch(column, 1)
+        body.addLayout(links)
+        self.map_button = QPushButton("Spatial overview")
+        self.map_button.setCheckable(True)
+        self.map_button.setAccessibleDescription("Show an interactive map of the study tools")
+        body.addWidget(self.map_button, 0, Qt.AlignmentFlag.AlignLeft)
+        self.instrument = StudyInstrument()
+        self.instrument.opened.connect(self.destination)
+        self.instrument.hide()
+        self.map_button.toggled.connect(self.instrument.setVisible)
+        body.addWidget(self.instrument, 1)
+        layout.addWidget(self.body)
+        layout.addStretch(1)
         self.set_study({})
 
     def eventFilter(self, widget, event):
@@ -250,13 +274,16 @@ class StudyHome(QWidget):
         active = bool(detail.get("workspace"))
         revision = detail.get("active_data_revision_id")
         study = detail.get("study", {})
-        self.title.setText(study.get("title") if active else "Research studies")
-        self.summary.setText("Choose a study to open its athletes and research." if not active else
-                             "A study needs measurements before athlete comparisons are available." if not revision else "")
-        self.summary.setVisible(bool(self.summary.text()))
+        self.title.setText((study.get("title") or "Untitled study") if active else "Research library")
+        number = next((row["number"] for row in detail.get("data_revisions", []) if row["id"] == revision), None)
+        if revision:
+            summary = f"Data revision {number}" if number is not None else "Measurements attached"
+        elif active:
+            summary = "Add measurements to investigate athletes and compare experiments."
+        else:
+            summary = "Open a study to continue your research or create a new study."
+        self.summary.setText(summary)
         self.body.setVisible(active)
-        self.open_button.setVisible(not active)
-        self.new_button.setVisible(not active)
         self.import_button.setVisible(active and not revision)
         for key in ("people", "series", "methods"):
             self.buttons[key].setEnabled(bool(revision))

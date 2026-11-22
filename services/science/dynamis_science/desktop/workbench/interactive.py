@@ -16,7 +16,7 @@ import math
 from typing import Any
 
 import pyqtgraph as pg
-from PySide6.QtCore import QEasingCurve, Qt, QVariantAnimation, Signal
+from PySide6.QtCore import Qt, QVariantAnimation, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -409,6 +409,10 @@ class Trajectory3D(QWidget):
         reset.clicked.connect(lambda: self.set_view("3D"))
         controls.addWidget(reset)
         layout.addLayout(controls)
+        self._animation = QVariantAnimation(self)
+        self._animation.setDuration(theme.CAMERA_TRANSITION_MS)
+        self._animation.setEasingCurve(theme.CAMERA_TRANSITION_EASING)
+        self._animation.valueChanged.connect(self._step)
         gl = _gl()
         self.gl = gl
         self.view = None
@@ -435,10 +439,6 @@ class Trajectory3D(QWidget):
         self.missing_note = _label("", "MissingNote")
         layout.addWidget(self.hint)
         layout.addWidget(self.missing_note)
-        self._animation = QVariantAnimation(self)
-        self._animation.setDuration(250)
-        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self._animation.valueChanged.connect(self._step)
 
     @property
     def available(self) -> bool:
@@ -481,11 +481,11 @@ class Trajectory3D(QWidget):
         if self.view is None:
             return
         target = (elevation, azimuth, DISTANCE)
-        if not animate:
+        self._animation.stop()
+        if not animate or theme.reduced_motion():
             self._set_camera(*target)
             return
         start = (self.view.opts["elevation"], self.view.opts["azimuth"], self.view.opts["distance"])
-        self._animation.stop()
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
         self._tween = (start, target)

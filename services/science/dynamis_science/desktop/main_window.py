@@ -9,10 +9,9 @@ import difflib
 from typing import Any
 
 from PySide6.QtCore import QEvent, QSettings, Qt, QTimer, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
-    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDockWidget,
@@ -82,6 +81,22 @@ class ResearchPerspectives(QStackedWidget):
         return page.minimumSizeHint().height() if page is not None else 0
 
 
+class WorkspaceLocation(QLabel):
+    """One-line context. The accessible name and tooltip retain the full text."""
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setWidth(0)
+        return hint
+
+    def paintEvent(self, _event):
+        rect = self.contentsRect().adjusted(6, 0, 0, 0)
+        text = self.fontMetrics().elidedText(self.text(), Qt.TextElideMode.ElideRight, rect.width())
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(QPalette.ColorRole.WindowText))
+        painter.drawText(rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+
+
 class MainWindow(QMainWindow):
     catalogue_loaded = Signal()
 
@@ -94,7 +109,7 @@ class MainWindow(QMainWindow):
         )
         application = QApplication.instance()
         if application is not None:
-            apply_theme(application, self.settings.value("workbench/theme", "light"))
+            apply_theme(application, self.settings.value("workbench/theme", "dark"))
         self.runner = TaskRunner(self)
         self._close_after_tasks = False
         self.runner.idle.connect(self._close_if_idle)
@@ -269,7 +284,6 @@ class MainWindow(QMainWindow):
         context_bar.addWidget(wordmark)
         self.investigate_button = QPushButton("Investigate")
         self.study_button = QPushButton("Library")
-        self.destination_group = QButtonGroup(self)
         self.destinations = {}
         routes = (
             ("library", self.study_button, self._show_study_home, "Open studies, people and sources"),
@@ -285,21 +299,16 @@ class MainWindow(QMainWindow):
             button.setAccessibleDescription(description)
             button.setToolTip(description)
             button.clicked.connect(action)
-            self.destination_group.addButton(button)
             self.destinations[key] = button
             context_bar.addWidget(button)
         for left, right in zip(tuple(self.destinations.values()), tuple(self.destinations.values())[1:]):
             QWidget.setTabOrder(left, right)
         context_bar.addSeparator()
-        self.location = QLabel()
+        self.location = WorkspaceLocation()
         self.location.setObjectName("ResearchLocation")
         self.location.setTextFormat(Qt.TextFormat.PlainText)
-        self.location.setMaximumWidth(320)
-        self.location.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.location.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         context_bar.addWidget(self.location)
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        context_bar.addWidget(spacer)
         self.tools_menu = QMenu("Study tools", self)
         tools_button = QToolButton()
         tools_button.setObjectName("ResearchTools")
@@ -541,6 +550,7 @@ class MainWindow(QMainWindow):
         header_scroll.setFixedHeight(self.performance_header.minimumHeight())  # its fixed 48 px, not the 29 px hint
         self.performance_toolbar.addWidget(header_scroll)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
+        self.insertToolBarBreak(self.performance_toolbar)
         self.performance_toolbar.hide()
 
     def _open_third_party_licenses(self) -> None:
@@ -1445,7 +1455,8 @@ class MainWindow(QMainWindow):
         elif active is self.workbench and (page is self.results_doc or page is self.signals_view):
             destination = "analyze"
             location = "Analysis workbench"
-        self.destinations[destination].setChecked(True)
+        for key, button in self.destinations.items():
+            button.setChecked(key == destination)
         self.location.setText(location)
         self.location.setToolTip(location)
         if stage:
