@@ -121,7 +121,8 @@ def walk(scale: str, appearance: str | None = None) -> None:
         timer.stop()
         if errors:
             raise errors[0]
-        assert len(steps) > first_step and steps[first_step]["step"] == name
+        assert len(steps) > first_step and steps[first_step]["step"] == name, f"Dialog did not open: {name}"
+        wait_for(lambda: not window.runner.active)
 
     started = perf_counter()
     wait_for(lambda: not window.runner.active and hasattr(window, "studies"))

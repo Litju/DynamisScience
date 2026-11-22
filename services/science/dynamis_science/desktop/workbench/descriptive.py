@@ -22,7 +22,7 @@ from matplotlib.figure import Figure
 
 from .. import theme
 from .spec import DEFAULTS, descriptives_syntax
-from .figures import _style
+from .figures import style_figure
 from .results import ResultBlock, _table
 
 MAX_ROWS = 50_000
@@ -293,7 +293,7 @@ def box_figure(frame: pd.DataFrame, variable: str, by: str | None, unit: str = "
     axis.set_xticks(positions, [_level(level) for level in levels])
     axis.set_xlabel("" if by == "_all" else by)
     axis.set_ylabel(f"{variable} ({unit})" if unit else variable)
-    _style(figure, t)
+    style_figure(figure, t)
     return figure
 
 
@@ -311,7 +311,7 @@ def hist_figure(frame: pd.DataFrame, variable: str, by: str | None, unit: str = 
         axis.legend(frameon=False, fontsize=7, title=by, title_fontsize=7)
     axis.set_xlabel(f"{variable} ({unit})" if unit else variable)
     axis.set_ylabel("Count")
-    _style(figure, t)
+    style_figure(figure, t)
     return figure
 
 
@@ -333,7 +333,7 @@ def change_figure(table: pd.DataFrame, labels: dict[str, str], unit: str = "", t
     axis.set_yticks(ys, names)
     axis.axvline(0, color=t["line2"], linewidth=0.8)
     axis.set_xlabel(f"Change ({unit})" if unit else "Change")
-    _style(figure, t)
+    style_figure(figure, t)
     axis.tick_params(axis="y", labelsize=7)
     axis.grid(False, axis="y")
     return figure
