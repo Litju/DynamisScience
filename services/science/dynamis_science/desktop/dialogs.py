@@ -16,12 +16,14 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QTextBrowser,
@@ -29,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .individual_research import fit_dialog
 from .services import DynamisAppService
 
 
@@ -477,12 +480,17 @@ class DatasetAdmissionDialog(QDialog):
         self.setWindowTitle("Admit local dataset")
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._source_page(), "Source rights")
-        self.tabs.addTab(self._measurement_page(), "Measurement metadata")
-        self.tabs.addTab(self._file_page(), "File and QC")
-        layout.addWidget(self.tabs)
-        footer = QHBoxLayout()
+        for page, label in ((self._source_page(), "Source rights"),
+                            (self._measurement_page(), "Measurement metadata"),
+                            (self._file_page(), "File and QC")):
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(page)
+            self.tabs.addTab(scroll, label)
+        layout.addWidget(self.tabs, 1)
+        footer = QGridLayout()
         self.review_button = QPushButton("Register source and run QC")
+        self.review_button.setProperty("primary", True)
         self.review_button.clicked.connect(self._review)
         self.admit_button = QPushButton("Admit QC-passed snapshot")
         self.admit_button.setEnabled(False)
@@ -492,15 +500,16 @@ class DatasetAdmissionDialog(QDialog):
         self.quarantine_button.clicked.connect(self._record_quarantine)
         cancel = QPushButton("Close")
         cancel.clicked.connect(self.reject)
-        footer.addWidget(self.review_button)
-        footer.addWidget(self.admit_button)
-        footer.addWidget(self.quarantine_button)
-        footer.addWidget(cancel)
-        layout.addLayout(footer)
+        footer.addWidget(self.review_button, 0, 0)
+        footer.addWidget(self.admit_button, 0, 1)
+        footer.addWidget(self.quarantine_button, 1, 0)
+        footer.addWidget(cancel, 1, 1)
         self.summary = QTextBrowser()
         self.summary.setMinimumHeight(100)
         self.summary.setMaximumHeight(160)
         layout.addWidget(self.summary)
+        layout.addLayout(footer)
+        fit_dialog(self, 920, 680)
 
     def _source_page(self) -> QWidget:
         page = QWidget()

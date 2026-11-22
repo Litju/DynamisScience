@@ -352,12 +352,15 @@ class IndividualResearchPanel(QWidget):
         self.run_button = QPushButton("&Run analysis")
         self.run_button.setProperty("primary", True)
         self.run_button.clicked.connect(self.execute)
-        layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignLeft)
         self.analysis_form = form
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(page)
-        self.tabs.addTab(scroll, "Analysis")
+        analysis = QWidget()
+        analysis_layout = QVBoxLayout(analysis)
+        analysis_layout.addWidget(scroll, 1)
+        analysis_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.tabs.addTab(analysis, "Analysis")
         self.trust_controls.hide()
 
     def _selected_method(self) -> dict | None:
