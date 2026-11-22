@@ -668,8 +668,12 @@ def _quality_result(artifact, family, metadata, status, errors, warnings, reject
     return assessment
 
 
+def list_quality() -> list[dict[str, Any]]:
+    return _load_list(_artifact_path("admission_quality.json"))
+
+
 def get_quality(assessment_id: str) -> dict[str, Any] | None:
-    return next((r for r in _load_list(_artifact_path("admission_quality.json")) if r.get("id") == assessment_id), None)
+    return next((record for record in list_quality() if record.get("id") == assessment_id), None)
 
 
 def harmonize_cmj(artifact: dict[str, Any], metadata: dict[str, Any]) -> pl.DataFrame:

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.dialogs import (
+    AdmissionHistoryDialog,
     CohortDialog,
     DatasetAdmissionDialog,
     PlanDialog,
@@ -1018,6 +1019,19 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     assert admitted["synthetic"] and not admitted["real_data"]
     assert any(item["id"] == record["dataset_snapshot_id"] for item in service.list_datasets())
     dialog.close()
+
+    history = []
+
+    def inspect_history(history_dialog):
+        history.extend(browser.toPlainText() for browser in history_dialog.findChildren(QTextBrowser))
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(AdmissionHistoryDialog, "exec", inspect_history)
+    window.action_admission_history.trigger()
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    assert not errors, errors
+    assert any(record["id"] in text for text in history)
+    assert any(dialog.quality["id"] in text for text in history)
     window.close()
 
 
