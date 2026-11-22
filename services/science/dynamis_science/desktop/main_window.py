@@ -573,7 +573,14 @@ class MainWindow(QMainWindow):
         self.performance_toolbar.setObjectName("PerformanceToolbar")
         self.performance_toolbar.setMovable(False)
         self.performance_toolbar.setFloatable(False)
-        self.performance_toolbar.addWidget(self.performance_header)
+        header_scroll = QScrollArea()
+        header_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        header_scroll.setWidgetResizable(True)
+        header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        header_scroll.setWidget(self.performance_header)
+        header_scroll.setFixedHeight(self.performance_header.minimumHeight())
+        header_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.performance_toolbar.addWidget(header_scroll)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
         self.insertToolBarBreak(self.performance_toolbar)
         self.performance_toolbar.hide()
@@ -704,9 +711,6 @@ class MainWindow(QMainWindow):
     def _show_performance_mode(self) -> None:
         self._ensure_performance()
         self.menuBar().hide()
-        self.performance_toolbar.show()
-        # Qt initially lays out newly attached toolbars with the generic toolbar padding.
-        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         if self._perspective != "performance":
             self._perspective = "performance"
             self.inspector_dock.setVisible(self.width() >= 1100)
@@ -715,6 +719,9 @@ class MainWindow(QMainWindow):
         self.navigator_dock.setMinimumWidth(196)
         self.navigator_dock.setMaximumWidth(232)
         self._fit_operations_navigation()
+        self.performance_toolbar.show()
+        # Qt initially lays out newly attached toolbars with the generic toolbar padding.
+        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         self.inspector_dock.setWindowTitle(
             "ATHLETE 360"
             if self.performance.context_panel.current_athlete

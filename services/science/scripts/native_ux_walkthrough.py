@@ -69,6 +69,8 @@ def walk(scale: str) -> None:
         if target is window:
             assert window.frameGeometry().height() <= work_area.height() + 2, (
                 name, window.frameGeometry().height(), work_area.height())
+            assert window.frameGeometry().width() <= work_area.width() + 2, (
+                name, window.frameGeometry().width(), work_area.width())
         pixmap = target.grab()
         filename = f"{len(steps) + 1:02d}-{name}.png"
         assert not pixmap.isNull() and pixmap.save(str(evidence / filename))
