@@ -46,6 +46,7 @@ Representative evidence is retained in `D:\SWE_HOME\codex_home\artifacts\dynamis
 - RES-758 exercised both report workflows and admitted data on the Windows backend. The native run recorded 48 passes and one failure because the exact 1440 px offscreen design fixture was run against a smaller physical desktop. The separate 27-test offscreen theme and pane suite passed.
 - The full 440-case attempt on `17ef41b` reached 65% and exceeded its 850-second child bound. That attempt is incomplete. Its three observed failures covered Operations width, the former Squad-to-athlete route, and the former event-to-athlete route. Corrected flows passed together on `03151c8` with no scientific engine change.
 - A later batch and its initial continuation stalled in an unattended workflow test. The test now waits for pending source review before closing and records an unexpected importer route directly. Both workflow cases passed on the corrected harness.
+- The 152 remaining collected cases passed on `7d3b6c8` in 374.45 seconds with no failures or skips. Coverage included scientific workbench and admitted data, persistent lifecycle and frozen reports, training context, storage isolation, and result export. This is a source-specific continuation and targeted recovery, with the earlier full-suite attempt still recorded separately.
 
 ## Review stack
 
