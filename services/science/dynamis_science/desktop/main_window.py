@@ -1609,8 +1609,7 @@ class MainWindow(QMainWindow):
             self.squad.setCurrentWidget(self.squad.board)
             self._show_squad_mode()
         elif key == "archive":
-            self._go_research_stage("Reports / history")
-            self.research.history_panel.set_context(self.current_study_id)
+            self._go_research_stage("Reports / history", all_scopes=True)
         elif key == "methods":
             self._show_research_mode()
             self._set_record_view(True)
@@ -1621,7 +1620,7 @@ class MainWindow(QMainWindow):
             self._go_research_stage(stage)
         self._sync_workflow_stage()
 
-    def _go_research_stage(self, stage: str) -> None:
+    def _go_research_stage(self, stage: str, *, all_scopes: bool = False) -> None:
         """Navigate existing native tasks without changing revision or frozen identity."""
         if not self.current_study.get('workspace'):
             return
@@ -1631,7 +1630,8 @@ class MainWindow(QMainWindow):
         if stage == 'Reports / history':
             self._show_research_mode()
             self._set_record_view(True)
-            self.research.history_panel.set_context(self.current_study_id, self.research_context.get('subject_id'))
+            subject = None if all_scopes else self.research_context.get("subject_id")
+            self.research.history_panel.set_context(self.current_study_id, subject)
             self.research.tabs.setCurrentWidget(self.research.history_panel)
             self.workbench.panes['data'].hide()
             self.stage_picker.setCurrentText(stage)
@@ -2771,25 +2771,34 @@ class ResearchWorkbench(QWidget):
     def _build_evidence(self) -> None:
         page = self.tabs.widget(4)
         layout = QVBoxLayout(page)
-        buttons = QGridLayout()
-        promote_button = QPushButton("Promote completed run to evidence")
-        promote_button.clicked.connect(self._promote)
-        cite_button = QPushButton("Cite promoted evidence")
-        cite_button.clicked.connect(self._cite_latest)
-        uncite_button = QPushButton("Remove current citation")
-        uncite_button.clicked.connect(self._uncite_latest)
+        layout.setContentsMargins(16, 14, 16, 14)
+        heading = QLabel("Report draft")
+        heading.setObjectName("StudyHeading")
+        layout.addWidget(heading)
+        buttons = QHBoxLayout()
+        evidence = QPushButton("Evidence and citations")
+        menu = QMenu(evidence)
+        for label, callback in (
+            ("Promote completed run to evidence", self._promote),
+            ("Cite promoted evidence", self._cite_latest),
+            ("Remove current citation", self._uncite_latest),
+            ("Show provenance lineage", self._lineage),
+        ):
+            menu.addAction(label, callback)
+        evidence.setMenu(menu)
         freeze_button = QPushButton("Freeze report version")
         freeze_button.clicked.connect(self._freeze_report)
-        lineage_button = QPushButton("Show provenance lineage")
-        lineage_button.clicked.connect(self._lineage)
-        export_button = QPushButton("Export versioned HTML report…")
+        export_button = QPushButton("Export HTML…")
         export_button.clicked.connect(self.export_report)
-        for index, button in enumerate((promote_button, cite_button, uncite_button, lineage_button, freeze_button, export_button)):
-            buttons.addWidget(button, index // 2, index % 2)
+        for button in (evidence, freeze_button, export_button):
+            buttons.addWidget(button)
+        buttons.addStretch()
         layout.addLayout(buttons)
-        self.evidence_output = QTextBrowser()
-        self.evidence_output.setMinimumHeight(130)
-        layout.addWidget(self.evidence_output, 1)
+
+        columns = QSplitter(Qt.Orientation.Horizontal)
+        editor = QWidget()
+        controls = QVBoxLayout(editor)
+        controls.setContentsMargins(0, 4, 8, 0)
         narrative = QFormLayout()
         self.report_title = QLineEdit()
         self.report_summary = QPlainTextEdit()
@@ -2802,12 +2811,25 @@ class ResearchWorkbench(QWidget):
         narrative.addRow("Summary", self.report_summary)
         narrative.addRow("Conclusion", self.report_conclusion)
         narrative.addRow("Recommendations", self.report_recommendations)
-        layout.addLayout(narrative)
+        controls.addLayout(narrative)
         self.save_report_button = QPushButton("Save report draft")
+        self.save_report_button.setProperty("primary", True)
         self.save_report_button.clicked.connect(self._save_report_draft)
-        layout.addWidget(self.save_report_button)
+        controls.addWidget(self.save_report_button)
+        details = QCheckBox("Show evidence and action details")
+        controls.addWidget(details)
+        self.evidence_output = QTextBrowser()
+        self.evidence_output.setAccessibleName("Evidence and report action details")
+        self.evidence_output.hide()
+        details.toggled.connect(self.evidence_output.setVisible)
+        controls.addWidget(self.evidence_output, 1)
+        controls.addStretch(1)
         self.report_preview = QTextBrowser()
-        layout.addWidget(self.report_preview, 2)
+        self.report_preview.setAccessibleName("Rendered report preview")
+        columns.addWidget(editor)
+        columns.addWidget(self.report_preview)
+        columns.setStretchFactor(1, 2)
+        layout.addWidget(columns, 1)
 
     def set_study(self, study_id: str, detail: dict[str, Any]) -> None:
         self.history_panel.set_context(None)

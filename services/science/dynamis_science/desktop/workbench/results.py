@@ -264,8 +264,11 @@ class ResultsDocument(QScrollArea):
         bar.setContentsMargins(14, 10, 14, 10)
         self.superseded_label = _label("", "SupersededText", rich=True)
         bar.addWidget(self.superseded_label)
-        self.empty = _label("Run an analysis to see results here.", "PaneEmpty")
+        self.empty = _label(
+            "Choose a method, assign the required variables, then run the analysis. "
+            "Results and their scientific limits appear here.", "PaneEmpty")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty.setWordWrap(True)
         for widget in (self.superseded_bar, self.empty):
             self.column.addWidget(widget)
         self.column.addStretch(1)
