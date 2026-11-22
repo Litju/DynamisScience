@@ -4,6 +4,8 @@ Baseline source is `2c911f514350e656b064f2efec9951ea65c84075` on the owner check
 
 The existing application is evidence of capabilities, friction and scientific boundaries. The proposed interface starts from the research tasks. Source findings below identify entry points and apparent risks. They do not establish task completion or accessibility.
 
+The [native control and entry index](ux-transformation-control-index.md) records 1,056 baseline source entries across 27 desktop modules.
+
 | Surface and entry | Controls, views and workflows | Redesign requirement |
 | --- | --- | --- |
 | Startup and Study home, `__main__.py`, `main_window.py`, `study_home.py` | Private data-root chooser and invalid-root error, catalogue loading, open/new study, attach data, Study destination buttons, rotatable QPainter map | Lead with opening or resuming work. Put workspaces in a persistent navigation system. Provide first actions before a study has data. |
