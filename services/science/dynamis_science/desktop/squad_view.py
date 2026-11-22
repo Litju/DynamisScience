@@ -683,7 +683,7 @@ class EventsFeed(QWidget):
         text.setTextFormat(Qt.TextFormat.RichText)
         row.addWidget(text, 1)
         if item.get("subject_id"):
-            open_button = QPushButton("Open athlete")
+            open_button = QPushButton("Investigate athlete")
             open_button.clicked.connect(lambda _=False, subject=item["subject_id"]: self.athlete_requested.emit(subject))
             row.addWidget(open_button)
         if action:
