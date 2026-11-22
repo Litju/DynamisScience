@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from html import escape
 import logging
 import sys
 import difflib
@@ -2483,20 +2484,45 @@ class ResearchWorkbench(QWidget):
     def _build_overview(self) -> None:
         page = self.tabs.widget(0)
         layout = QVBoxLayout(page)
-        edit = QPushButton("Edit study…")
-        edit.clicked.connect(self.window._edit_current)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(12)
+        heading = QLabel("Study design")
+        heading.setObjectName("StudyHeading")
+        layout.addWidget(heading)
+        self.overview = QTextBrowser()
+        self.overview.setAccessibleName("Study question, state and data revision")
+        layout.addWidget(self.overview, 3)
+
         actions = QHBoxLayout()
+        edit = QPushButton("Edit study…")
+        edit.setProperty("primary", True)
+        edit.clicked.connect(self.window._edit_current)
         actions.addWidget(edit)
         cohorts = QPushButton("Review cohort membership…")
         cohorts.clicked.connect(self._open_cohort_review)
         actions.addWidget(cohorts)
+        plan = QPushButton("Analysis plan")
+        menu = QMenu(plan)
+        for label, callback in (
+            ("New plan…", self.window._new_plan),
+            ("Edit current plan…", self.window._edit_plan),
+            ("Freeze current plan", self.window._freeze_plan),
+            ("Fork current plan…", self.window._fork_plan),
+            ("Plan history…", self.window._plan_history),
+        ):
+            menu.addAction(label, callback)
+        plan.setMenu(menu)
+        actions.addWidget(plan)
+        self.compare_experiments = QPushButton("Compare experiments")
+        self.compare_experiments.clicked.connect(lambda: self.window._open_study_destination("series"))
+        self.compare_experiments.setEnabled(False)
+        actions.addWidget(self.compare_experiments)
         details = QPushButton("Details / Provenance…")
         details.clicked.connect(self._show_setup_details)
         actions.addWidget(details)
         actions.addStretch()
         layout.addLayout(actions)
-        self.overview = QTextBrowser()
-        layout.addWidget(self.overview)
+        layout.addStretch(2)
 
     def _show_setup_details(self) -> None:
         from .individual_research import fit_dialog
@@ -2519,15 +2545,18 @@ class ResearchWorkbench(QWidget):
         if isinstance(question, dict):
             question = question.get("question") or question.get("statement") or question.get("title")
         state = (study.get("state") or study.get("status") or "").replace("_", " ").capitalize()
-        sections = [title, state]
-        sections.append(f"Research question\n{question}" if question else "Research question is open.")
+        sections = [f"<h2>{escape(str(title))}</h2>"]
+        if state:
+            sections.append(f"<p><b>{escape(state)}</b></p>")
+        sections.append(f"<h3>Research question</h3><p>{escape(str(question or 'Research question not specified.'))}</p>")
         if revision:
-            sections.append(f"Data revision {revision} · {run_count} saved study {'analysis' if run_count == 1 else 'analyses'}")
+            sections.append(f"<p>Data revision {revision} · {run_count} saved study {'analysis' if run_count == 1 else 'analyses'}</p>")
         elif run_count is not None:
-            sections.append("Add measurements to start the investigation.")
-        else:
-            sections.append(study.get("description") or "")
-        self.overview.setPlainText("\n\n".join(section for section in sections if section))
+            sections.append("<p>Add measurements to start the investigation.</p>")
+        elif study.get("description"):
+            sections.append(f"<p>{escape(str(study['description']))}</p>")
+        self.compare_experiments.setEnabled(bool(revision))
+        self.overview.setHtml("".join(sections))
 
     def _build_dataset(self) -> None:
         page = self.tabs.widget(1)
