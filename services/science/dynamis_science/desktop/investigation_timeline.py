@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QPushButton, QTextBrowser, QVBoxLayout, QWidget
 
+from . import theme
 from .individual_research import fit_dialog
 
 LANES = {
@@ -56,15 +57,18 @@ class InvestigationChart(pg.PlotWidget):
         self.getAxis("left").setTicks([[(i, lane[0]) for i, lane in enumerate(LANES.values(), 1)]])
         self.showGrid(x=True, y=True, alpha=.13)
         self.rows = []
+        self.labels: list[tuple[int, float, pg.TextItem]] = []
         self.selection = None
         self.dark = False
-        self.set_theme("light")
+        self.set_theme(theme.current_theme())
+        self.getViewBox().sigXRangeChanged.connect(self._fit_labels)
+        self.getViewBox().sigResized.connect(self._fit_labels)
 
     def set_theme(self, name):
         self.dark = name == "dark"
-        background = "#211f1b" if self.dark else "#fbf7ed"
-        self.ink = "#efe5d2" if self.dark else "#3b3329"
-        self.setBackground(background)
+        colors = theme.tokens(name)
+        self.ink = colors["text"]
+        self.setBackground(colors["base"])
         for side in ("left", "bottom"):
             axis = self.getAxis(side)
             axis.setPen(self.ink)
@@ -77,6 +81,7 @@ class InvestigationChart(pg.PlotWidget):
 
     def render(self, rows, offset, pair):
         self.rows = rows
+        self.labels.clear()
         self.clear()
         axis = self.getAxis("bottom")
         axis.utcOffset = -datetime.fromisoformat(f"2000-01-01T00:00:00{offset}").utcoffset().total_seconds()
@@ -99,9 +104,10 @@ class InvestigationChart(pg.PlotWidget):
                     for boundary in (start, end):
                         self.plot([boundary, boundary], [lane - .14, lane + .14], pen=pg.mkPen(self.ink, width=1))
                     if single_athlete:
-                        self._label(row["period"]["label"], (start + end) / 2, lane + .13)
+                        self._label(row["period"]["label"], (start + end) / 2, lane)
                 continue
             spots = []
+            previous_phase = None
             for index, row in entries:
                 valid = row["status"] in GOOD
                 changed = row.get("adherence") == "MODIFIED" or (
@@ -112,25 +118,53 @@ class InvestigationChart(pg.PlotWidget):
                                   pen=pg.mkPen(color, width=2), brush=color, size=14 if compared else 10))
                 if key == "VISIT" and single_athlete:
                     observed = row.get("observed_period")
-                    if observed:
-                        adherence = row["visit"]["adherence_percent"]
-                        suffix = f" · {adherence:g}%" if adherence is not None else ""
-                        self._label(observed["label"] + suffix, row["axis_time"], lane + .13)
+                    phase = observed["label"] if observed else None
+                    if valid and phase and phase != previous_phase:
+                        self._label(phase, row["axis_time"], lane)
+                        previous_phase = phase
                 elif compared:
                     label = "Reference" if row["id"] == pair[0] else "Follow-up"
-                    self._label(label, row["axis_time"], lane + .12)
+                    self._label(label, row["axis_time"], lane)
             if spots:
-                scatter = pg.ScatterPlotItem(spots=spots, hoverable=True, hoverSize=15, tip=None)
+                scatter = pg.ScatterPlotItem(spots=spots, hoverable=True, hoverSize=15, tip=self._point_tip)
                 scatter.sigClicked.connect(self._pick_point)
                 self.addItem(scatter)
         self.selection = pg.ScatterPlotItem(symbol="o", size=20, brush=None, pen=pg.mkPen(self.ink, width=1.5))
         self.addItem(self.selection, ignoreBounds=True)
         self.enableAutoRange(axis="x")
+        self._fit_labels()
 
-    def _label(self, text, x, y):
+    def _label(self, text, x, lane):
         item = pg.TextItem(text, color=self.ink, anchor=(.5, 1))
         self.addItem(item, ignoreBounds=True)
-        item.setPos(x, y)
+        item.setPos(x, lane + .13)
+        self.labels.append((lane, x, item))
+
+    def _fit_labels(self, *_args):
+        view = self.getViewBox()
+        lower, upper = view.viewRange()[0]
+        width = view.width()
+        if upper <= lower or width <= 0:
+            return
+        right_by_lane = {}
+        for lane, date, item in sorted(self.labels, key=lambda entry: entry[:2]):
+            center = (date - lower) * width / (upper - lower)
+            half = item.textItem.boundingRect().width() / 2
+            left, right = center - half, center + half
+            visible = left >= right_by_lane.get(lane, 0) and right <= width
+            item.setVisible(visible)
+            if visible:
+                right_by_lane[lane] = right + 8
+
+    def _point_tip(self, *, x, y, data):
+        row = self.rows[data]
+        text = f"{LANES[row['kind']][0]} · {row['subject_id']} · {readable(row['status'])}"
+        visit = row.get("visit") or {}
+        if row.get("observed_period"):
+            text += f"\n{row['observed_period']['label']}"
+        if visit.get("adherence_percent") is not None:
+            text += f" · {visit['adherence_percent']:g}% adherence"
+        return text
 
     def _pick_point(self, _scatter, points, event):
         if points:
