@@ -139,6 +139,7 @@ class WorkbenchShell(QWidget):
         self.settings = settings
         self._compact: bool | None = None
         self._drawer_open = False
+        self._task_mode = False
         self._sized = False
         self._build_actions()
         self._build_ribbon()
@@ -193,6 +194,10 @@ class WorkbenchShell(QWidget):
         theme.set_reduced_motion(motion.isChecked())
         motion.toggled.connect(self._set_reduced_motion)
         self.view_actions.append(motion)
+        self.action_syntax = QAction("Show analysis syntax", self)
+        self.action_syntax.setCheckable(True)
+        self.action_syntax.toggled.connect(self._update_syntax_visibility)
+        self.view_actions.append(self.action_syntax)
 
     def _set_reduced_motion(self, enabled: bool) -> None:
         theme.set_reduced_motion(enabled)
@@ -228,6 +233,12 @@ class WorkbenchShell(QWidget):
         self.palette_button.setAccessibleName("Search commands (Ctrl+K)")
         self.palette_button.clicked.connect(lambda: self.palette.popup())
         self.ribbon.addWidget(self.palette_button)
+        self.setup_button = QPushButton("Analysis setup")
+        self.setup_button.setAccessibleDescription("Show or hide variable roles and method options")
+        self.setup_button.setCheckable(True)
+        self.setup_button.toggled.connect(self._set_options_drawer)
+        self.setup_action = self.ribbon.addWidget(self.setup_button)
+        self.setup_action.setVisible(False)
         self.run_pill = QFrame()
         self.run_pill.setObjectName("RunStatePill")
         pill = QHBoxLayout(self.run_pill)
@@ -274,15 +285,15 @@ class WorkbenchShell(QWidget):
         options.set_content(self._empty("Choose an analysis in the ribbon."))
 
         results.header_layout.addStretch(1)
-        self.run_button = QPushButton("Run")
+        self.run_button = QPushButton("Run analysis")
+        self.run_button.setProperty("primary", True)
         self.run_button.setAccessibleName("Run analysis")
         self.run_button.setToolTip("Run the configured analysis (Ctrl+Enter)")
         self.run_button.clicked.connect(self.action_run.trigger)
         results.header_layout.addWidget(self.run_button)
-        for action, primary in ((self.action_export, False), (self.action_add_to_report, True)):
+        for action in (self.action_export, self.action_add_to_report):
             button = QPushButton(action.text())
             button.setAccessibleName(action.text().rstrip("…"))
-            button.setProperty("primary", primary)
             button.clicked.connect(action.trigger)
             action.enabledChanged.connect(button.setEnabled)
             results.header_layout.addWidget(button)
@@ -302,6 +313,7 @@ class WorkbenchShell(QWidget):
         results.body.addWidget(self.stale_bar)
         results.set_content(self._empty("Results appear here after a run."), 1)
         results.layout().addWidget(self._build_syntax_bar())
+        self._update_syntax_visibility()
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setObjectName("WorkbenchSplitter")
@@ -352,13 +364,23 @@ class WorkbenchShell(QWidget):
 
     def set_research_task_mode(self, enabled: bool) -> None:
         """Task pages supply their own bound actions; hide unrelated scratch-analysis controls."""
+        self._task_mode = enabled
         self.ribbon.setVisible(not enabled)
-        self.syntax.parentWidget().setVisible(not enabled)
+        self._update_syntax_visibility()
         header = self.panes['results'].header_layout
         for index in range(header.count()):
             widget = header.itemAt(index).widget()
             if isinstance(widget, QPushButton):
                 widget.setVisible(not enabled)
+
+    def _update_syntax_visibility(self) -> None:
+        self.syntax.parentWidget().setVisible(self.action_syntax.isChecked() and not self._task_mode)
+
+    def _set_options_drawer(self, opened: bool) -> None:
+        self._drawer_open = opened
+        self.setup_button.setChecked(opened)
+        if self._compact:
+            self.panes["options"].setVisible(opened and not self._task_mode)
 
     def _build_status_items(self) -> None:
         """Widgets for the host's status bar: application status, then provenance."""
@@ -491,11 +513,9 @@ class WorkbenchShell(QWidget):
         pane = self.panes[PANES[index]]
         if PANES[index] == "options" and self._compact:
             if pane.isVisible() and self.focused_pane() == "options":
-                self._drawer_open = False
-                pane.hide()
+                self._set_options_drawer(False)
                 return
-            self._drawer_open = True
-            pane.show()
+            self._set_options_drawer(True)
         target = pane.content if pane.content is not None and pane.content.focusPolicy() != Qt.FocusPolicy.NoFocus else None
         if target is None:
             target = next(
@@ -541,8 +561,9 @@ class WorkbenchShell(QWidget):
         self.palette_button.setText("Ctrl K" if compact else "Search commands…      Ctrl K")
         self.palette_button.setProperty("compact", compact)
         self.theme_switch_action.setVisible(not compact)  # still in View menu and the palette
+        self.setup_action.setVisible(compact)
         theme.repolish(self.palette_button)
-        self.panes["options"].setVisible(not compact or self._drawer_open)
+        self.panes["options"].setVisible(not self._task_mode and (not compact or self._drawer_open))
 
     def save_state(self) -> None:
         if self.settings is None:
