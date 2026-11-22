@@ -131,6 +131,13 @@ def walk(scale: str) -> None:
     athlete, revision = panel.scope.currentData(), panel.revision
     assert revision == case["revisions"][-1]
     capture("investigate", perf_counter())
+    started = perf_counter()
+    panel.athlete_record_action.trigger()
+    wait_for(lambda: window.perspectives.currentWidget() is window.squad
+             and window.squad.currentWidget() is window.squad.athlete_page and not window.runner.active)
+    assert window.squad.athlete_page.athlete["subject_id"] == athlete
+    capture("athlete-record", started)
+    visit("library-with-study", window.study_button)
     visit("design", window.destinations["design"])
     visit("evidence", window.destinations["evidence"])
     visit("analyze", window.destinations["analyze"])

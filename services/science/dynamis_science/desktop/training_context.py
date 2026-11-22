@@ -182,7 +182,7 @@ class TrainingContextPanel(QWidget):
 
     def _request_athlete_record(self) -> None:
         subject = self.scope.currentData()
-        if subject and not subject.startswith("cohort:"):
+        if self.view and not self.saved and subject and not subject.startswith("cohort:"):
             self.athlete_record_requested.emit(subject)
 
     def set_theme(self, theme):
