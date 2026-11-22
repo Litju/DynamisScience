@@ -1738,8 +1738,14 @@ class MainWindow(QMainWindow):
         self._sync_workflow_stage()
 
     def _show_athlete_record(self, subject_id: str) -> None:
-        self.settings.setValue(f"athlete-record/{self.current_study_id}", subject_id)
-        self.settings.setValue(f"research-stage/{self.current_study_id}", "Athlete record")
+        identity = self.current_study_id
+        branch = (self.research_context.get("investigation_id")
+                  if self.research_context.get("subject_id") == subject_id else None)
+        panel = self.research.individual
+        if (panel.workspace_id, panel.investigation_id) != (identity, branch):
+            panel.set_investigation(identity, branch)
+        self.settings.setValue(f"athlete-record/{identity}", subject_id)
+        self.settings.setValue(f"research-stage/{identity}", "Athlete record")
         self._open_athlete(subject_id)
         self._scroll_to_top()
 
