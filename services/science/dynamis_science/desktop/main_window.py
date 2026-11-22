@@ -1665,6 +1665,14 @@ class MainWindow(QMainWindow):
         self.stage_picker.setCurrentText(stage)
         individual = self.research_context.get('scope') == 'INDIVIDUAL'
         panel = self.research.individual
+        if stage == "Athlete record":
+            subject = self.research_context.get("subject_id") or self.settings.value(
+                f"athlete-record/{self.current_study_id}", "")
+            if subject:
+                self._show_athlete_record(subject)
+            else:
+                self._open_investigation()
+            return
         if stage == 'Reports / history':
             self._show_research_mode()
             self._set_record_view(True)
@@ -1728,6 +1736,11 @@ class MainWindow(QMainWindow):
         self._show_squad_mode()
         squad.setCurrentWidget(squad.athlete_page)
         self._sync_workflow_stage()
+
+    def _show_athlete_record(self, subject_id: str) -> None:
+        self.settings.setValue(f"athlete-record/{self.current_study_id}", subject_id)
+        self.settings.setValue(f"research-stage/{self.current_study_id}", "Athlete record")
+        self._open_athlete(subject_id)
         self._scroll_to_top()
 
     def _board_loaded(self) -> None:
@@ -2487,6 +2500,7 @@ class ResearchWorkbench(QWidget):
         from . import theme
         self.training_context = TrainingContextPanel(window.run_task, window.settings)
         self.training_context.tool_requested.connect(window._open_individual_tool)
+        self.training_context.athlete_record_requested.connect(window._show_athlete_record)
         self.training_context.set_theme(theme.current_theme())
         window.workbench.theme_changed.connect(self.training_context.set_theme)
         self.history_panel.context_requested.connect(self._open_saved_training_context)

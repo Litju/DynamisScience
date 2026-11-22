@@ -222,6 +222,8 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     idle()
     window._show_study(identity, service.get_study_detail(identity))
     idle()
+    assert window._investigation_visible()
+    window.study_home.buttons["people"].click()
     home = window.squad
     assert window.perspectives.currentWidget() is home and home.currentWidget() is home.board
     assert "Data revision 1" in window.context_title.text()
@@ -234,6 +236,10 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     # Tap P01: athlete page on the main line, then a new branch becomes the individual investigation.
     p01 = next(tile for tile in tiles if tile.athlete["subject_id"] == "P01")
     p01.click()
+    idle()
+    timeline = window.research.training_context
+    assert window._investigation_visible() and timeline.scope.currentData() == "P01"
+    timeline.athlete_record_action.trigger()
     idle()
     page = home.athlete_page
     assert home.currentWidget() is page and "P01" in page.header.text() and page.branch_picker.currentData() is None
@@ -251,12 +257,15 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     submit = window.runner.submit
     monkeypatch.setattr(window.runner, "submit", lambda operation, done, failed: callbacks.append(done))
     panel.set_investigation(identity, panel.investigation_id)
+    monkeypatch.setattr(window.runner, "submit", submit)
     page.back_requested.emit()
     next(tile for tile in home.board.tiles() if tile.athlete["subject_id"] == "P02").click()
+    idle()
+    timeline.athlete_record_action.trigger()
+    idle()
     assert panel.data_table.rowCount() == 0 and "P02" in page.header.text()
     callbacks[0](service.individual_research(window.investigations[0]["id"]))
     assert "P01" not in panel.header.text()
-    monkeypatch.setattr(window.runner, "submit", submit)
 
     # Researcher-defined squad simulation through the native dialog.
     dialog = SimulationDialog(service, window.run_task, identity, home.board.board, None, window)

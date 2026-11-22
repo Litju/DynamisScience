@@ -20,6 +20,7 @@ from .investigation_timeline import EvidencePanel, InvestigationChart, LANES, da
 
 class TrainingContextPanel(QWidget):
     tool_requested = Signal(str, object)
+    athlete_record_requested = Signal(str)
 
     def __init__(self, run_task, settings=None):
         super().__init__()
@@ -126,6 +127,9 @@ class TrainingContextPanel(QWidget):
         footer = QHBoxLayout()
         self.research_actions = QPushButton("Research actions")
         research = QMenu(self.research_actions)
+        self.athlete_record_action = research.addAction("Open athlete record")
+        self.athlete_record_action.triggered.connect(self._request_athlete_record)
+        research.addSeparator()
         for title, name in (("Plan", "Protocol"), ("Record visits", "Visits and timeline"), ("Run analysis", "Analysis"),
                             ("Saved analyses", "Results"), ("Compare with cohort", "Compare with cohort"),
                             ("Scenarios", "Scenarios"), ("Assessment data", "Data")):
@@ -175,6 +179,11 @@ class TrainingContextPanel(QWidget):
         form.addRow(buttons)
         self.plots.currentIndexChanged.connect(self._plot_values)
         self._render()
+
+    def _request_athlete_record(self) -> None:
+        subject = self.scope.currentData()
+        if subject and not subject.startswith("cohort:"):
+            self.athlete_record_requested.emit(subject)
 
     def set_theme(self, theme):
         self.chart.set_theme(theme)
