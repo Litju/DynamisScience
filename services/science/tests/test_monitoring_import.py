@@ -157,7 +157,11 @@ def test_native_events_screen_opens_athletes_and_starts_follow_ups(service, tmp_
     feed._render()
     assert all("entered" in card.findChild(type(feed.title)).text() or "no longer" in card.findChild(type(feed.title)).text()
                for card in feed.cards()[1:])
-    next(b for b in feed.cards()[0].findChildren(QPushButton) if b.text() == "Open athlete").click()
+    next(b for b in feed.cards()[0].findChildren(QPushButton) if b.text() == "Investigate athlete").click()
+    idle()
+    timeline = window.research.training_context
+    assert window._investigation_visible() and timeline.scope.currentData() == "P03"
+    timeline.athlete_record_action.trigger()
     idle()
     assert window.perspectives.currentWidget() is window.squad and "P03" in window.squad.athlete_page.header.text()
     window._show_events_mode()

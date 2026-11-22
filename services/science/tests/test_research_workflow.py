@@ -58,6 +58,7 @@ def test_research_tasks_keep_athlete_across_data_series_append_and_restart(qtbot
     # Add data on an admitted CMJ workspace opens the follow-up review.
     opened = []
     monkeypatch.setattr(window, '_open_workspace', lambda *, reconcile: opened.append(reconcile))
+    monkeypatch.setattr(window, '_open_import', lambda: opened.append(False))
     window._add_workspace_data()
     assert opened == [True]
     revision = service.attach_workspace_data(identity, study['follow_up'], append=True,
@@ -79,6 +80,7 @@ def test_research_tasks_keep_athlete_across_data_series_append_and_restart(qtbot
     assert not panel.run_button.isEnabled()
     stage(window, 'Data / QC')
     stage(window, 'Analysis')
+    idle(qtbot, window)
     assert panel.method_picker.currentData()['method_id'] == 'METH-ONSET-EXACT'
     assert not panel.run_button.isEnabled()
     window.close()

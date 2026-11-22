@@ -20,6 +20,7 @@ from .investigation_timeline import EvidencePanel, InvestigationChart, LANES, da
 
 class TrainingContextPanel(QWidget):
     tool_requested = Signal(str, object)
+    athlete_record_requested = Signal(str)
 
     def __init__(self, run_task, settings=None):
         super().__init__()
@@ -102,9 +103,12 @@ class TrainingContextPanel(QWidget):
         timeline_header = QHBoxLayout()
         title = QLabel("Training and testing timeline")
         heading(title, 13)
+        title.setWordWrap(True)
         timeline_header.addWidget(title)
         timeline_header.addStretch(1)
-        timeline_header.addWidget(QLabel("◆ Assessment    ▲ Modified    × Missing or unusable"))
+        legend = QLabel("◆ Assessment    ▲ Modified    × Missing or unusable")
+        legend.setWordWrap(True)
+        timeline_header.addWidget(legend)
         timeline_layout.addLayout(timeline_header)
         self.chart = InvestigationChart()
         timeline_layout.addWidget(self.chart, 1)
@@ -126,6 +130,9 @@ class TrainingContextPanel(QWidget):
         footer = QHBoxLayout()
         self.research_actions = QPushButton("Research actions")
         research = QMenu(self.research_actions)
+        self.athlete_record_action = research.addAction("Open athlete record")
+        self.athlete_record_action.triggered.connect(self._request_athlete_record)
+        research.addSeparator()
         for title, name in (("Plan", "Protocol"), ("Record visits", "Visits and timeline"), ("Run analysis", "Analysis"),
                             ("Saved analyses", "Results"), ("Compare with cohort", "Compare with cohort"),
                             ("Scenarios", "Scenarios"), ("Assessment data", "Data")):
@@ -175,6 +182,11 @@ class TrainingContextPanel(QWidget):
         form.addRow(buttons)
         self.plots.currentIndexChanged.connect(self._plot_values)
         self._render()
+
+    def _request_athlete_record(self) -> None:
+        subject = self.scope.currentData()
+        if self.view and not self.saved and subject and not subject.startswith("cohort:"):
+            self.athlete_record_requested.emit(subject)
 
     def set_theme(self, theme):
         self.chart.set_theme(theme)

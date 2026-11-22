@@ -59,6 +59,21 @@ def _pretty(value: Any) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False, default=str)
 
 
+def _show_source_details(parent: QWidget, title: str, value: dict[str, Any]) -> None:
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    layout = QVBoxLayout(dialog)
+    details = QTextBrowser()
+    details.setAccessibleName(title)
+    details.setPlainText(_pretty(value))
+    layout.addWidget(details, 1)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    buttons.rejected.connect(dialog.reject)
+    layout.addWidget(buttons)
+    dialog.resize(680, 360)
+    dialog.exec()
+
+
 class SessionDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -219,6 +234,7 @@ class ReportDialog(QDialog):
 
 class PerformanceHeader(QWidget):
     search_requested = Signal(str)
+    page_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -234,6 +250,13 @@ class PerformanceHeader(QWidget):
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu_button.setObjectName("PerformanceMenu")
         layout.addWidget(self.menu_button)
+        self.page_picker = QComboBox()
+        self.page_picker.setAccessibleName("Operations page")
+        for key, name in zip(PERFORMANCE_PAGE_KEYS, PERFORMANCE_PAGE_NAMES):
+            self.page_picker.addItem(name, key)
+        self.page_picker.activated.connect(lambda: self.page_requested.emit(self.page_picker.currentData()))
+        self.page_picker.hide()
+        layout.addWidget(self.page_picker)
         self.club = QLabel("Loading roster…")
         self.club.setObjectName("PerformanceClub")
         self.squad = QLabel()
@@ -264,6 +287,10 @@ class PerformanceHeader(QWidget):
         menu = QMenu(self.menu_button)
         menu.addActions(actions)
         self.menu_button.setMenu(menu)
+
+    def set_compact_navigation(self, compact: bool) -> None:
+        self.menu_button.setVisible(not compact)
+        self.page_picker.setVisible(compact)
 
     def set_context(self, context: dict[str, Any]) -> None:
         club = context.get("club", {})
@@ -317,7 +344,7 @@ class PerformanceRail(QWidget):
             group.addWidget(label)
             for key in items:
                 name = labels[key]
-                button = QPushButton(name)
+                button = QPushButton(name.replace("&", "&&"))
                 button.setObjectName("PerformanceRailItem")
                 button.setAccessibleName(name)
                 button.setCheckable(True)
@@ -661,9 +688,14 @@ class PerformanceWorkbench(QWidget):
 
     @staticmethod
     def _heading(layout: QVBoxLayout, title: str, note: str = "") -> None:
-        label = QLabel(title if not note else f"{title}  ·  {note}")
+        label = QLabel(title)
+        label.setObjectName("OperationsHeading")
         label.setWordWrap(True)
         layout.addWidget(label)
+        if note:
+            summary = QLabel(note)
+            summary.setWordWrap(True)
+            layout.addWidget(summary)
 
     @staticmethod
     def _module(title: str, note: str = "") -> tuple[QFrame, QVBoxLayout]:
@@ -857,18 +889,25 @@ class PerformanceWorkbench(QWidget):
         _, layout = self._page(self.page_names[1])
         controls = QHBoxLayout()
         self.athlete_picker = QComboBox()
+        self.athlete_picker.setAccessibleName("Athlete 360 selection")
         self.athlete_picker.currentTextChanged.connect(self._load_athlete)
         controls.addWidget(QLabel("Athlete"))
         controls.addWidget(self.athlete_picker, 1)
         note_button = QPushButton("Add practitioner note…")
         note_button.clicked.connect(self._add_athlete_note)
         controls.addWidget(note_button)
+        self.athlete_source = QPushButton("Details / Provenance…")
+        self.athlete_source.setEnabled(False)
+        self.athlete_source.clicked.connect(lambda: _show_source_details(self, "Athlete source details", self.athlete_record))
+        controls.addWidget(self.athlete_source)
         back_to_today = QPushButton("Today")
         back_to_today.clicked.connect(lambda: self.show_page("today"))
         controls.addWidget(back_to_today)
         layout.addLayout(controls)
         split = QSplitter(Qt.Orientation.Vertical)
         self.athlete_detail = QTextBrowser()
+        self.athlete_detail.setAccessibleName("Selected athlete summary")
+        self.athlete_detail.setMaximumHeight(115)
         split.addWidget(self.athlete_detail)
         charts = QWidget()
         chart_layout = QHBoxLayout(charts)
@@ -878,10 +917,12 @@ class PerformanceWorkbench(QWidget):
         self.force_trace = pg.PlotWidget(title="Force–time trace · synthetic fixture")
         self.force_trace.setLabel("left", "Force", units="N")
         self.force_trace.setLabel("bottom", "Time", units="s")
+        self.athlete_trend.setAccessibleName("Recorded jump height by study week")
+        self.force_trace.setAccessibleName("Selected athlete force-time trace")
         chart_layout.addWidget(self.athlete_trend)
         chart_layout.addWidget(self.force_trace)
         split.addWidget(charts)
-        split.setSizes([280, 400])
+        split.setSizes([100, 400])
         layout.addWidget(split, 1)
         self.athlete_note = QLabel("Notes are practitioner-entered operational records, not clinical records.")
         layout.addWidget(self.athlete_note)
@@ -906,7 +947,7 @@ class PerformanceWorkbench(QWidget):
         actions.addWidget(edit)
         actions.addWidget(publish)
         actions.addStretch(1)
-        layout.addLayout(actions)
+        layout.insertLayout(2, actions)
 
     def _build_monitor(self) -> None:
         _, layout = self._page(self.page_names[3])
@@ -954,12 +995,16 @@ class PerformanceWorkbench(QWidget):
         self._heading(layout, "Match tracking and pose", "10 Hz synthetic segment; not a full-match or validated kinematics product")
         controls = QHBoxLayout()
         self.match_player = QComboBox()
+        self.match_player.setAccessibleName("Player for movement and pose")
+        self.match_player.setMinimumContentsLength(16)
+        self.match_player.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.match_player.currentIndexChanged.connect(
             lambda _index: self._load_match_path(self.match_player.currentData())
         )
         controls.addWidget(QLabel("Player"))
         controls.addWidget(self.match_player)
         self.frame_slider = QSlider(Qt.Orientation.Horizontal)
+        self.frame_slider.setAccessibleName("Match frame")
         self.frame_slider.setRange(0, 1799)
         self.frame_slider.setValue(900)
         self.frame_slider.valueChanged.connect(self._schedule_match_frame)
@@ -994,8 +1039,9 @@ class PerformanceWorkbench(QWidget):
 
     def _build_research(self) -> None:
         _, layout = self._page(self.page_names[6])
-        self._heading(layout, "Operational-to-scientific research links", "only qualified evidence is presented as scientific evidence")
+        self._heading(layout, "Linked research", "Review the study and its recorded evidence classifications.")
         self.research_summary = QTextBrowser()
+        self.research_summary.setAccessibleName("Linked study and evidence summary")
         layout.addWidget(self.research_summary, 1)
         self.units_view, self.units_model = _record_view()
         self.metrics_view, self.metrics_model = _record_view()
@@ -1005,7 +1051,14 @@ class PerformanceWorkbench(QWidget):
         layout.addWidget(tables, 1)
         button = QPushButton("Open linked research study")
         button.clicked.connect(self._open_linked_study)
-        layout.addWidget(button)
+        self.research_source = QPushButton("Details / Provenance…")
+        self.research_source.setEnabled(False)
+        self.research_source.clicked.connect(lambda: _show_source_details(self, "Linked research details", self.research_record))
+        actions = QHBoxLayout()
+        actions.addWidget(button)
+        actions.addWidget(self.research_source)
+        actions.addStretch(1)
+        layout.insertLayout(2, actions)
 
     def _build_report(self) -> None:
         _, layout = self._page(self.page_names[7])
@@ -1016,19 +1069,25 @@ class PerformanceWorkbench(QWidget):
         self.report_preview = QTextBrowser()
         self.report_preview.setObjectName("PerformanceReportPreview")
         split.addWidget(self.report_preview)
-        self.report_view.clicked.connect(self._select_report)
-        layout.addWidget(split, 1)
+        self.report_view.setAccessibleName("Practitioner report history")
+        self.report_preview.setAccessibleName("Selected practitioner report")
+        self.report_view.selectionModel().currentChanged.connect(self._select_report)
         actions = QHBoxLayout()
         create = QPushButton("Compose report…")
+        create.setProperty("primary", True)
         create.clicked.connect(self._create_report)
-        freeze = QPushButton("Freeze selected report")
-        freeze.clicked.connect(self._freeze_report)
-        export = QPushButton("Export HTML…")
-        export.clicked.connect(self._export_report)
-        for button in (create, freeze, export):
+        self.report_freeze = QPushButton("Freeze selected report")
+        self.report_freeze.clicked.connect(self._freeze_report)
+        self.report_export = QPushButton("Export HTML…")
+        self.report_export.clicked.connect(self._export_report)
+        self.report_freeze.setEnabled(False)
+        self.report_export.setEnabled(False)
+        self.report_preview.setPlainText("Loading practitioner reports…")
+        for button in (create, self.report_freeze, self.report_export):
             actions.addWidget(button)
         actions.addStretch(1)
         layout.addLayout(actions)
+        layout.addWidget(split, 1)
 
     def _load_page(self, page: str) -> None:
         if page in self.loaded_pages:
@@ -1260,8 +1319,20 @@ class PerformanceWorkbench(QWidget):
                 self._load_match_frame()
         elif page == "research":
             research = values["research"]
-            self.linked_study_id = research["study"]["id"]
-            self.research_summary.setPlainText(_pretty(research))
+            self.research_record = research
+            study = research["study"]
+            self.linked_study_id = study["id"]
+            lines = [study["title"],
+                     f"{study['state']} · {study['participants']} participants · Source {study['snapshot_id']}",
+                     study["design"]]
+            for item in study["primary_evidence"]:
+                status = " · ".join(str(item[field]) for field in ("evidence_class", "quality") if item.get(field))
+                lines.append(f"{item['title']} · {status}" if status else item["title"])
+                if item.get("interpretation"):
+                    lines.append(item["interpretation"])
+            lines.extend(study["limitations"])
+            self.research_summary.setPlainText("\n".join(lines))
+            self.research_source.setEnabled(True)
             self.units_model.set_rows(values["units"]["units"])
             self.metrics_model.set_rows(values["metrics"])
         elif page == "report":
@@ -1269,8 +1340,17 @@ class PerformanceWorkbench(QWidget):
             if not self.athletes:
                 self.athletes = values["athletes"]
             self.report_model.set_rows(self.report_records)
+            self.report_view.setVisible(bool(self.report_records))
             if self.report_records:
-                self._show_report(self.report_records[0])
+                selected = getattr(self, "selected_report_id", None)
+                row = next((i for i, report in enumerate(self.report_records) if report["id"] == selected), 0)
+                self.report_view.setCurrentIndex(self.report_model.index(row, 0))
+                self._show_report(self.report_records[row])
+            else:
+                self.selected_report_id = None
+                self.report_preview.setPlainText("No practitioner reports yet. Compose a report to create a draft.")
+                self.report_freeze.setEnabled(False)
+                self.report_export.setEnabled(False)
 
     def _refresh_page(self, page: str) -> None:
         self.loaded_pages.discard(page)
@@ -1305,6 +1385,10 @@ class PerformanceWorkbench(QWidget):
     def _load_athlete(self, athlete_id: str) -> None:
         if not athlete_id or not hasattr(self, "athlete_detail"):
             return
+        self.athlete_source.setEnabled(False)
+        self.athlete_detail.setPlainText(f"Loading {athlete_id}…")
+        self.athlete_trend.clear()
+        self.force_trace.clear()
         self.window.run_task(
             lambda: self.service.performance_athlete(athlete_id),
             self._athlete_loaded,
@@ -1312,9 +1396,20 @@ class PerformanceWorkbench(QWidget):
         )
 
     def _athlete_loaded(self, detail: dict[str, Any]) -> None:
-        if detail["subject"]["display_id"] != self.athlete_picker.currentText():
+        subject = detail["subject"]
+        athlete_id = subject["display_id"]
+        if athlete_id != self.athlete_picker.currentText():
             return
-        self.athlete_detail.setPlainText(_pretty(detail))
+        self.athlete_record = detail
+        self.athlete_source.setEnabled(True)
+        change = detail["individual_change"]
+        measured_change = (f"Observed change {change['change_cm']:+g} cm"
+                           if change["change_cm"] is not None else "Observed change unavailable")
+        self.athlete_detail.setPlainText(
+            f"{athlete_id} · {subject['position']} · Study week {detail['current']['week']}\n"
+            f"{measured_change} · {change['method']}\n{change['limitations']}\n"
+            f"Practitioner notes on record · {len(detail['notes'])}"
+        )
         weeks = detail["weeks"]
         self.athlete_trend.clear()
         self.athlete_trend.plot(
@@ -1325,10 +1420,12 @@ class PerformanceWorkbench(QWidget):
             symbolSize=5,
         )
         trial_id = detail.get("force_trial_id")
+        self.force_trace.clear()
+        self.force_trace.setTitle("Force–time trace · synthetic fixture" if trial_id else "No eligible force trace for this athlete")
         if trial_id:
             self.window.run_task(
                 lambda: self.service.get_signal_waveform("DS-SYNTH-001", trial_id, 1000),
-                self._draw_force,
+                lambda waveform: self._draw_force(waveform) if self.athlete_picker.currentText() == athlete_id else None,
                 f"Loading force trace · {trial_id}",
             )
 
@@ -1553,13 +1650,15 @@ class PerformanceWorkbench(QWidget):
         )
         self._show_report(report)
 
-    def _select_report(self, index) -> None:
+    def _select_report(self, index, _previous) -> None:
         if index.isValid() and index.row() < len(self.report_records):
             self._show_report(self.report_records[index.row()])
 
     def _show_report(self, report: dict[str, Any]) -> None:
         self.selected_report_id = report["id"]
         self.report_preview.setHtml(self.service.performance_render_report(report))
+        self.report_freeze.setEnabled(report["status"] == "DRAFT")
+        self.report_export.setEnabled(True)
 
     def _freeze_report(self) -> None:
         report_id = getattr(self, "selected_report_id", None)

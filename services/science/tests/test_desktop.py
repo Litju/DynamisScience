@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from dynamis_science.desktop.main_window import MainWindow
 from dynamis_science.desktop.dialogs import (
+    AdmissionHistoryDialog,
     CohortDialog,
     DatasetAdmissionDialog,
     PlanDialog,
@@ -1018,6 +1019,19 @@ def test_native_admission_form_verifies_rights_runs_qc_and_admits(
     assert admitted["synthetic"] and not admitted["real_data"]
     assert any(item["id"] == record["dataset_snapshot_id"] for item in service.list_datasets())
     dialog.close()
+
+    history = []
+
+    def inspect_history(history_dialog):
+        history.extend(browser.toPlainText() for browser in history_dialog.findChildren(QTextBrowser))
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(AdmissionHistoryDialog, "exec", inspect_history)
+    window.action_admission_history.trigger()
+    qtbot.waitUntil(lambda: not window.runner.active, timeout=30000)
+    assert not errors, errors
+    assert any(record["id"] in text for text in history)
+    assert any(dialog.quality["id"] in text for text in history)
     window.close()
 
 
@@ -1282,12 +1296,14 @@ def test_athlete_inspector_full_profile_preserves_selection_on_first_load(qtbot,
     window.performance.context_panel._open_full_profile()
     qtbot.waitUntil(lambda: "athlete" in window.performance.loaded_pages and not window.runner.active)
     assert window.performance.athlete_picker.currentText() == selected
-    assert json.loads(window.performance.athlete_detail.toPlainText())["subject"]["display_id"] == selected
+    assert window.performance.athlete_detail.toPlainText().startswith(f"{selected} · ")
+    assert window.performance.athlete_record["subject"]["display_id"] == selected
 
     # A delayed response for a previous selection must not replace the current profile.
     stale = window.service.performance_athlete(window.performance.athlete_picker.itemText(0))
     window.performance._athlete_loaded(stale)
-    assert json.loads(window.performance.athlete_detail.toPlainText())["subject"]["display_id"] == selected
+    assert window.performance.athlete_detail.toPlainText().startswith(f"{selected} · ")
+    assert window.performance.athlete_record["subject"]["display_id"] == selected
     window.close()
 
 
@@ -1351,6 +1367,9 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     window._navigation_activated(performance_root.child(7), 0)
     qtbot.waitUntil(lambda: "report" in window.performance.loaded_pages)
     qtbot.waitUntil(lambda: not window.runner.active)
+    assert "Compose a report" in window.performance.report_preview.toPlainText()
+    assert window.performance.report_view.isHidden()
+    assert not window.performance.report_export.isEnabled()
     monkeypatch.setattr(
         ReportDialog,
         "exec",
@@ -1360,6 +1379,8 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     qtbot.waitUntil(lambda: not window.runner.active)
     reports = service.performance_page_data("report")["reports"]
     assert reports
+    assert not window.performance.report_view.isHidden()
+    assert window.performance.report_freeze.isEnabled()
     preview = window.performance.report_preview.toPlainText()
     assert reports[-1]["title"] in preview
     assert reports[-1]["sections"][0]["body"][0] in preview
@@ -1367,6 +1388,7 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     report_id = window.performance.selected_report_id
     window.performance._freeze_report()
     qtbot.waitUntil(lambda: not window.runner.active)
+    assert not window.performance.report_freeze.isEnabled()
     assert next(item for item in service.performance_page_data("report")["reports"] if item["id"] == report_id)["status"] == "FROZEN"
     output = tmp_path / "practitioner-report.html"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args: (str(output), "HTML report (*.html)"))

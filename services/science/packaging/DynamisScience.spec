@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from runpy import run_path
 from PyInstaller.building.datastruct import TOC
 
 service_root = Path(SPECPATH).resolve().parent
@@ -11,6 +12,11 @@ if not fixture_root.is_dir():
 repo_root = service_root.parents[1]
 license_notice = repo_root / "docs" / "desktop" / "THIRD_PARTY_LICENSES.md"
 datas = [(str(fixture_root), "data")]
+science_root = service_root / "dynamis_science"
+catalogue = run_path(str(science_root / "method_catalogue.py"))
+# The method binding hashes these exact source bytes in a frozen worker.
+for name in catalogue["EXECUTION_SOURCE_FILES"] + catalogue["MEASUREMENT_TRUST_SOURCE_FILES"]:
+    datas.append((str(science_root / name), "dynamis_science"))
 if license_notice.is_file():
     datas.append((str(license_notice), "."))
 third_party_notices = Path(os.environ["DYNAMISSCIENCE_THIRD_PARTY_NOTICES"]).resolve()

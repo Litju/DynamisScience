@@ -9,7 +9,7 @@ import sys
 import difflib
 from typing import Any
 
-from PySide6.QtCore import QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QPainter, QPalette
 from PySide6.QtWidgets import (
     QApplication,
@@ -211,6 +211,7 @@ class MainWindow(QMainWindow):
         from .squad_view import SquadHome
 
         self.squad = SquadHome(self.service, self.run_task, self.research.individual)
+        self.workbench.theme_changed.connect(self.squad.athlete_page.refresh_measurement_theme)
         self.squad.board.athlete_opened.connect(self._athlete_opened)
         self.squad.board.loaded.connect(self._board_loaded)
         self.squad.athlete_page.investigation_selected.connect(self._branch_selected)
@@ -557,17 +558,30 @@ class MainWindow(QMainWindow):
         self.perspectives.addWidget(self.performance)
         self.performance_header = PerformanceHeader(self)
         self.performance_header.search_requested.connect(self._search_performance)
+        self.performance_header.page_requested.connect(self.show_performance_page)
         self.performance_header.set_menu_actions(self.menuBar().actions())
         self.performance_header.context_button.clicked.connect(self.inspector_dock.setVisible)
         self.inspector_dock.visibilityChanged.connect(self.performance_header.context_button.setChecked)
         self.performance_rail = PerformanceRail(self)
         self.performance_rail.page_selected.connect(self.show_performance_page)
-        self.navigator_stack.addWidget(self.performance_rail)
+        self.performance_navigation = QScrollArea()
+        self.performance_navigation.setWidgetResizable(True)
+        self.performance_navigation.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.performance_navigation.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.performance_navigation.setWidget(self.performance_rail)
+        self.navigator_stack.addWidget(self.performance_navigation)
         self.performance_toolbar = QToolBar("Performance OS", self)
         self.performance_toolbar.setObjectName("PerformanceToolbar")
         self.performance_toolbar.setMovable(False)
         self.performance_toolbar.setFloatable(False)
-        self.performance_toolbar.addWidget(self.performance_header)
+        header_scroll = QScrollArea()
+        header_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        header_scroll.setWidgetResizable(True)
+        header_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        header_scroll.setWidget(self.performance_header)
+        header_scroll.setFixedHeight(self.performance_header.minimumHeight())
+        header_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.performance_toolbar.addWidget(header_scroll)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.performance_toolbar)
         self.insertToolBarBreak(self.performance_toolbar)
         self.performance_toolbar.hide()
@@ -698,15 +712,17 @@ class MainWindow(QMainWindow):
     def _show_performance_mode(self) -> None:
         self._ensure_performance()
         self.menuBar().hide()
-        self.performance_toolbar.show()
         if self._perspective != "performance":
             self._perspective = "performance"
-            self.navigator_dock.show()
             self.inspector_dock.setVisible(self.width() >= 1100)
-        self.navigator_stack.setCurrentWidget(self.performance_rail)
+        self.navigator_stack.setCurrentWidget(self.performance_navigation)
         self.navigator_dock.setTitleBarWidget(QWidget())
         self.navigator_dock.setMinimumWidth(196)
         self.navigator_dock.setMaximumWidth(232)
+        self._fit_operations_navigation()
+        self.performance_toolbar.show()
+        # Qt initially lays out newly attached toolbars with the generic toolbar padding.
+        QApplication.sendEvent(self.performance_toolbar, QEvent(QEvent.Type.StyleChange))
         self.inspector_dock.setWindowTitle(
             "ATHLETE 360"
             if self.performance.context_panel.current_athlete
@@ -731,6 +747,16 @@ class MainWindow(QMainWindow):
     def _performance_context_loaded_from_service(self, context: dict[str, Any]) -> None:
         self.performance_header.set_context(context)
         self.performance_rail.set_context(context)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if getattr(self, "_perspective", "") == "performance":
+            self._fit_operations_navigation()
+
+    def _fit_operations_navigation(self) -> None:
+        compact = self.width() < 1020
+        self.performance_header.set_compact_navigation(compact)
+        self.navigator_dock.setVisible(not compact)
 
     def _fit_perspective(self, *_args) -> None:
         for index in range(self.perspectives.count()):
@@ -1016,6 +1042,7 @@ class MainWindow(QMainWindow):
         self._ensure_performance()
         self._show_performance_mode()
         self.performance_rail.set_current(page)
+        self.performance_header.page_picker.setCurrentIndex(PERFORMANCE_PAGE_KEYS.index(page))
         self.current_target = {"type": "performance", "page": page}
         title = {"athlete": "Athlete 360", "match": "Match & Pose"}.get(
             page, self.performance.page_names[self.performance.page_keys.index(page)]
@@ -1589,7 +1616,12 @@ class MainWindow(QMainWindow):
         if event:
             panel.investigation_loaded.connect(focus_event)
             QTimer.singleShot(0, dialog, focus_event)
-        fit_dialog(dialog, 1120, 710)
+        if task == "Analysis":
+            fit_dialog(dialog, 840, 560)
+        elif task == "Protocol":
+            fit_dialog(dialog, 920, 600)
+        else:
+            fit_dialog(dialog, 1120, 710)
 
         def switch_title(index):
             dialog.setWindowTitle(f"{subject} · {panel.tabs.tabText(index)}")
@@ -1639,6 +1671,14 @@ class MainWindow(QMainWindow):
         self.stage_picker.setCurrentText(stage)
         individual = self.research_context.get('scope') == 'INDIVIDUAL'
         panel = self.research.individual
+        if stage == "Athlete record":
+            subject = self.research_context.get("subject_id") or self.settings.value(
+                f"athlete-record/{self.current_study_id}", "")
+            if subject:
+                self._show_athlete_record(subject)
+            else:
+                self._open_investigation()
+            return
         if stage == 'Reports / history':
             self._show_research_mode()
             self._set_record_view(True)
@@ -1702,6 +1742,17 @@ class MainWindow(QMainWindow):
         self._show_squad_mode()
         squad.setCurrentWidget(squad.athlete_page)
         self._sync_workflow_stage()
+
+    def _show_athlete_record(self, subject_id: str) -> None:
+        identity = self.current_study_id
+        branch = (self.research_context.get("investigation_id")
+                  if self.research_context.get("subject_id") == subject_id else None)
+        panel = self.research.individual
+        if (panel.workspace_id, panel.investigation_id) != (identity, branch):
+            panel.set_investigation(identity, branch)
+        self.settings.setValue(f"athlete-record/{identity}", subject_id)
+        self.settings.setValue(f"research-stage/{identity}", "Athlete record")
+        self._open_athlete(subject_id)
         self._scroll_to_top()
 
     def _board_loaded(self) -> None:
@@ -2461,6 +2512,7 @@ class ResearchWorkbench(QWidget):
         from . import theme
         self.training_context = TrainingContextPanel(window.run_task, window.settings)
         self.training_context.tool_requested.connect(window._open_individual_tool)
+        self.training_context.athlete_record_requested.connect(window._show_athlete_record)
         self.training_context.set_theme(theme.current_theme())
         window.workbench.theme_changed.connect(self.training_context.set_theme)
         self.history_panel.context_requested.connect(self._open_saved_training_context)

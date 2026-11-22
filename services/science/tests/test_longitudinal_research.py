@@ -207,9 +207,12 @@ def test_protocol_scenarios_and_cohort_comparison(service, study):
 
 
 def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_path, qtbot, monkeypatch):
+    from matplotlib.colors import to_hex
+    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QFileDialog, QInputDialog
 
     from dynamis_science import squad
+    from dynamis_science.desktop import theme
     from dynamis_science.desktop.main_window import MainWindow
     from dynamis_science.desktop.squad_view import SimulationDialog
 
@@ -222,6 +225,8 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     idle()
     window._show_study(identity, service.get_study_detail(identity))
     idle()
+    assert window._investigation_visible()
+    window.study_home.buttons["people"].click()
     home = window.squad
     assert window.perspectives.currentWidget() is home and home.currentWidget() is home.board
     assert "Data revision 1" in window.context_title.text()
@@ -235,8 +240,24 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     p01 = next(tile for tile in tiles if tile.athlete["subject_id"] == "P01")
     p01.click()
     idle()
+    timeline = window.research.training_context
+    assert window._investigation_visible() and timeline.scope.currentData() == "P01"
+    timeline.athlete_record_action.trigger()
+    idle()
     page = home.athlete_page
     assert home.currentWidget() is page and "P01" in page.header.text() and page.branch_picker.currentData() is None
+    axis = page.figure.figure.axes[0]
+    assert axis.get_xlabel() == "Testing occasion"
+    assert theme.contrast_ratio(to_hex(axis.lines[0].get_color()), to_hex(axis.get_facecolor())) >= 3
+    qtbot.keyClick(page.view_values, Qt.Key.Key_Space)
+    values = page.measurement_values
+    assert page.measurement_view.currentWidget() is values
+    assert values.horizontalHeaderItem(1).text() == "P01 (cm)"
+    observations = {str(item["point"]): item["value"] for item in page.athlete["series"]}
+    assert {values.item(i, 0).text(): float(values.item(i, 1).text()) for i in range(values.rowCount())
+            if values.item(i, 1).text() != "—"} == pytest.approx(observations, abs=0.0005)
+    qtbot.keyClick(page.view_values, Qt.Key.Key_Space)
+    assert page.measurement_view.currentWidget() is page.figure
     monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Plyometric block", True))
     page.new_branch()
     idle()
@@ -251,12 +272,15 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     submit = window.runner.submit
     monkeypatch.setattr(window.runner, "submit", lambda operation, done, failed: callbacks.append(done))
     panel.set_investigation(identity, panel.investigation_id)
+    monkeypatch.setattr(window.runner, "submit", submit)
     page.back_requested.emit()
     next(tile for tile in home.board.tiles() if tile.athlete["subject_id"] == "P02").click()
+    idle()
+    timeline.athlete_record_action.trigger()
+    idle()
     assert panel.data_table.rowCount() == 0 and "P02" in page.header.text()
     callbacks[0](service.individual_research(window.investigations[0]["id"]))
     assert "P01" not in panel.header.text()
-    monkeypatch.setattr(window.runner, "submit", submit)
 
     # Researcher-defined squad simulation through the native dialog.
     dialog = SimulationDialog(service, window.run_task, identity, home.board.board, None, window)

@@ -198,6 +198,7 @@ class IndividualResearchPanel(QWidget):
         self.workspace_id, self.investigation_id = workspace_id, investigation_id
         self.payload = {}
         self.protocol_dirty = False
+        self.protocol_state.setText("Loading protocol…" if investigation_id else "Open an investigation to edit its protocol.")
         self.result_diagnostics.clear()
         # Clear first so another participant's measurements are never shown while loading.
         for table in (self.data_table, self.period_table, self.compare_table, self.timeline_table, self.visit_history):
@@ -266,7 +267,7 @@ class IndividualResearchPanel(QWidget):
                                  ", ".join(point["quality_flags"]) or "—"] for point in payload["points"]])
         self.method_picker.clear()
         for method in payload["eligibility"]:
-            self.method_picker.addItem(f"{method['name']} · {method['status'].lower()}", method)
+            self.method_picker.addItem(method["name"], method)
         self.method_picker.setCurrentIndex(max(0, next((i for i in range(self.method_picker.count())
                                                         if self.method_picker.itemData(i)["status"] == "ELIGIBLE"), 0)))
         self._method_changed()
@@ -305,22 +306,21 @@ class IndividualResearchPanel(QWidget):
     def _build_analysis(self) -> None:
         page = QWidget()
         layout = QVBoxLayout(page)
-        note = QLabel("Individual observational analyses describe one participant's measured trajectory. They are not "
-                      "personalized causal estimates, forecasts or injury-risk assessments.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
-        inference_note = QLabel('Randomized-onset inference requires a saved prospective allocation and complete faithful conduct. Phase differences remain descriptive.')
-        inference_note.setWordWrap(True)
-        layout.addWidget(inference_note)
+        heading = QLabel("Individual analysis")
+        heading.setObjectName("StudyHeading")
+        layout.addWidget(heading)
+        form = QFormLayout()
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.method_picker = QComboBox()
         self.method_picker.setAccessibleName("Individual analysis method")
         self.method_picker.currentIndexChanged.connect(self._method_changed)
-        layout.addWidget(self.method_picker)
+        form.addRow("&Method", self.method_picker)
         self.analysis_protocol = QComboBox()
         self.analysis_protocol.setAccessibleName('Experimental analysis protocol version')
         self.analysis_protocol.currentIndexChanged.connect(self._method_changed)
         self.analysis_protocol.currentIndexChanged.connect(lambda _: self.context_changed.emit())
-        layout.addWidget(self.analysis_protocol)
+        form.addRow("&Protocol version", self.analysis_protocol)
+        layout.addLayout(form)
         self.trust_controls = QWidget()
         trust_form = QFormLayout(self.trust_controls)
         trust_form.setContentsMargins(0, 0, 0, 0)
@@ -342,15 +342,25 @@ class IndividualResearchPanel(QWidget):
         self.trust_note.setWordWrap(True)
         trust_form.addRow(self.trust_note)
         layout.addWidget(self.trust_controls)
+        self.method_detail = QTextBrowser()
+        self.method_detail.setAccessibleName("Method eligibility, estimate and limitations")
+        self.method_detail.setMinimumHeight(105)
+        layout.addWidget(self.method_detail, 1)
         self.method_advanced = QCheckBox('Show full statistical contract and assumptions')
         self.method_advanced.toggled.connect(self._method_changed)
         layout.addWidget(self.method_advanced)
-        self.method_detail = QTextBrowser()
-        layout.addWidget(self.method_detail, 1)
-        self.run_button = QPushButton("Run individual analysis on the active revision")
+        self.run_button = QPushButton("&Run analysis")
+        self.run_button.setProperty("primary", True)
         self.run_button.clicked.connect(self.execute)
-        layout.addWidget(self.run_button)
-        self.tabs.addTab(page, "Analysis")
+        self.analysis_form = form
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        analysis = QWidget()
+        analysis_layout = QVBoxLayout(analysis)
+        analysis_layout.addWidget(scroll, 1)
+        analysis_layout.addWidget(self.run_button, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.tabs.addTab(analysis, "Analysis")
         self.trust_controls.hide()
 
     def _selected_method(self) -> dict | None:
@@ -363,7 +373,8 @@ class IndividualResearchPanel(QWidget):
     def _method_changed(self) -> None:
         method = self._selected_method()
         trust_selected = bool(method and method["method_id"] == TRUST_METHOD)
-        self.analysis_protocol.setVisible(bool(method and method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'}))
+        experimental = bool(method and method['method_id'] in {'METH-EXPERIMENT-DESC', 'METH-ONSET-EXACT'})
+        self.analysis_form.setRowVisible(self.analysis_protocol, experimental)
         self.trust_controls.setVisible(trust_selected)
         self.run_button.setEnabled(bool(method and method["status"] == "ELIGIBLE"
                                         and (not trust_selected or self._trust_sessions_selected())))
@@ -373,17 +384,23 @@ class IndividualResearchPanel(QWidget):
             self.trust_note.setText("Retest review recorded for this comparison." if self.trust_retest else
                                     "Jump height (cm). With no applicable retest evidence, the assessment reports observed values and limits.")
         if not method:
-            self.method_detail.clear()
+            self.method_detail.setPlainText("Choose a method to review eligibility and limitations.")
             return
         if self.method_advanced.isChecked():
             self.method_detail.setHtml(method_html(method))
         else:
-            p = (self.analysis_protocol.currentData() or {}).get('protocol', {})
-            issues = '<br>'.join(html.escape(s) for s in method['issues']) or 'Eligible on the captured protocol and active data revision.'
-            protocol = f"<p>{html.escape(p['question'])}<br>{html.escape(p['design_label'])} · protocol v{p['version']}</p>" if p else ""
-            self.method_detail.setHtml(f"<h3>{html.escape(method['name'])}</h3>" + protocol +
-                f"<p><b>{html.escape(method.get('inference_status', method['status']))}</b><br>{issues}</p>"
-                f"<p>{html.escape(method['estimand'])}</p><p>{html.escape(method['uncertainty'])}</p>")
+            status = "Eligible to run" if method["status"] == "ELIGIBLE" else "Cannot run"
+            issues = "".join(f"<li>{html.escape(issue)}</li>" for issue in method["issues"])
+            reasons = f"<ul>{issues}</ul>" if issues else ""
+            inference = method.get("inference_status")
+            inference_note = f"<p>Inference status · {html.escape(inference)}</p>" if inference else ""
+            self.method_detail.setHtml(
+                f"<h3>{status}</h3>{reasons}{inference_note}"
+                f"<p><b>Estimate</b><br>{html.escape(method['estimand'])}</p>"
+                f"<p><b>Uncertainty</b><br>{html.escape(method['uncertainty'])}</p>"
+                "<p>Individual observational analyses describe one participant's measured trajectory. "
+                "They are not personalized causal estimates, forecasts or injury-risk assessments.</p>"
+            )
 
     def _trust_sessions_selected(self) -> bool:
         first, second = self.trust_reference.currentData(), self.trust_comparison.currentData()
@@ -699,6 +716,7 @@ class IndividualResearchPanel(QWidget):
         self.period_table.setColumnHidden(5, True)
         self.period_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.period_table.setMinimumHeight(100)
+        self.period_table.model().rowsRemoved.connect(self._protocol_edited)
         schedule.addWidget(self.period_table, 1)
         row = QHBoxLayout()
         add = QPushButton("Add period")
@@ -721,10 +739,17 @@ class IndividualResearchPanel(QWidget):
         conduct.addWidget(conduct_note)
         conduct.addWidget(self.changes)
         self.save_protocol_button = QPushButton("Save protocol version")
+        self.save_protocol_button.setProperty("primary", True)
         self.save_protocol_button.clicked.connect(self.save_protocol)
         self.design_picker.currentIndexChanged.connect(self._design_changed)
         self._design_changed()
-        layout.addWidget(self.save_protocol_button)
+        footer = QHBoxLayout()
+        self.protocol_state = QLabel()
+        self.protocol_state.setWordWrap(True)
+        self.protocol_state.setAccessibleName("Protocol save status")
+        footer.addWidget(self.protocol_state, 1)
+        footer.addWidget(self.save_protocol_button)
+        layout.addLayout(footer)
         self.period_view = QTextBrowser()
         self.period_view.setMaximumHeight(90)
         conduct.addWidget(self.period_view)
@@ -747,6 +772,7 @@ class IndividualResearchPanel(QWidget):
     def _protocol_edited(self, *_args) -> None:
         if self.payload and not getattr(self, '_rendering_protocol', False):
             self.protocol_dirty = True
+            self.protocol_state.setText("Unsaved protocol changes")
             self.context_changed.emit()
 
     def _design_changed(self) -> None:
@@ -775,6 +801,7 @@ class IndividualResearchPanel(QWidget):
         kind = QComboBox()
         kind.addItems(PERIOD_KINDS)
         kind.setCurrentText(period.get("kind", "BASELINE"))
+        kind.currentIndexChanged.connect(self._protocol_edited)
         self.period_table.setCellWidget(row, 0, kind)
         adherence = adherence or {}
         for column, value in enumerate((period.get("label", ""), period.get("start", ""), period.get("end", ""),
@@ -807,6 +834,8 @@ class IndividualResearchPanel(QWidget):
         self.changes.setPlainText("\n".join(f"{item['at']}: {item['description']}" for item in protocol.get("changes", [])))
         self._rendering_protocol = False
         self.protocol_dirty = False
+        version = protocol.get("version")
+        self.protocol_state.setText(f"Saved protocol v{version}" if version else "No saved protocol version")
 
     def _show_periods(self, periods: list[dict[str, Any]]) -> None:
         self.period_view.setPlainText("\n".join(f"{item['label']} ({item['kind'].lower()}): occasions {', '.join(map(str, item['occasions'])) or 'none'} "

@@ -23,7 +23,7 @@ from ..plots import export_figure
 FORMATS = ("png", "pdf", "svg")
 
 
-def _style(figure: Figure, t: dict[str, str]) -> None:
+def style_figure(figure: Figure, t: dict[str, str]) -> None:
     figure.set_facecolor(t["base"])
     for axis in figure.axes:
         axis.set_facecolor(t["base"])
@@ -71,7 +71,7 @@ def provenance_footer(run: dict[str, Any]) -> str:
 
 
 def _finish(figure: Figure, run: dict[str, Any], t: dict[str, str]) -> Figure:
-    _style(figure, t)
+    style_figure(figure, t)
     status = run.get("method_status") or {}
     if status.get("state") == "SUPERSEDED":
         figure.suptitle(

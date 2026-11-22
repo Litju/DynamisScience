@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .individual_research import fit_dialog
 from .models import RecordTableModel
 
 
@@ -27,14 +28,13 @@ class ScientificLibraryDialog(QDialog):
         super().__init__(parent)
         self.library = library
         self.setWindowTitle("Scientific definition library")
-        self.resize(1180, 760)
         layout = QVBoxLayout(self)
-        layout.addWidget(
-            QLabel(
-                "Read-only definitions used by the workbench. Prototype and unavailable "
-                "entries are shown with their recorded status and limitations."
-            )
+        introduction = QLabel(
+            "Read-only definitions used by the workbench. Prototype and unavailable "
+            "entries are shown with their recorded status and limitations."
         )
+        introduction.setWordWrap(True)
+        layout.addWidget(introduction)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs, 1)
         self.sections: dict[str, dict[str, Any]] = {}
@@ -79,6 +79,7 @@ class ScientificLibraryDialog(QDialog):
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
         layout.addWidget(buttons)
+        fit_dialog(self, 1180, 760)
 
     @staticmethod
     def _row(record: dict[str, Any]) -> dict[str, Any]:

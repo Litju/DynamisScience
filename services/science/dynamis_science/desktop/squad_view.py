@@ -41,9 +41,10 @@ from PySide6.QtWidgets import (
 
 from ..squad import MEASURES, OPERATORS, TONES, VARIANTS
 from . import theme
-from .individual_research import IndividualResearchPanel, _table, fit_dialog
+from .individual_research import IndividualResearchPanel, _fill, _table, fit_dialog
 from .plots import ScientificFigureWidget
 from .services import DynamisAppService
+from .workbench.figures import style_figure
 
 RunTask = Callable[[Callable[[], Any], Callable[[Any], None], str], None]
 TILE_WIDTH = 176
@@ -525,7 +526,16 @@ class AthletePage(QWidget):
         self.research_tabs.insertTab(1, self.flags, "Rule evaluations")
         self.figure = ScientificFigureWidget()
         self.figure.setMinimumHeight(160)
-        overview.addWidget(self.figure, 1)
+        self.figure.setAccessibleName("Athlete measurements and squad mean chart")
+        self.measurement_values = _table(["Testing occasion", "Athlete", "Squad mean"], "Athlete measurements and squad mean values")
+        self.measurement_view = QStackedWidget()
+        self.measurement_view.addWidget(self.figure)
+        self.measurement_view.addWidget(self.measurement_values)
+        self.view_values = QPushButton("Show measurement values")
+        self.view_values.setCheckable(True)
+        self.view_values.toggled.connect(self._show_measurement_values)
+        overview.addWidget(self.view_values, alignment=Qt.AlignmentFlag.AlignLeft)
+        overview.addWidget(self.measurement_view, 1)
         research = QVBoxLayout(investigations)
         research.setContentsMargins(4, 4, 4, 4)
         branches = QHBoxLayout()
@@ -571,29 +581,57 @@ class AthletePage(QWidget):
         self.research_tabs.setCurrentIndex(2 if current else 0)
 
     def _plot(self, athlete: dict[str, Any]) -> None:
+        tokens = theme.tokens()
         figure = Figure(figsize=(5, 3), constrained_layout=True)
         axis = figure.subplots()
         metric = self.board.board["metric"]
-        points = [_x(item["point"]) for item in athlete["series"]]
+        observed = {_x(item["point"]): item["value"] for item in athlete["series"]}
+        points = list(observed)
         dense = len(points) > 15
-        axis.plot(points, [item["value"] for item in athlete["series"]], marker="." if dense else "o", markersize=4 if dense else 6,
-                  color=theme.tokens()["obs"], label=f"{athlete['display_id']} observed")
+        axis.plot(points, list(observed.values()), marker="." if dense else "o", markersize=4 if dense else 6,
+                  color=tokens["obs"], label=f"{athlete['display_id']} observed")
         squad = {}
         for group in self.board.board["groups"]:
             for other in group["athletes"]:
                 for item in other["series"]:
                     squad.setdefault(_x(item["point"]), []).append(item["value"])
         xs = sorted(squad)
-        axis.plot(xs, [sum(squad[x]) / len(squad[x]) for x in xs], linestyle="--", color=theme.tokens()["dim"], label="Squad mean")
+        means = {x: sum(squad[x]) / len(squad[x]) for x in xs}
+        axis.plot(xs, list(means.values()), linestyle="--", color=tokens["dim"], label="Squad mean")
         axis.set_ylabel(f"{metric['label']} ({metric['unit']})")
-        if points and isinstance(points[0], date):
+        dated = bool(xs and isinstance(xs[0], date))
+        axis_label = "Measurement date" if dated else "Testing occasion"
+        axis.set_xlabel(axis_label)
+        if dated:
             from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
 
             locator = AutoDateLocator(maxticks=6)
             axis.xaxis.set_major_locator(locator)
             axis.xaxis.set_major_formatter(ConciseDateFormatter(locator))
-        axis.legend(frameon=False, fontsize=8)
+        style_figure(figure, tokens)
+        axis.legend(frameon=False, fontsize=8, labelcolor=tokens["text"])
         self.figure.show_figure(figure)
+        self.measurement_values.setHorizontalHeaderLabels(
+            [axis_label, f"{athlete['display_id']} ({metric['unit']})", f"Squad mean ({metric['unit']})"])
+        _fill(self.measurement_values,
+              [[str(point), _fmt(observed.get(point), 3), _fmt(means[point], 3)] for point in xs])
+
+    def _show_measurement_values(self, enabled: bool) -> None:
+        self.measurement_view.setCurrentWidget(self.measurement_values if enabled else self.figure)
+        self.view_values.setText("Show measurement chart" if enabled else "Show measurement values")
+
+    def refresh_measurement_theme(self, name: str) -> None:
+        figure = self.figure.figure
+        if not figure.axes:
+            return
+        tokens = theme.tokens(name)
+        axis = figure.axes[0]
+        observed, mean = axis.lines
+        observed.set_color(tokens["obs"])
+        mean.set_color(tokens["dim"])
+        style_figure(figure, tokens)
+        axis.legend(frameon=False, fontsize=8, labelcolor=tokens["text"])
+        self.figure.canvas.draw_idle()
 
     def _branch_chosen(self) -> None:
         self.investigation_selected.emit(self.branch_picker.currentData() or "")
@@ -683,7 +721,7 @@ class EventsFeed(QWidget):
         text.setTextFormat(Qt.TextFormat.RichText)
         row.addWidget(text, 1)
         if item.get("subject_id"):
-            open_button = QPushButton("Open athlete")
+            open_button = QPushButton("Investigate athlete")
             open_button.clicked.connect(lambda _=False, subject=item["subject_id"]: self.athlete_requested.emit(subject))
             row.addWidget(open_button)
         if action:
