@@ -12,6 +12,7 @@ from PySide6.QtCore import QEvent, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDockWidget,
@@ -208,6 +209,8 @@ class MainWindow(QMainWindow):
         self.performance_header = None
         self.performance_rail = None
         self.performance_toolbar = None
+        self._last_performance_page = "today"
+        self._research_target = None
         self.perspectives.currentChanged.connect(self._fit_perspective)
         self._fit_perspective()
         screen = self.screen()
@@ -256,7 +259,7 @@ class MainWindow(QMainWindow):
             action.triggered.connect(callback)
             self.addAction(action)
             self.workspace_actions[key] = action
-        context_bar = QToolBar("Research Context", self)
+        context_bar = QToolBar("Workspace navigation", self)
         context_bar.setObjectName("ResearchContext")
         self.addToolBar(context_bar)
         context_bar.setMovable(False)
@@ -265,17 +268,34 @@ class MainWindow(QMainWindow):
         wordmark.setObjectName("ResearchWordmark")
         context_bar.addWidget(wordmark)
         self.investigate_button = QPushButton("Investigate")
-        self.study_button = QPushButton("Study")
-        for button, action in ((self.investigate_button, self._open_investigation), (self.study_button, self._show_study_home)):
+        self.study_button = QPushButton("Library")
+        self.destination_group = QButtonGroup(self)
+        self.destinations = {}
+        routes = (
+            ("library", self.study_button, self._show_study_home, "Open studies, people and sources"),
+            ("investigate", self.investigate_button, self._open_investigation, "Inspect athlete and cohort observations"),
+            ("design", QPushButton("Design"), lambda: self._open_study_destination("design"), "Set up the study and its protocol"),
+            ("analyze", QPushButton("Analyze"), self._open_scratch_workbench, "Open the scientific analysis workbench"),
+            ("evidence", QPushButton("Evidence"), lambda: self._open_study_destination("archive"), "Review reports, saved analyses and revisions"),
+            ("operations", QPushButton("Operations"), self._open_operations, "Open the performance workspace"),
+        )
+        for key, button, action, description in routes:
             button.setObjectName("ResearchDestination")
             button.setCheckable(True)
+            button.setAccessibleDescription(description)
+            button.setToolTip(description)
             button.clicked.connect(action)
+            self.destination_group.addButton(button)
+            self.destinations[key] = button
             context_bar.addWidget(button)
-        QWidget.setTabOrder(self.investigate_button, self.study_button)
+        for left, right in zip(tuple(self.destinations.values()), tuple(self.destinations.values())[1:]):
+            QWidget.setTabOrder(left, right)
         context_bar.addSeparator()
         self.location = QLabel()
         self.location.setObjectName("ResearchLocation")
         self.location.setTextFormat(Qt.TextFormat.PlainText)
+        self.location.setMaximumWidth(320)
+        self.location.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         context_bar.addWidget(self.location)
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -730,6 +750,8 @@ class MainWindow(QMainWindow):
         self.menuBar().hide()
         if self.performance_toolbar is not None:
             self.performance_toolbar.hide()
+        if self._perspective == "performance":
+            self.current_target = self._research_target
         self.perspectives.setCurrentWidget(self.workbench)
         if self._perspective not in ("research", "squad", "events"):
             # The navigator lives in the Data pane; raw inspector detail is behind View > Advanced.
@@ -962,6 +984,8 @@ class MainWindow(QMainWindow):
         self.research._report_cited(run.get("study_id", ""), result)
 
     def show_performance_page(self, page: str) -> None:
+        if self._perspective != "performance":
+            self._research_target = self.current_target
         self._ensure_performance()
         self._show_performance_mode()
         page_alias = {"athlete": "today", "match": "monitor"}
@@ -977,6 +1001,11 @@ class MainWindow(QMainWindow):
         self.workbench.set_provenance("DS-SYNTH-001 · NO REAL DATA", provenance="synthetic")  # until research mode returns
         self.perspectives.setCurrentWidget(self.performance)
         self.performance.select_page(page)
+        self._last_performance_page = page
+        self._sync_workflow_stage()
+
+    def _open_operations(self) -> None:
+        self.show_performance_page(self._last_performance_page)
 
     def _search_performance(self, query: str) -> None:
         if not query:
@@ -1326,6 +1355,8 @@ class MainWindow(QMainWindow):
         self.scope_picker.setEnabled(bool(detail))
         self.stage_picker.setEnabled(bool(detail))
         self.investigate_button.setEnabled(bool(detail.get("active_data_revision_id")))
+        self.destinations["design"].setEnabled(bool(detail))
+        self.destinations["evidence"].setEnabled(bool(detail))
         panel = self.research.individual
         binding = ''
         if selected and panel.investigation_id == selected and panel.payload:
@@ -1382,16 +1413,18 @@ class MainWindow(QMainWindow):
         self.workbench.status_items.setVisible(not (focused or page is self.study_home and active is self.workbench))
         if focused or (active is self.workbench and page is self.study_home):
             self.workbench.panes["data"].hide()
-        self.investigate_button.setChecked(focused)
-        self.study_button.setChecked(not focused)
         self._sync_context_title(focused)
         stage = None
         location = ""
+        destination = "library"
         if focused:
+            destination = "investigate"
             stage = "Training context"
             location = self.current_study.get("study", {}).get("title", "")
         elif active is self.workbench and self.results_stack.currentIndex() == 1:
             index = self.research.tabs.currentIndex()
+            destination = {0: "design", 2: "analyze", 3: "analyze", 4: "evidence",
+                           5: "design", 6: "evidence"}.get(index, "library")
             stage = {0:"Study", 1:"Data / QC", 3:"Analysis", 4:"Reports / history",
                      5:"Series comparison", 6:"Reports / history"}.get(index)
             location = {0:"Study setup", 1:"Sources & quality", 2:"Explore signals", 3:"Study analysis",
@@ -1399,13 +1432,20 @@ class MainWindow(QMainWindow):
         elif active is self.squad:
             location = "People"
             if self.squad.currentWidget() is self.squad.athlete_page:
+                destination = "investigate"
                 individual = self.research.individual.tabs
                 stage = {"Data":"Data / QC", "Protocol":"Protocol", "Visits and timeline":"Observations",
                          "Analysis":"Analysis", "Results":"Results"}.get(individual.tabText(individual.currentIndex()))
         elif active is self.events_view:
+            destination = "investigate"
             location = "Events"
-        elif active is self.workbench and page is self.results_doc:
+        elif active is self.performance:
+            destination = "operations"
+            location = PERFORMANCE_PAGE_NAMES[PERFORMANCE_PAGE_KEYS.index(self._last_performance_page)]
+        elif active is self.workbench and (page is self.results_doc or page is self.signals_view):
+            destination = "analyze"
             location = "Analysis workbench"
+        self.destinations[destination].setChecked(True)
         self.location.setText(location)
         self.location.setToolTip(location)
         if stage:
