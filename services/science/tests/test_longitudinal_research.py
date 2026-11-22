@@ -207,9 +207,12 @@ def test_protocol_scenarios_and_cohort_comparison(service, study):
 
 
 def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_path, qtbot, monkeypatch):
+    from matplotlib.colors import to_hex
+    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QFileDialog, QInputDialog
 
     from dynamis_science import squad
+    from dynamis_science.desktop import theme
     from dynamis_science.desktop.main_window import MainWindow
     from dynamis_science.desktop.squad_view import SimulationDialog
 
@@ -243,6 +246,18 @@ def test_native_squad_home_athlete_branches_and_simulation(service, study, tmp_p
     idle()
     page = home.athlete_page
     assert home.currentWidget() is page and "P01" in page.header.text() and page.branch_picker.currentData() is None
+    axis = page.figure.figure.axes[0]
+    assert axis.get_xlabel() == "Testing occasion"
+    assert theme.contrast_ratio(to_hex(axis.lines[0].get_color()), to_hex(axis.get_facecolor())) >= 3
+    qtbot.keyClick(page.view_values, Qt.Key.Key_Space)
+    values = page.measurement_values
+    assert page.measurement_view.currentWidget() is values
+    assert values.horizontalHeaderItem(1).text() == "P01 (cm)"
+    observations = {str(item["point"]): item["value"] for item in page.athlete["series"]}
+    assert {values.item(i, 0).text(): float(values.item(i, 1).text()) for i in range(values.rowCount())
+            if values.item(i, 1).text() != "—"} == pytest.approx(observations, abs=0.0005)
+    qtbot.keyClick(page.view_values, Qt.Key.Key_Space)
+    assert page.measurement_view.currentWidget() is page.figure
     monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Plyometric block", True))
     page.new_branch()
     idle()

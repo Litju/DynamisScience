@@ -211,6 +211,7 @@ class MainWindow(QMainWindow):
         from .squad_view import SquadHome
 
         self.squad = SquadHome(self.service, self.run_task, self.research.individual)
+        self.workbench.theme_changed.connect(self.squad.athlete_page.refresh_measurement_theme)
         self.squad.board.athlete_opened.connect(self._athlete_opened)
         self.squad.board.loaded.connect(self._board_loaded)
         self.squad.athlete_page.investigation_selected.connect(self._branch_selected)
@@ -1615,7 +1616,12 @@ class MainWindow(QMainWindow):
         if event:
             panel.investigation_loaded.connect(focus_event)
             QTimer.singleShot(0, dialog, focus_event)
-        fit_dialog(dialog, 1120, 710)
+        if task == "Analysis":
+            fit_dialog(dialog, 840, 560)
+        elif task == "Protocol":
+            fit_dialog(dialog, 920, 600)
+        else:
+            fit_dialog(dialog, 1120, 710)
 
         def switch_title(index):
             dialog.setWindowTitle(f"{subject} · {panel.tabs.tabText(index)}")

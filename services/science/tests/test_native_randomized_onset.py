@@ -99,6 +99,7 @@ def test_native_two_athletes_exact_results_and_report(qtbot,service,prospective,
                          if panel.method_picker.itemData(i)['method_id']=='METH-EXPERIMENT')
         panel.method_picker.setCurrentIndex(unavailable)
         assert not panel.run_button.isEnabled()
+        assert 'Cannot run' in panel.method_detail.toPlainText()
         assert 'No qualified within-person causal estimator' in panel.method_detail.toPlainText()
         panel.analyze_experiment_button.click()
         panel.method_advanced.setChecked(True)

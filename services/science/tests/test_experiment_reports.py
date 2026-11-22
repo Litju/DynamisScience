@@ -70,6 +70,8 @@ def test_native_experiment_analysis_chart_and_report(qtbot, service, experiment_
     panel.method_picker.setCurrentIndex(index)
     panel.tabs.setCurrentIndex(1)
     assert panel.run_button.isEnabled() and panel.analysis_protocol.count()==1
+    assert panel.method_picker.currentText() == panel.method_picker.currentData()["name"]
+    assert "Eligible to run" in panel.method_detail.toPlainText()
     panel.method_advanced.setChecked(True)
     assert 'Serial dependence' in panel.method_detail.toPlainText()
     qtbot.mouseClick(panel.run_button, Qt.MouseButton.LeftButton)
@@ -97,6 +99,7 @@ def test_native_experiment_analysis_chart_and_report(qtbot, service, experiment_
     service.save_protocol(a['id'],amendment,current['version'])
     panel.reload()
     idle()
+    assert panel.protocol_state.text() == "Saved protocol v2"
     panel.method_picker.setCurrentIndex(index)
     assert panel.analysis_protocol.count()==2
     panel.analysis_protocol.setCurrentIndex(1)
