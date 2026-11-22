@@ -1353,6 +1353,9 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     window._navigation_activated(performance_root.child(7), 0)
     qtbot.waitUntil(lambda: "report" in window.performance.loaded_pages)
     qtbot.waitUntil(lambda: not window.runner.active)
+    assert "Compose a report" in window.performance.report_preview.toPlainText()
+    assert window.performance.report_view.isHidden()
+    assert not window.performance.report_export.isEnabled()
     monkeypatch.setattr(
         ReportDialog,
         "exec",
@@ -1362,6 +1365,8 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     qtbot.waitUntil(lambda: not window.runner.active)
     reports = service.performance_page_data("report")["reports"]
     assert reports
+    assert not window.performance.report_view.isHidden()
+    assert window.performance.report_freeze.isEnabled()
     preview = window.performance.report_preview.toPlainText()
     assert reports[-1]["title"] in preview
     assert reports[-1]["sections"][0]["body"][0] in preview
@@ -1369,6 +1374,7 @@ def test_native_performance_operations_edit_monitor_and_reports(qtbot, tmp_path,
     report_id = window.performance.selected_report_id
     window.performance._freeze_report()
     qtbot.waitUntil(lambda: not window.runner.active)
+    assert not window.performance.report_freeze.isEnabled()
     assert next(item for item in service.performance_page_data("report")["reports"] if item["id"] == report_id)["status"] == "FROZEN"
     output = tmp_path / "practitioner-report.html"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args: (str(output), "HTML report (*.html)"))

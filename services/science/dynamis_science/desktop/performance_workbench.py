@@ -907,6 +907,7 @@ class PerformanceWorkbench(QWidget):
         split = QSplitter(Qt.Orientation.Vertical)
         self.athlete_detail = QTextBrowser()
         self.athlete_detail.setAccessibleName("Selected athlete summary")
+        self.athlete_detail.setMaximumHeight(115)
         split.addWidget(self.athlete_detail)
         charts = QWidget()
         chart_layout = QHBoxLayout(charts)
@@ -921,7 +922,7 @@ class PerformanceWorkbench(QWidget):
         chart_layout.addWidget(self.athlete_trend)
         chart_layout.addWidget(self.force_trace)
         split.addWidget(charts)
-        split.setSizes([280, 400])
+        split.setSizes([100, 400])
         layout.addWidget(split, 1)
         self.athlete_note = QLabel("Notes are practitioner-entered operational records, not clinical records.")
         layout.addWidget(self.athlete_note)
@@ -946,7 +947,7 @@ class PerformanceWorkbench(QWidget):
         actions.addWidget(edit)
         actions.addWidget(publish)
         actions.addStretch(1)
-        layout.addLayout(actions)
+        layout.insertLayout(2, actions)
 
     def _build_monitor(self) -> None:
         _, layout = self._page(self.page_names[3])
@@ -1057,7 +1058,7 @@ class PerformanceWorkbench(QWidget):
         actions.addWidget(button)
         actions.addWidget(self.research_source)
         actions.addStretch(1)
-        layout.addLayout(actions)
+        layout.insertLayout(2, actions)
 
     def _build_report(self) -> None:
         _, layout = self._page(self.page_names[7])
@@ -1071,7 +1072,6 @@ class PerformanceWorkbench(QWidget):
         self.report_view.setAccessibleName("Practitioner report history")
         self.report_preview.setAccessibleName("Selected practitioner report")
         self.report_view.selectionModel().currentChanged.connect(self._select_report)
-        layout.addWidget(split, 1)
         actions = QHBoxLayout()
         create = QPushButton("Compose report…")
         create.setProperty("primary", True)
@@ -1087,6 +1087,7 @@ class PerformanceWorkbench(QWidget):
             actions.addWidget(button)
         actions.addStretch(1)
         layout.addLayout(actions)
+        layout.addWidget(split, 1)
 
     def _load_page(self, page: str) -> None:
         if page in self.loaded_pages:
@@ -1339,6 +1340,7 @@ class PerformanceWorkbench(QWidget):
             if not self.athletes:
                 self.athletes = values["athletes"]
             self.report_model.set_rows(self.report_records)
+            self.report_view.setVisible(bool(self.report_records))
             if self.report_records:
                 selected = getattr(self, "selected_report_id", None)
                 row = next((i for i, report in enumerate(self.report_records) if report["id"] == selected), 0)
