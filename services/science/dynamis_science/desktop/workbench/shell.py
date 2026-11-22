@@ -234,6 +234,7 @@ class WorkbenchShell(QWidget):
         self.palette_button.clicked.connect(lambda: self.palette.popup())
         self.ribbon.addWidget(self.palette_button)
         self.setup_button = QPushButton("Analysis setup")
+        self.setup_button.setAccessibleName("Analysis setup")
         self.setup_button.setAccessibleDescription("Show or hide variable roles and method options")
         self.setup_button.setCheckable(True)
         self.setup_button.toggled.connect(self._set_options_drawer)
