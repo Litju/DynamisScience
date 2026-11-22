@@ -186,6 +186,18 @@ class WorkbenchShell(QWidget):
             action = QAction(f"Switch to {name} theme", self)
             action.triggered.connect(lambda _checked=False, name=name: self.set_theme(name))
             self.view_actions.append(action)
+        motion = QAction("Reduce animations", self)
+        motion.setCheckable(True)
+        motion.setChecked(self.settings.value("workbench/reducedMotion", False, type=bool)
+                          if self.settings is not None else False)
+        theme.set_reduced_motion(motion.isChecked())
+        motion.toggled.connect(self._set_reduced_motion)
+        self.view_actions.append(motion)
+
+    def _set_reduced_motion(self, enabled: bool) -> None:
+        theme.set_reduced_motion(enabled)
+        if self.settings is not None:
+            self.settings.setValue("workbench/reducedMotion", enabled)
 
     def _build_ribbon(self) -> None:
         self.ribbon = QToolBar("Analyses", self)

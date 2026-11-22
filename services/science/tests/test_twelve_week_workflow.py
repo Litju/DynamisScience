@@ -196,7 +196,7 @@ def test_twelve_week_researcher_journey(qtbot, service, tmp_path, monkeypatch):
     window.investigate_button.setFocus()
     assert window.investigate_button.hasFocus()
     qtbot.keyClick(window.investigate_button, Qt.Key.Key_Tab)
-    assert window.study_button.hasFocus()
+    assert window.destinations["design"].hasFocus()
     window.resize(911, 480)  # 1366×720 physical-area equivalent at 150%; not actual Windows DPI.
     stage(window, 'Observations')
     assert panel.visit_editor_toggle.isVisible()

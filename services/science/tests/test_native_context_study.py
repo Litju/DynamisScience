@@ -252,7 +252,10 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     study_home = window.study_home
     assert study_home.isVisible() and window.study_button.isChecked()
     assert not window.stage_picker.isVisible() and not window.research.tabs.tabBar().isVisible()
+    assert not study_home.instrument.isVisible()
+    study_home.map_button.click()
     instrument = study_home.instrument
+    assert instrument.isVisible()
     original_projection = instrument._project(_NODES[1])[0]
     instrument.setFocus()
     qtbot.keyClick(instrument, Qt.Key.Key_Right)
@@ -270,6 +273,15 @@ def test_native_twenty_athlete_twelve_week_context(qtbot, monkeypatch, tmp_path)
     window.investigate_button.click()
     wait(window)
     assert panel.scope.currentData() == "A01" and panel.comparison is comparison
+    window.destinations["design"].click()
+    assert window.destinations["design"].isChecked()
+    window.destinations["operations"].click()
+    assert window.destinations["operations"].isChecked()
+    wait(window)
+    window.investigate_button.click()
+    wait(window)
+    assert panel.scope.currentData() == "A01" and panel.comparison is comparison
+    assert window.current_target == {"type": "study", "id": workspace}
 
     def check_task(title, verify):
         opened = []

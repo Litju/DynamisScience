@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from string import Template
 
+from PySide6.QtCore import QEasingCurve
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
@@ -17,6 +18,9 @@ SANS = "Segoe UI Variable Text"
 MONO = "Cascadia Mono"
 SPACING = (2, 4, 6, 8, 10, 12, 14, 16, 22)
 RADII = {"kbd": 4, "control": 6, "slot": 8, "pane": 10, "chip": 9}
+CAMERA_TRANSITION_MS = 250
+CAMERA_TRANSITION_EASING = QEasingCurve.Type.OutCubic
+FEEDBACK_TRANSITION_MS = 280
 
 LIGHT = dict(desk="#E7E3DC", window="#F6F4F0", base="#FFFFFF", alt="#FAF8F5", chrome="#EFECE6", dock="#F2EFEA",
              line="#E2DDD4", line2="#CFC8BC", hover="#ECE8E1", text="#1B1D20", muted="#464B52", dim="#6D7178",
@@ -104,6 +108,17 @@ def tokens(name: str | None = None) -> dict[str, str]:
 
 def current_theme() -> str:
     return _current
+
+
+def reduced_motion() -> bool:
+    application = QApplication.instance()
+    return bool(application and application.property("reducedMotion"))
+
+
+def set_reduced_motion(enabled: bool) -> None:
+    application = QApplication.instance()
+    if application is not None:
+        application.setProperty("reducedMotion", enabled)
 
 
 def text_pairs(name: str) -> list[tuple[str, str, str, str]]:
@@ -206,23 +221,28 @@ QSplitter::handle { background: transparent; }
 QSplitter::handle:hover { background: $line; }
 
 /* ---- study and investigation ---- */
-QToolBar#ResearchContext { background: $window; border-bottom: 1px solid $line2; min-height: 54px; }
-QLabel#ResearchWordmark { font-family: Georgia; font-size: 19px; font-weight: bold; padding-right: 12px; }
-QLabel#ResearchLocation { color: $muted; padding-left: 6px; }
-QPushButton#ResearchDestination { min-height: 26px; min-width: 82px; border: 1px solid transparent; background: transparent; }
-QPushButton#ResearchDestination:checked { border-color: $accent_text; background: $accent_tint; color: $text; font-weight: bold; }
+QToolBar#ResearchContext { background: $chrome; border-bottom: 1px solid $line2; min-height: 56px; }
+QLabel#ResearchWordmark { font-size: 18px; font-weight: 700; padding-right: 12px; }
+QLabel#ResearchLocation { color: $dim_text; padding-left: 6px; }
+QPushButton#ResearchDestination { min-height: 24px; border: 1px solid transparent; background: transparent;
+    padding: 6px 9px; }
+QPushButton#ResearchDestination:checked { border-bottom-color: $accent; background: $accent_tint;
+    color: $accent_text; font-weight: 700; }
 QPushButton#ResearchDestination:hover { border-color: $line2; }
 QPushButton#ResearchDestination:focus { border-color: $accent_text; }
 QPushButton#ResearchDestination:disabled { color: $faint; }
-QWidget#StudyHome { background: $window; }
-QLabel#StudyHeading, QLabel#InvestigationFinding { font-family: Georgia; font-weight: bold; color: $text; }
-QLabel#StudyHeading { font-size: 30px; }
-QLabel#StudySummary { color: $muted; }
+QWidget#StudyHome { background: $desk; }
+QFrame#WorkspaceIdentity { background: $window; border: 1px solid $line2; border-top: 2px solid $accent;
+    border-radius: 10px; }
+QFrame#WorkspaceTool { background: $window; border: 1px solid $line2; border-radius: 8px; }
+QLabel#StudyHeading, QLabel#InvestigationFinding { font-weight: 700; color: $text; }
+QLabel#StudyHeading { font-size: 32px; }
+QLabel#StudySummary { color: $dim_text; }
 QFrame#SourceCard { background: $base; border: 1px solid $line2; border-radius: 10px; }
 QLabel#SourceCount { background: $accent_tint; color: $text; padding: 6px 10px; border-radius: 5px; font-weight: bold; }
-QPushButton#StudyDestination { text-align: left; padding: 9px 16px; min-height: 26px; font-weight: bold;
-    border-left: 4px solid $line2; background: $base; }
-QPushButton#StudyDestination:hover, QPushButton#StudyDestination:focus { border-left-color: $accent_text; background: $accent_tint; }
+QPushButton#StudyDestination { text-align: left; padding: 7px 10px; min-height: 24px;
+    font-weight: 700; background: $base; }
+QPushButton#StudyDestination:hover, QPushButton#StudyDestination:focus { border-color: $accent; background: $accent_tint; }
 QLabel#InvestigationMode { padding: 4px 8px; border: 1px solid $accent_edge; border-radius: 6px; background: $accent_tint; }
 QLabel#InvestigationMode[frozen="true"] { background: $warn_chip; color: $warn_text; border-color: $warn_edge; }
 

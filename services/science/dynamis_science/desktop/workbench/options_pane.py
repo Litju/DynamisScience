@@ -178,7 +178,7 @@ class RoleSlot(QFrame):
         self._layout.addWidget(self.box)
         self._apply_shake(0)
         self._animation = QPropertyAnimation(self, b"shake_offset", self)
-        self._animation.setDuration(280)
+        self._animation.setDuration(theme.FEEDBACK_TRANSITION_MS)
         self._animation.setKeyValueAt(0, 0)
         for stop, value in ((0.2, -8), (0.4, 8), (0.6, -5), (0.8, 4), (1, 0)):
             self._animation.setKeyValueAt(stop, value)
@@ -195,7 +195,9 @@ class RoleSlot(QFrame):
 
     def shake(self) -> None:
         self._animation.stop()
-        self._animation.start()
+        self._apply_shake(0)
+        if not theme.reduced_motion():
+            self._animation.start()
 
     @property
     def shaking(self) -> bool:
