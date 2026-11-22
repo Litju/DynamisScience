@@ -11,6 +11,13 @@ from typing import Any
 
 CATALOGUE_VERSION = "1.4.0"
 MIN_TREND_REPEATED_ATHLETES = 3
+EXECUTION_SOURCE_FILES = (
+    "method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py",
+    "longitudinal.py", "researchstore.py", "experiments.py", "randomized_onset.py",
+)
+MEASUREMENT_TRUST_SOURCE_FILES = (
+    "measurement_trust.py", "admission.py", "importer.py", "reconciliation.py",
+)
 
 # Estimands and limits follow the RES-619 matrix, not menu labels.
 DETAILS = {
@@ -228,13 +235,13 @@ def execution_binding(identity: str, metric: dict, parameters: dict, snapshot: d
                       revision: str | None, subjects: list[str], excluded: list[str]) -> dict:
     """Capture contract and implementation bytes, including uncommitted source changes."""
     root = Path(__file__).resolve().parent
-    sources = [root / name for name in ("method_catalogue.py", "analysis.py", "realanalysis.py", "researchanalysis.py", "longitudinal.py", "researchstore.py", "experiments.py", "randomized_onset.py")]
+    sources = EXECUTION_SOURCE_FILES
     if identity == "METH-U-MEASUREMENT-TRUST":
-        sources.extend(root / name for name in ("measurement_trust.py", "admission.py", "importer.py", "reconciliation.py"))
+        sources += MEASUREMENT_TRUST_SOURCE_FILES
     digest = hashlib.sha256()
-    for path in sources:
-        digest.update(path.name.encode())
-        digest.update(path.read_bytes())
+    for name in sources:
+        digest.update(name.encode())
+        digest.update((root / name).read_bytes())
     try:
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, timeout=3, check=True).stdout.strip()
     except (OSError, subprocess.SubprocessError):

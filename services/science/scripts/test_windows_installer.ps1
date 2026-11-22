@@ -161,7 +161,10 @@ request = {"data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"], "study_id": stud
 run = s.execute_analysis_run(study["id"], payload)
 base = Path(os.environ["DYNAMISSCIENCE_DATA_ROOT"]) / "tmp"
 (base / "packaged-worker-request.json").write_text(json.dumps(request), encoding="utf-8")
-(base / "packaged-worker-expected.json").write_text(json.dumps({"result_digest": run["result_digest"]}), encoding="utf-8")
+(base / "packaged-worker-expected.json").write_text(json.dumps({
+    "result_digest": run["result_digest"],
+    "implementation_sha256": run["execution"]["method_binding"]["source_revision"]["implementation_sha256"],
+}), encoding="utf-8")
 (base / "figure-worker-request.json").write_text(json.dumps({"operation": "figure_export", "data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"], "output_dir": str(base / "packaged-figures"), "run": run}, default=str), encoding="utf-8")
 (base / "qualification-worker-request.json").write_text(json.dumps({"operation": "real_qualification", "data_root": os.environ["DYNAMISSCIENCE_DATA_ROOT"]}), encoding="utf-8")
 
@@ -249,17 +252,25 @@ for activity, prefix in {"Walking": "walk", "Running": "run", "Heel drop": "heel
         -ArgumentList @("--worker", $workerRequestPath, $workerResponsePath) `
         -PassThru -Wait -WindowStyle Hidden
     $workerClock.Stop()
-    if ($workerProcess.ExitCode -ne 0) { throw "The packaged scientific worker failed ($($workerProcess.ExitCode))." }
-    $workerResult = Get-Content -LiteralPath $workerResponsePath -Raw | ConvertFrom-Json
+    $workerResult = if (Test-Path -LiteralPath $workerResponsePath) {
+        Get-Content -LiteralPath $workerResponsePath -Raw | ConvertFrom-Json
+    }
+    if ($workerProcess.ExitCode -ne 0) {
+        throw "The packaged scientific worker failed ($($workerProcess.ExitCode)). $($workerResult.type) $($workerResult.message)"
+    }
     $workerExpected = Get-Content -LiteralPath $workerExpectedPath -Raw | ConvertFrom-Json
     if ($workerResult.status -ne "COMPLETED" -or $workerResult.result_digest -ne $workerExpected.result_digest) {
         throw "The packaged scientific worker did not reproduce the direct analysis result."
+    }
+    if ($workerResult.execution.method_binding.source_revision.implementation_sha256 -ne $workerExpected.implementation_sha256) {
+        throw "The packaged scientific worker did not bind the same scientific implementation as the source run."
     }
     $benchmarks.scientific_worker = @{
         method_id = $workerResult.method_id
         status = $workerResult.status
         result_digest = $workerResult.result_digest
         result_digest_matches_direct = $true
+        implementation_sha256 = $workerExpected.implementation_sha256
         elapsed_ms = [Math]::Round($workerClock.Elapsed.TotalMilliseconds, 2)
     }
 
