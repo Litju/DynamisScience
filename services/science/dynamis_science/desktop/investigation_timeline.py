@@ -156,8 +156,8 @@ class InvestigationChart(pg.PlotWidget):
             if visible:
                 right_by_lane[lane] = right + 8
 
-    def _point_tip(self, _x, _y, index):
-        row = self.rows[index]
+    def _point_tip(self, *, x, y, data):
+        row = self.rows[data]
         text = f"{LANES[row['kind']][0]} · {row['subject_id']} · {readable(row['status'])}"
         visit = row.get("visit") or {}
         if row.get("observed_period"):
