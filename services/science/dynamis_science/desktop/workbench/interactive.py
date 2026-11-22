@@ -344,6 +344,19 @@ def _view_class(gl):
             self.opts["distance"] = min(max(self.opts["distance"], DISTANCE / ZOOM[1]), DISTANCE / ZOOM[0])
             self.update()
 
+        def keyPressEvent(self, event):
+            movements = {
+                Qt.Key.Key_Left: (-8, 0), Qt.Key.Key_Right: (8, 0),
+                Qt.Key.Key_Up: (0, 8), Qt.Key.Key_Down: (0, -8),
+            }
+            key = event.key()
+            if key in movements:
+                self.orbit(*movements[key])
+                self.update()
+                event.accept()
+            else:
+                super().keyPressEvent(event)
+
     return ClampedView
 
 
@@ -433,6 +446,8 @@ class Trajectory3D(QWidget):
         else:
             self.view.setMinimumHeight(360)
             self.view.setAccessibleName("3D trajectories view")
+            self.view.setAccessibleDescription("Arrow keys rotate. Tab moves between the view and camera controls.")
+            self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
             layout.addWidget(self.view, 1)
             self.set_view("3D", animate=False)
         self.hint = _label("Drag to rotate · scroll to zoom · Front / Side / 3D presets", "BlockNote")
