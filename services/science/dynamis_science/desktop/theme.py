@@ -235,6 +235,7 @@ QWidget#StudyHome { background: $desk; }
 QFrame#WorkspaceIdentity { background: $window; border: 1px solid $line2; border-top: 2px solid $accent;
     border-radius: 10px; }
 QFrame#WorkspaceTool { background: $window; border: 1px solid $line2; border-radius: 8px; }
+QWidget#DropZone { border: 2px dashed $line2; border-radius: 8px; padding: 10px; }
 QLabel#StudyHeading, QLabel#InvestigationFinding { font-weight: 700; color: $text; }
 QLabel#StudyHeading { font-size: 32px; }
 QLabel#StudySummary { color: $dim_text; }
