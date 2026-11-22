@@ -1240,9 +1240,15 @@ def test_native_performance_os_workspaces_load_without_errors(qtbot, tmp_path, m
     qtbot.waitUntil(lambda: not window.runner.active)
     assert window.frameGeometry().width() <= max(window.screen().availableGeometry().width(), 800)
     assert {key: button.accessibleName() for key, button in window.performance_rail.buttons.items()} == {
-        "today": "Today", "plan": "Plan", "monitor": "Monitor", "test": "Test",
-        "research": "Research", "report": "Reports",
+        "today": "Today", "athlete": "Athlete 360", "plan": "Plan", "monitor": "Monitor",
+        "test": "Test", "match": "Match & Pose", "research": "Research", "report": "Reports",
     }
+    window.performance_rail.buttons["match"].click()
+    assert window.performance.current_page == "match"
+    assert window.performance_rail.buttons["match"].isChecked()
+    assert not window.performance_rail.buttons["monitor"].isChecked()
+    window.performance_rail.buttons["today"].click()
+    qtbot.waitUntil(lambda: not window.runner.active)
     assert window.performance.context_panel.injury.wordWrap()
     assert window.performance.context_panel.movement.wordWrap()
     window.performance._open_selected_athlete()

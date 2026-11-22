@@ -26,9 +26,10 @@ from pathlib import Path
 from typing import Any
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
@@ -242,6 +243,7 @@ class ResultsDocument(QScrollArea):
         self.trajectory_mode = "2D"
         self.selected_athlete = ""
         self.trajectory_plot = self.trajectory_3d = None
+        self.trajectory_athletes = self.trajectory_points = self.trajectory_readout = None
         self._build: Callable[[], list[ResultBlock]] | None = None  # descriptive blocks, rebuilt on theme change
         self.run_spec_hash: str | None = None
         self.stale = False
@@ -285,6 +287,7 @@ class ResultsDocument(QScrollArea):
         self.blocks = []
         self.run = self.spec = self.observed = self.explore = None
         self.trajectory_plot = self.trajectory_3d = None
+        self.trajectory_athletes = self.trajectory_points = self.trajectory_readout = None
         self._build = None
         self.run_spec_hash = None
         self.state = {"kind": "unavailable", "label": "", "promotable": False, "reason": ""}
@@ -362,6 +365,10 @@ class ResultsDocument(QScrollArea):
         for view in (self.trajectory_plot, self.trajectory_3d):
             if view is not None and view.selected != (subject_id or None):
                 view.select_athlete(subject_id or None)
+        if self.trajectory_athletes is not None:
+            with QSignalBlocker(self.trajectory_athletes):
+                self.trajectory_athletes.setCurrentIndex(max(0, self.trajectory_athletes.findData(self.selected_athlete)))
+            self._trajectory_observations()
 
     def set_trajectory_mode(self, mode: str) -> None:
         """``2D`` (pyqtgraph) or ``3D`` (pyqtgraph.opengl, created on first use)."""
@@ -603,13 +610,31 @@ class ResultsDocument(QScrollArea):
             row.addWidget(button)
         bar = QHBoxLayout()
         bar.addWidget(switch)
-        bar.addStretch(1)
+        self.trajectory_athletes = QComboBox()
+        self.trajectory_athletes.setAccessibleName("Highlight an athlete in both trajectory views")
+        self.trajectory_athletes.addItem("All athletes", "")
+        bar.addWidget(self.trajectory_athletes, 1)
         block.body.addLayout(bar)
+
+        observation = QHBoxLayout()
+        self.trajectory_points = QComboBox()
+        self.trajectory_points.setAccessibleName("Recorded athlete occasion")
+        self.trajectory_points.currentIndexChanged.connect(self._trajectory_point_changed)
+        observation.addWidget(self.trajectory_points)
+        self.trajectory_readout = _label("", "BlockNote")
+        self.trajectory_readout.setAccessibleName("Selected trajectory observation")
+        self.trajectory_readout.setWordWrap(True)
+        observation.addWidget(self.trajectory_readout, 1)
+        block.body.addLayout(observation)
         block.trajectory_stack = QStackedWidget()
         block.trajectory_stack.setMinimumHeight(440)
         self.trajectory_plot = TrajectoryPlot()
         self.trajectory_plot.set_data(self.explore, run)
-        self.trajectory_plot.select_athlete(self.selected_athlete or None)
+        for athlete in self.trajectory_plot.data["athletes"]:
+            self.trajectory_athletes.addItem(athlete["label"], athlete["id"])
+        self.trajectory_athletes.currentIndexChanged.connect(
+            lambda: self._trajectory_selected(self.trajectory_athletes.currentData() or ""))
+        self.select_athlete(self.selected_athlete)
         self.trajectory_plot.athlete_selected.connect(self._trajectory_selected)
         block.trajectory_stack.addWidget(self.trajectory_plot)
         block.body.addWidget(block.trajectory_stack)
@@ -623,6 +648,23 @@ class ResultsDocument(QScrollArea):
     def _trajectory_selected(self, subject_id: str) -> None:
         self.select_athlete(subject_id)
         self.athlete_selected.emit(subject_id)
+
+    def _trajectory_observations(self) -> None:
+        subject = self.trajectory_athletes.currentData()
+        previous = self.trajectory_points.currentData()
+        with QSignalBlocker(self.trajectory_points):
+            self.trajectory_points.clear()
+            if subject:
+                for index, label in enumerate(self.trajectory_plot.data["labels"]):
+                    self.trajectory_points.addItem(label, (subject, index))
+                self.trajectory_points.setCurrentIndex(max(0, self.trajectory_points.findData(previous)))
+        self.trajectory_points.setEnabled(bool(subject))
+        self._trajectory_point_changed()
+
+    def _trajectory_point_changed(self) -> None:
+        point = self.trajectory_points.currentData()
+        self.trajectory_readout.setText(
+            self.trajectory_plot.describe_point(*point) if point else "Choose an athlete to inspect observed values.")
 
     def _reliability(self, run: dict[str, Any]) -> None:
         t = theme.tokens()

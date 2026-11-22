@@ -355,28 +355,23 @@ QLabel#PaletteHint { color: $dim_text; font-family: "$mono"; font-size: 11px; pa
 /* ---- Performance OS, restyled onto the same tokens ---- */
 QToolBar#PerformanceToolbar { background: $chrome; border-bottom: 1px solid $line; min-height: 48px; max-height: 48px; padding: 0; }
 QWidget#PerformanceHeader { background: $chrome; }
-QToolButton#PerformanceBrandMark { min-width: 23px; max-width: 23px; min-height: 23px; max-height: 23px; padding: 0;
-    border: 1px solid $accent_edge; border-radius: 4px; color: $accent_text; background: $accent_chip; font-family: "$mono"; font-size: 11px; }
-QLabel#PerformanceBrandName { color: $text; font-size: 11px; font-weight: 600; }
-QLabel#PerformanceBrandDescriptor, QLabel#PerformanceRoleLabel { color: $dim_text; font-family: "$mono"; font-size: 7px; letter-spacing: 1px; }
-QLabel#PerformanceClub { color: $text; font-size: 9px; font-weight: 600; }
-QLabel#PerformanceMuted, QLabel#PerformanceRole { color: $dim_text; font-size: 9px; }
-QLabel#PerformanceSeason { color: $accent_text; border: 1px solid $accent_edge; border-radius: 4px; padding: 3px 7px; font-family: "$mono"; font-size: 8px; }
+QToolButton#PerformanceMenu { padding: 4px 8px; border: 1px solid $line2; border-radius: 6px; background: $base; }
+QToolButton#PerformanceMenu:focus { border-color: $accent; }
+QLabel#PerformanceClub { color: $text; font-size: 12px; font-weight: 700; }
+QLabel#PerformanceMuted { color: $dim_text; font-size: 11px; }
+QLabel#PerformanceSeason { color: $accent_text; border: 1px solid $accent_edge; border-radius: 4px; padding: 3px 7px; font-family: "$mono"; font-size: 10px; }
 QLineEdit#PerformanceSearch { min-height: 23px; padding: 2px 8px; }
-QLabel#PerformanceAvatar { min-width: 25px; max-width: 25px; min-height: 25px; max-height: 25px; qproperty-alignment: AlignCenter;
-    border: 1px solid $line2; border-radius: 12px; background: $hover; color: $muted; font-family: "$mono"; font-size: 8px; }
 QWidget#PerformanceRail { background: $dock; border-right: 1px solid $line; }
 QLabel#PerformanceCrest { min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; qproperty-alignment: AlignCenter;
     border: 1px solid $line2; border-radius: 6px; background: $base; color: $accent_text; font-family: "$mono"; font-size: 9px; }
-QLabel#PerformanceRailClub { color: $text; font-size: 9px; font-weight: 600; }
-QLabel#PerformanceRailMeta, QLabel#PerformanceRailNote { color: $dim_text; font-size: 8px; }
-QLabel#PerformanceRailGroup { color: $dim_text; font-family: "$mono"; font-size: 7px; letter-spacing: 1px; padding: 3px 6px; }
+QLabel#PerformanceRailClub { color: $text; font-size: 12px; font-weight: 700; }
+QLabel#PerformanceRailMeta, QLabel#PerformanceRailNote { color: $dim_text; font-size: 10px; }
+QLabel#PerformanceRailGroup { color: $dim_text; font-family: "$mono"; font-size: 10px; letter-spacing: 1px; padding: 3px 6px; }
 QPushButton#PerformanceRailItem { text-align: left; padding: 4px 6px; min-height: 22px; border: 0; border-radius: 6px;
     border-left: 2px solid transparent; background: transparent; color: $muted; }
 QPushButton#PerformanceRailItem:hover { background: $hover; color: $text; }
+QPushButton#PerformanceRailItem:focus { border: 1px solid $accent; }
 QPushButton#PerformanceRailItem:checked { background: $accent_tint; border-left-color: $accent; color: $text; }
-QLabel#PerformanceRailItemName { font-size: 9px; }
-QLabel#PerformanceRailTag { color: $dim_text; font-family: "$mono"; font-size: 7px; }
 QFrame#PerformanceSquadFooter { border-top: 1px solid $line; background: transparent; }
 QLabel#PerformanceAvailability { color: $accent_text; font-family: "$mono"; font-size: 17px; }
 QFrame#PerformanceAvailabilitySegment { background: $accent; border: 0; }
